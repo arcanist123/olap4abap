@@ -70,6 +70,16 @@ cmd_pull() {
     [ -e "$include" ] || continue
     grep -Eqv '^[[:space:]]*(\*.*|".*)?[[:space:]]*$' "$include" || rm "$include"
   done
+  # sapcli writes a source without its last newline; editors and the other scripts write it, so every source gets
+  # one, with the line ending of the file's other lines (CRLF on Windows), and a pull does not change files whose
+  # code did not
+  local source
+  for source in "$tmp/pkg/$SRC_DIR"/*.abap; do
+    [ -s "$source" ] || continue
+    [ "$(tail -c1 "$source" | od -An -c | tr -d ' ')" = '\n' ] && continue
+    # (tr, not grep: Git Bash's grep drops the CRs)
+    if [ "$(tr -cd '\r' <"$source" | head -c1 | wc -c)" -gt 0 ]; then printf '\r\n' >>"$source"; else printf '\n' >>"$source"; fi
+  done
   rm -rf "$ROOT/$SRC_DIR"
   cp "$tmp/pkg/.abapgit.xml" "$ROOT/.abapgit.xml"
   cp -r "$tmp/pkg/$SRC_DIR" "$ROOT/$SRC_DIR"
