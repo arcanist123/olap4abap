@@ -18,9 +18,13 @@ CLASS zzxxmla1_cl_xmla_mddataset DEFINITION
 
   PUBLIC SECTION.
     "! @parameter with_schema | true for Content SchemaData (the default), false for Data
+    "! @parameter excel | true if the client is Excel: an Integer cell is xsd:int, as the reference's release writes it
+    "!   (Excel drops the filter of Keep Only Selected Items after an xsd:integer child count of its item path query);
+    "!   for other clients xsd:integer, as the reference writes it since it was changed for Power BI
     CLASS-METHODS build
       IMPORTING result        TYPE zzxxmla1_cl_mdx_engine=>ty_result
                 with_schema   TYPE abap_bool
+                excel         TYPE abap_bool DEFAULT abap_false
       RETURNING VALUE(xml)    TYPE string.
 
   PRIVATE SECTION.
@@ -55,6 +59,7 @@ CLASS zzxxmla1_cl_xmla_mddataset DEFINITION
     CLASS-METHODS cell_xml
       IMPORTING cell          TYPE zzxxmla1_cl_mdx_engine=>ty_cell
                 properties    TYPE string_table
+                excel         TYPE abap_bool
       RETURNING VALUE(result) TYPE string.
     CLASS-METHODS axis_info
       IMPORTING name             TYPE string
@@ -102,7 +107,7 @@ CLASS zzxxmla1_cl_xmla_mddataset IMPLEMENTATION.
 
     DATA(cells) = VALUE string( ).
     LOOP AT result-cells INTO DATA(cell).
-      cells = cells && cell_xml( cell = cell properties = result-cell_properties ).
+      cells = cells && cell_xml( cell = cell properties = result-cell_properties excel = excel ).
     ENDLOOP.
     DATA(cell_info) = VALUE string( ).
     LOOP AT result-cell_properties INTO DATA(cell_property_name).
@@ -298,7 +303,9 @@ CLASS zzxxmla1_cl_xmla_mddataset IMPLEMENTATION.
       CASE property.
         WHEN `VALUE`.
           IF cell-empty = abap_false.
-            elements = elements && |          <Value xsi:type="{ cell-value_type }">{ text( cell-value ) }</Value>| && nl.
+            DATA(value_type) = COND string( WHEN excel = abap_true AND cell-value_type = `xsd:integer` THEN `xsd:int`
+                                            ELSE cell-value_type ).
+            elements = elements && |          <Value xsi:type="{ value_type }">{ text( cell-value ) }</Value>| && nl.
             any = abap_true.
           ENDIF.
         WHEN `FORMATTED_VALUE`.

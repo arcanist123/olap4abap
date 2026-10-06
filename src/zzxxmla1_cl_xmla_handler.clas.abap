@@ -351,9 +351,11 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
       DATA(query) = statement-query.
       DATA(engine) = NEW zzxxmla1_cl_mdx_engine( default_catalog( request ) ).
       DATA(content) = VALUE string( request-properties[ name = 'Content' ]-value OPTIONAL ).
+      DATA(application) = VALUE string( request-properties[ name = 'SspropInitAppName' ]-value OPTIONAL ).
       result = zzxxmla1_cl_xmla_mddataset=>build(
         result      = engine->execute( query )
-        with_schema = xsdbool( content IS INITIAL OR content = `SchemaData` OR content = `Schema` ) ).
+        with_schema = xsdbool( content IS INITIAL OR content = `SchemaData` OR content = `Schema` )
+        excel       = xsdbool( application = `Excel` ) ).
       RETURN.
     ENDIF.
 

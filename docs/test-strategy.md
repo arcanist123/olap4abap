@@ -57,6 +57,15 @@ pointed at SAP. What Excel (MSOLAP 17) does: it offers binary XML and compressio
 Execute without statement and `BeginSession`, sends `Session SessionId=...` with every request and ends with
 `EndSession`; it sends no `Content`, so every Discover answer needs the rowset's `xsd:schema` (Content SchemaData).
 
+Keep Only Selected Items (right-click a pivot item, Filter): Excel first sends its item path query (`with member
+measures.__XlItemPath as Generate(Ascendants(...))`, `__XlSiblingCount`, `__XlChildCount`) and only then the filtered
+query, a subselect `FROM (SELECT ({member}) ON COLUMNS FROM [cube])`. It sends that only if the integer child count is
+typed `xsd:int`; after an `xsd:integer` it silently does nothing. The reference fork writes every Integer cell as
+`xsd:integer` (`XmlaHandler`, "fix for Power BI - does not support xsd:int"), so the filter fails on it; its release
+(container `emondrian-release`) writes `xsd:int`, and also reports the provider as SSAS 2008 R2 (`ProviderVersion`
+10.50), so Excel filters there with `VisualTotals` sets instead of subselects. olap4abap writes `xsd:int` when the
+request's `SspropInitAppName` is `Excel` and `xsd:integer` otherwise (`ZZXXMLA1_CL_XMLA_MDDATASET=>build`).
+
 Sessions keep no state on SAP (decision and when to revisit it: `docs/mvp-scope.md`, session decision); Mondrian
 faults for a session id it does not know, SAP does not (cases `session_*`).
 
