@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<!--
+  The data sources of olap4abap: its /WEB-INF/datasources.xml, read as the reference server reads its datasources.xml
+  (ZZXXMLA1_CL_REPOSITORY). Same layout and the same catalog as the reference container's reference/schema/datasources.xml;
+  only what is about the connection differs: the server reads every catalog from its own database, so DataSourceInfo
+  has no Jdbc, and an empty URL makes DISCOVER_DATASOURCES give the URL the request came in on.
+
+  Add a catalog: write its schema file among the server's files and add a <Catalog> whose Definition is its path, e.g.
+    python scripts/sap-files.py put my/Schema.xml /WEB-INF/schema/Schema.xml
+    python scripts/sap-files.py put reference/schema/datasources-sap.xml /WEB-INF/datasources.xml
+  (scripts/sap-files.py deploy writes this file and FoodmartBW.xml).
+-->
+<DataSources>
+  <DataSource>
+    <DataSourceName>ABAP BW</DataSourceName>
+    <DataSourceDescription>SAP BW data served by olap4abap</DataSourceDescription>
+    <URL></URL>
+    <DataSourceInfo>Provider=olap4abap</DataSourceInfo>
+    <ProviderName>olap4abap</ProviderName>
+    <ProviderType>MDP</ProviderType>
+    <AuthenticationMode>Unauthenticated</AuthenticationMode>
+    <Catalogs>
+        <Catalog name="ZFOODMART">
+            <Definition>/WEB-INF/schema/FoodmartBW.xml</Definition>
+        </Catalog>
+    </Catalogs>
+  </DataSource>
+</DataSources>

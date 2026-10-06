@@ -1,0 +1,11 @@
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<SOAP-ENV:Body>
+<Execute xmlns="urn:schemas-microsoft-com:xml-analysis" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<Command><Statement>with 
+  member [Measures].[DateName] as 
+    'Generate({[Time].[1997].[Q1], [Time].[1997].[Q2]}, [Time].[Time].CurrentMember.Name) '
+select {[Measures].[DateName]} on columns,
+ {[Time].[1997].[Q1], [Time].[1997].[Q2]} on rows
+from [ZFMSALES]</Statement></Command>
+<Properties><PropertyList><DataSourceInfo>ABAP BW</DataSourceInfo><Catalog>ZFOODMART</Catalog><Format>Multidimensional</Format><AxisFormat>TupleFormat</AxisFormat><Content>SchemaData</Content></PropertyList></Properties>
+</Execute></SOAP-ENV:Body></SOAP-ENV:Envelope>

@@ -1,0 +1,142 @@
+diff --git a/mondrian/src/main/java/mondrian/rolap/RolapNativeCrossJoin.java b/mondrian/src/main/java/mondrian/rolap/RolapNativeCrossJoin.java
+index 45dffaf3e..b27c2db3f 100644
+--- a/mondrian/src/main/java/mondrian/rolap/RolapNativeCrossJoin.java
++++ b/mondrian/src/main/java/mondrian/rolap/RolapNativeCrossJoin.java
+@@ -369,10 +369,15 @@ public class RolapNativeCrossJoin extends RolapNativeSet {
+ 
+         List<List<CrossJoinArg>> operandStates =
+             new ArrayList<List<CrossJoinArg>>();
++        // per operand the position of each member in its evaluated list, null for an operand
++        // that was not evaluated (its members come from one level); the order of the result
++        final List<Map<Member, Integer>> operandOrders =
++            new ArrayList<Map<Member, Integer>>();
+         long variantCount = 1;
+         boolean anySplit = false;
+         for (Exp operand : operands) {
+-            List<CrossJoinArg> states = resolveOperandStates(evaluator, operand);
++            List<CrossJoinArg> states =
++                resolveOperandStates(evaluator, operand, operandOrders);
+             if (states == null || states.isEmpty()) {
+                 LOGGER.debug(
+                     "multi-variant crossjoin: bail, operand unresolvable: "
+@@ -427,7 +432,7 @@ public class RolapNativeCrossJoin extends RolapNativeSet {
+             "using native crossjoin (multi-variant expansion, "
+             + variants.size() + " variant(s))");
+ 
+-        return new MultiVariantSetEvaluator(evaluator, fun, variants);
++        return new MultiVariantSetEvaluator(evaluator, fun, variants, operandOrders);
+     }
+ 
+     /**
+@@ -468,13 +473,15 @@ public class RolapNativeCrossJoin extends RolapNativeSet {
+      */
+     private List<CrossJoinArg> resolveOperandStates(
+         RolapEvaluator evaluator,
+-        Exp operand)
++        Exp operand,
++        List<Map<Member, Integer>> operandOrders)
+     {
+         List<CrossJoinArg[]> direct =
+             crossJoinArgFactory().checkCrossJoinArg(evaluator, operand);
+         if (direct != null && direct.size() == 1 && direct.get(0) != null
+             && direct.get(0).length == 1)
+         {
++            operandOrders.add(null);
+             return Collections.singletonList(direct.get(0)[0]);
+         }
+ 
+@@ -503,6 +510,14 @@ public class RolapNativeCrossJoin extends RolapNativeSet {
+             }
+             Util.checkCJResultLimit(tupleList.size());
+ 
++            final Map<Member, Integer> order = new HashMap<Member, Integer>();
++            for (Member m : tupleList.slice(0)) {
++                if (!order.containsKey(m)) {
++                    order.put(m, order.size());
++                }
++            }
++            operandOrders.add(order);
++
+             final LinkedHashMap<RolapLevel, List<RolapMember>> byLevel =
+                 new LinkedHashMap<RolapLevel, List<RolapMember>>();
+             for (Member m : tupleList.slice(0)) {
+@@ -659,15 +674,18 @@ public class RolapNativeCrossJoin extends RolapNativeSet {
+         private final RolapEvaluator evaluator;
+         private final FunDef fun;
+         private final List<CrossJoinArg[]> variants;
++        private final List<Map<Member, Integer>> operandOrders;
+ 
+         MultiVariantSetEvaluator(
+             RolapEvaluator evaluator,
+             FunDef fun,
+-            List<CrossJoinArg[]> variants)
++            List<CrossJoinArg[]> variants,
++            List<Map<Member, Integer>> operandOrders)
+         {
+             this.evaluator = evaluator;
+             this.fun = fun;
+             this.variants = variants;
++            this.operandOrders = operandOrders;
+         }
+ 
+         public Object execute(ResultStyle desiredResultStyle) {
+@@ -676,7 +694,58 @@ public class RolapNativeCrossJoin extends RolapNativeSet {
+             for (CrossJoinArg[] variant : variants) {
+                 executeOneVariant(variant, result);
+             }
+-            return result;
++            return inOperandOrder(result);
++        }
++
++        /**
++         * The tuples in the order the interpreted crossjoin gives them: by the first member's
++         * position in its operand, then the second's, and so on. Each variant is in that order
++         * already, but the variants follow one another (by level), so a split operand such as
++         * Hierarchize(DrilldownMember(...)) would lose its order: the children of a drilled
++         * member would come after all members of the level above. An operand that was not
++         * evaluated has the members of one level, in hierarchical order.
++         */
++        private TupleList inOperandOrder(TupleList result) {
++            if (result.size() < 2) {
++                return result;
++            }
++            final List<List<Member>> tuples = new ArrayList<List<Member>>(result.size());
++            for (List<Member> tuple : result) {
++                tuples.add(new ArrayList<Member>(tuple));
++            }
++            // a stable sort: tuples that compare equal keep their native order
++            Collections.sort(tuples, new Comparator<List<Member>>() {
++                public int compare(List<Member> a, List<Member> b) {
++                    for (int k = 0; k < a.size(); k++) {
++                        final int c = compareInOperand(k, a.get(k), b.get(k));
++                        if (c != 0) {
++                            return c;
++                        }
++                    }
++                    return 0;
++                }
++            });
++            final TupleList sorted = TupleCollections.createList(result.getArity());
++            for (List<Member> tuple : tuples) {
++                sorted.add(tuple);
++            }
++            return sorted;
++        }
++
++        private int compareInOperand(int k, Member a, Member b) {
++            if (a.equals(b)) {
++                return 0;
++            }
++            final Map<Member, Integer> order =
++                k < operandOrders.size() ? operandOrders.get(k) : null;
++            if (order != null) {
++                final Integer ia = order.get(a);
++                final Integer ib = order.get(b);
++                if (ia != null && ib != null) {
++                    return ia.compareTo(ib);
++                }
++            }
++            return FunUtil.compareHierarchically(a, b, false);
+         }
+ 
+         private void executeOneVariant(CrossJoinArg[] variant, TupleList result) {

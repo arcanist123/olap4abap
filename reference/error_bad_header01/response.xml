@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<SOAP-ENV:Fault>
+  <faultcode>SOAP-ENV:MustUnderstand.00HSHA01</faultcode>
+  <faultstring>SOAP Header must understand element not recognized Invalid XML/A message: Unknown &#34;mustUnderstand&#34; XMLA Header element &#34;Foo&#34;</faultstring>
+  <faultactor>Mondrian</faultactor>
+  <detail>
+    <Error ErrorCode="3238658121" Description="The Mondrian XML: Invalid XML/A message: Unknown &#34;mustUnderstand&#34; XMLA Header element &#34;Foo&#34;"/>
+  </detail>
+</SOAP-ENV:Fault>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

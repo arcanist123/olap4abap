@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<DiscoverResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <DIMENSION_UNIQUE_NAME>[Customers]</DIMENSION_UNIQUE_NAME>
+        <HIERARCHY_UNIQUE_NAME>[Customers.Gender]</HIERARCHY_UNIQUE_NAME>
+        <LEVEL_UNIQUE_NAME>[Customers.Gender].[(All)]</LEVEL_UNIQUE_NAME>
+        <LEVEL_NUMBER>0</LEVEL_NUMBER>
+        <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+        <MEMBER_NAME>All Customers.Genders</MEMBER_NAME>
+        <MEMBER_UNIQUE_NAME>[Customers.Gender].[All Customers.Genders]</MEMBER_UNIQUE_NAME>
+        <MEMBER_TYPE>2</MEMBER_TYPE>
+        <MEMBER_CAPTION>All Customers.Genders</MEMBER_CAPTION>
+        <CHILDREN_CARDINALITY>3</CHILDREN_CARDINALITY>
+        <PARENT_LEVEL>0</PARENT_LEVEL>
+        <PARENT_COUNT>0</PARENT_COUNT>
+        <DEPTH>0</DEPTH>
+      </row>
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <DIMENSION_UNIQUE_NAME>[Customers]</DIMENSION_UNIQUE_NAME>
+        <HIERARCHY_UNIQUE_NAME>[Customers.Gender]</HIERARCHY_UNIQUE_NAME>
+        <LEVEL_UNIQUE_NAME>[Customers.Gender].[Gender]</LEVEL_UNIQUE_NAME>
+        <LEVEL_NUMBER>1</LEVEL_NUMBER>
+        <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+        <MEMBER_NAME/>
+        <MEMBER_UNIQUE_NAME>[Customers.Gender].[]</MEMBER_UNIQUE_NAME>
+        <MEMBER_TYPE>1</MEMBER_TYPE>
+        <MEMBER_CAPTION/>
+        <CHILDREN_CARDINALITY>0</CHILDREN_CARDINALITY>
+        <PARENT_LEVEL>0</PARENT_LEVEL>
+        <PARENT_UNIQUE_NAME>[Customers.Gender].[All Customers.Genders]</PARENT_UNIQUE_NAME>
+        <PARENT_COUNT>1</PARENT_COUNT>
+        <DEPTH>1</DEPTH>
+      </row>
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <DIMENSION_UNIQUE_NAME>[Customers]</DIMENSION_UNIQUE_NAME>
+        <HIERARCHY_UNIQUE_NAME>[Customers.Gender]</HIERARCHY_UNIQUE_NAME>
+        <LEVEL_UNIQUE_NAME>[Customers.Gender].[Gender]</LEVEL_UNIQUE_NAME>
+        <LEVEL_NUMBER>1</LEVEL_NUMBER>
+        <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+        <MEMBER_NAME>F</MEMBER_NAME>
+        <MEMBER_UNIQUE_NAME>[Customers.Gender].[F]</MEMBER_UNIQUE_NAME>
+        <MEMBER_TYPE>1</MEMBER_TYPE>
+        <MEMBER_CAPTION>F</MEMBER_CAPTION>
+        <CHILDREN_CARDINALITY>0</CHILDREN_CARDINALITY>
+        <PARENT_LEVEL>0</PARENT_LEVEL>
+        <PARENT_UNIQUE_NAME>[Customers.Gender].[All Customers.Genders]</PARENT_UNIQUE_NAME>
+        <PARENT_COUNT>1</PARENT_COUNT>
+        <DEPTH>1</DEPTH>
+      </row>
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <DIMENSION_UNIQUE_NAME>[Customers]</DIMENSION_UNIQUE_NAME>
+        <HIERARCHY_UNIQUE_NAME>[Customers.Gender]</HIERARCHY_UNIQUE_NAME>
+        <LEVEL_UNIQUE_NAME>[Customers.Gender].[Gender]</LEVEL_UNIQUE_NAME>
+        <LEVEL_NUMBER>1</LEVEL_NUMBER>
+        <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+        <MEMBER_NAME>M</MEMBER_NAME>
+        <MEMBER_UNIQUE_NAME>[Customers.Gender].[M]</MEMBER_UNIQUE_NAME>
+        <MEMBER_TYPE>1</MEMBER_TYPE>
+        <MEMBER_CAPTION>M</MEMBER_CAPTION>
+        <CHILDREN_CARDINALITY>0</CHILDREN_CARDINALITY>
+        <PARENT_LEVEL>0</PARENT_LEVEL>
+        <PARENT_UNIQUE_NAME>[Customers.Gender].[All Customers.Genders]</PARENT_UNIQUE_NAME>
+        <PARENT_COUNT>1</PARENT_COUNT>
+        <DEPTH>1</DEPTH>
+      </row>
+    </root>
+  </return>
+</DiscoverResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

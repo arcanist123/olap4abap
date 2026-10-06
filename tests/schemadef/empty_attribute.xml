@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<!-- An empty attribute is no attribute (W3CDOMWrapper.getAttribute): name="" leaves the hierarchy unnamed, and a
+     Boolean is true only for "true" in any case. -->
+<Schema name="Empty" description="">
+  <Dimension name="Store" caption="">
+    <Hierarchy name="" hasAll="TRUE" visible="yes" primaryKey="id" primaryKeyTable="">
+      <Table name="store" schema=""/>
+      <Level name="Country" column="country" uniqueMembers="True"/>
+    </Hierarchy>
+  </Dimension>
+</Schema>

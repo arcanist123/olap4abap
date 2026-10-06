@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<SOAP-ENV:Fault>
+  <faultcode>SOAP-ENV:00UE001.Internal Error</faultcode>
+  <faultstring>SqlException: The emondrian DAX module was not found. Or a proper license was not found. Details: emondrian/dax/CsdlSchemaGenerator</faultstring>
+  <faultactor>Mondrian</faultactor>
+  <detail>
+    <Error ErrorCode="3238658121" Description="The Mondrian XML: The emondrian DAX module was not found. Or a proper license was not found. Details: emondrian/dax/CsdlSchemaGenerator"/>
+  </detail>
+</SOAP-ENV:Fault>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

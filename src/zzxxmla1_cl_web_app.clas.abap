@@ -1,0 +1,112 @@
+*----------------------------------------------------------------------------------------------------------------------*
+* olap4abap - XMLA server with an MDX engine for SAP BW               https://github.com/arcanist123/olap4abap
+* Copyright (c) 2026 the olap4abap authors
+*
+* This program and the accompanying materials are made available under the terms of the Eclipse Public License 2.0,
+* which is available at https://www.eclipse.org/legal/epl-2.0/
+* SPDX-License-Identifier: EPL-2.0
+*
+* olap4abap contains code derived from Mondrian (Eclipse Public License 1.0): Copyright (C) 1998-2005 Julian Hyde,
+* Copyright (C) 2005-2021 Hitachi Vantara and others, Copyright (C) 2021-2025 Sergei Semenkov. See the NOTICE file.
+*----------------------------------------------------------------------------------------------------------------------*
+"! The schema generator's app under /zzxxmla1/schema/ (docs/schema-generator.md, UI): files of the server
+"! (ZZXXMLA1_CL_FILES) below /schema/, uploaded from web/schema/ by scripts/sap-files.py app. Strings in, strings out,
+"! like ZZXXMLA1_CL_SCHEMA_API, so ZZXXMLA1_MAIN_ENDPOINT only moves them to HTTP.
+"! - /schema redirects to /schema/, so the app's relative URLs (app.js, api/...) resolve below the node;
+"! - a path ending in / serves its index.html;
+"! - the content type comes from the extension; only GET; nothing outside /schema/ (no /WEB-INF/) and no "..".
+CLASS zzxxmla1_cl_web_app DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC.
+
+  PUBLIC SECTION.
+    "! the app's path below the ICF node, also the folder of its files
+    CONSTANTS c_path TYPE string VALUE `/schema`.
+    TYPES:
+      BEGIN OF ty_result,
+        status       TYPE i,
+        content_type TYPE string,
+        body         TYPE string,
+        allow        TYPE string,  " for 405
+        location     TYPE string,  " for 301, relative to the request
+      END OF ty_result.
+
+    "! Whether a path below the ICF node is one of the app (the API's paths are not).
+    CLASS-METHODS is_app
+      IMPORTING !path         TYPE string
+      RETURNING VALUE(result) TYPE abap_bool.
+    "! Answers a request: the file, a redirect or an error (plain text).
+    METHODS handle
+      IMPORTING !method       TYPE string
+                !path         TYPE string
+                !query        TYPE string OPTIONAL
+      RETURNING VALUE(result) TYPE ty_result.
+
+  PROTECTED SECTION.
+  PRIVATE SECTION.
+    "! The server file of a path of the app; initial if the path may not be served.
+    CLASS-METHODS file_path
+      IMPORTING !path         TYPE string
+      RETURNING VALUE(result) TYPE string.
+    "! The content type of a file by its extension.
+    CLASS-METHODS content_type
+      IMPORTING !path         TYPE string
+      RETURNING VALUE(result) TYPE string.
+ENDCLASS.
+
+
+
+CLASS zzxxmla1_cl_web_app IMPLEMENTATION.
+
+  METHOD is_app.
+    result = xsdbool( zzxxmla1_cl_schema_api=>is_api( path ) = abap_false
+                      AND ( path = c_path OR ( strlen( path ) > strlen( c_path )
+                                               AND substring( val = path len = strlen( c_path ) + 1 ) = |{ c_path }/| ) ) ).
+  ENDMETHOD.
+
+  METHOD handle.
+    IF method <> `GET`.
+      result = VALUE #( status = 405 content_type = `text/plain; charset=utf-8` allow = `GET`
+                        body = |{ method } is not allowed on { path }| ).
+      RETURN.
+    ENDIF.
+    IF path = c_path.
+      " the last segment of the request's path is "schema", so "schema/" is the folder
+      result = VALUE #( status = 301 content_type = `text/plain; charset=utf-8` body = `Moved`
+                        location = |schema/{ COND string( WHEN query IS NOT INITIAL THEN |?{ query }| ) }| ).
+      RETURN.
+    ENDIF.
+    DATA(file) = COND zzxxmla1_cl_files=>ty_file( WHEN file_path( path ) IS NOT INITIAL
+                                                  THEN zzxxmla1_cl_files=>read( file_path( path ) ) ).
+    IF file-path IS INITIAL.
+      result = VALUE #( status = 404 content_type = `text/plain; charset=utf-8` body = |No file { path }| ).
+      RETURN.
+    ENDIF.
+    result = VALUE #( status = 200 content_type = content_type( file-path ) body = file-content ).
+  ENDMETHOD.
+
+  METHOD file_path.
+    IF is_app( path ) = abap_false OR path = c_path OR path CS `..` OR path CS `\`.
+      RETURN.
+    ENDIF.
+    result = path.
+    IF substring( val = result off = strlen( result ) - 1 ) = `/`.
+      result = |{ result }index.html|.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD content_type.
+    DATA(name) = to_lower( path ).
+    FIND REGEX `\.([a-z0-9]+)$` IN name SUBMATCHES DATA(extension).
+    result = SWITCH #( extension
+                       WHEN `html` OR `htm` THEN `text/html; charset=utf-8`
+                       WHEN `js` OR `mjs`   THEN `text/javascript; charset=utf-8`
+                       WHEN `css`           THEN `text/css; charset=utf-8`
+                       WHEN `json`          THEN `application/json; charset=utf-8`
+                       WHEN `svg`           THEN `image/svg+xml; charset=utf-8`
+                       WHEN `xml`           THEN `application/xml; charset=utf-8`
+                       ELSE                      `text/plain; charset=utf-8` ).
+  ENDMETHOD.
+
+ENDCLASS.

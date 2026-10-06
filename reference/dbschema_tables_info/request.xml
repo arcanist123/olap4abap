@@ -1,0 +1,7 @@
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<SOAP-ENV:Body>
+<Discover xmlns="urn:schemas-microsoft-com:xml-analysis" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<RequestType>DBSCHEMA_TABLES_INFO</RequestType>
+<Restrictions><RestrictionList></RestrictionList></Restrictions>
+<Properties><PropertyList><DataSourceInfo>ABAP BW</DataSourceInfo><Catalog>ZFOODMART</Catalog><Content>Data</Content></PropertyList></Properties>
+</Discover></SOAP-ENV:Body></SOAP-ENV:Envelope>

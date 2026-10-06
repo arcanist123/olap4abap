@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<DiscoverResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <DIMENSION_UNIQUE_NAME>[Promotions]</DIMENSION_UNIQUE_NAME>
+        <HIERARCHY_UNIQUE_NAME>[Promotions.Media Type]</HIERARCHY_UNIQUE_NAME>
+        <LEVEL_UNIQUE_NAME>[Promotions.Media Type].[(All)]</LEVEL_UNIQUE_NAME>
+        <LEVEL_NUMBER>0</LEVEL_NUMBER>
+        <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+        <MEMBER_NAME>All Promotions.Media Types</MEMBER_NAME>
+        <MEMBER_UNIQUE_NAME>[Promotions.Media Type].[All Promotions.Media Types]</MEMBER_UNIQUE_NAME>
+        <MEMBER_TYPE>2</MEMBER_TYPE>
+        <MEMBER_CAPTION>All Promotions.Media Types</MEMBER_CAPTION>
+        <CHILDREN_CARDINALITY>14</CHILDREN_CARDINALITY>
+        <PARENT_LEVEL>0</PARENT_LEVEL>
+        <PARENT_COUNT>0</PARENT_COUNT>
+        <DEPTH>0</DEPTH>
+      </row>
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <DIMENSION_UNIQUE_NAME>[Promotions]</DIMENSION_UNIQUE_NAME>
+        <HIERARCHY_UNIQUE_NAME>[Promotions.Media Type]</HIERARCHY_UNIQUE_NAME>
+        <LEVEL_UNIQUE_NAME>[Promotions.Media Type].[Media Type]</LEVEL_UNIQUE_NAME>
+        <LEVEL_NUMBER>1</LEVEL_NUMBER>
+        <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+        <MEMBER_NAME>Bulk Mail</MEMBER_NAME>
+        <MEMBER_UNIQUE_NAME>[Promotions.Media Type].[Bulk Mail]</MEMBER_UNIQUE_NAME>
+        <MEMBER_TYPE>1</MEMBER_TYPE>
+        <MEMBER_CAPTION>Bulk Mail</MEMBER_CAPTION>
+        <CHILDREN_CARDINALITY>0</CHILDREN_CARDINALITY>
+        <PARENT_LEVEL>0</PARENT_LEVEL>
+        <PARENT_UNIQUE_NAME>[Promotions.Media Type].[All Promotions.Media Types]</PARENT_UNIQUE_NAME>
+        <PARENT_COUNT>1</PARENT_COUNT>
+        <DEPTH>1</DEPTH>
+      </row>
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <DIMENSION_UNIQUE_NAME>[Promotions]</DIMENSION_UNIQUE_NAME>
+        <HIERARCHY_UNIQUE_NAME>[Promotions.Media Type]</HIERARCHY_UNIQUE_NAME>
+        <LEVEL_UNIQUE_NAME>[Promotions.Media Type].[Media Type]</LEVEL_UNIQUE_NAME>
+        <LEVEL_NUMBER>1</LEVEL_NUMBER>
+        <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+        <MEMBER_NAME>Cash Register Handout</MEMBER_NAME>
+        <MEMBER_UNIQUE_NAME>[Promotions.Media Type].[Cash Register Handout]</MEMBER_UNIQUE_NAME>
+        <MEMBER_TYPE>1</MEMBER_TYPE>
+        <MEMBER_CAPTION>Cash Register Handout</MEMBER_CAPTION>
+        <CHILDREN_CARDINALITY>0</CHILDREN_CARDINALITY>
+        <PARENT_LEVEL>0</PARENT_LEVEL>
+        <PARENT_UNIQUE_NAME>[Promotions.Media Type].[All Promotions.Media Types]</PARENT_UNIQUE_NAME>
+        <PARENT_COUNT>1</PARENT_COUNT>
+        <DEPTH>1</DEPTH>
+      </row>
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <DIMENSION_UNIQUE_NAME>[Promotions]</DIMENSION_UNIQUE_NAME>
+        <HIERARCHY_UNIQUE_NAME>[Promotions.Media Type]</HIERARCHY_UNIQUE_NAME>
+        <LEVEL_UNIQUE_NAME>[Promotions.Media Type].[Media Type]</LEVEL_UNIQUE_NAME>
+        <LEVEL_NUMBER>1</LEVEL_NUMBER>
+        <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+        <MEMBER_NAME>Daily Paper</MEMBER_NAME>
+        <MEMBER_UNIQUE_NAME>[Promotions.Media Type].[Daily Paper]</MEMBER_UNIQUE_NAME>
+        <MEMBER_TYPE>1</MEMBER_TYPE>
+        <MEMBER_CAPTION>Daily Paper</MEMBER_CAPTION>
+        <CHILDREN_CARDINALITY>0</CHILDREN_CARDINALITY>
+        <PARENT_LEVEL>0</PARENT_LEVEL>
+        <PARENT_UNIQUE_NAME>[Promotions.Media Type].[All Promotions.Media Types]</PARENT_UNIQUE_NAME>
+        <PARENT_COUNT>1</PARENT_COUNT>
+        <DEPTH>1</DEPTH>
+      </row>
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <DIMENSION_UNIQUE_NAME>[Promotions]</DIMENSION_UNIQUE_NAME>
+        <HIERARCHY_UNIQUE_NAME>[Promotions.Media Type]</HIERARCHY_UNIQUE_NAME>
+        <LEVEL_UNIQUE_NAME>[Promotions.Media Type].[Media Type]</LEVEL_UNIQUE_NAME>
+        <LEVEL_NUMBER>1</LEVEL_NUMBER>
+        <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+        <MEMBER_NAME>Daily Paper, Radio</MEMBER_NAME>
+        <MEMBER_UNIQUE_NAME>[Promotions.Media Type].[Daily Paper, Radio]</MEMBER_UNIQUE_NAME>
+        <MEMBER_TYPE>1</MEMBER_TYPE>
+        <MEMBER_CAPTION>Daily Paper, Radio</MEMBER_CAPTION>
+        <CHILDREN_CARDINALITY>0</CHILDREN_CARDINALITY>
+        <PARENT_LEVEL>0</PARENT_LEVEL>
+        <PARENT_UNIQUE_NAME>[Promotions.Media Type].[All Promotions.Media Types]</PARENT_UNIQUE_NAME>
+        <PARENT_COUNT>1</PARENT_COUNT>
+        <DEPTH>1</DEPTH>
+      </row>
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <DIMENSION_UNIQUE_NAME>[Promotions]</DIMENSION_UNIQUE_NAME>
+        <HIERARCHY_UNIQUE_NAME>[Promotions.Media Type]</HIERARCHY_UNIQUE_NAME>
+        <LEVEL_UNIQUE_NAME>[Promotions.Media Type].[Media Type]</LEVEL_UNIQUE_NAME>
+        <LEVEL_NUMBER>1</LEVEL_NUMBER>
+        <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+        <MEMBER_NAME>Daily Paper, Radio, TV</MEMBER_NAME>
+        <MEMBER_UNIQUE_NAME>[Promotions.Media Type].[Daily Paper, Radio, TV]</MEMBER_UNIQUE_NAME>
+        <MEMBER_TYPE>1</MEMBER_TYPE>
+        <MEMBER_CAPTION>Daily Paper, Radio, TV</MEMBER_CAPTION>
+        <CHILDREN_CARDINALITY>0</CHILDREN_CARDINALITY>
+        <PARENT_LEVEL>0</PARENT_LEVEL>
+        <PARENT_UNIQUE_NAME>[Promotions.Media Type].[All Promotions.Media Types]</PARENT_UNIQUE_NAME>
+        <PARENT_COUNT>1</PARENT_COUNT>
+        <DEPTH>1</DEPTH>
+      </row>
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <DIMENSION_UNIQUE_NAME>[Promotions]</DIMENSION_UNIQUE_NAME>
+        <HIERARCHY_UNIQUE_NAME>[Promotions.Media Type]</HIERARCHY_UNIQUE_NAME>
+        <LEVEL_UNIQUE_NAME>[Promotions.Media Type].[Media Type]</LEVEL_UNIQUE_NAME>
+        <LEVEL_NUMBER>1</LEVEL_NUMBER>
+        <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+        <MEMBER_NAME>In-Store Coupon</MEMBER_NAME>
+        <MEMBER_UNIQUE_NAME>[Promotions.Media Type].[In-Store Coupon]</MEMBER_UNIQUE_NAME>
+        <MEMBER_TYPE>1</MEMBER_TYPE>
+        <MEMBER_CAPTION>In-Store Coupon</MEMBER_CAPTION>
+        <CHILDREN_CARDINALITY>0</CHILDREN_CARDINALITY>
+        <PARENT_LEVEL>0</PARENT_LEVEL>
+        <PARENT_UNIQUE_NAME>[Promotions.Media Type].[All Promotions.Media Types]</PARENT_UNIQUE_NAME>
+        <PARENT_COUNT>1</PARENT_COUNT>
+        <DEPTH>1</DEPTH>
+      </row>
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <DIMENSION_UNIQUE_NAME>[Promotions]</DIMENSION_UNIQUE_NAME>
+        <HIERARCHY_UNIQUE_NAME>[Promotions.Media Type]</HIERARCHY_UNIQUE_NAME>
+        <LEVEL_UNIQUE_NAME>[Promotions.Media Type].[Media Type]</LEVEL_UNIQUE_NAME>
+        <LEVEL_NUMBER>1</LEVEL_NUMBER>
+        <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+        <MEMBER_NAME>No Media</MEMBER_NAME>
+        <MEMBER_UNIQUE_NAME>[Promotions.Media Type].[No Media]</MEMBER_UNIQUE_NAME>
+        <MEMBER_TYPE>1</MEMBER_TYPE>
+        <MEMBER_CAPTION>No Media</MEMBER_CAPTION>
+        <CHILDREN_CARDINALITY>0</CHILDREN_CARDINALITY>
+        <PARENT_LEVEL>0</PARENT_LEVEL>
+        <PARENT_UNIQUE_NAME>[Promotions.Media Type].[All Promotions.Media Types]</PARENT_UNIQUE_NAME>
+        <PARENT_COUNT>1</PARENT_COUNT>
+        <DEPTH>1</DEPTH>
+      </row>
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <DIMENSION_UNIQUE_NAME>[Promotions]</DIMENSION_UNIQUE_NAME>
+        <HIERARCHY_UNIQUE_NAME>[Promotions.Media Type]</HIERARCHY_UNIQUE_NAME>
+        <LEVEL_UNIQUE_NAME>[Promotions.Media Type].[Media Type]</LEVEL_UNIQUE_NAME>
+        <LEVEL_NUMBER>1</LEVEL_NUMBER>
+        <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+        <MEMBER_NAME>Product Attachment</MEMBER_NAME>
+        <MEMBER_UNIQUE_NAME>[Promotions.Media Type].[Product Attachment]</MEMBER_UNIQUE_NAME>
+        <MEMBER_TYPE>1</MEMBER_TYPE>
+        <MEMBER_CAPTION>Product Attachment</MEMBER_CAPTION>
+        <CHILDREN_CARDINALITY>0</CHILDREN_CARDINALITY>
+        <PARENT_LEVEL>0</PARENT_LEVEL>
+        <PARENT_UNIQUE_NAME>[Promotions.Media Type].[All Promotions.Media Types]</PARENT_UNIQUE_NAME>
+        <PARENT_COUNT>1</PARENT_COUNT>
+        <DEPTH>1</DEPTH>
+      </row>
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <DIMENSION_UNIQUE_NAME>[Promotions]</DIMENSION_UNIQUE_NAME>
+        <HIERARCHY_UNIQUE_NAME>[Promotions.Media Type]</HIERARCHY_UNIQUE_NAME>
+        <LEVEL_UNIQUE_NAME>[Promotions.Media Type].[Media Type]</LEVEL_UNIQUE_NAME>
+        <LEVEL_NUMBER>1</LEVEL_NUMBER>
+        <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+        <MEMBER_NAME>Radio</MEMBER_NAME>
+        <MEMBER_UNIQUE_NAME>[Promotions.Media Type].[Radio]</MEMBER_UNIQUE_NAME>
+        <MEMBER_TYPE>1</MEMBER_TYPE>
+        <MEMBER_CAPTION>Radio</MEMBER_CAPTION>
+        <CHILDREN_CARDINALITY>0</CHILDREN_CARDINALITY>
+        <PARENT_LEVEL>0</PARENT_LEVEL>
+        <PARENT_UNIQUE_NAME>[Promotions.Media Type].[All Promotions.Media Types]</PARENT_UNIQUE_NAME>
+        <PARENT_COUNT>1</PARENT_COUNT>
+        <DEPTH>1</DEPTH>
+      </row>
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <DIMENSION_UNIQUE_NAME>[Promotions]</DIMENSION_UNIQUE_NAME>
+        <HIERARCHY_UNIQUE_NAME>[Promotions.Media Type]</HIERARCHY_UNIQUE_NAME>
+        <LEVEL_UNIQUE_NAME>[Promotions.Media Type].[Media Type]</LEVEL_UNIQUE_NAME>
+        <LEVEL_NUMBER>1</LEVEL_NUMBER>
+        <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+        <MEMBER_NAME>Street Handout</MEMBER_NAME>
+        <MEMBER_UNIQUE_NAME>[Promotions.Media Type].[Street Handout]</MEMBER_UNIQUE_NAME>
+        <MEMBER_TYPE>1</MEMBER_TYPE>
+        <MEMBER_CAPTION>Street Handout</MEMBER_CAPTION>
+        <CHILDREN_CARDINALITY>0</CHILDREN_CARDINALITY>
+        <PARENT_LEVEL>0</PARENT_LEVEL>
+        <PARENT_UNIQUE_NAME>[Promotions.Media Type].[All Promotions.Media Types]</PARENT_UNIQUE_NAME>
+        <PARENT_COUNT>1</PARENT_COUNT>
+        <DEPTH>1</DEPTH>
+      </row>
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <DIMENSION_UNIQUE_NAME>[Promotions]</DIMENSION_UNIQUE_NAME>
+        <HIERARCHY_UNIQUE_NAME>[Promotions.Media Type]</HIERARCHY_UNIQUE_NAME>
+        <LEVEL_UNIQUE_NAME>[Promotions.Media Type].[Media Type]</LEVEL_UNIQUE_NAME>
+        <LEVEL_NUMBER>1</LEVEL_NUMBER>
+        <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+        <MEMBER_NAME>Sunday Paper</MEMBER_NAME>
+        <MEMBER_UNIQUE_NAME>[Promotions.Media Type].[Sunday Paper]</MEMBER_UNIQUE_NAME>
+        <MEMBER_TYPE>1</MEMBER_TYPE>
+        <MEMBER_CAPTION>Sunday Paper</MEMBER_CAPTION>
+        <CHILDREN_CARDINALITY>0</CHILDREN_CARDINALITY>
+        <PARENT_LEVEL>0</PARENT_LEVEL>
+        <PARENT_UNIQUE_NAME>[Promotions.Media Type].[All Promotions.Media Types]</PARENT_UNIQUE_NAME>
+        <PARENT_COUNT>1</PARENT_COUNT>
+        <DEPTH>1</DEPTH>
+      </row>
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <DIMENSION_UNIQUE_NAME>[Promotions]</DIMENSION_UNIQUE_NAME>
+        <HIERARCHY_UNIQUE_NAME>[Promotions.Media Type]</HIERARCHY_UNIQUE_NAME>
+        <LEVEL_UNIQUE_NAME>[Promotions.Media Type].[Media Type]</LEVEL_UNIQUE_NAME>
+        <LEVEL_NUMBER>1</LEVEL_NUMBER>
+        <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+        <MEMBER_NAME>Sunday Paper, Radio</MEMBER_NAME>
+        <MEMBER_UNIQUE_NAME>[Promotions.Media Type].[Sunday Paper, Radio]</MEMBER_UNIQUE_NAME>
+        <MEMBER_TYPE>1</MEMBER_TYPE>
+        <MEMBER_CAPTION>Sunday Paper, Radio</MEMBER_CAPTION>
+        <CHILDREN_CARDINALITY>0</CHILDREN_CARDINALITY>
+        <PARENT_LEVEL>0</PARENT_LEVEL>
+        <PARENT_UNIQUE_NAME>[Promotions.Media Type].[All Promotions.Media Types]</PARENT_UNIQUE_NAME>
+        <PARENT_COUNT>1</PARENT_COUNT>
+        <DEPTH>1</DEPTH>
+      </row>
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <DIMENSION_UNIQUE_NAME>[Promotions]</DIMENSION_UNIQUE_NAME>
+        <HIERARCHY_UNIQUE_NAME>[Promotions.Media Type]</HIERARCHY_UNIQUE_NAME>
+        <LEVEL_UNIQUE_NAME>[Promotions.Media Type].[Media Type]</LEVEL_UNIQUE_NAME>
+        <LEVEL_NUMBER>1</LEVEL_NUMBER>
+        <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+        <MEMBER_NAME>Sunday Paper, Radio, TV</MEMBER_NAME>
+        <MEMBER_UNIQUE_NAME>[Promotions.Media Type].[Sunday Paper, Radio, TV]</MEMBER_UNIQUE_NAME>
+        <MEMBER_TYPE>1</MEMBER_TYPE>
+        <MEMBER_CAPTION>Sunday Paper, Radio, TV</MEMBER_CAPTION>
+        <CHILDREN_CARDINALITY>0</CHILDREN_CARDINALITY>
+        <PARENT_LEVEL>0</PARENT_LEVEL>
+        <PARENT_UNIQUE_NAME>[Promotions.Media Type].[All Promotions.Media Types]</PARENT_UNIQUE_NAME>
+        <PARENT_COUNT>1</PARENT_COUNT>
+        <DEPTH>1</DEPTH>
+      </row>
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <DIMENSION_UNIQUE_NAME>[Promotions]</DIMENSION_UNIQUE_NAME>
+        <HIERARCHY_UNIQUE_NAME>[Promotions.Media Type]</HIERARCHY_UNIQUE_NAME>
+        <LEVEL_UNIQUE_NAME>[Promotions.Media Type].[Media Type]</LEVEL_UNIQUE_NAME>
+        <LEVEL_NUMBER>1</LEVEL_NUMBER>
+        <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+        <MEMBER_NAME>TV</MEMBER_NAME>
+        <MEMBER_UNIQUE_NAME>[Promotions.Media Type].[TV]</MEMBER_UNIQUE_NAME>
+        <MEMBER_TYPE>1</MEMBER_TYPE>
+        <MEMBER_CAPTION>TV</MEMBER_CAPTION>
+        <CHILDREN_CARDINALITY>0</CHILDREN_CARDINALITY>
+        <PARENT_LEVEL>0</PARENT_LEVEL>
+        <PARENT_UNIQUE_NAME>[Promotions.Media Type].[All Promotions.Media Types]</PARENT_UNIQUE_NAME>
+        <PARENT_COUNT>1</PARENT_COUNT>
+        <DEPTH>1</DEPTH>
+      </row>
+    </root>
+  </return>
+</DiscoverResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

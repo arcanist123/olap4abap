@@ -1,0 +1,166 @@
+<?xml version="1.0"?>
+<!--
+  Schema of the BW cube ZFMSALES, written against the BW tables themselves. The same file runs in the reference server
+  (whose reference database has these tables with BW's contents, scripts/build-bw-reference-db.py) and in our engine
+  on SAP, so their answers can be compared one-to-one (docs/mvp-scope.md, schema decision).
+
+  Physical side, as BW stores a HANA-optimised InfoCube, without any SQL in the schema:
+  - the fact table is the cube's /BIC/FZFMSALES, with one SID column per characteristic (SID_<characteristic>) and the
+    key figures;
+  - a dimension's table is the generated CDS view of its characteristic (ZZXXMLA1_CL_BW_VIEW_GEN; database views
+    ZZXXMLA1V0000001 ZFMPROD, ...2 ZFMCUST, ...3 ZFMSTORE, ...4 ZFMPROMO, ...5 ZFMDATE): the SID table joined with the
+    active attributes, columns SID, the key and the attributes without the /BIC/ namespace, NUMC columns as numbers
+    (docs/bw-to-schema-mapping.md). The reference database has the same views (scripts/build-bw-reference-db.py);
+  - the dimension key is the SID (the SIDs of ZFMSALES are the FoodMart ids).
+
+  Logical side, the rules of the BW model generator:
+  - one cube per BW cube, measures = the SUM key figures only;
+  - one dimension per BW characteristic (not per BW dimension);
+  - the characteristic key is the Key attribute "<dimension> Id" (as eMondrian's Foodmart.xml names it), every flat
+    attribute is a DimensionAttribute with its own attribute hierarchy (All + one level);
+  - member properties are FoodMart's (the Store Name and the customer Name level), each the Property of an attribute
+    (sourceAttribute), named as in FoodMart so Mondrian's tests apply; the attributes keep their hierarchies;
+  - user hierarchies (Mondrian level-based hierarchies over flat attributes, docs/mvp-scope.md) follow the attributes,
+    as Mondrian reads the children of a Dimension in that order. They are named as in FoodMart: the first one is
+    unnamed, so it is the dimension's default hierarchy ([Store], [Product], [Customers], [Time], [Promotions]) and
+    Mondrian's FoodMart tests apply to it; its levels are named as FoodMart's (Store Country, Product Family, ...);
+  - no BW texts exist, so a member is named by its value (the key member by the key), except the customer's Name level,
+    which is keyed by the customer and named by its full name as in FoodMart;
+  - dimension names are FoodMart's where FoodMart has the same dimension (Customers, Time, Promotions), else the
+    InfoObject texts of ZZXXMLA1_CL_BW_FOODMART_GEN; attribute names are the InfoObject texts;
+  - a characteristic of type date (DATS) or a BW time characteristic (0CAL*, 0FISC*) is a TimeDimension, its levels
+    and attributes have time level types: the Time dimension (ZFMDATE) has FoodMart's hierarchies Year > Quarter >
+    Month (without All) and Weekly (Year > Week > Day);
+  - the catalog is the InfoArea (ZFOODMART), the cube keeps its technical BW name (caption = BW text).
+-->
+<Schema name="ZFOODMART">
+  <Dimension name="Product" table="ZZXXMLA1V0000001">
+    <DimensionAttribute name="Product Id" usage="Key">
+      <KeyColumn dataType="Integer" columnName="SID"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="Product Name"><KeyColumn dataType="String" columnName="ZFMPNAME"/></DimensionAttribute>
+    <DimensionAttribute name="Brand Name"><KeyColumn dataType="String" columnName="ZFMBRAND"/></DimensionAttribute>
+    <DimensionAttribute name="Subcategory"><KeyColumn dataType="String" columnName="ZFMSUBCT"/></DimensionAttribute>
+    <DimensionAttribute name="Product Category"><KeyColumn dataType="String" columnName="ZFMCATEG"/></DimensionAttribute>
+    <DimensionAttribute name="Department"><KeyColumn dataType="String" columnName="ZFMDEPT"/></DimensionAttribute>
+    <DimensionAttribute name="Product Family"><KeyColumn dataType="String" columnName="ZFMFAMILY"/></DimensionAttribute>
+    <Hierarchy hasAll="true">
+      <Level name="Product Family" uniqueMembers="true" sourceAttribute="Product Family"/>
+      <Level name="Product Department" uniqueMembers="false" sourceAttribute="Department"/>
+      <Level name="Product Category" uniqueMembers="false" sourceAttribute="Product Category"/>
+      <Level name="Product Subcategory" uniqueMembers="false" sourceAttribute="Subcategory"/>
+      <Level name="Brand Name" uniqueMembers="false" sourceAttribute="Brand Name"/>
+      <Level name="Product Name" uniqueMembers="true" sourceAttribute="Product Name"/>
+    </Hierarchy>
+  </Dimension>
+
+  <Dimension name="Customers" table="ZZXXMLA1V0000002">
+    <DimensionAttribute name="Customer Id" usage="Key">
+      <KeyColumn dataType="Integer" columnName="SID"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="Customer Name"><KeyColumn dataType="String" columnName="ZFMCNAME"/></DimensionAttribute>
+    <DimensionAttribute name="Country"><KeyColumn dataType="String" columnName="ZFMCNTRY"/></DimensionAttribute>
+    <DimensionAttribute name="State Province"><KeyColumn dataType="String" columnName="ZFMSTATE"/></DimensionAttribute>
+    <DimensionAttribute name="City"><KeyColumn dataType="String" columnName="ZFMCITY"/></DimensionAttribute>
+    <DimensionAttribute name="Gender"><KeyColumn dataType="String" columnName="ZFMGENDR"/></DimensionAttribute>
+    <DimensionAttribute name="Marital Status"><KeyColumn dataType="String" columnName="ZFMMARIT"/></DimensionAttribute>
+    <DimensionAttribute name="Education"><KeyColumn dataType="String" columnName="ZFMEDU"/></DimensionAttribute>
+    <DimensionAttribute name="Yearly Income"><KeyColumn dataType="String" columnName="ZFMINCOM"/></DimensionAttribute>
+    <Hierarchy hasAll="true" allMemberName="All Customers">
+      <Level name="Country" uniqueMembers="true" sourceAttribute="Country"/>
+      <Level name="State Province" uniqueMembers="true" sourceAttribute="State Province"/>
+      <Level name="City" uniqueMembers="false" sourceAttribute="City"/>
+      <Level name="Name" uniqueMembers="true" nameColumn="ZFMCNAME" sourceAttribute="Customer Id">
+        <Property name="Gender" sourceAttribute="Gender"/>
+        <Property name="Marital Status" sourceAttribute="Marital Status"/>
+        <Property name="Education" sourceAttribute="Education"/>
+        <Property name="Yearly Income" sourceAttribute="Yearly Income"/>
+      </Level>
+    </Hierarchy>
+  </Dimension>
+
+  <Dimension name="Store" table="ZZXXMLA1V0000003">
+    <DimensionAttribute name="Store Id" usage="Key">
+      <KeyColumn dataType="Integer" columnName="SID"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="Store Name"><KeyColumn dataType="String" columnName="ZFMSNAME"/></DimensionAttribute>
+    <DimensionAttribute name="Country"><KeyColumn dataType="String" columnName="ZFMCNTRY"/></DimensionAttribute>
+    <DimensionAttribute name="State Province"><KeyColumn dataType="String" columnName="ZFMSTATE"/></DimensionAttribute>
+    <DimensionAttribute name="City"><KeyColumn dataType="String" columnName="ZFMCITY"/></DimensionAttribute>
+    <DimensionAttribute name="Store Type"><KeyColumn dataType="String" columnName="ZFMSTYPE"/></DimensionAttribute>
+    <DimensionAttribute name="Store Manager"><KeyColumn dataType="String" columnName="ZFMMGR"/></DimensionAttribute>
+    <DimensionAttribute name="Store Sqft"><KeyColumn dataType="Numeric" columnName="ZFMSQFT"/></DimensionAttribute>
+    <DimensionAttribute name="Grocery Sqft"><KeyColumn dataType="Numeric" columnName="ZFMGSQFT"/></DimensionAttribute>
+    <DimensionAttribute name="Frozen Sqft"><KeyColumn dataType="Numeric" columnName="ZFMFSQFT"/></DimensionAttribute>
+    <DimensionAttribute name="Meat Sqft"><KeyColumn dataType="Numeric" columnName="ZFMMSQFT"/></DimensionAttribute>
+    <DimensionAttribute name="Has Coffee Bar"><KeyColumn dataType="String" columnName="ZFMCOFFE"/></DimensionAttribute>
+    <DimensionAttribute name="Street Address"><KeyColumn dataType="String" columnName="ZFMADDR"/></DimensionAttribute>
+    <Hierarchy hasAll="true">
+      <Level name="Store Country" uniqueMembers="true" sourceAttribute="Country"/>
+      <Level name="Store State" uniqueMembers="true" sourceAttribute="State Province"/>
+      <Level name="Store City" uniqueMembers="false" sourceAttribute="City"/>
+      <Level name="Store Name" uniqueMembers="true" sourceAttribute="Store Name">
+        <Property name="Store Type" sourceAttribute="Store Type"/>
+        <Property name="Store Manager" sourceAttribute="Store Manager"/>
+        <Property name="Store Sqft" sourceAttribute="Store Sqft"/>
+        <Property name="Grocery Sqft" sourceAttribute="Grocery Sqft"/>
+        <Property name="Frozen Sqft" sourceAttribute="Frozen Sqft"/>
+        <Property name="Meat Sqft" sourceAttribute="Meat Sqft"/>
+        <Property name="Has coffee bar" sourceAttribute="Has Coffee Bar"/>
+        <Property name="Street address" sourceAttribute="Street Address"/>
+      </Level>
+    </Hierarchy>
+  </Dimension>
+
+  <Dimension name="Promotions" table="ZZXXMLA1V0000004">
+    <DimensionAttribute name="Promotion Id" usage="Key">
+      <KeyColumn dataType="Integer" columnName="SID"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="Promotion Name"><KeyColumn dataType="String" columnName="ZFMPRNAM"/></DimensionAttribute>
+    <DimensionAttribute name="Media Type"><KeyColumn dataType="String" columnName="ZFMMEDIA"/></DimensionAttribute>
+    <Hierarchy hasAll="true" allMemberName="All Promotions">
+      <Level name="Promotion Name" uniqueMembers="true" sourceAttribute="Promotion Name"/>
+    </Hierarchy>
+  </Dimension>
+
+  <!-- A time dimension: ZFMDATE is the date characteristic of the cube. Like the other keys it is the id (time_id).
+       Every level of a TimeDimension needs a time level type (RolapLevel), the attribute hierarchies' too; the day name
+       and the fiscal period are no period of the calendar, so they are TimeUndefined. The hierarchies are FoodMart's. -->
+  <Dimension name="Time" type="TimeDimension" table="ZZXXMLA1V0000005">
+    <DimensionAttribute name="Time Id" usage="Key" levelType="TimeDays">
+      <KeyColumn dataType="Integer" columnName="SID"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="The Date" levelType="TimeDays"><KeyColumn dataType="String" columnName="ZFMTHEDT"/></DimensionAttribute>
+    <DimensionAttribute name="Day Name" levelType="TimeUndefined"><KeyColumn dataType="String" columnName="ZFMDAYNM"/></DimensionAttribute>
+    <DimensionAttribute name="Month Name" levelType="TimeMonths"><KeyColumn dataType="String" columnName="ZFMMONNM"/></DimensionAttribute>
+    <DimensionAttribute name="Year" levelType="TimeYears"><KeyColumn dataType="Numeric" columnName="ZFMYEAR"/></DimensionAttribute>
+    <DimensionAttribute name="Day of Month" levelType="TimeDays"><KeyColumn dataType="Numeric" columnName="ZFMDAYOM"/></DimensionAttribute>
+    <DimensionAttribute name="Week of Year" levelType="TimeWeeks"><KeyColumn dataType="Numeric" columnName="ZFMWEEK"/></DimensionAttribute>
+    <DimensionAttribute name="Month of Year" levelType="TimeMonths"><KeyColumn dataType="Numeric" columnName="ZFMMONTH"/></DimensionAttribute>
+    <DimensionAttribute name="Quarter" levelType="TimeQuarters"><KeyColumn dataType="String" columnName="ZFMQTR"/></DimensionAttribute>
+    <DimensionAttribute name="Fiscal Period" levelType="TimeUndefined"><KeyColumn dataType="String" columnName="ZFMFISCP"/></DimensionAttribute>
+    <!-- BW's empty member (SID 0) has the year 0, which sorts first: the default member is FoodMart's first year -->
+    <Hierarchy hasAll="false" defaultMember="[Time].[1997]">
+      <Level name="Year" uniqueMembers="true" sourceAttribute="Year" levelType="TimeYears"/>
+      <Level name="Quarter" uniqueMembers="false" sourceAttribute="Quarter" levelType="TimeQuarters"/>
+      <Level name="Month" uniqueMembers="false" sourceAttribute="Month of Year" levelType="TimeMonths"/>
+    </Hierarchy>
+    <Hierarchy name="Weekly" hasAll="true">
+      <Level name="Year" uniqueMembers="true" sourceAttribute="Year" levelType="TimeYears"/>
+      <Level name="Week" uniqueMembers="false" sourceAttribute="Week of Year" levelType="TimeWeeks"/>
+      <Level name="Day" uniqueMembers="false" sourceAttribute="Day of Month" levelType="TimeDays"/>
+    </Hierarchy>
+  </Dimension>
+
+  <Cube name="ZFMSALES" caption="FoodMart Sales" defaultMeasure="Unit Sales">
+    <Table name="/BIC/FZFMSALES"/>
+    <DimensionUsage name="Product" source="Product" foreignKey="SID_ZFMPROD"/>
+    <DimensionUsage name="Customers" source="Customers" foreignKey="SID_ZFMCUST"/>
+    <DimensionUsage name="Store" source="Store" foreignKey="SID_ZFMSTORE"/>
+    <DimensionUsage name="Promotions" source="Promotions" foreignKey="SID_ZFMPROMO"/>
+    <DimensionUsage name="Time" source="Time" foreignKey="SID_ZFMDATE"/>
+    <Measure name="Unit Sales" column="/BIC/ZFMUNITS" aggregator="sum"/>
+    <Measure name="Store Cost" column="/BIC/ZFMSCOST" aggregator="sum"/>
+    <Measure name="Store Sales" column="/BIC/ZFMSSALES" aggregator="sum"/>
+  </Cube>
+</Schema>

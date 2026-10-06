@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "abap-fs": {
+      "type": "http",
+      "url": "http://localhost:4847/mcp",
+      "headers": {
+        "Authorization": "Bearer <token shown by the ABAP FS VS Code extension>"
+      }
+    }
+  }
+}

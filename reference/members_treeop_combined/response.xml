@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<DiscoverResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <DIMENSION_UNIQUE_NAME>[Store]</DIMENSION_UNIQUE_NAME>
+        <HIERARCHY_UNIQUE_NAME>[Store.Country]</HIERARCHY_UNIQUE_NAME>
+        <LEVEL_UNIQUE_NAME>[Store.Country].[(All)]</LEVEL_UNIQUE_NAME>
+        <LEVEL_NUMBER>0</LEVEL_NUMBER>
+        <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+        <MEMBER_NAME>All Store.Countrys</MEMBER_NAME>
+        <MEMBER_UNIQUE_NAME>[Store.Country].[All Store.Countrys]</MEMBER_UNIQUE_NAME>
+        <MEMBER_TYPE>2</MEMBER_TYPE>
+        <MEMBER_CAPTION>All Store.Countrys</MEMBER_CAPTION>
+        <CHILDREN_CARDINALITY>3</CHILDREN_CARDINALITY>
+        <PARENT_LEVEL>0</PARENT_LEVEL>
+        <PARENT_COUNT>0</PARENT_COUNT>
+        <DEPTH>0</DEPTH>
+      </row>
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <DIMENSION_UNIQUE_NAME>[Store]</DIMENSION_UNIQUE_NAME>
+        <HIERARCHY_UNIQUE_NAME>[Store.Country]</HIERARCHY_UNIQUE_NAME>
+        <LEVEL_UNIQUE_NAME>[Store.Country].[Country]</LEVEL_UNIQUE_NAME>
+        <LEVEL_NUMBER>1</LEVEL_NUMBER>
+        <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+        <MEMBER_NAME>USA</MEMBER_NAME>
+        <MEMBER_UNIQUE_NAME>[Store.Country].[USA]</MEMBER_UNIQUE_NAME>
+        <MEMBER_TYPE>1</MEMBER_TYPE>
+        <MEMBER_CAPTION>USA</MEMBER_CAPTION>
+        <CHILDREN_CARDINALITY>0</CHILDREN_CARDINALITY>
+        <PARENT_LEVEL>0</PARENT_LEVEL>
+        <PARENT_UNIQUE_NAME>[Store.Country].[All Store.Countrys]</PARENT_UNIQUE_NAME>
+        <PARENT_COUNT>1</PARENT_COUNT>
+        <DEPTH>1</DEPTH>
+      </row>
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <DIMENSION_UNIQUE_NAME>[Store]</DIMENSION_UNIQUE_NAME>
+        <HIERARCHY_UNIQUE_NAME>[Store.Country]</HIERARCHY_UNIQUE_NAME>
+        <LEVEL_UNIQUE_NAME>[Store.Country].[Country]</LEVEL_UNIQUE_NAME>
+        <LEVEL_NUMBER>1</LEVEL_NUMBER>
+        <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+        <MEMBER_NAME>Canada</MEMBER_NAME>
+        <MEMBER_UNIQUE_NAME>[Store.Country].[Canada]</MEMBER_UNIQUE_NAME>
+        <MEMBER_TYPE>1</MEMBER_TYPE>
+        <MEMBER_CAPTION>Canada</MEMBER_CAPTION>
+        <CHILDREN_CARDINALITY>0</CHILDREN_CARDINALITY>
+        <PARENT_LEVEL>0</PARENT_LEVEL>
+        <PARENT_UNIQUE_NAME>[Store.Country].[All Store.Countrys]</PARENT_UNIQUE_NAME>
+        <PARENT_COUNT>1</PARENT_COUNT>
+        <DEPTH>1</DEPTH>
+      </row>
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <DIMENSION_UNIQUE_NAME>[Store]</DIMENSION_UNIQUE_NAME>
+        <HIERARCHY_UNIQUE_NAME>[Store.Country]</HIERARCHY_UNIQUE_NAME>
+        <LEVEL_UNIQUE_NAME>[Store.Country].[Country]</LEVEL_UNIQUE_NAME>
+        <LEVEL_NUMBER>1</LEVEL_NUMBER>
+        <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+        <MEMBER_NAME>Mexico</MEMBER_NAME>
+        <MEMBER_UNIQUE_NAME>[Store.Country].[Mexico]</MEMBER_UNIQUE_NAME>
+        <MEMBER_TYPE>1</MEMBER_TYPE>
+        <MEMBER_CAPTION>Mexico</MEMBER_CAPTION>
+        <CHILDREN_CARDINALITY>0</CHILDREN_CARDINALITY>
+        <PARENT_LEVEL>0</PARENT_LEVEL>
+        <PARENT_UNIQUE_NAME>[Store.Country].[All Store.Countrys]</PARENT_UNIQUE_NAME>
+        <PARENT_COUNT>1</PARENT_COUNT>
+        <DEPTH>1</DEPTH>
+      </row>
+    </root>
+  </return>
+</DiscoverResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

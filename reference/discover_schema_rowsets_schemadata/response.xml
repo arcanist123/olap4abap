@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<DiscoverResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:sql="urn:schemas-microsoft-com:xml-sql" targetNamespace="urn:schemas-microsoft-com:xml-analysis:rowset" elementFormDefault="qualified">
+        <xsd:element name="root">
+          <xsd:complexType>
+            <xsd:sequence>
+              <xsd:element name="row" type="row" minOccurs="0" maxOccurs="unbounded"/>
+            </xsd:sequence>
+          </xsd:complexType>
+        </xsd:element>
+        <xsd:simpleType name="uuid">
+          <xsd:restriction base="xsd:string">
+            <xsd:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+          </xsd:restriction>
+        </xsd:simpleType>
+        <xsd:complexType name="row">
+          <xsd:sequence>
+            <xsd:element sql:field="SchemaName" name="SchemaName" type="xsd:string"/>
+            <xsd:element sql:field="SchemaGuid" name="SchemaGuid" type="uuid" minOccurs="0"/>
+            <xsd:element sql:field="Restrictions" name="Restrictions" minOccurs="0" maxOccurs="unbounded">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element name="Name" type="xsd:string" sql:field="Name"/>
+                  <xsd:element name="Type" type="xsd:string" sql:field="Type"/>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element sql:field="Description" name="Description" type="xsd:string"/>
+            <xsd:element sql:field="RestrictionsMask" name="RestrictionsMask" type="xsd:unsignedLong" minOccurs="0"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:schema>
+      <row>
+        <SchemaName>MDSCHEMA_CUBES</SchemaName>
+        <SchemaGuid>C8B522D8-5CF3-11CE-ADE5-00AA0044773D</SchemaGuid>
+        <Restrictions>
+          <Name>CATALOG_NAME</Name>
+          <Type>xsd:string</Type>
+        </Restrictions>
+        <Restrictions>
+          <Name>SCHEMA_NAME</Name>
+          <Type>xsd:string</Type>
+        </Restrictions>
+        <Restrictions>
+          <Name>CUBE_NAME</Name>
+          <Type>xsd:string</Type>
+        </Restrictions>
+        <Restrictions>
+          <Name>CUBE_TYPE</Name>
+          <Type>xsd:string</Type>
+        </Restrictions>
+        <Restrictions>
+          <Name>BASE_CUBE_NAME</Name>
+          <Type>xsd:string</Type>
+        </Restrictions>
+        <Restrictions>
+          <Name>CUBE_SOURCE</Name>
+          <Type>xsd:int</Type>
+        </Restrictions>
+        <Description/>
+      </row>
+    </root>
+  </return>
+</DiscoverResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

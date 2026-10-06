@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<!-- A tag that names an abstract class matches a field of that class but cannot be instantiated. -->
+<Schema name="Err">
+  <Cube name="Sales">
+    <Relation/>
+  </Cube>
+</Schema>

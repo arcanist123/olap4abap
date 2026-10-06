@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<!-- A required element is only checked when there is a next child: a Cube without any child has no fact and no
+     error; a Closure whose only child is not a Table fails. -->
+<Schema name="Missing">
+  <Cube name="Empty"/>
+</Schema>

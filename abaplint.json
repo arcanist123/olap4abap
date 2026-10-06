@@ -1,0 +1,31 @@
+{
+  "global": {
+    "files": "/src/**/*.*",
+    "exclude": [],
+    "noIssues": [],
+    "skipGeneratedGatewayClasses": true,
+    "skipGeneratedPersistentClasses": true,
+    "skipGeneratedFunctionGroups": true
+  },
+  "dependencies": [
+    {
+      "url": "https://github.com/abaplint/deps",
+      "folder": "/deps",
+      "files": "/src/**/*.*"
+    },
+    {
+      "folder": "/abaplint/stubs",
+      "files": "/**/*.*"
+    }
+  ],
+  "syntax": {
+    "version": "v750",
+    "errorNamespace": "^(Z|Y|LCL_|TY_|LIF_|LTC_)"
+  },
+  "rules": {
+    "parser_error": true,
+    "check_syntax": {
+      "exclude": ["zzxxmla1_main_endpoint\\.clas\\.abap"]
+    }
+  }
+}

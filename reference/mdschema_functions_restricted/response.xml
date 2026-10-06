@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<DiscoverResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <row>
+        <FUNCTION_NAME>Sum</FUNCTION_NAME>
+        <DESCRIPTION>Returns the sum of a numeric expression evaluated over a set.</DESCRIPTION>
+        <PARAMETER_LIST>Set</PARAMETER_LIST>
+        <RETURN_TYPE>5</RETURN_TYPE>
+        <ORIGIN>1</ORIGIN>
+        <INTERFACE_NAME/>
+        <CAPTION>Sum</CAPTION>
+      </row>
+      <row>
+        <FUNCTION_NAME>Sum</FUNCTION_NAME>
+        <DESCRIPTION>Returns the sum of a numeric expression evaluated over a set.</DESCRIPTION>
+        <PARAMETER_LIST>Set, Numeric Expression</PARAMETER_LIST>
+        <RETURN_TYPE>5</RETURN_TYPE>
+        <ORIGIN>1</ORIGIN>
+        <INTERFACE_NAME/>
+        <CAPTION>Sum</CAPTION>
+      </row>
+    </root>
+  </return>
+</DiscoverResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

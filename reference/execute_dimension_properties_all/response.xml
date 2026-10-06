@@ -1,0 +1,448 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<ExecuteResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:mddataset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:schemas-microsoft-com:xml-analysis:mddataset" xmlns="urn:schemas-microsoft-com:xml-analysis:mddataset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:sql="urn:schemas-microsoft-com:xml-sql" elementFormDefault="qualified">
+        <xsd:complexType name="MemberType">
+          <xsd:sequence>
+            <xsd:element name="UName" type="xsd:string"/>
+            <xsd:element name="Caption" type="xsd:string"/>
+            <xsd:element name="LName" type="xsd:string"/>
+            <xsd:element name="LNum" type="xsd:unsignedInt"/>
+            <xsd:element name="DisplayInfo" type="xsd:unsignedInt"/>
+            <xsd:sequence maxOccurs="unbounded" minOccurs="0">
+              <xsd:any processContents="lax" maxOccurs="unbounded"/>
+            </xsd:sequence>
+          </xsd:sequence>
+          <xsd:attribute name="Hierarchy" type="xsd:string"/>
+        </xsd:complexType>
+        <xsd:complexType name="PropType">
+          <xsd:attribute name="name" type="xsd:string"/>
+        </xsd:complexType>
+        <xsd:complexType name="TupleType">
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:element name="Member" type="MemberType"/>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:complexType name="MembersType">
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:element name="Member" type="MemberType"/>
+          </xsd:sequence>
+          <xsd:attribute name="Hierarchy" type="xsd:string"/>
+        </xsd:complexType>
+        <xsd:complexType name="TuplesType">
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:element name="Tuple" type="TupleType"/>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:complexType name="CrossProductType">
+          <xsd:sequence>
+            <xsd:choice minOccurs="0" maxOccurs="unbounded">
+              <xsd:element name="Members" type="MembersType"/>
+              <xsd:element name="Tuples" type="TuplesType"/>
+            </xsd:choice>
+          </xsd:sequence>
+          <xsd:attribute name="Size" type="xsd:unsignedInt"/>
+        </xsd:complexType>
+        <xsd:complexType name="OlapInfo">
+          <xsd:sequence>
+            <xsd:element name="CubeInfo">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element name="Cube" maxOccurs="unbounded">
+                    <xsd:complexType>
+                      <xsd:sequence>
+                        <xsd:element name="CubeName" type="xsd:string"/>
+                      </xsd:sequence>
+                    </xsd:complexType>
+                  </xsd:element>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="AxesInfo">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element name="AxisInfo" maxOccurs="unbounded">
+                    <xsd:complexType>
+                      <xsd:sequence>
+                        <xsd:element name="HierarchyInfo" minOccurs="0" maxOccurs="unbounded">
+                          <xsd:complexType>
+                            <xsd:sequence>
+                              <xsd:sequence maxOccurs="unbounded">
+                                <xsd:element name="UName" type="PropType"/>
+                                <xsd:element name="Caption" type="PropType"/>
+                                <xsd:element name="LName" type="PropType"/>
+                                <xsd:element name="LNum" type="PropType"/>
+                                <xsd:element name="DisplayInfo" type="PropType" minOccurs="0" maxOccurs="unbounded"/>
+                              </xsd:sequence>
+                              <xsd:sequence>
+                                <xsd:any processContents="lax" minOccurs="0" maxOccurs="unbounded"/>
+                              </xsd:sequence>
+                            </xsd:sequence>
+                            <xsd:attribute name="name" type="xsd:string" use="required"/>
+                          </xsd:complexType>
+                        </xsd:element>
+                      </xsd:sequence>
+                      <xsd:attribute name="name" type="xsd:string"/>
+                    </xsd:complexType>
+                  </xsd:element>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="CellInfo">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:sequence minOccurs="0" maxOccurs="unbounded">
+                    <xsd:choice>
+                      <xsd:element name="Value" type="PropType"/>
+                      <xsd:element name="FmtValue" type="PropType"/>
+                      <xsd:element name="BackColor" type="PropType"/>
+                      <xsd:element name="ForeColor" type="PropType"/>
+                      <xsd:element name="FontName" type="PropType"/>
+                      <xsd:element name="FontSize" type="PropType"/>
+                      <xsd:element name="FontFlags" type="PropType"/>
+                      <xsd:element name="FormatString" type="PropType"/>
+                      <xsd:element name="NonEmptyBehavior" type="PropType"/>
+                      <xsd:element name="SolveOrder" type="PropType"/>
+                      <xsd:element name="Updateable" type="PropType"/>
+                      <xsd:element name="Visible" type="PropType"/>
+                      <xsd:element name="Expression" type="PropType"/>
+                    </xsd:choice>
+                  </xsd:sequence>
+                  <xsd:sequence maxOccurs="unbounded" minOccurs="0">
+                    <xsd:any processContents="lax" maxOccurs="unbounded"/>
+                  </xsd:sequence>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:complexType name="Axes">
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:element name="Axis">
+              <xsd:complexType>
+                <xsd:choice minOccurs="0" maxOccurs="unbounded">
+                  <xsd:element name="CrossProduct" type="CrossProductType"/>
+                  <xsd:element name="Tuples" type="TuplesType"/>
+                  <xsd:element name="Members" type="MembersType"/>
+                </xsd:choice>
+                <xsd:attribute name="name" type="xsd:string"/>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:complexType name="CellData">
+          <xsd:sequence>
+            <xsd:element name="Cell" minOccurs="0" maxOccurs="unbounded">
+              <xsd:complexType>
+                <xsd:sequence maxOccurs="unbounded">
+                  <xsd:choice>
+                    <xsd:element name="Value"/>
+                    <xsd:element name="FmtValue" type="xsd:string"/>
+                    <xsd:element name="BackColor" type="xsd:unsignedInt"/>
+                    <xsd:element name="ForeColor" type="xsd:unsignedInt"/>
+                    <xsd:element name="FontName" type="xsd:string"/>
+                    <xsd:element name="FontSize" type="xsd:unsignedShort"/>
+                    <xsd:element name="FontFlags" type="xsd:unsignedInt"/>
+                    <xsd:element name="FormatString" type="xsd:string"/>
+                    <xsd:element name="NonEmptyBehavior" type="xsd:unsignedShort"/>
+                    <xsd:element name="SolveOrder" type="xsd:unsignedInt"/>
+                    <xsd:element name="Updateable" type="xsd:unsignedInt"/>
+                    <xsd:element name="Visible" type="xsd:unsignedInt"/>
+                    <xsd:element name="Expression" type="xsd:string"/>
+                  </xsd:choice>
+                </xsd:sequence>
+                <xsd:attribute name="CellOrdinal" type="xsd:unsignedInt" use="required"/>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:element name="root">
+          <xsd:complexType>
+            <xsd:sequence maxOccurs="unbounded">
+              <xsd:element name="OlapInfo" type="OlapInfo"/>
+              <xsd:element name="Axes" type="Axes"/>
+              <xsd:element name="CellData" type="CellData"/>
+            </xsd:sequence>
+          </xsd:complexType>
+        </xsd:element>
+      </xsd:schema>
+      <OlapInfo>
+        <CubeInfo>
+          <Cube>
+            <CubeName>ZFMSALES</CubeName>
+            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-05T08:05:27</LastDataUpdate>
+            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-05T08:05:27</LastSchemaUpdate>
+          </Cube>
+        </CubeInfo>
+        <AxesInfo>
+          <AxisInfo name="Axis0">
+            <HierarchyInfo name="[Product]">
+              <UName name="[Product].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
+              <Caption name="[Product].[MEMBER_CAPTION]" type="xsd:string"/>
+              <LName name="[Product].[LEVEL_UNIQUE_NAME]" type="xsd:string"/>
+              <LNum name="[Product].[LEVEL_NUMBER]" type="xsd:unsignedInt"/>
+              <DisplayInfo name="[Product].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
+              <CATALOG_NAME name="[Product].[CATALOG_NAME]" type="xsd:string"/>
+              <SCHEMA_NAME name="[Product].[SCHEMA_NAME]" type="xsd:string"/>
+              <CUBE_NAME name="[Product].[CUBE_NAME]" type="xsd:string"/>
+              <DIMENSION_UNIQUE_NAME name="[Product].[DIMENSION_UNIQUE_NAME]" type="xsd:string"/>
+              <HIERARCHY_UNIQUE_NAME name="[Product].[HIERARCHY_UNIQUE_NAME]" type="xsd:string"/>
+              <LEVEL_UNIQUE_NAME name="[Product].[LEVEL_UNIQUE_NAME]" type="xsd:string"/>
+              <LEVEL_NUMBER name="[Product].[LEVEL_NUMBER]" type="xsd:unsignedInt"/>
+              <MEMBER_ORDINAL name="[Product].[MEMBER_ORDINAL]" type="xsd:unsignedInt"/>
+              <MEMBER_NAME name="[Product].[MEMBER_NAME]" type="xsd:string"/>
+              <MEMBER_UNIQUE_NAME name="[Product].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
+              <MEMBER_TYPE name="[Product].[MEMBER_TYPE]" type="xsd:string"/>
+              <MEMBER_GUID name="[Product].[MEMBER_GUID]" type="xsd:string"/>
+              <MEMBER_CAPTION name="[Product].[MEMBER_CAPTION]" type="xsd:string"/>
+              <CHILDREN_CARDINALITY name="[Product].[CHILDREN_CARDINALITY]" type="xsd:unsignedInt"/>
+              <PARENT_LEVEL name="[Product].[PARENT_LEVEL]" type="xsd:unsignedInt"/>
+              <PARENT_UNIQUE_NAME name="[Product].[PARENT_UNIQUE_NAME]" type="xsd:string"/>
+              <PARENT_COUNT name="[Product].[PARENT_COUNT]" type="xsd:unsignedInt"/>
+              <DESCRIPTION name="[Product].[DESCRIPTION]" type="xsd:string"/>
+              <_x0024_visible name="[Product].[$visible]" type="xsd:boolean"/>
+              <MEMBER_KEY name="[Product].[MEMBER_KEY]" type="xsd:string"/>
+              <IS_PLACEHOLDERMEMBER name="[Product].[IS_PLACEHOLDERMEMBER]" type="xsd:boolean"/>
+              <IS_DATAMEMBER name="[Product].[IS_DATAMEMBER]" type="xsd:boolean"/>
+              <DEPTH name="[Product].[DEPTH]" type="xsd:unsignedInt"/>
+              <DISPLAY_INFO name="[Product].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
+              <VALUE name="[Product].[VALUE]" type="xsd:string"/>
+            </HierarchyInfo>
+          </AxisInfo>
+          <AxisInfo name="Axis1">
+            <HierarchyInfo name="[Measures]">
+              <UName name="[Measures].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
+              <Caption name="[Measures].[MEMBER_CAPTION]" type="xsd:string"/>
+              <LName name="[Measures].[LEVEL_UNIQUE_NAME]" type="xsd:string"/>
+              <LNum name="[Measures].[LEVEL_NUMBER]" type="xsd:unsignedInt"/>
+              <DisplayInfo name="[Measures].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
+              <CATALOG_NAME name="[Measures].[CATALOG_NAME]" type="xsd:string"/>
+              <SCHEMA_NAME name="[Measures].[SCHEMA_NAME]" type="xsd:string"/>
+              <CUBE_NAME name="[Measures].[CUBE_NAME]" type="xsd:string"/>
+              <DIMENSION_UNIQUE_NAME name="[Measures].[DIMENSION_UNIQUE_NAME]" type="xsd:string"/>
+              <HIERARCHY_UNIQUE_NAME name="[Measures].[HIERARCHY_UNIQUE_NAME]" type="xsd:string"/>
+              <LEVEL_UNIQUE_NAME name="[Measures].[LEVEL_UNIQUE_NAME]" type="xsd:string"/>
+              <LEVEL_NUMBER name="[Measures].[LEVEL_NUMBER]" type="xsd:unsignedInt"/>
+              <MEMBER_ORDINAL name="[Measures].[MEMBER_ORDINAL]" type="xsd:unsignedInt"/>
+              <MEMBER_NAME name="[Measures].[MEMBER_NAME]" type="xsd:string"/>
+              <MEMBER_UNIQUE_NAME name="[Measures].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
+              <MEMBER_TYPE name="[Measures].[MEMBER_TYPE]" type="xsd:string"/>
+              <MEMBER_GUID name="[Measures].[MEMBER_GUID]" type="xsd:string"/>
+              <MEMBER_CAPTION name="[Measures].[MEMBER_CAPTION]" type="xsd:string"/>
+              <CHILDREN_CARDINALITY name="[Measures].[CHILDREN_CARDINALITY]" type="xsd:unsignedInt"/>
+              <PARENT_LEVEL name="[Measures].[PARENT_LEVEL]" type="xsd:unsignedInt"/>
+              <PARENT_UNIQUE_NAME name="[Measures].[PARENT_UNIQUE_NAME]" type="xsd:string"/>
+              <PARENT_COUNT name="[Measures].[PARENT_COUNT]" type="xsd:unsignedInt"/>
+              <DESCRIPTION name="[Measures].[DESCRIPTION]" type="xsd:string"/>
+              <_x0024_visible name="[Measures].[$visible]" type="xsd:boolean"/>
+              <MEMBER_KEY name="[Measures].[MEMBER_KEY]" type="xsd:string"/>
+              <IS_PLACEHOLDERMEMBER name="[Measures].[IS_PLACEHOLDERMEMBER]" type="xsd:boolean"/>
+              <IS_DATAMEMBER name="[Measures].[IS_DATAMEMBER]" type="xsd:boolean"/>
+              <DEPTH name="[Measures].[DEPTH]" type="xsd:unsignedInt"/>
+              <DISPLAY_INFO name="[Measures].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
+              <VALUE name="[Measures].[VALUE]" type="xsd:string"/>
+            </HierarchyInfo>
+          </AxisInfo>
+          <AxisInfo name="SlicerAxis"/>
+        </AxesInfo>
+        <CellInfo>
+          <Value name="VALUE"/>
+          <FmtValue name="FORMATTED_VALUE" type="xsd:string"/>
+          <FormatString name="FORMAT_STRING" type="xsd:string"/>
+          <CellOrdinal name="CELL_ORDINAL" type="xsd:unsignedInt"/>
+          <Language name="LANGUAGE" type="xsd:unsignedInt"/>
+          <BackColor name="BACK_COLOR" type="xsd:unsignedInt"/>
+          <ForeColor name="FORE_COLOR" type="xsd:unsignedInt"/>
+          <FontFlags name="FONT_FLAGS" type="xsd:int"/>
+        </CellInfo>
+      </OlapInfo>
+      <Axes>
+        <Axis name="Axis0">
+          <Tuples>
+            <Tuple>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[All Products]</UName>
+                <Caption>All Products</Caption>
+                <LName>[Product].[(All)]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>65540</DisplayInfo>
+                <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+                <DIMENSION_UNIQUE_NAME>[Product]</DIMENSION_UNIQUE_NAME>
+                <HIERARCHY_UNIQUE_NAME>[Product]</HIERARCHY_UNIQUE_NAME>
+                <LEVEL_UNIQUE_NAME>[Product].[(All)]</LEVEL_UNIQUE_NAME>
+                <LEVEL_NUMBER>0</LEVEL_NUMBER>
+                <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+                <MEMBER_NAME>All Products</MEMBER_NAME>
+                <MEMBER_UNIQUE_NAME>[Product].[All Products]</MEMBER_UNIQUE_NAME>
+                <MEMBER_TYPE>2</MEMBER_TYPE>
+                <MEMBER_CAPTION>All Products</MEMBER_CAPTION>
+                <CHILDREN_CARDINALITY>4</CHILDREN_CARDINALITY>
+                <PARENT_LEVEL>0</PARENT_LEVEL>
+                <PARENT_COUNT>0</PARENT_COUNT>
+                <_x0024_visible>true</_x0024_visible>
+                <MEMBER_KEY>0</MEMBER_KEY>
+                <DEPTH>0</DEPTH>
+                <DISPLAY_INFO>65540</DISPLAY_INFO>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Drink]</UName>
+                <Caption>Drink</Caption>
+                <LName>[Product].[Product Family]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>65539</DisplayInfo>
+                <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+                <DIMENSION_UNIQUE_NAME>[Product]</DIMENSION_UNIQUE_NAME>
+                <HIERARCHY_UNIQUE_NAME>[Product]</HIERARCHY_UNIQUE_NAME>
+                <LEVEL_UNIQUE_NAME>[Product].[Product Family]</LEVEL_UNIQUE_NAME>
+                <LEVEL_NUMBER>1</LEVEL_NUMBER>
+                <MEMBER_ORDINAL>-1</MEMBER_ORDINAL>
+                <MEMBER_NAME>Drink</MEMBER_NAME>
+                <MEMBER_UNIQUE_NAME>[Product].[Drink]</MEMBER_UNIQUE_NAME>
+                <MEMBER_TYPE>1</MEMBER_TYPE>
+                <MEMBER_CAPTION>Drink</MEMBER_CAPTION>
+                <CHILDREN_CARDINALITY>3</CHILDREN_CARDINALITY>
+                <PARENT_LEVEL>0</PARENT_LEVEL>
+                <PARENT_UNIQUE_NAME>[Product].[All Products]</PARENT_UNIQUE_NAME>
+                <PARENT_COUNT>1</PARENT_COUNT>
+                <_x0024_visible>true</_x0024_visible>
+                <MEMBER_KEY>Drink</MEMBER_KEY>
+                <DEPTH>1</DEPTH>
+                <DISPLAY_INFO>65539</DISPLAY_INFO>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Drink].[Dairy]</UName>
+                <Caption>Dairy</Caption>
+                <LName>[Product].[Product Department]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>1</DisplayInfo>
+                <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+                <DIMENSION_UNIQUE_NAME>[Product]</DIMENSION_UNIQUE_NAME>
+                <HIERARCHY_UNIQUE_NAME>[Product]</HIERARCHY_UNIQUE_NAME>
+                <LEVEL_UNIQUE_NAME>[Product].[Product Department]</LEVEL_UNIQUE_NAME>
+                <LEVEL_NUMBER>2</LEVEL_NUMBER>
+                <MEMBER_ORDINAL>-1</MEMBER_ORDINAL>
+                <MEMBER_NAME>Dairy</MEMBER_NAME>
+                <MEMBER_UNIQUE_NAME>[Product].[Drink].[Dairy]</MEMBER_UNIQUE_NAME>
+                <MEMBER_TYPE>1</MEMBER_TYPE>
+                <MEMBER_CAPTION>Dairy</MEMBER_CAPTION>
+                <CHILDREN_CARDINALITY>1</CHILDREN_CARDINALITY>
+                <PARENT_LEVEL>1</PARENT_LEVEL>
+                <PARENT_UNIQUE_NAME>[Product].[Drink]</PARENT_UNIQUE_NAME>
+                <PARENT_COUNT>1</PARENT_COUNT>
+                <_x0024_visible>true</_x0024_visible>
+                <MEMBER_KEY>Dairy</MEMBER_KEY>
+                <DEPTH>2</DEPTH>
+                <DISPLAY_INFO>1</DISPLAY_INFO>
+              </Member>
+            </Tuple>
+          </Tuples>
+        </Axis>
+        <Axis name="Axis1">
+          <Tuples>
+            <Tuple>
+              <Member Hierarchy="[Measures]">
+                <UName>[Measures].[Unit Sales]</UName>
+                <Caption>Unit Sales</Caption>
+                <LName>[Measures].[MeasuresLevel]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>0</DisplayInfo>
+                <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+                <DIMENSION_UNIQUE_NAME>[Measures]</DIMENSION_UNIQUE_NAME>
+                <HIERARCHY_UNIQUE_NAME>[Measures]</HIERARCHY_UNIQUE_NAME>
+                <LEVEL_UNIQUE_NAME>[Measures].[MeasuresLevel]</LEVEL_UNIQUE_NAME>
+                <LEVEL_NUMBER>0</LEVEL_NUMBER>
+                <MEMBER_ORDINAL>0</MEMBER_ORDINAL>
+                <MEMBER_NAME>Unit Sales</MEMBER_NAME>
+                <MEMBER_UNIQUE_NAME>[Measures].[Unit Sales]</MEMBER_UNIQUE_NAME>
+                <MEMBER_TYPE>3</MEMBER_TYPE>
+                <MEMBER_CAPTION>Unit Sales</MEMBER_CAPTION>
+                <CHILDREN_CARDINALITY>0</CHILDREN_CARDINALITY>
+                <PARENT_LEVEL>0</PARENT_LEVEL>
+                <PARENT_COUNT>0</PARENT_COUNT>
+                <_x0024_visible>true</_x0024_visible>
+                <MEMBER_KEY>Unit Sales</MEMBER_KEY>
+                <DEPTH>0</DEPTH>
+                <DISPLAY_INFO>0</DISPLAY_INFO>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Measures]">
+                <UName>[Measures].[Store Sales]</UName>
+                <Caption>Store Sales</Caption>
+                <LName>[Measures].[MeasuresLevel]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>0</DisplayInfo>
+                <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+                <DIMENSION_UNIQUE_NAME>[Measures]</DIMENSION_UNIQUE_NAME>
+                <HIERARCHY_UNIQUE_NAME>[Measures]</HIERARCHY_UNIQUE_NAME>
+                <LEVEL_UNIQUE_NAME>[Measures].[MeasuresLevel]</LEVEL_UNIQUE_NAME>
+                <LEVEL_NUMBER>0</LEVEL_NUMBER>
+                <MEMBER_ORDINAL>2</MEMBER_ORDINAL>
+                <MEMBER_NAME>Store Sales</MEMBER_NAME>
+                <MEMBER_UNIQUE_NAME>[Measures].[Store Sales]</MEMBER_UNIQUE_NAME>
+                <MEMBER_TYPE>3</MEMBER_TYPE>
+                <MEMBER_CAPTION>Store Sales</MEMBER_CAPTION>
+                <CHILDREN_CARDINALITY>0</CHILDREN_CARDINALITY>
+                <PARENT_LEVEL>0</PARENT_LEVEL>
+                <PARENT_COUNT>0</PARENT_COUNT>
+                <_x0024_visible>true</_x0024_visible>
+                <MEMBER_KEY>Store Sales</MEMBER_KEY>
+                <DEPTH>0</DEPTH>
+                <DISPLAY_INFO>0</DISPLAY_INFO>
+              </Member>
+            </Tuple>
+          </Tuples>
+        </Axis>
+      </Axes>
+      <CellData>
+        <Cell CellOrdinal="0">
+          <Value xsi:type="xsd:double">266773</Value>
+          <FmtValue>266,773</FmtValue>
+          <FormatString/>
+          <FontFlags>0</FontFlags>
+        </Cell>
+        <Cell CellOrdinal="1">
+          <Value xsi:type="xsd:double">24597</Value>
+          <FmtValue>24,597</FmtValue>
+          <FormatString/>
+          <FontFlags>0</FontFlags>
+        </Cell>
+        <Cell CellOrdinal="2">
+          <Value xsi:type="xsd:double">4186</Value>
+          <FmtValue>4,186</FmtValue>
+          <FormatString/>
+          <FontFlags>0</FontFlags>
+        </Cell>
+        <Cell CellOrdinal="3">
+          <Value xsi:type="xsd:double">565238.13</Value>
+          <FmtValue>565,238.13</FmtValue>
+          <FormatString/>
+          <FontFlags>0</FontFlags>
+        </Cell>
+        <Cell CellOrdinal="4">
+          <Value xsi:type="xsd:double">48836.21</Value>
+          <FmtValue>48,836.21</FmtValue>
+          <FormatString/>
+          <FontFlags>0</FontFlags>
+        </Cell>
+        <Cell CellOrdinal="5">
+          <Value xsi:type="xsd:double">7058.6</Value>
+          <FmtValue>7,058.6</FmtValue>
+          <FormatString/>
+          <FontFlags>0</FontFlags>
+        </Cell>
+      </CellData>
+    </root>
+  </return>
+</ExecuteResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

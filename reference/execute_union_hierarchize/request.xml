@@ -1,0 +1,9 @@
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<SOAP-ENV:Body>
+<Execute xmlns="urn:schemas-microsoft-com:xml-analysis" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<Command><Statement>select {[Measures].[Unit Sales]} ON COLUMNS,
+Hierarchize(Union(Union(Union({[Store].[All Stores]}, [Store].[All Stores].Children), [Store].[All Stores].[USA].Children), [Store].[All Stores].[USA].[CA].Children)) ON ROWS
+from [ZFMSALES]
+where [Time].[1997]</Statement></Command>
+<Properties><PropertyList><DataSourceInfo>ABAP BW</DataSourceInfo><Catalog>ZFOODMART</Catalog><Format>Multidimensional</Format><AxisFormat>TupleFormat</AxisFormat><Content>SchemaData</Content></PropertyList></Properties>
+</Execute></SOAP-ENV:Body></SOAP-ENV:Envelope>

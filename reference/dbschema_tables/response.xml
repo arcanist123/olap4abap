@@ -1,0 +1,679 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<DiscoverResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Customers.City:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Customers.City Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Customers.City:City</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Customers.City Hierarchy - City Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Customers.Country:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Customers.Country Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Customers.Country:Country</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Customers.Country Hierarchy - Country Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Customers.Customer Id:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Customers.Customer Id Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Customers.Customer Id:Customer Id</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Customers.Customer Id Hierarchy - Customer Id Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Customers.Customer Name:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Customers.Customer Name Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Customers.Customer Name:Customer Name</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Customers.Customer Name Hierarchy - Customer Name Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Customers.Education:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Customers.Education Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Customers.Education:Education</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Customers.Education Hierarchy - Education Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Customers.Gender:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Customers.Gender Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Customers.Gender:Gender</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Customers.Gender Hierarchy - Gender Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Customers.Marital Status:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Customers.Marital Status Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Customers.Marital Status:Marital Status</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Customers.Marital Status Hierarchy - Marital Status Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Customers.State Province:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Customers.State Province Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Customers.State Province:State Province</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Customers.State Province Hierarchy - State Province Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Customers.Yearly Income:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Customers.Yearly Income Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Customers.Yearly Income:Yearly Income</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Customers.Yearly Income Hierarchy - Yearly Income Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Customers:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Customers Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Customers:City</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Customers Hierarchy - City Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Customers:Country</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Customers Hierarchy - Country Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Customers:Name</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Customers Hierarchy - Name Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Customers:State Province</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Customers Hierarchy - State Province Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Product.Brand Name:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Product.Brand Name Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Product.Brand Name:Brand Name</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Product.Brand Name Hierarchy - Brand Name Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Product.Department:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Product.Department Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Product.Department:Department</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Product.Department Hierarchy - Department Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Product.Product Category:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Product.Product Category Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Product.Product Category:Product Category</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Product.Product Category Hierarchy - Product Category Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Product.Product Family:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Product.Product Family Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Product.Product Family:Product Family</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Product.Product Family Hierarchy - Product Family Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Product.Product Id:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Product.Product Id Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Product.Product Id:Product Id</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Product.Product Id Hierarchy - Product Id Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Product.Product Name:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Product.Product Name Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Product.Product Name:Product Name</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Product.Product Name Hierarchy - Product Name Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Product.Subcategory:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Product.Subcategory Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Product.Subcategory:Subcategory</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Product.Subcategory Hierarchy - Subcategory Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Product:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Product Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Product:Brand Name</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Product Hierarchy - Brand Name Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Product:Product Category</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Product Hierarchy - Product Category Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Product:Product Department</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Product Hierarchy - Product Department Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Product:Product Family</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Product Hierarchy - Product Family Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Product:Product Name</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Product Hierarchy - Product Name Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Product:Product Subcategory</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Product Hierarchy - Product Subcategory Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Promotions.Media Type:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Promotions.Media Type Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Promotions.Media Type:Media Type</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Promotions.Media Type Hierarchy - Media Type Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Promotions.Promotion Id:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Promotions.Promotion Id Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Promotions.Promotion Id:Promotion Id</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Promotions.Promotion Id Hierarchy - Promotion Id Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Promotions.Promotion Name:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Promotions.Promotion Name Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Promotions.Promotion Name:Promotion Name</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Promotions.Promotion Name Hierarchy - Promotion Name Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Promotions:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Promotions Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Promotions:Promotion Name</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Promotions Hierarchy - Promotion Name Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.City:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.City Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.City:City</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.City Hierarchy - City Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.Country:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.Country Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.Country:Country</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.Country Hierarchy - Country Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.Frozen Sqft:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.Frozen Sqft Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.Frozen Sqft:Frozen Sqft</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.Frozen Sqft Hierarchy - Frozen Sqft Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.Grocery Sqft:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.Grocery Sqft Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.Grocery Sqft:Grocery Sqft</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.Grocery Sqft Hierarchy - Grocery Sqft Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.Has Coffee Bar:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.Has Coffee Bar Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.Has Coffee Bar:Has Coffee Bar</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.Has Coffee Bar Hierarchy - Has Coffee Bar Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.Meat Sqft:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.Meat Sqft Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.Meat Sqft:Meat Sqft</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.Meat Sqft Hierarchy - Meat Sqft Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.State Province:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.State Province Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.State Province:State Province</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.State Province Hierarchy - State Province Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.Store Id:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.Store Id Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.Store Id:Store Id</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.Store Id Hierarchy - Store Id Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.Store Manager:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.Store Manager Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.Store Manager:Store Manager</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.Store Manager Hierarchy - Store Manager Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.Store Name:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.Store Name Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.Store Name:Store Name</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.Store Name Hierarchy - Store Name Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.Store Sqft:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.Store Sqft Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.Store Sqft:Store Sqft</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.Store Sqft Hierarchy - Store Sqft Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.Store Type:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.Store Type Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.Store Type:Store Type</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.Store Type Hierarchy - Store Type Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.Street Address:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.Street Address Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store.Street Address:Street Address</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store.Street Address Hierarchy - Street Address Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store:Store City</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store Hierarchy - Store City Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store:Store Country</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store Hierarchy - Store Country Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store:Store Name</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store Hierarchy - Store Name Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Store:Store State</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Store Hierarchy - Store State Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time.Day Name:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time.Day Name Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time.Day Name:Day Name</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time.Day Name Hierarchy - Day Name Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time.Day of Month:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time.Day of Month Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time.Day of Month:Day of Month</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time.Day of Month Hierarchy - Day of Month Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time.Fiscal Period:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time.Fiscal Period Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time.Fiscal Period:Fiscal Period</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time.Fiscal Period Hierarchy - Fiscal Period Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time.Month Name:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time.Month Name Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time.Month Name:Month Name</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time.Month Name Hierarchy - Month Name Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time.Month of Year:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time.Month of Year Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time.Month of Year:Month of Year</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time.Month of Year Hierarchy - Month of Year Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time.Quarter:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time.Quarter Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time.Quarter:Quarter</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time.Quarter Hierarchy - Quarter Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time.The Date:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time.The Date Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time.The Date:The Date</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time.The Date Hierarchy - The Date Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time.Time Id:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time.Time Id Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time.Time Id:Time Id</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time.Time Id Hierarchy - Time Id Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time.Week of Year:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time.Week of Year Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time.Week of Year:Week of Year</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time.Week of Year Hierarchy - Week of Year Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time.Weekly:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time.Weekly Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time.Weekly:Day</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time.Weekly Hierarchy - Day Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time.Weekly:Week</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time.Weekly Hierarchy - Week Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time.Weekly:Year</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time.Weekly Hierarchy - Year Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time.Year:(All)</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time.Year Hierarchy - (All) Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time.Year:Year</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time.Year Hierarchy - Year Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time:Month</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time Hierarchy - Month Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time:Quarter</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time Hierarchy - Quarter Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES:Time:Year</TABLE_NAME>
+        <TABLE_TYPE>SYSTEM TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube - Time Hierarchy - Year Level</DESCRIPTION>
+      </row>
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES</TABLE_NAME>
+        <TABLE_TYPE>TABLE</TABLE_TYPE>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube</DESCRIPTION>
+      </row>
+    </root>
+  </return>
+</DiscoverResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

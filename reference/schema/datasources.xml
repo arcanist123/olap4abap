@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<!--
+  eMondrian data sources for the reference container: the same as the one shipped with eMondrian, except that the only
+  catalog is ZFOODMART (reference/schema/FoodmartBW.xml), the schema that mirrors our BW model. The original FoodMart
+  catalog is gone on purpose, so that every answer of the container can be compared one-to-one with our ABAP server.
+  Installed by scripts/deploy-reference-schema.sh.
+-->
+<DataSources>
+  <DataSource>
+    <DataSourceName>ABAP BW</DataSourceName>
+    <DataSourceDescription>Foodmart Sample Data</DataSourceDescription>
+    <URL>http://localhost:8080/emondrian/xmla</URL>
+    <DataSourceInfo>Provider=mondrian;Jdbc=jdbc:hsqldb:res:/hsqldb-foodmart/foodmart;JdbcDrivers=org.hsqldb.jdbc.JDBCDriver</DataSourceInfo>
+    <ProviderName>Mondrian</ProviderName>
+    <ProviderType>MDP</ProviderType>
+    <AuthenticationMode>Unauthenticated</AuthenticationMode>
+    <Catalogs>
+        <Catalog name="ZFOODMART">
+            <Definition>/WEB-INF/schema/FoodmartBW.xml</Definition>
+        </Catalog>
+    </Catalogs>
+  </DataSource>
+</DataSources>

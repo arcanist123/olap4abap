@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<Schema name="Err">
+  <Dimension name="Store">
+    <Hierarchy hasAll="true"><Table name="store"/><Level name="Country" column="country" type="Text"/></Hierarchy>
+  </Dimension>
+</Schema>

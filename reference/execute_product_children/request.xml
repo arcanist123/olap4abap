@@ -1,0 +1,7 @@
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<SOAP-ENV:Body>
+<Execute xmlns="urn:schemas-microsoft-com:xml-analysis" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<Command><Statement>select [Product].Children on 0
+from [ZFMSALES]</Statement></Command>
+<Properties><PropertyList><DataSourceInfo>ABAP BW</DataSourceInfo><Catalog>ZFOODMART</Catalog><Format>Multidimensional</Format><AxisFormat>TupleFormat</AxisFormat><Content>SchemaData</Content></PropertyList></Properties>
+</Execute></SOAP-ENV:Body></SOAP-ENV:Envelope>

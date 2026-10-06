@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<DiscoverResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <row>
+        <TABLE_CATALOG>ZFOODMART</TABLE_CATALOG>
+        <TABLE_NAME>ZFMSALES</TABLE_NAME>
+        <TABLE_TYPE>TABLE</TABLE_TYPE>
+        <BOOKMARKS>false</BOOKMARKS>
+        <TABLE_VERSION>null</TABLE_VERSION>
+        <CARDINALITY>1000000</CARDINALITY>
+        <DESCRIPTION>ZFOODMART - ZFMSALES Cube</DESCRIPTION>
+      </row>
+    </root>
+  </return>
+</DiscoverResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

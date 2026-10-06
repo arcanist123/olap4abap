@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<DiscoverResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <row>
+        <DataSourceName>ABAP BW</DataSourceName>
+        <DataSourceDescription>Foodmart Sample Data</DataSourceDescription>
+        <URL>http://localhost:8080/emondrian/xmla</URL>
+        <DataSourceInfo>Provider=mondrian; JdbcDrivers=org.hsqldb.jdbc.JDBCDriver</DataSourceInfo>
+        <ProviderName>Mondrian</ProviderName>
+        <ProviderType>MDP</ProviderType>
+        <AuthenticationMode>Unauthenticated</AuthenticationMode>
+      </row>
+    </root>
+  </return>
+</DiscoverResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

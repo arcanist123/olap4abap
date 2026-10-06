@@ -1,0 +1,51 @@
+olap4abap
+Copyright (c) 2026 the olap4abap authors
+https://github.com/arcanist123/olap4abap
+
+This program and the accompanying materials are made available under the terms of the Eclipse Public License 2.0
+(see LICENSE), SPDX-License-Identifier: EPL-2.0.
+
+
+Derived work: Mondrian
+----------------------
+
+olap4abap is in large part a port to ABAP of Mondrian, the OLAP server (https://github.com/pentaho/mondrian), in
+version 9.3 of Sergei Semenkov's eMondrian fork (https://github.com/SergeiSemenkov/mondrian, branch eMondrian, and
+https://github.com/SergeiSemenkov/eMondrian). The ported parts are the MDX parser
+(from the JavaCC grammar MdxParser.jj), the validator, the built-in function table, the evaluator and the functions,
+the format strings, the schema definition (MondrianDef), the XMLA rowsets and answers, and the error texts. Mondrian
+is distributed under the Eclipse Public License 1.0, and the ported code is distributed here under the Eclipse Public
+License 2.0 as section 7 of the EPL 1.0 allows. Its copyright notices:
+
+  Copyright (C) 1998-2005 Julian Hyde
+  Copyright (C) 2005-2021 Hitachi Vantara and others
+  Copyright (C) 2021-2025 Sergei Semenkov
+
+The source code of Mondrian is available at the addresses above; scripts/setup-reference.sh fetches the version this
+port follows. scripts/patches/ holds our changes to it, under the license of the files they change (EPL 1.0).
+
+Mondrian is a trademark of Hitachi Vantara. olap4abap is not affiliated with or endorsed by Hitachi Vantara.
+
+The test data (tests/, reference/ and the unit tests) holds MDX statements of Mondrian's test suite and its demo
+schemas FoodMart.xml and SteelWheels.xml (Eclipse Public License 1.0), answers captured from the eMondrian server, and
+the schema Foodmart.xml of the eMondrian web application (https://github.com/SergeiSemenkov/eMondrian, Apache License
+2.0, http://www.apache.org/licenses/LICENSE-2.0).
+
+
+Third-party code in the web application
+---------------------------------------
+
+web/schema/vendor/htm-preact-standalone.mjs, unchanged from https://unpkg.com/htm@3.1.1/preact/standalone.module.js:
+
+  Preact 10 - Copyright (c) 2015-present Jason Miller, MIT License
+  (https://github.com/preactjs/preact/blob/main/LICENSE)
+
+  htm 3.1.1 - Copyright 2018 Google Inc., Apache License 2.0
+  (https://github.com/developit/htm/blob/master/LICENSE, http://www.apache.org/licenses/LICENSE-2.0)
+
+
+Trademarks
+----------
+
+SAP, SAP BW, SAP HANA, ABAP and SAP NetWeaver are trademarks or registered trademarks of SAP SE. olap4abap is not
+affiliated with or endorsed by SAP SE.

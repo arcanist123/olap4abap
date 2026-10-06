@@ -1,0 +1,30 @@
+# Local MCP config holds a bearer token - never commit it (see .mcp.json.example)
+.mcp.json
+# SAP logon data for scripts/sap-sync.sh (see .env.sap.example)
+.env.sap
+
+# Third-party reference implementation, fetched by scripts/setup-reference.sh
+/mondrian/
+/eMondrian/
+
+# FoodMart CSVs exported from the third-party jar by scripts/export-foodmart-csv.py, and the ABAP data classes
+# generated from them by scripts/generate-foodmart-abap.py
+/data/foodmart/
+/data/foodmart-abap/
+# The FoodMart data classes and the class that loads them into the BW cube ZFMSALES live in a private repository:
+# a pull writes them into src/, but they are not part of olap4abap
+/src/zzxxmla1_cl_fm_data_*
+/src/zzxxmla1_cl_bw_foodmart_gen.*
+
+# Build output and logs
+*.log
+target/
+node_modules/
+/data/foodmart-bw/
+__pycache__/
+
+# Exchanges recorded by scripts/xmla-proxy.py
+/logs/
+
+# Mondrian 10.2.0.0-SNAPSHOT (EPL, from before the BSL switch), copied by hand as a further reference
+/mondrian-10.2.0.0/

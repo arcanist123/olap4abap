@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+<Session SessionId="yp613dboe" xmlns="urn:schemas-microsoft-com:xml-analysis" /></SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<DiscoverResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:sql="urn:schemas-microsoft-com:xml-sql" targetNamespace="urn:schemas-microsoft-com:xml-analysis:rowset" elementFormDefault="qualified">
+        <xsd:element name="root">
+          <xsd:complexType>
+            <xsd:sequence>
+              <xsd:element name="row" type="row" minOccurs="0" maxOccurs="unbounded"/>
+            </xsd:sequence>
+          </xsd:complexType>
+        </xsd:element>
+        <xsd:simpleType name="uuid">
+          <xsd:restriction base="xsd:string">
+            <xsd:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+          </xsd:restriction>
+        </xsd:simpleType>
+        <xsd:complexType name="row">
+          <xsd:sequence>
+            <xsd:element sql:field="CATALOG_NAME" name="CATALOG_NAME" type="xsd:string"/>
+            <xsd:element sql:field="DESCRIPTION" name="DESCRIPTION" type="xsd:string"/>
+            <xsd:element sql:field="ROLES" name="ROLES" type="xsd:string"/>
+            <xsd:element sql:field="DATE_MODIFIED" name="DATE_MODIFIED" type="xsd:dateTime" minOccurs="0"/>
+            <xsd:element sql:field="COMPATIBILITY_LEVEL" name="COMPATIBILITY_LEVEL" type="xsd:int" minOccurs="0"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:schema>
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <DESCRIPTION>No description available</DESCRIPTION>
+        <ROLES/>
+        <DATE_MODIFIED>2026-10-05T09:09:59</DATE_MODIFIED>
+        <COMPATIBILITY_LEVEL>1100</COMPATIBILITY_LEVEL>
+      </row>
+    </root>
+  </return>
+</DiscoverResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

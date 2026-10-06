@@ -1,0 +1,725 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<ExecuteResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:mddataset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:schemas-microsoft-com:xml-analysis:mddataset" xmlns="urn:schemas-microsoft-com:xml-analysis:mddataset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:sql="urn:schemas-microsoft-com:xml-sql" elementFormDefault="qualified">
+        <xsd:complexType name="MemberType">
+          <xsd:sequence>
+            <xsd:element name="UName" type="xsd:string"/>
+            <xsd:element name="Caption" type="xsd:string"/>
+            <xsd:element name="LName" type="xsd:string"/>
+            <xsd:element name="LNum" type="xsd:unsignedInt"/>
+            <xsd:element name="DisplayInfo" type="xsd:unsignedInt"/>
+            <xsd:sequence maxOccurs="unbounded" minOccurs="0">
+              <xsd:any processContents="lax" maxOccurs="unbounded"/>
+            </xsd:sequence>
+          </xsd:sequence>
+          <xsd:attribute name="Hierarchy" type="xsd:string"/>
+        </xsd:complexType>
+        <xsd:complexType name="PropType">
+          <xsd:attribute name="name" type="xsd:string"/>
+        </xsd:complexType>
+        <xsd:complexType name="TupleType">
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:element name="Member" type="MemberType"/>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:complexType name="MembersType">
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:element name="Member" type="MemberType"/>
+          </xsd:sequence>
+          <xsd:attribute name="Hierarchy" type="xsd:string"/>
+        </xsd:complexType>
+        <xsd:complexType name="TuplesType">
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:element name="Tuple" type="TupleType"/>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:complexType name="CrossProductType">
+          <xsd:sequence>
+            <xsd:choice minOccurs="0" maxOccurs="unbounded">
+              <xsd:element name="Members" type="MembersType"/>
+              <xsd:element name="Tuples" type="TuplesType"/>
+            </xsd:choice>
+          </xsd:sequence>
+          <xsd:attribute name="Size" type="xsd:unsignedInt"/>
+        </xsd:complexType>
+        <xsd:complexType name="OlapInfo">
+          <xsd:sequence>
+            <xsd:element name="CubeInfo">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element name="Cube" maxOccurs="unbounded">
+                    <xsd:complexType>
+                      <xsd:sequence>
+                        <xsd:element name="CubeName" type="xsd:string"/>
+                      </xsd:sequence>
+                    </xsd:complexType>
+                  </xsd:element>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="AxesInfo">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element name="AxisInfo" maxOccurs="unbounded">
+                    <xsd:complexType>
+                      <xsd:sequence>
+                        <xsd:element name="HierarchyInfo" minOccurs="0" maxOccurs="unbounded">
+                          <xsd:complexType>
+                            <xsd:sequence>
+                              <xsd:sequence maxOccurs="unbounded">
+                                <xsd:element name="UName" type="PropType"/>
+                                <xsd:element name="Caption" type="PropType"/>
+                                <xsd:element name="LName" type="PropType"/>
+                                <xsd:element name="LNum" type="PropType"/>
+                                <xsd:element name="DisplayInfo" type="PropType" minOccurs="0" maxOccurs="unbounded"/>
+                              </xsd:sequence>
+                              <xsd:sequence>
+                                <xsd:any processContents="lax" minOccurs="0" maxOccurs="unbounded"/>
+                              </xsd:sequence>
+                            </xsd:sequence>
+                            <xsd:attribute name="name" type="xsd:string" use="required"/>
+                          </xsd:complexType>
+                        </xsd:element>
+                      </xsd:sequence>
+                      <xsd:attribute name="name" type="xsd:string"/>
+                    </xsd:complexType>
+                  </xsd:element>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="CellInfo">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:sequence minOccurs="0" maxOccurs="unbounded">
+                    <xsd:choice>
+                      <xsd:element name="Value" type="PropType"/>
+                      <xsd:element name="FmtValue" type="PropType"/>
+                      <xsd:element name="BackColor" type="PropType"/>
+                      <xsd:element name="ForeColor" type="PropType"/>
+                      <xsd:element name="FontName" type="PropType"/>
+                      <xsd:element name="FontSize" type="PropType"/>
+                      <xsd:element name="FontFlags" type="PropType"/>
+                      <xsd:element name="FormatString" type="PropType"/>
+                      <xsd:element name="NonEmptyBehavior" type="PropType"/>
+                      <xsd:element name="SolveOrder" type="PropType"/>
+                      <xsd:element name="Updateable" type="PropType"/>
+                      <xsd:element name="Visible" type="PropType"/>
+                      <xsd:element name="Expression" type="PropType"/>
+                    </xsd:choice>
+                  </xsd:sequence>
+                  <xsd:sequence maxOccurs="unbounded" minOccurs="0">
+                    <xsd:any processContents="lax" maxOccurs="unbounded"/>
+                  </xsd:sequence>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:complexType name="Axes">
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:element name="Axis">
+              <xsd:complexType>
+                <xsd:choice minOccurs="0" maxOccurs="unbounded">
+                  <xsd:element name="CrossProduct" type="CrossProductType"/>
+                  <xsd:element name="Tuples" type="TuplesType"/>
+                  <xsd:element name="Members" type="MembersType"/>
+                </xsd:choice>
+                <xsd:attribute name="name" type="xsd:string"/>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:complexType name="CellData">
+          <xsd:sequence>
+            <xsd:element name="Cell" minOccurs="0" maxOccurs="unbounded">
+              <xsd:complexType>
+                <xsd:sequence maxOccurs="unbounded">
+                  <xsd:choice>
+                    <xsd:element name="Value"/>
+                    <xsd:element name="FmtValue" type="xsd:string"/>
+                    <xsd:element name="BackColor" type="xsd:unsignedInt"/>
+                    <xsd:element name="ForeColor" type="xsd:unsignedInt"/>
+                    <xsd:element name="FontName" type="xsd:string"/>
+                    <xsd:element name="FontSize" type="xsd:unsignedShort"/>
+                    <xsd:element name="FontFlags" type="xsd:unsignedInt"/>
+                    <xsd:element name="FormatString" type="xsd:string"/>
+                    <xsd:element name="NonEmptyBehavior" type="xsd:unsignedShort"/>
+                    <xsd:element name="SolveOrder" type="xsd:unsignedInt"/>
+                    <xsd:element name="Updateable" type="xsd:unsignedInt"/>
+                    <xsd:element name="Visible" type="xsd:unsignedInt"/>
+                    <xsd:element name="Expression" type="xsd:string"/>
+                  </xsd:choice>
+                </xsd:sequence>
+                <xsd:attribute name="CellOrdinal" type="xsd:unsignedInt" use="required"/>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:element name="root">
+          <xsd:complexType>
+            <xsd:sequence maxOccurs="unbounded">
+              <xsd:element name="OlapInfo" type="OlapInfo"/>
+              <xsd:element name="Axes" type="Axes"/>
+              <xsd:element name="CellData" type="CellData"/>
+            </xsd:sequence>
+          </xsd:complexType>
+        </xsd:element>
+      </xsd:schema>
+      <OlapInfo>
+        <CubeInfo>
+          <Cube>
+            <CubeName>ZFMSALES</CubeName>
+            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-05T16:55:40</LastDataUpdate>
+            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-05T16:55:40</LastSchemaUpdate>
+          </Cube>
+        </CubeInfo>
+        <AxesInfo>
+          <AxisInfo name="Axis0">
+            <HierarchyInfo name="[Measures]">
+              <UName name="[Measures].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
+              <Caption name="[Measures].[MEMBER_CAPTION]" type="xsd:string"/>
+              <LName name="[Measures].[LEVEL_UNIQUE_NAME]" type="xsd:string"/>
+              <LNum name="[Measures].[LEVEL_NUMBER]" type="xsd:unsignedInt"/>
+              <DisplayInfo name="[Measures].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
+            </HierarchyInfo>
+          </AxisInfo>
+          <AxisInfo name="Axis1">
+            <HierarchyInfo name="[Customers]">
+              <UName name="[Customers].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
+              <Caption name="[Customers].[MEMBER_CAPTION]" type="xsd:string"/>
+              <LName name="[Customers].[LEVEL_UNIQUE_NAME]" type="xsd:string"/>
+              <LNum name="[Customers].[LEVEL_NUMBER]" type="xsd:unsignedInt"/>
+              <DisplayInfo name="[Customers].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
+            </HierarchyInfo>
+          </AxisInfo>
+          <AxisInfo name="SlicerAxis">
+            <HierarchyInfo name="[Time]">
+              <UName name="[Time].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
+              <Caption name="[Time].[MEMBER_CAPTION]" type="xsd:string"/>
+              <LName name="[Time].[LEVEL_UNIQUE_NAME]" type="xsd:string"/>
+              <LNum name="[Time].[LEVEL_NUMBER]" type="xsd:unsignedInt"/>
+              <DisplayInfo name="[Time].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
+            </HierarchyInfo>
+          </AxisInfo>
+        </AxesInfo>
+        <CellInfo>
+          <Value name="VALUE"/>
+          <FmtValue name="FORMATTED_VALUE" type="xsd:string"/>
+        </CellInfo>
+      </OlapInfo>
+      <Axes>
+        <Axis name="Axis0">
+          <Tuples>
+            <Tuple>
+              <Member Hierarchy="[Measures]">
+                <UName>[Measures].[Unit Sales]</UName>
+                <Caption>Unit Sales</Caption>
+                <LName>[Measures].[MeasuresLevel]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+          </Tuples>
+        </Axis>
+        <Axis name="Axis1">
+          <Tuples>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Wildon Cameron]</UName>
+                <Caption>Wildon Cameron</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Emily Barela]</UName>
+                <Caption>Emily Barela</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Dauna Barton]</UName>
+                <Caption>Dauna Barton</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Mona Vigil]</UName>
+                <Caption>Mona Vigil</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Linda Combs]</UName>
+                <Caption>Linda Combs</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Jack Zucconi]</UName>
+                <Caption>Jack Zucconi</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Eric Winters]</UName>
+                <Caption>Eric Winters</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Luann Crawford]</UName>
+                <Caption>Luann Crawford</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Suzanne Davis]</UName>
+                <Caption>Suzanne Davis</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Lucy Flowers]</UName>
+                <Caption>Lucy Flowers</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Donna Weisinger]</UName>
+                <Caption>Donna Weisinger</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Stanley Marks]</UName>
+                <Caption>Stanley Marks</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[James Short]</UName>
+                <Caption>James Short</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Dawn Laner]</UName>
+                <Caption>Dawn Laner</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Curtis Pollard]</UName>
+                <Caption>Curtis Pollard</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Patricia Towns]</UName>
+                <Caption>Patricia Towns</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Puyallup].[William Wade]</UName>
+                <Caption>William Wade</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Lorriene Weathers]</UName>
+                <Caption>Lorriene Weathers</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Grace McLaughlin]</UName>
+                <Caption>Grace McLaughlin</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Edna Woodson]</UName>
+                <Caption>Edna Woodson</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Harry Torphy]</UName>
+                <Caption>Harry Torphy</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Anne Allard]</UName>
+                <Caption>Anne Allard</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Bonnie Staley]</UName>
+                <Caption>Bonnie Staley</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Olympia].[Patricia Gervasi]</UName>
+                <Caption>Patricia Gervasi</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Shirley Gottbehuet]</UName>
+                <Caption>Shirley Gottbehuet</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Puyallup].[Jeremy Styers]</UName>
+                <Caption>Jeremy Styers</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Beth Ohnheiser]</UName>
+                <Caption>Beth Ohnheiser</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Bremerton].[Harold Powers]</UName>
+                <Caption>Harold Powers</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Daniel Thompson]</UName>
+                <Caption>Daniel Thompson</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[WA].[Spokane].[Fran McEvilly]</UName>
+                <Caption>Fran McEvilly</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+          </Tuples>
+        </Axis>
+        <Axis name="SlicerAxis">
+          <Tuples>
+            <Tuple>
+              <Member Hierarchy="[Time]">
+                <UName>[Time].[1997].[Q1].[2]</UName>
+                <Caption>2</Caption>
+                <LName>[Time].[Month]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Time]">
+                <UName>[Time].[1997].[Q1].[3]</UName>
+                <Caption>3</Caption>
+                <LName>[Time].[Month]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Time]">
+                <UName>[Time].[1997].[Q2].[4]</UName>
+                <Caption>4</Caption>
+                <LName>[Time].[Month]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Time]">
+                <UName>[Time].[1997].[Q2].[5]</UName>
+                <Caption>5</Caption>
+                <LName>[Time].[Month]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Time]">
+                <UName>[Time].[1997].[Q2].[6]</UName>
+                <Caption>6</Caption>
+                <LName>[Time].[Month]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Time]">
+                <UName>[Time].[1997].[Q3].[7]</UName>
+                <Caption>7</Caption>
+                <LName>[Time].[Month]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Time]">
+                <UName>[Time].[1997].[Q3].[8]</UName>
+                <Caption>8</Caption>
+                <LName>[Time].[Month]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Time]">
+                <UName>[Time].[1997].[Q3].[9]</UName>
+                <Caption>9</Caption>
+                <LName>[Time].[Month]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Time]">
+                <UName>[Time].[1997].[Q4].[10]</UName>
+                <Caption>10</Caption>
+                <LName>[Time].[Month]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Time]">
+                <UName>[Time].[1997].[Q4].[11]</UName>
+                <Caption>11</Caption>
+                <LName>[Time].[Month]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+          </Tuples>
+        </Axis>
+      </Axes>
+      <CellData>
+        <Cell CellOrdinal="0">
+          <Value xsi:type="xsd:double">327</Value>
+          <FmtValue>327</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="1">
+          <Value xsi:type="xsd:double">323</Value>
+          <FmtValue>323</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="2">
+          <Value xsi:type="xsd:double">319</Value>
+          <FmtValue>319</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="3">
+          <Value xsi:type="xsd:double">308</Value>
+          <FmtValue>308</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="4">
+          <Value xsi:type="xsd:double">305</Value>
+          <FmtValue>305</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="5">
+          <Value xsi:type="xsd:double">296</Value>
+          <FmtValue>296</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="6">
+          <Value xsi:type="xsd:double">296</Value>
+          <FmtValue>296</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="7">
+          <Value xsi:type="xsd:double">295</Value>
+          <FmtValue>295</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="8">
+          <Value xsi:type="xsd:double">291</Value>
+          <FmtValue>291</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="9">
+          <Value xsi:type="xsd:double">289</Value>
+          <FmtValue>289</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="10">
+          <Value xsi:type="xsd:double">285</Value>
+          <FmtValue>285</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="11">
+          <Value xsi:type="xsd:double">284</Value>
+          <FmtValue>284</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="12">
+          <Value xsi:type="xsd:double">281</Value>
+          <FmtValue>281</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="13">
+          <Value xsi:type="xsd:double">279</Value>
+          <FmtValue>279</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="14">
+          <Value xsi:type="xsd:double">279</Value>
+          <FmtValue>279</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="15">
+          <Value xsi:type="xsd:double">278</Value>
+          <FmtValue>278</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="16">
+          <Value xsi:type="xsd:double">277</Value>
+          <FmtValue>277</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="17">
+          <Value xsi:type="xsd:double">271</Value>
+          <FmtValue>271</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="18">
+          <Value xsi:type="xsd:double">268</Value>
+          <FmtValue>268</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="19">
+          <Value xsi:type="xsd:double">266</Value>
+          <FmtValue>266</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="20">
+          <Value xsi:type="xsd:double">265</Value>
+          <FmtValue>265</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="21">
+          <Value xsi:type="xsd:double">264</Value>
+          <FmtValue>264</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="22">
+          <Value xsi:type="xsd:double">260</Value>
+          <FmtValue>260</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="23">
+          <Value xsi:type="xsd:double">251</Value>
+          <FmtValue>251</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="24">
+          <Value xsi:type="xsd:double">250</Value>
+          <FmtValue>250</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="25">
+          <Value xsi:type="xsd:double">249</Value>
+          <FmtValue>249</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="26">
+          <Value xsi:type="xsd:double">249</Value>
+          <FmtValue>249</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="27">
+          <Value xsi:type="xsd:double">248</Value>
+          <FmtValue>248</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="28">
+          <Value xsi:type="xsd:double">247</Value>
+          <FmtValue>247</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="29">
+          <Value xsi:type="xsd:double">247</Value>
+          <FmtValue>247</FmtValue>
+        </Cell>
+      </CellData>
+    </root>
+  </return>
+</ExecuteResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

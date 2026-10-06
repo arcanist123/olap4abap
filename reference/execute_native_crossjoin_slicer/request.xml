@@ -1,0 +1,15 @@
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<SOAP-ENV:Body>
+<Execute xmlns="urn:schemas-microsoft-com:xml-analysis" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<Command><Statement>select {[Measures].[Store Sales]} on columns,
+  NON EMPTY Crossjoin(
+    [Customers].[Name].Members,
+    [Product].[Product Name].Members
+ ) ON rows
+from [ZFMSALES]
+where (
+  [Store].[All Stores].[USA].[CA].[San Francisco].[Store 14],
+  [Time].[1997].[Q1].[1]
+)</Statement></Command>
+<Properties><PropertyList><DataSourceInfo>ABAP BW</DataSourceInfo><Catalog>ZFOODMART</Catalog><Format>Multidimensional</Format><AxisFormat>TupleFormat</AxisFormat><Content>SchemaData</Content></PropertyList></Properties>
+</Execute></SOAP-ENV:Body></SOAP-ENV:Envelope>

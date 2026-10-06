@@ -1,0 +1,3 @@
+<?xml version="1.0"?>
+<!-- The root element is read as a Schema whatever its name. -->
+<Cube name="NotASchema"><Table name="t"/></Cube>

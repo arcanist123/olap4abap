@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<abapGit version="v1.0.0" serializer="LCL_OBJECT_TABL" serializer_version="v1.0.0">
+ <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+  <asx:values>
+   <DD02V>
+    <TABNAME>ZZXXMLA1_FILE</TABNAME>
+    <DDLANGUAGE>E</DDLANGUAGE>
+    <TABCLASS>TRANSP</TABCLASS>
+    <DDTEXT>abaplint stub: created by ZZXXMLA1_CL_CREATE_TABLES</DDTEXT>
+    <CONTFLAG>C</CONTFLAG>
+   </DD02V>
+   <DD03P_TABLE>
+     <DD03P>
+      <FIELDNAME>PATH</FIELDNAME><KEYFLAG>X</KEYFLAG>
+      <INTTYPE>C</INTTYPE>
+      <DATATYPE>CHAR</DATATYPE>
+      <LENG>000255</LENG>
+      <DECIMALS>000000</DECIMALS>
+     </DD03P>
+     <DD03P>
+      <FIELDNAME>CONTENT</FIELDNAME>
+      <INTTYPE>g</INTTYPE>
+      <DATATYPE>STRG</DATATYPE>
+      <LENG>000000</LENG>
+      <DECIMALS>000000</DECIMALS>
+     </DD03P>
+     <DD03P>
+      <FIELDNAME>CHANGED_AT</FIELDNAME>
+      <INTTYPE>P</INTTYPE>
+      <DATATYPE>DEC</DATATYPE>
+      <LENG>000021</LENG>
+      <DECIMALS>000007</DECIMALS>
+     </DD03P>
+     <DD03P>
+      <FIELDNAME>CHANGED_BY</FIELDNAME>
+      <INTTYPE>C</INTTYPE>
+      <DATATYPE>CHAR</DATATYPE>
+      <LENG>000012</LENG>
+      <DECIMALS>000000</DECIMALS>
+     </DD03P>
+   </DD03P_TABLE>
+  </asx:values>
+ </asx:abap>
+</abapGit>

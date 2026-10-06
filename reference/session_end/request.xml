@@ -1,0 +1,1 @@
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Header><EndSession xmlns="urn:schemas-microsoft-com:xml-analysis" SessionId="yp613dboe"/></soap:Header><soap:Body><Execute xmlns="urn:schemas-microsoft-com:xml-analysis"><Command><Statement xmlns="urn:schemas-microsoft-com:xml-analysis"/></Command><Properties/></Execute></soap:Body></soap:Envelope>

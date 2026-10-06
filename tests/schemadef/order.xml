@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<!-- Children are read in the order of the definition (DOMElementParser): a Dimension after the Measures is not
+     part of any array and is silently dropped, as is an element of no known class (Foo). Tags are matched after
+     capitalising the first letter: <table> is a Table. -->
+<Schema name="Order">
+  <Cube name="Sales">
+    <table name="sales_fact"/>
+    <Foo bar="1"/>
+    <Measure name="Units" column="units" aggregator="sum"/>
+    <Dimension name="Late" foreignKey="x"><Hierarchy hasAll="true"><Level name="L" column="c"/></Hierarchy></Dimension>
+  </Cube>
+</Schema>
