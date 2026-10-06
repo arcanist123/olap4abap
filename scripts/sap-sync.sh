@@ -53,6 +53,23 @@ cmd_pull() {
   "${SAPCLI[@]}" checkout package "$PACKAGE" "$tmp/pkg"
   [ -f "$tmp/pkg/.abapgit.xml" ] || die "export has no .abapgit.xml, nothing copied"
   [ -d "$tmp/pkg/$SRC_DIR" ]    || die "export has no $SRC_DIR/ folder (check .abapgit.xml STARTING_FOLDER), nothing copied"
+  # classes have no local includes (CLAUDE.md): sapcli writes SAP's template of every class's local definitions and
+  # implementations, which are dropped; one with code is refused
+  local locals include with_code=()
+  for locals in "$tmp/pkg/$SRC_DIR"/*.clas.locals_def.abap "$tmp/pkg/$SRC_DIR"/*.clas.locals_imp.abap; do
+    [ -e "$locals" ] || continue
+    if grep -Eqv '^[[:space:]]*(\*.*|".*)?[[:space:]]*$' "$locals"; then
+      with_code+=("$(basename "$locals")")
+    else
+      rm "$locals"
+    fi
+  done
+  [ ${#with_code[@]} -eq 0 ] || die "local includes with code (move them into global classes), nothing copied: ${with_code[*]}"
+  # a test include that is only SAP's template is dropped as well
+  for include in "$tmp/pkg/$SRC_DIR"/*.clas.testclasses.abap; do
+    [ -e "$include" ] || continue
+    grep -Eqv '^[[:space:]]*(\*.*|".*)?[[:space:]]*$' "$include" || rm "$include"
+  done
   rm -rf "$ROOT/$SRC_DIR"
   cp "$tmp/pkg/.abapgit.xml" "$ROOT/.abapgit.xml"
   cp -r "$tmp/pkg/$SRC_DIR" "$ROOT/$SRC_DIR"

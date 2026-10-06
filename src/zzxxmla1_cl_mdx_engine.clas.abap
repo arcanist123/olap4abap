@@ -38,7 +38,8 @@
 CLASS zzxxmla1_cl_mdx_engine DEFINITION
   PUBLIC
   FINAL
-  CREATE PUBLIC.
+  CREATE PUBLIC
+  GLOBAL FRIENDS zzxxmla1_cl_mdx_slicer_calc zzxxmla1_cl_mdx_vtotal_calc.
 
   PUBLIC SECTION.
     INTERFACES zzxxmla1_if_mdx_calc.
@@ -976,7 +977,7 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
     "! The calculation of a visual total member; none for any other member.
     METHODS visual_total_calc
       IMPORTING member        TYPE ty_member
-      RETURNING VALUE(result) TYPE REF TO lcl_visual_total_calc.
+      RETURNING VALUE(result) TYPE REF TO zzxxmla1_cl_mdx_vtotal_calc.
     "! VisualTotalsFunDef.substitute: * is the name, ** an asterisk.
     CLASS-METHODS substitute
       IMPORTING pattern       TYPE string
@@ -3424,7 +3425,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       RETURN.
     ENDIF.
     DATA(reduced) = VALUE ty_t_tuple( FOR t IN tuples ( VALUE #( FOR p IN varying ( t[ p ] ) ) ) ).
-    DATA(calc) = NEW lcl_compound_slicer_calc( engine = me tuples = reduced ).
+    DATA(calc) = NEW zzxxmla1_cl_mdx_slicer_calc( engine = me tuples = reduced ).
     " the placeholder delegates to the null member of the hierarchy (RolapHierarchy.getNullMember, named #null)
     LOOP AT varying INTO position.
       member = first[ position ].
@@ -5002,7 +5003,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     " not calculated in the query, with Aggregate
     schema_reader->add_visual_total( VALUE #(
       member = result cube_scope = abap_true contains_aggregate = abap_true
-      calc = NEW lcl_visual_total_calc(
+      calc = NEW zzxxmla1_cl_mdx_vtotal_calc(
                engine = me member = wrapped
                children = real_members( following_descendants( member = member index = index + 1
                                                                 members = members ) ) ) ) ).
@@ -5059,7 +5060,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       RETURN.
     ENDIF.
     DATA(calc) = schema_reader->get_calculation( member )-calc.
-    IF calc IS BOUND AND calc IS INSTANCE OF lcl_visual_total_calc.
+    IF calc IS BOUND AND calc IS INSTANCE OF zzxxmla1_cl_mdx_vtotal_calc.
       result = CAST #( calc ).
     ENDIF.
   ENDMETHOD.
@@ -5709,8 +5710,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       RETURN.
     ENDIF.
     DATA(calc) = schema_reader->get_calculation( member )-calc.
-    IF calc IS BOUND AND calc IS INSTANCE OF lcl_compound_slicer_calc.
-      result = CAST lcl_compound_slicer_calc( calc )->tuples.
+    IF calc IS BOUND AND calc IS INSTANCE OF zzxxmla1_cl_mdx_slicer_calc.
+      result = CAST zzxxmla1_cl_mdx_slicer_calc( calc )->tuples.
     ENDIF.
   ENDMETHOD.
 

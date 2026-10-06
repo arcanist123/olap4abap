@@ -94,45 +94,45 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
     METHODS proposal
       IMPORTING request       TYPE ty_request
       RETURNING VALUE(result) TYPE string
-      RAISING   lcx_refused.
+      RAISING   zzxxmla1_cx_api_refused.
     METHODS schemas
       RETURNING VALUE(result) TYPE string
-      RAISING   lcx_refused.
+      RAISING   zzxxmla1_cx_api_refused.
     METHODS schema
       IMPORTING request       TYPE ty_request
       RETURNING VALUE(result) TYPE string
-      RAISING   lcx_refused.
+      RAISING   zzxxmla1_cx_api_refused.
     METHODS check
       IMPORTING request       TYPE ty_request
       RETURNING VALUE(result) TYPE string
-      RAISING   lcx_refused.
+      RAISING   zzxxmla1_cx_api_refused.
     METHODS accept
       IMPORTING request       TYPE ty_request
       RETURNING VALUE(result) TYPE string
-      RAISING   lcx_refused.
+      RAISING   zzxxmla1_cx_api_refused.
     METHODS remove
       IMPORTING request       TYPE ty_request
       RETURNING VALUE(result) TYPE string
-      RAISING   lcx_refused.
+      RAISING   zzxxmla1_cx_api_refused.
     "! Everything accept checks before it changes anything.
     METHODS check_request
       IMPORTING request       TYPE ty_request
       RETURNING VALUE(result) TYPE ty_checked
-      RAISING   lcx_refused.
+      RAISING   zzxxmla1_cx_api_refused.
     "! The catalogs of a data sources file, in the order of the file.
     METHODS all_catalogs
       IMPORTING content       TYPE string
       RETURNING VALUE(result) TYPE ty_t_catalog_entry
-      RAISING   lcx_refused.
+      RAISING   zzxxmla1_cx_api_refused.
     "! The catalogs of a data sources file, each name once with its first definition (the XMLA endpoint's choice).
     METHODS first_catalogs
       IMPORTING content       TYPE string
       RETURNING VALUE(result) TYPE ty_t_catalog_entry
-      RAISING   lcx_refused.
+      RAISING   zzxxmla1_cx_api_refused.
     "! The server's data sources file, refused if it has none.
     METHODS datasources_file
       RETURNING VALUE(result) TYPE zzxxmla1_cl_files=>ty_file
-      RAISING   lcx_refused.
+      RAISING   zzxxmla1_cx_api_refused.
     "! The value of a query parameter, initial if it is not there.
     METHODS parameter
       IMPORTING request       TYPE ty_request
@@ -141,7 +141,7 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
     "! A catalog name is a file name too: letters, digits, _, - and . (not first).
     METHODS check_catalog_name
       IMPORTING catalog TYPE string
-      RAISING   lcx_refused.
+      RAISING   zzxxmla1_cx_api_refused.
     "! The data sources file with the catalog in its first data source: unchanged if a data source already has the
     "! catalog with this definition, refused if one has it with another.
     METHODS add_catalog
@@ -149,7 +149,7 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
                 catalog       TYPE string
                 definition    TYPE string
       RETURNING VALUE(result) TYPE string
-      RAISING   lcx_refused.
+      RAISING   zzxxmla1_cx_api_refused.
     "! The data sources file without the catalog in any data source: each Catalog element is cut out of the text
     "! (with its line if it has one of its own), so the file keeps its comments and layout; refused if there is no
     "! such catalog, or if the file read back has anything else changed.
@@ -157,14 +157,14 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
       IMPORTING content       TYPE string
                 catalog       TYPE string
       RETURNING VALUE(result) TYPE string
-      RAISING   lcx_refused.
+      RAISING   zzxxmla1_cx_api_refused.
     "! Loads the catalogs of the data sources file in ZZXXMLA1_CL_SCHEMA as the XMLA endpoint does (the first
     "! definition of a catalog name), with the given schema as the catalog's; refused with the reader's error.
     METHODS check_schema
       IMPORTING datasources TYPE string
                 catalog     TYPE string
                 schema_xml  TYPE string
-      RAISING   lcx_refused.
+      RAISING   zzxxmla1_cx_api_refused.
     "! The table names of the schema's dimensions (shared and private, and the Table of their hierarchies), each
     "! once in the order of the schema; a name that is the DDL source of a view is replaced by its database view.
     METHODS map_tables
@@ -246,7 +246,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
                                          ELSE                  remove( request ) ).
         result-status = 200.
         result-content_type = c_json.
-      CATCH lcx_refused INTO DATA(refused).
+      CATCH zzxxmla1_cx_api_refused INTO DATA(refused).
         result = error_result( status = refused->status message = refused->message ).
       CATCH cx_root INTO DATA(error) ##CATCH_ALL.
         " a JSON error rather than a dump the UI cannot show
@@ -266,19 +266,19 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
   METHOD proposal.
     DATA(name) = parameter( request = request name = `provider` ).
     IF name IS INITIAL.
-      RAISE EXCEPTION TYPE lcx_refused EXPORTING status = 400 message = `Parameter provider is missing`.
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400 message = `Parameter provider is missing`.
     ENDIF.
     DATA provider TYPE zzxxmla1_cl_bw_provider=>ty_provider.
     TRY.
         provider = NEW zzxxmla1_cl_bw_provider( )->read( name ).
       CATCH zzxxmla1_cx_bw_provider INTO DATA(error).
-        RAISE EXCEPTION TYPE lcx_refused EXPORTING status = 404 message = error->get_text( ).
+        RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 404 message = error->get_text( ).
     ENDTRY.
     DATA proposal TYPE zzxxmla1_cl_schema_proposal=>ty_proposal.
     TRY.
         proposal = NEW zzxxmla1_cl_schema_proposal( )->propose( provider ).
       CATCH zzxxmla1_cx_xom INTO DATA(xom_error).
-        RAISE EXCEPTION TYPE lcx_refused EXPORTING status = 500 message = |Proposal not readable: { xom_error->error_message }|.
+        RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 500 message = |Proposal not readable: { xom_error->error_message }|.
     ENDTRY.
 
     DATA notes TYPE string_table.
@@ -311,23 +311,23 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
   METHOD schema.
     DATA(catalog) = parameter( request = request name = `catalog` ).
     IF catalog IS INITIAL.
-      RAISE EXCEPTION TYPE lcx_refused EXPORTING status = 400 message = `Parameter catalog is missing`.
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400 message = `Parameter catalog is missing`.
     ENDIF.
     DATA(entries) = first_catalogs( datasources_file( )-content ).
     READ TABLE entries INTO DATA(entry) WITH KEY name = catalog.
     IF sy-subrc <> 0.
-      RAISE EXCEPTION TYPE lcx_refused EXPORTING status = 404 message = |No catalog '{ catalog }'|.
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 404 message = |No catalog '{ catalog }'|.
     ENDIF.
     DATA(file) = zzxxmla1_cl_files=>read( entry-definition ).
     IF file-path IS INITIAL.
-      RAISE EXCEPTION TYPE lcx_refused EXPORTING status = 404
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 404
         message = |Catalog '{ catalog }': the schema file { entry-definition } does not exist|.
     ENDIF.
     DATA parsed TYPE zzxxmla1_cl_schema_def=>ty_schema.
     TRY.
         parsed = zzxxmla1_cl_schema_def=>parse( file-content ).
       CATCH zzxxmla1_cx_xom INTO DATA(xom_error).
-        RAISE EXCEPTION TYPE lcx_refused EXPORTING status = 500
+        RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 500
           message = |Schema file { entry-definition } not readable: { xom_error->error_message }|.
     ENDTRY.
     result = |\{"catalog":{ json( entry-name ) },"dataSource":{ json( entry-data_source ) },| &&
@@ -354,7 +354,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     TRY.
         result-schema = zzxxmla1_cl_schema_def=>parse( request-body ).
       CATCH zzxxmla1_cx_xom INTO DATA(xom_error).
-        RAISE EXCEPTION TYPE lcx_refused EXPORTING status = 400 message = |Schema not readable: { xom_error->error_message }|.
+        RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400 message = |Schema not readable: { xom_error->error_message }|.
     ENDTRY.
     result-catalog = parameter( request = request name = `catalog` ).
     IF result-catalog IS INITIAL.
@@ -390,7 +390,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
         TRY.
             APPEND generator->generate( CONV #( characteristic ) ) TO views.
           CATCH cx_dd_ddl_exception INTO DATA(ddl_error).
-            RAISE EXCEPTION TYPE lcx_refused EXPORTING status = 500
+            RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 500
               message = |View of { characteristic } not generated: { ddl_error->get_text( ) }|.
         ENDTRY.
       ENDIF.
@@ -419,7 +419,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
   METHOD remove.
     DATA(catalog) = parameter( request = request name = `catalog` ).
     IF catalog IS INITIAL.
-      RAISE EXCEPTION TYPE lcx_refused EXPORTING status = 400 message = `Parameter catalog is missing`.
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400 message = `Parameter catalog is missing`.
     ENDIF.
     DATA(datasources) = datasources_file( )-content.
     DATA(new_datasources) = remove_catalog( content = datasources catalog = catalog ).
@@ -458,7 +458,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     TRY.
         data_sources = zzxxmla1_cl_repository=>of_content( content )->data_sources( ).
       CATCH zzxxmla1_cx_xmla INTO DATA(error).
-        RAISE EXCEPTION TYPE lcx_refused EXPORTING status = 500 message = error->description.
+        RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 500 message = error->description.
     ENDTRY.
     LOOP AT data_sources INTO DATA(data_source).
       LOOP AT data_source-catalogs INTO DATA(catalog).
@@ -479,13 +479,13 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
   METHOD datasources_file.
     result = zzxxmla1_cl_files=>read( zzxxmla1_cl_files=>c_datasources ).
     IF result-path IS INITIAL.
-      RAISE EXCEPTION TYPE lcx_refused EXPORTING status = 500 message = |The server has no { zzxxmla1_cl_files=>c_datasources }|.
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 500 message = |The server has no { zzxxmla1_cl_files=>c_datasources }|.
     ENDIF.
   ENDMETHOD.
 
   METHOD check_catalog_name.
     IF NOT matches( val = catalog regex = `[A-Za-z0-9_][A-Za-z0-9_.\-]*` ).
-      RAISE EXCEPTION TYPE lcx_refused EXPORTING status = 400
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400
         message = |Catalog name '{ catalog }': only letters, digits, _, - and . (not first) are allowed|.
     ENDIF.
   ENDMETHOD.
@@ -495,17 +495,17 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     TRY.
         data_sources = zzxxmla1_cl_repository=>of_content( content )->data_sources( ).
       CATCH zzxxmla1_cx_xmla INTO DATA(error).
-        RAISE EXCEPTION TYPE lcx_refused EXPORTING status = 500 message = error->description.
+        RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 500 message = error->description.
     ENDTRY.
     IF data_sources IS INITIAL.
-      RAISE EXCEPTION TYPE lcx_refused EXPORTING status = 500
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 500
         message = |{ zzxxmla1_cl_files=>c_datasources } has no data source|.
     ENDIF.
     DATA(registered) = abap_false.
     LOOP AT data_sources INTO DATA(data_source).
       LOOP AT data_source-catalogs INTO DATA(existing) WHERE name = catalog.
         IF existing-definition <> definition.
-          RAISE EXCEPTION TYPE lcx_refused EXPORTING status = 400
+          RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400
             message = |Catalog '{ catalog }' exists already, with the schema file { existing-definition }|.
         ENDIF.
         registered = abap_true.
@@ -542,7 +542,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
         added = abap_false.
     ENDTRY.
     IF added = abap_false.
-      RAISE EXCEPTION TYPE lcx_refused EXPORTING status = 500
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 500
         message = |The catalog cannot be added to the Catalogs of the first data source of { zzxxmla1_cl_files=>c_datasources }|.
     ENDIF.
   ENDMETHOD.
@@ -552,7 +552,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     DATA(expected) = before.
     DELETE expected WHERE name = catalog.
     IF lines( expected ) = lines( before ).
-      RAISE EXCEPTION TYPE lcx_refused EXPORTING status = 404 message = |No catalog '{ catalog }'|.
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 404 message = |No catalog '{ catalog }'|.
     ENDIF.
 
     DATA name TYPE string.
@@ -601,11 +601,11 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     DATA(removed) = abap_false.
     TRY.
         removed = xsdbool( all_catalogs( result ) = expected AND result <> content ).
-      CATCH lcx_refused.
+      CATCH zzxxmla1_cx_api_refused.
         removed = abap_false.
     ENDTRY.
     IF removed = abap_false.
-      RAISE EXCEPTION TYPE lcx_refused EXPORTING status = 500
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 500
         message = |Catalog '{ catalog }' cannot be removed from the text of { zzxxmla1_cl_files=>c_datasources }|.
     ENDIF.
   ENDMETHOD.
@@ -618,7 +618,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
       ELSE.
         DATA(file) = zzxxmla1_cl_files=>read( entry-definition ).
         IF file-path IS INITIAL.
-          RAISE EXCEPTION TYPE lcx_refused EXPORTING status = 500
+          RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 500
             message = |Catalog '{ entry-name }': the schema file { entry-definition } does not exist|.
         ENDIF.
         APPEND VALUE #( name = entry-name schema = file-content updated_at = file-changed_at ) TO catalogs.
@@ -627,7 +627,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     TRY.
         zzxxmla1_cl_schema=>of_catalogs( catalogs ).
       CATCH zzxxmla1_cx_xmla INTO DATA(error).
-        RAISE EXCEPTION TYPE lcx_refused EXPORTING status = 400 message = error->description.
+        RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400 message = error->description.
     ENDTRY.
   ENDMETHOD.
 

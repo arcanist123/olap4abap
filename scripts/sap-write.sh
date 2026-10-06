@@ -2,7 +2,7 @@
 # Writes ABAP class sources from src/ into SAP with sapcli and activates them, unchanged byte for byte (the ABAP FS
 # edit tool decodes backslash escapes). The classes must exist. Logon data from .env.sap, as scripts/sap-sync.sh.
 #
-#   scripts/sap-write.sh zzxxmla1_cl_sql [zzxxmla1_cl_schema ...]   # main source and, if present, local types and test include
+#   scripts/sap-write.sh zzxxmla1_cl_sql [zzxxmla1_cl_schema ...]   # main source and, if present, test include
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -31,13 +31,6 @@ for base in "$@"; do
   if [ "$kind" = "intf" ]; then
     "${SAPCLI[@]}" interface write "$name" "src/$base.intf.abap" >/dev/null
   else
-    # the local types first: the main source may use them
-    if [ -f "src/$base.clas.locals_def.abap" ]; then
-      "${SAPCLI[@]}" class write --type definitions "$name" "src/$base.clas.locals_def.abap" >/dev/null
-    fi
-    if [ -f "src/$base.clas.locals_imp.abap" ]; then
-      "${SAPCLI[@]}" class write --type implementations "$name" "src/$base.clas.locals_imp.abap" >/dev/null
-    fi
     "${SAPCLI[@]}" class write --type main "$name" "src/$base.clas.abap" >/dev/null
     if [ -f "src/$base.clas.testclasses.abap" ]; then
       "${SAPCLI[@]}" class write --type testclasses "$name" "src/$base.clas.testclasses.abap" >/dev/null

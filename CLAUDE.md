@@ -33,6 +33,10 @@ Read before designing anything:
   after changes; the 2025 development system accepts newer syntax that 7.50 rejects.
 - After every ABAP edit run the diagnostics check (`get_abap_diagnostics`) and then activate. The editor's checker can
   be stale after multi-step edits; a small re-save of the changed line forces a resync.
+- **No local includes in classes:** a class has only its global source and, if it has tests, its test include
+  (`.clas.testclasses.abap`); no local definitions/implementations (`locals_def`/`locals_imp`). A helper class, an
+  exception or a type a class needs is a global object of its own (a `GLOBAL FRIENDS` of the class if it needs its
+  private parts, e.g. `ZZXXMLA1_CL_MDX_SLICER_CALC`). `scripts/sap-sync.sh pull` refuses a local include with code.
 - Put logic in small private methods and test those in the class's local test include
   (`.clas.testclasses.abap`, created with `abapfs_create_test_include`); `IF_HTTP_SERVER` is awkward to fake.
 - ABAP SQL via the SQL tool: keep statements multi-line, use `ORDER BY ... ASCENDING/DESCENDING`, functions need

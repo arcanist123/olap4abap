@@ -4,9 +4,8 @@ Writes ABAP classes and interfaces from src/ into SAP with sapcli and activates 
 scripts/sap-write.sh).
 
 .DESCRIPTION
-For each object: the local definitions, the local implementations, the main source and the test classes of a class
-(the includes that exist in src/), or the source of an interface; then all objects are activated. Every sapcli call
-runs on its own, one after the other. A failed call stops that object and names the step; nothing is retried. The
+For each object: the main source and the test classes of a class (classes have no local includes, CLAUDE.md), or
+the source of an interface; then all objects are activated. Every sapcli call runs on its own, one after the other. A failed call stops that object and names the step; nothing is retried. The
 objects must exist in SAP. Logon data comes from .env.sap (SAP_ASHOST, SAP_CLIENT, SAP_USER, SAP_PASSWORD, optional
 SAP_PORT and SAP_USE_SSL), as for scripts/sap-sync.sh.
 
@@ -72,13 +71,6 @@ foreach ($object in $Objects) {
     if (Test-Path "src/$base.intf.abap") {
         $steps += , @('interface source', @('interface', 'write', $name, "src/$base.intf.abap"))
     } else {
-        # the local types first: the main source may use them
-        if (Test-Path "src/$base.clas.locals_def.abap") {
-            $steps += , @('local definitions', @('class', 'write', '--type', 'definitions', $name, "src/$base.clas.locals_def.abap"))
-        }
-        if (Test-Path "src/$base.clas.locals_imp.abap") {
-            $steps += , @('local implementations', @('class', 'write', '--type', 'implementations', $name, "src/$base.clas.locals_imp.abap"))
-        }
         $steps += , @('main source', @('class', 'write', '--type', 'main', $name, "src/$base.clas.abap"))
         if (Test-Path "src/$base.clas.testclasses.abap") {
             $steps += , @('test classes', @('class', 'write', '--type', 'testclasses', $name, "src/$base.clas.testclasses.abap"))

@@ -282,13 +282,18 @@ cube name is one cube of the server (Mondrian allows the same cube in two catalo
 The `DataSourceInfo` of a catalog or a data source is not used for the connection. The rows of `ZZXXMLA1_FILE` go to
 another system as table entries (`R3TR TABU ZZXXMLA1_FILE`, delivery class C) in a transport.
 
-`scripts/sap-write.sh <name>...` writes any class (local types, main source and test include)
+`scripts/sap-write.sh <name>...` writes any class (main source and test include)
 or interface from `src/` with sapcli and activates it; `scripts/sap-write.ps1 <name>...` does the same in PowerShell
 and names the step that failed (it stops that object, it does not retry). Every sapcli call is a session of its own,
 one after the other, and sapcli never closes it: the stateful ADT session of each write (for the lock) stays in SM04
 until it times out, four or five per class. Prefer `scripts/sap-write.py <name>...` (run with sapcli's Python,
 `"$LOCALAPPDATA/pipx/pipx/venvs/sapcli/Scripts/python.exe" scripts/sap-write.py ...`): one connection per object writes
 its includes and activates, then ends the stateful context and logs off, so SM04 stays empty.
+With `--together` it writes all the objects in one session and activates them in one activation, for objects that
+need each other (`ZZXXMLA1_CL_MDX_ENGINE` and its global friends `ZZXXMLA1_CL_MDX_SLICER_CALC`,
+`ZZXXMLA1_CL_MDX_VTOTAL_CALC`). Classes have no local includes (CLAUDE.md): `sap-write.py` empties a local definitions
+or implementations include that still holds code in SAP, and `sap-sync.sh pull` drops the template-only ones sapcli
+exports (and template-only test includes) and refuses to pull a local include with code.
 
 Work processes in PRIV mode: an ADT session on a large class (`ZZXXMLA1_CL_MDX_ENGINE`) can exceed its extended
 memory and go into private memory; its dialog work process then stays bound to the session ("On Hold, ABAP Session in

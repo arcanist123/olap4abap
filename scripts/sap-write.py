@@ -2,23 +2,32 @@
 session per object that is closed afterwards.
 
     "$LOCALAPPDATA/pipx/pipx/venvs/sapcli/Scripts/python.exe" scripts/sap-write.py zzxxmla1_cl_sql [zzxxmla1_cl_schema ...]
+    ... scripts/sap-write.py --together zzxxmla1_cl_mdx_engine zzxxmla1_cl_mdx_slicer_calc
+
 
 Runs in sapcli's Python (it uses its library). Every `sapcli class write` is a process of its own whose ADT session
 (stateful, for the lock) stays open on the server until it times out: a class of four includes leaves four sessions in
 SM04, and on large classes they pin dialog work processes (docs/environment.md, work processes in PRIV mode). Here
 one connection writes the includes and activates, then ends the stateful context and logs off. Objects are written one
-after the other; the first one that fails stops the run (no retries). Logon data from .env.sap, as scripts/sap-sync.sh.
+after the other; the first one that fails stops the run (no retries). With --together all objects are written in one
+session and activated in one activation: for objects that need each other (global friends, a new class and its user).
+Logon data from .env.sap, as scripts/sap-sync.sh.
+
+Classes have no local includes (CLAUDE.md): only the main source and the test classes are written, and a local
+definitions or implementations include that still holds code in SAP is emptied.
 """
 import pathlib
 import sys
 
 import sap.adt
+import sap.adt.objects
 import sap.adt.wb
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-# include type -> sapcli attribute of the class; the local types first, the main source may use them
-CLASS_INCLUDES = [("locals_def", "definitions"), ("locals_imp", "implementations"), (None, None),
-                  ("testclasses", "test_classes")]
+# include type -> sapcli attribute of the class
+CLASS_INCLUDES = [(None, None), ("testclasses", "test_classes")]
+# the local includes, which must hold no code
+LOCAL_INCLUDES = ["definitions", "implementations"]
 
 
 def env():
@@ -53,7 +62,12 @@ def write(obj, path):
         editor.write(path.read_text(encoding="utf-8"))
 
 
-def deploy(connection, base):
+def has_code(text):
+    """True if an ABAP source has a line that is neither blank nor a comment."""
+    return any(line.strip() and not line.lstrip().startswith(("*", '"')) for line in text.splitlines())
+
+
+def write_object(connection, base):
     name = base.upper()
     intf = ROOT / "src" / f"{base}.intf.abap"
     if intf.exists():
@@ -65,20 +79,36 @@ def deploy(connection, base):
             path = ROOT / "src" / (f"{base}.clas.{suffix}.abap" if suffix else f"{base}.clas.abap")
             if path.exists():
                 write(getattr(obj, attribute) if attribute else obj, path)
-    results, _ = sap.adt.wb.try_activate(obj)
+        for attribute in LOCAL_INCLUDES:
+            include = getattr(obj, attribute)
+            if has_code(include.text):
+                with include.open_editor() as editor:
+                    editor.write("\n")  # sapcli strips one trailing newline; it rejects ""
+                print(f"   {name}: local {attribute} emptied")
+    return obj
+
+
+def activate(connection, objects):
+    references = sap.adt.objects.ADTObjectReferences()
+    for obj in objects:
+        references.add_object(obj)
+    results, _ = sap.adt.wb.mass_activate(connection, references)
     errors = [m for m in results.messages if m.is_error]
     warnings = [m for m in results.messages if m.is_warning]
-    print(f"== {name}: Errors: {len(errors)} Warnings: {len(warnings)}")
+    print(f"== {', '.join(obj.name for obj in objects)}: Errors: {len(errors)} Warnings: {len(warnings)}")
     for m in errors + warnings:
         print(f"  {m.typ}: {m.obj_descr} line {m.line}: {m.short_text}")
     return not errors
 
 
 def main():
-    for base in (a.lower() for a in sys.argv[1:]):
+    args = [a.lower() for a in sys.argv[1:]]
+    together = "--together" in args
+    bases = [a for a in args if a != "--together"]
+    for group in ([bases] if together else [[base] for base in bases]):
         connection = connect()
         try:
-            ok = deploy(connection, base)
+            ok = activate(connection, [write_object(connection, base) for base in group])
         finally:
             close(connection)
         if not ok:

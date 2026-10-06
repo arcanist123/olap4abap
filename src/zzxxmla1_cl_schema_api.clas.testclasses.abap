@@ -128,7 +128,7 @@ CLASS ltc_api IMPLEMENTATION.
     TRY.
         api->add_catalog( content = datasources( ) catalog = `ZFOODMART` definition = `/WEB-INF/schema/ZFOODMART.xml` ).
         cl_abap_unit_assert=>fail( `refused expected` ).
-      CATCH lcx_refused INTO DATA(refused).
+      CATCH zzxxmla1_cx_api_refused INTO DATA(refused).
         cl_abap_unit_assert=>assert_equals( act = refused->status exp = 400 ).
         cl_abap_unit_assert=>assert_equals(
           act = refused->message
@@ -139,14 +139,14 @@ CLASS ltc_api IMPLEMENTATION.
   METHOD catalog_names.
     TRY.
         api->check_catalog_name( `ZFMSALES_2.v-1` ).
-      CATCH lcx_refused.
+      CATCH zzxxmla1_cx_api_refused.
         cl_abap_unit_assert=>fail( `ZFMSALES_2.v-1 is a valid name` ).
     ENDTRY.
     LOOP AT VALUE string_table( ( `../x` ) ( `.x` ) ( `a b` ) ( `a/b` ) ) INTO DATA(name).
       TRY.
           api->check_catalog_name( name ).
           cl_abap_unit_assert=>fail( |{ name } must be refused| ).
-        CATCH lcx_refused ##NO_HANDLER.
+        CATCH zzxxmla1_cx_api_refused ##NO_HANDLER.
       ENDTRY.
     ENDLOOP.
   ENDMETHOD.
@@ -308,7 +308,7 @@ CLASS ltc_api IMPLEMENTATION.
     TRY.
         api->remove_catalog( content = datasources( ) catalog = `ZFOOD` ).
         cl_abap_unit_assert=>fail( `refused expected` ).
-      CATCH lcx_refused INTO DATA(refused).
+      CATCH zzxxmla1_cx_api_refused INTO DATA(refused).
         cl_abap_unit_assert=>assert_equals( act = refused->status exp = 404 ).
         cl_abap_unit_assert=>assert_equals( act = refused->message exp = `No catalog 'ZFOOD'` ).
     ENDTRY.
