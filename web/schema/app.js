@@ -11,6 +11,8 @@ const AGGREGATORS = ['sum', 'count'];
 const FORMATS = ['Standard', '#,###', '#,##0', '#,##0.00', 'Currency', 'Percent', '0.0%'];
 // a catalog name is a file name too (ZZXXMLA1_CL_SCHEMA_API, check_catalog_name)
 const CATALOG_NAME = /^[A-Za-z0-9_-][A-Za-z0-9_.-]*$/;
+// the catalog proposed for a schema: its name with every other character a _ (/1BW/C01 -> 1BW_C01)
+const catalogNameOf = (name) => (name || '').replace(/[^A-Za-z0-9_.-]+/g, '_').replace(/^[_.]+|_+$/g, '');
 
 // ---------------------------------------------------------------------------------------------------------- API
 
@@ -914,7 +916,7 @@ function App() {
         const doc = parseXml(d.xml);
         next = {
           doc,
-          catalog: attr(schemaOf(doc), 'name'),
+          catalog: catalogNameOf(attr(schemaOf(doc), 'name')),
           source: { kind: 'proposal', name: d.provider.name, providerKind: d.provider.kind, text: d.provider.text, factTable: d.provider.factTable },
           notes: d.notes || [],
           suggestions: suggestionKeys(doc, d.suggestions),
