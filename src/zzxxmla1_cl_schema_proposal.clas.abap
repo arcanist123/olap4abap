@@ -17,8 +17,10 @@
 "!   joined to its view, none is built on the fact table's columns. The characteristic is the key attribute, named
 "!   like the dimension: on an InfoCube keyed by the view's SID (the fact table's SID column is the foreign key) and
 "!   named by the value, on an aDSO keyed by the value (the fact column). Every time-independent attribute is a further
-"!   DimensionAttribute; each attribute is an attribute hierarchy, and there are no user hierarchies, because BW does
-"!   not say which attributes nest in which order. A characteristic without SID table (0CALDAY) has no view and is not
+"!   DimensionAttribute. As in the reference's FoodMart schema, where a dimension has its one hierarchy and the other
+"!   columns are properties, only the key attribute is a hierarchy: the others have attributeHierarchyEnabled="false"
+"!   (except on BW's standard time characteristics) and the user makes the hierarchies, attribute or user ones, because
+"!   BW does not say which attributes nest in which order. A characteristic without SID table (0CALDAY) has no view and is not
 "!   proposed. No dimension is a TimeDimension: the user marks one (the suggestions give the level types);
 "! - one Measure per key figure that sums, takes the minimum or the maximum, without exception aggregation and not
 "!   non-cumulative; the first one is the default measure.
@@ -95,6 +97,14 @@ CLASS zzxxmla1_cl_schema_proposal DEFINITION
       IMPORTING iobjnm        TYPE csequence
 
       RETURNING VALUE(result) TYPE string.
+
+    "! Whether a characteristic is one of BW's standard time characteristics (0CALWEEK, ..., 0FISCVARNT).
+
+    CLASS-METHODS is_time_characteristic
+
+      IMPORTING iobjnm        TYPE csequence
+
+      RETURNING VALUE(result) TYPE abap_bool.
 
     "! The reference's data type of a column of a view: Integer for the integer types and for NUMC up to 9 digits (the
 
@@ -408,11 +418,18 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
 
 
 
+    " as in the reference's FoodMart schema, the other attributes are no hierarchies unless the user makes them one;
+    " a standard time characteristic keeps them
+
+    DATA(enabled) = COND string( WHEN is_time_characteristic( characteristic-iobjnm ) = abap_false THEN `false` ).
+
     LOOP AT characteristic-attributes INTO DATA(attribute).
 
       DATA(attribute_name) = unique_name( scope = `attribute` text = attribute-text iobjnm = attribute-iobjnm ).
 
-      open( name = `DimensionAttribute` attributes = VALUE #( ( name = `name` value = attribute_name ) ) ).
+      open( name = `DimensionAttribute` attributes = VALUE #( ( name = `name` value = attribute_name )
+
+                                                              ( name = `attributeHierarchyEnabled` value = enabled ) ) ).
 
       leaf( name = `KeyColumn` attributes = VALUE #( ( name = `dataType` value = data_type( attribute-column ) )
 
@@ -529,6 +546,14 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
                        WHEN `0FISCPER`    THEN `TimeMonths`
 
                        WHEN `0FISCYEAR`   THEN `TimeYears` ).
+
+  ENDMETHOD.
+
+
+
+  METHOD is_time_characteristic.
+
+    result = xsdbool( time_level_type( iobjnm ) IS NOT INITIAL OR iobjnm = `0FISCVARNT` ).
 
   ENDMETHOD.
 

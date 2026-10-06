@@ -86,7 +86,9 @@ Read before designing anything:
   `scripts/schema_api_test.py`). Each cube is served from its own catalog for the MVP (`docs/mvp-scope.md`, Catalog
   decision); an aDSO is proposed as an InfoCube is: every characteristic,
   the time ones too, a dimension on its CDS view (no dimensions on fact columns; `0CALDAY` has no SID table and is not
-  supported); a time dimension only if the user marks one. The UI (`web/schema/`, Preact with htm, no build step) is served from
+  supported); a time dimension only if the user marks one. Only the key attribute is a hierarchy (as in FoodMart.xml,
+  one hierarchy per dimension); the other attributes have `attributeHierarchyEnabled="false"` except on BW's
+  standard time characteristics, and the user makes hierarchies in the UI. The UI (`web/schema/`, Preact with htm, no build step) is served from
   files of the server below `/schema/` by `ZZXXMLA1_CL_WEB_APP`; the files are in the generated class
   `ZZXXMLA1_CL_WEB_APP_FILES` (`scripts/generate-web-app-abap.py`, run after every change of `web/schema/`) and
   written by the setup (below); it

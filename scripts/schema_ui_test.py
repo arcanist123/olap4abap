@@ -9,6 +9,7 @@ remove dialogs.
 """
 import argparse
 import pathlib
+import re
 import sys
 
 from playwright.sync_api import sync_playwright
@@ -106,6 +107,8 @@ def main():
         xml = page.input_value("textarea.xml")
         check("XML has the hierarchy", '<Hierarchy name="Store Hierarchy" hasAll="true">' in xml
               and '<Property name="Store Type" sourceAttribute="Store Type"/>' in xml)
+        check("only the key attribute is a hierarchy", re.search(
+            r'<DimensionAttribute name="Store Type"[^>]*attributeHierarchyEnabled="false"', xml) is not None)
 
         # the aDSO: a time characteristic marked as time gets its suggested level type
         page = browser.new_page(viewport={"width": 1400, "height": 900}, color_scheme="dark")
@@ -116,7 +119,7 @@ def main():
         page.click("text=Time dimension")
         page.wait_for_selector(".status.busy", timeout=5000)
         check("time dimension loads", "Loads" in status(page))
-        check("with the suggested level type", page.locator("select:has(option[value=TimeMonths])").input_value() == "TimeMonths")
+        check("with the suggested level type", page.locator("tr:has(.kind) select").input_value() == "TimeMonths")
         shot(page, "4-adso-time")
         browser.close()
 

@@ -192,6 +192,10 @@ function setAttributeLevelType(dim, attribute, levelType) {
   }
 }
 
+// an attribute is an attribute hierarchy unless attributeHierarchyEnabled is false; the proposal makes only the key one
+const hasHierarchy = (attribute) => isTrue(attribute, 'attributeHierarchyEnabled', true);
+const setAttributeHierarchy = (attribute, on) => setAttr(attribute, 'attributeHierarchyEnabled', on ? '' : 'false');
+
 const required = (what) => (value) => (value.trim() ? '' : `${what} needs a name`);
 const unique = (what, others) => (value) =>
   required(what)(value) || (others.includes(value) ? `${what} '${value}' exists already` : '');
@@ -230,9 +234,9 @@ function Select({ value, options, onChange, title }) {
   </select>`;
 }
 
-function Check({ checked, onChange, label, title }) {
+function Check({ checked, onChange, label, title, disabled }) {
   return html`<label class="switch" title=${title}>
-    <input type="checkbox" checked=${checked} onChange=${(e) => onChange(e.target.checked)} />${label}
+    <input type="checkbox" checked=${checked} disabled=${disabled} onChange=${(e) => onChange(e.target.checked)} />${label}
   </label>`;
 }
 
@@ -486,6 +490,7 @@ function DimensionPane({ doc, edit, dim, sel, select, suggestions }) {
   const used = new Set(hierarchies.flatMap((h) => kids(h, 'Level').flatMap((l) =>
     [attr(l, 'sourceAttribute'), ...kids(l, 'Property').map((p) => attr(p, 'sourceAttribute'))])));
   const siblings = isShared(dim) ? sharedDims(doc) : kids(dim.parentNode, 'Dimension');
+  const hierarchyCount = hierarchies.length + attributes.filter(hasHierarchy).length;
 
   const remove = () => {
     const what = usages.length ? ` and its ${usages.length} cube usage(s)` : '';
@@ -525,9 +530,9 @@ function DimensionPane({ doc, edit, dim, sel, select, suggestions }) {
     </div>
 
     <section class="section">
-      <header><h3>Attributes</h3><span class="spacer"></span><span class="muted small">each one is an attribute hierarchy</span></header>
+      <header><h3>Attributes</h3><span class="spacer"></span><span class="muted small">a ticked attribute is a hierarchy of its own; the others serve as levels and properties</span></header>
       <div class="body scroll-x"><table>
-        <thead><tr><th>Name</th><th>Key column</th><th>Name column</th>${time && html`<th>Level type</th>`}<th></th></tr></thead>
+        <thead><tr><th>Name</th><th>Key column</th><th>Name column</th><th>Hierarchy</th>${time && html`<th>Level type</th>`}<th></th></tr></thead>
         <tbody>${attributes.map((a, i) => {
           const suggestion = suggestionFor(suggestions, dim, a);
           const isKey = attr(a, 'usage') === 'Key';
@@ -536,6 +541,9 @@ function DimensionPane({ doc, edit, dim, sel, select, suggestions }) {
               onCommit=${(v) => edit(() => renameAttribute(dim, a, v))} /></td>
             <td class="mono small">${keyColumn(a)} ${isKey && html`<span class="kind">key</span>`}</td>
             <td class="mono small">${attr(kids(a, 'NameColumn')[0], 'columnName')}</td>
+            <td><${Check} checked=${hasHierarchy(a)} disabled=${hasHierarchy(a) && hierarchyCount === 1}
+              title=${hasHierarchy(a) && hierarchyCount === 1 ? 'The dimension needs a hierarchy' : 'The attribute is a hierarchy of its own'}
+              onChange=${(on) => edit(() => setAttributeHierarchy(a, on))} /></td>
             ${time && html`<td><div class="row">
               <${Select} value=${attr(a, 'levelType')} options=${TIME_TYPES} onChange=${(v) => edit(() => setAttributeLevelType(dim, a, v))} />
               ${suggestion && suggestion !== attr(a, 'levelType') && html`<button class="link small"

@@ -86,6 +86,10 @@ CLASS ltc_proposal IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = store-attributes[ 2 ]-key_column->data_type exp = `String` ).
     cl_abap_unit_assert=>assert_equals( act = store-attributes[ 3 ]-key_column->column_name exp = `ZFMSQFT` ).
     cl_abap_unit_assert=>assert_equals( act = store-attributes[ 3 ]-key_column->data_type exp = `Numeric` ).
+    " only the key is a hierarchy, as the Store dimension of the reference's FoodMart has one
+    cl_abap_unit_assert=>assert_equals( act = key-attribute_hierarchy_enabled exp = abap_undefined ).
+    cl_abap_unit_assert=>assert_equals( act = store-attributes[ 2 ]-attribute_hierarchy_enabled exp = abap_false ).
+    cl_abap_unit_assert=>assert_equals( act = store-attributes[ 4 ]-attribute_hierarchy_enabled exp = abap_false ).
 
     DATA(cube) = schema-cubes[ 1 ].
     cl_abap_unit_assert=>assert_equals( act = cube-name exp = `ZFMSALESA` ).
@@ -115,8 +119,11 @@ CLASS ltc_proposal IMPLEMENTATION.
 
   METHOD time_characteristics.
     " BW's time characteristics are characteristics like the others, on InfoCubes and aDSOs alike: each a dimension on
-    " its view, joined on its fact column, none a TimeDimension; 0CALDAY has no SID table, so no view
+    " its view, joined on its fact column, none a TimeDimension; 0CALDAY has no SID table, so no view. Their attributes
+    " stay hierarchies.
     DATA(adso) = adso( ).
+    adso-characteristics[ 4 ]-attributes = VALUE #( ( iobjnm = `0CALMONTH2` text = `Calendar Month`
+                                                      column = VALUE #( name = `CALMONTH2` datatype = `NUMC` length = 2 ) ) ).
     DATA(cube) = adso.
     cube-kind = zzxxmla1_cl_bw_provider=>c_kind-cube.
     cube-characteristics[ 4 ]-fact_column = VALUE #( name = `SID_0CALMONTH` datatype = `INT4` length = 10 ).
@@ -133,6 +140,7 @@ CLASS ltc_proposal IMPLEMENTATION.
     cl_abap_unit_assert=>assert_initial( month-type ).
     cl_abap_unit_assert=>assert_equals( act = month-attributes[ 1 ]-key_column->column_name exp = `CALMONTH` ).
     cl_abap_unit_assert=>assert_equals( act = month-attributes[ 1 ]-key_column->data_type exp = `Integer` ).
+    cl_abap_unit_assert=>assert_equals( act = month-attributes[ 2 ]-attribute_hierarchy_enabled exp = abap_undefined ).
     DATA(adso_usage) = CAST zzxxmla1_cl_schema_def=>ty_dimension_usage(
                          adso_proposal-schema-cubes[ 1 ]-dimensions[ 3 ]-def ).
     cl_abap_unit_assert=>assert_equals( act = adso_usage->foreign_key exp = `CALMONTH` ).

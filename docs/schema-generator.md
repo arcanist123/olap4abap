@@ -43,8 +43,12 @@ The proposal is a flat schema in Mondrian 4 form, like `reference/schema/Foodmar
 parts:
 
 - one `Dimension` per characteristic of the provider, on its generated view, the characteristic as the key attribute
-  and every time-independent attribute as a further `DimensionAttribute`. Every attribute is an attribute hierarchy,
-  so everything is usable in MDX without user hierarchies. Names are the InfoObject texts; the key attribute is named
+  and every time-independent attribute as a further `DimensionAttribute`. Only the key attribute is a hierarchy: the
+  others get `attributeHierarchyEnabled="false"` and serve as the levels and properties of the hierarchies the user
+  makes (decided on 2026-10-06, after the reference's `FoodMart.xml`: each dimension there has one hand-written
+  hierarchy, most columns are member properties, and only a few, Gender or Store Type, were made dimensions by hand;
+  an attribute hierarchy per attribute gave dozens of hierarchies per cube). BW's standard time characteristics
+  (`0CALWEEK`, ..., `0FISCVARNT`) keep their attributes' hierarchies. Names are the InfoObject texts; the key attribute is named
   like its dimension; a repeated name gets the InfoObject in brackets (`Country (ZFMCNTRY2)`). On an InfoCube the key
   attribute is keyed by the view's `SID` and named by the value (`NameColumn`, which `ZZXXMLA1_CL_SCHEMA` reads for
   this), so members are named by the characteristic, not by BW's numbers; on an aDSO it is keyed by the value. A view
@@ -216,8 +220,9 @@ Implemented (2026-10-06):
   in the URL reopens it after a reload. The outline (a tree of cubes and dimensions) edits the DOM: schema name and
   description; cube name, caption, default measure, dimension usages (rename, remove); measures (rename, aggregator,
   format string, visible, order, remove); dimensions (rename, which renames their usages and default members,
-  caption, remove with their usages); attributes (rename, which renames the levels and properties on them, remove if
-  unused); the time switch (`type="TimeDimension"`, level types from the proposal's suggestions else
+  caption, remove with their usages); attributes (rename, which renames the levels and properties on them, whether
+  the attribute is a hierarchy of its own, `attributeHierarchyEnabled`, not offered off for a dimension's last
+  hierarchy, remove if unused); the time switch (`type="TimeDimension"`, level types from the proposal's suggestions else
   `TimeUndefined`, removed again when switched off); user hierarchies (name, All member and its name, default
   member, levels from attributes with level type, unique members and order, member properties). The XML tab edits
   everything else as text. Undo (Ctrl+Z) keeps the last 100 states.
