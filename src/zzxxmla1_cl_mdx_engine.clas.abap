@@ -864,9 +864,12 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       IMPORTING node   TYPE ty_node
       EXPORTING arg    TYPE ty_cj_arg
                 found  TYPE abap_bool.
-    "! MemberListCrossJoinArg.create: members of one level (null members left out), at most MaxConstraints.
+    "! MemberListCrossJoinArg.create: members of one level (null members left out), at most MaxConstraints;
+    "! without limit for a level group of the multi-variant expansion (the native read has no IN list: it reads
+    "! the level in the database and keeps the listed members, so the database expands the crossjoin).
     METHODS member_list_cj_arg
       IMPORTING members TYPE ty_t_member
+                limit   TYPE abap_bool DEFAULT abap_true
       EXPORTING arg     TYPE ty_cj_arg
                 found   TYPE abap_bool.
     "! The position of a member in an evaluated crossjoin operand.
@@ -2383,7 +2386,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       WHEN `CAPTION|Property|6`.
         result = VALUE #( kind = zzxxmla1_cl_mdx_evaluator=>c_value-string
                           text = evaluate_member( evaluator = evaluator node = node->args[ 1 ] )-caption ).
-      WHEN `UNIQUENAME|Property|6`.
+      WHEN `UNIQUENAME|Property|6` OR `UNIQUE_NAME|Property|6`.
+        " Unique_Name is the reference's synonym of <Member>.UniqueName (BuiltinFunTable)
         result = VALUE #( kind = zzxxmla1_cl_mdx_evaluator=>c_value-string
                           text = evaluate_member( evaluator = evaluator node = node->args[ 1 ] )-unique_name ).
       WHEN `UNIQUENAME|Property|4` OR `NAME|Property|4` OR `CAPTION|Property|4`.
@@ -4574,7 +4578,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
 
   METHOD member_list_cj_arg.
     CLEAR: arg, found.
-    IF lines( members ) > c_max_constraints.
+    IF limit = abap_true AND lines( members ) > c_max_constraints.
       RETURN.
     ENDIF.
     arg-member_list = abap_true.
@@ -4649,7 +4653,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         CLEAR result.
         RETURN.
       ENDIF.
-      member_list_cj_arg( EXPORTING members = members IMPORTING arg = arg found = found ).
+      " the group's own bound above, not MaxConstraints (our deviation: the reference's IN list is no limit here)
+      member_list_cj_arg( EXPORTING members = members limit = abap_false IMPORTING arg = arg found = found ).
       IF found = abap_false.
         CLEAR result.
         RETURN.

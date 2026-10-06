@@ -57,6 +57,8 @@ CLASS ltc_engine DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT
     METHODS crossjoin_result_limit FOR TESTING RAISING zzxxmla1_cx_xmla.
     "! The native crossjoin (RolapNativeCrossJoin): the combinations with facts, in hierarchy order.
     METHODS native_crossjoin FOR TESTING RAISING zzxxmla1_cx_xmla.
+    "! The multi-variant expansion: a level group of more members than MaxConstraints is still read natively.
+    METHODS native_crossjoin_large_level FOR TESTING RAISING zzxxmla1_cx_xmla.
 ENDCLASS.
 
 CLASS ltc_engine IMPLEMENTATION.
@@ -556,6 +558,11 @@ CLASS ltc_engine IMPLEMENTATION.
                                                                   ( `[Product].[(All)]` ) ( `[Product]` )
                                                                   ( `[Product].[All Products]` ) ( `Drink` )
                                                                   ( `[Product].[Product Family]` ) ( `[Product]` ) ) ).
+    " Unique_Name is the reference's synonym of <Member>.UniqueName (Excel sends it; the reference server fails it)
+    result = execute( `with member [Measures].[u] as '[Product].CurrentMember.Unique_Name' `
+                   && `select {[Measures].[u]} on 0, {[Product].[Drink]} on 1 from [ZFMSALES]` ).
+    cl_abap_unit_assert=>assert_equals( act = values( result )
+                                        exp = VALUE string_table( ( `[Product].[Drink]` ) ) ).
     " OrderKey compares keys: strings ignoring case first
     result = execute( `with member [Measures].[k] as 'SetToStr(Order([Store].[Store State].Members, `
                    && `[Store].CurrentMember.OrderKey, BDESC))' select {[Measures].[k]} on 0 from [ZFMSALES]` ).
@@ -782,6 +789,24 @@ CLASS ltc_engine IMPLEMENTATION.
                                                                   ( `[Store].[USA].[OR].[Salem],[Product].[Food]` )
                                                                   ( `[Store].[USA].[WA].[Tacoma],[Product].[Food]` ) )
                                         msg = concat_lines_of( table = tuples( result ) sep = ` | ` ) ).
+  ENDMETHOD.
+
+  METHOD native_crossjoin_large_level.
+    " Excel's drilled pivot field: the All member and a level of more than MaxConstraints (1000) members. The
+    " multi-variant expansion reads it natively; interpreted, 10,282 customers x 52 promotions exceed the limit
+    DATA(limit) = zzxxmla1_cl_mdx_engine=>result_limit.
+    zzxxmla1_cl_mdx_engine=>result_limit = 20000.
+    TRY.
+        DATA(result) = execute( `select NON EMPTY CrossJoin({[Customers].[All Customers], [Customers].[Name].Members}, `
+                             && `{[Promotions].[All Promotions], [Promotions].[Promotion Name].Members}) on 0 `
+                             && `from [ZFMSALES]` ).
+      CLEANUP.
+        zzxxmla1_cl_mdx_engine=>result_limit = limit.
+    ENDTRY.
+    zzxxmla1_cl_mdx_engine=>result_limit = limit.
+    DATA(names) = tuples( result ).
+    cl_abap_unit_assert=>assert_equals( act = names[ 1 ] exp = `[Customers].[All Customers],[Promotions].[All Promotions]` ).
+    cl_abap_unit_assert=>assert_true( xsdbool( lines( names ) > 5581 ) ).
   ENDMETHOD.
 
 ENDCLASS.
