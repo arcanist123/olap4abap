@@ -62,6 +62,15 @@ def main():
           and len(month) == 1 and month[0]["table"] and body.get("notes") == [
               {"iobjnm": "0CALDAY", "reason": "no SID table, so no view"}], body)
 
+    # 0D_NW_SOLD, 0D_NW_SHIP and 0D_NW_PAYER of the SAP demo cube reference 0D_NW_CUST: no tables of their own
+    status, body, _ = call(args.url, args.client, "GET", "proposal", {"provider": "0D_NW_C01"})
+    references = ["0D_NW_SHIP", "0D_NW_SOLD", "0D_NW_PAYER"]
+    xml = body.get("xml", "")
+    check("proposal with reference characteristics: dimensions on the referenced characteristic's tables",
+          status == 200 and all(f'table="ZZXXMLA1_C_{r}"' in xml for r in references)
+          and xml.count('columnName="D_NW_CUST"') >= len(references)
+          and not any(n["iobjnm"] in references for n in body.get("notes", [])), body)
+
     status, body, _ = call(args.url, args.client, "GET", "proposal", {"provider": "NO_SUCH_PROVIDER"})
     check("proposal of an unknown provider", status == 404 and "error" in body, body)
 

@@ -35,6 +35,10 @@ CLASS ltc_bw_view_gen DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION 
 
     METHODS tables_of_zfmstore FOR TESTING.
 
+    "! a reference characteristic of the demo cube 0D_NW_C01 has the tables and key of the one it references
+
+    METHODS tables_of_reference FOR TESTING.
+
 ENDCLASS.
 
 
@@ -177,12 +181,22 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
 
       act = NEW zzxxmla1_cl_bw_view_gen( )->tables( 'ZFMSTORE' )
 
-      exp = VALUE zzxxmla1_cl_bw_view_gen=>ty_tables( sids       = '/BIC/SZFMSTORE'
+      exp = VALUE zzxxmla1_cl_bw_view_gen=>ty_tables( basic      = 'ZFMSTORE'
+                                                      sids       = '/BIC/SZFMSTORE'
 
                                                       attributes = '/BIC/PZFMSTORE'
 
                                                       key_field  = '/BIC/ZFMSTORE' ) ).
 
+  ENDMETHOD.
+
+  METHOD tables_of_reference.
+    cl_abap_unit_assert=>assert_equals(
+      act = NEW zzxxmla1_cl_bw_view_gen( )->tables( '0D_NW_SOLD' )
+      exp = VALUE zzxxmla1_cl_bw_view_gen=>ty_tables( basic      = '0D_NW_CUST'
+                                                      sids       = '/BI0/SD_NW_CUST'
+                                                      attributes = '/BI0/PD_NW_CUST'
+                                                      key_field  = 'D_NW_CUST' ) ).
   ENDMETHOD.
 
 

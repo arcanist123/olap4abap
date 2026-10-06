@@ -65,7 +65,8 @@ FoodMart's `store` or `customer`, without snowflake handling. BW-specific parts 
 - columns: `SID` (the key of the view), the key and every time-independent attribute (`OBJVERS`, `CHANGED` and the SID
   flags left out), named without their namespace (SAP objects: `/BI0/` tables, fields have no namespace); the table
   names come from BW (`RSD_CHKTAB_GET_FOR_CHA_BAS`), and a characteristic without attribute table gets a view of its
-  SID table alone;
+  SID table alone; a reference characteristic (`RSDCHA-CHABASNM` differs, `0SOLD_TO` -> `0CUSTOMER`) has no tables of
+  its own: its view, under its own name, is on the basic characteristic's tables and key field (and attributes);
 - NUMC columns as numbers: `INT4` up to 9 digits, `INT8` up to 18, `DEC(31,0)` beyond; other columns as they are;
 - DDL source `ZZXXMLA1_C_<char>`, database view `ZZXXMLA1V` + 7 digits; a view keeps its number when generated
   again, a new one gets the next free number. An active source cannot rename its database view, so a source with a

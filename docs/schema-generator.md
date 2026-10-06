@@ -24,7 +24,9 @@ tables and views by type (`AQ` inbound, `AT` active, `VR` the 7 view), the funct
 `RSD_FIELDNM_GET_FROM_IOBJNM` (the field of an InfoObject; `RSDIOBJ-FIELDNM` holds the same name and is what the
 reader joins). `ZZXXMLA1_CL_BW_VIEW_GEN` asks `RSD_CHKTAB_GET_FOR_CHA_BAS` for the SID and attribute tables and drops
 any namespace from a view column, not only `/BIC/`; a characteristic without attribute table gets a view of its SID
-table alone (SID and key).
+table alone (SID and key). A reference characteristic is asked for by its basic characteristic (`RSDCHA-CHABASNM`; `0D_NW_SOLD` of
+`0D_NW_C01` references `0D_NW_CUST`); its fact column stays `SID_<characteristic>`. A characteristic whose tables BW
+cannot name, or whose key field is not a column of them, is a note (no SID table, so no view), not a failure.
 
 Which providers: an InfoCube is HANA-optimised when `RSDCUBE` has type `B` and subtype `F` (flat; `ZFMSALES` and
 `0D_NW_C01` are), and its fact table must have a `SID_<characteristic>` column per characteristic (the reader refuses

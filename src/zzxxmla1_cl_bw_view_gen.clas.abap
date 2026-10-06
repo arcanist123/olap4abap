@@ -16,6 +16,8 @@
 "! INT8 up to 18, else DEC 31), the other columns as they are, all named without their namespace (/BIC/ or another).
 "! The table and field names are BW's (RSD_CHKTAB_GET_FOR_CHA_BAS, RSDIOBJ-FIELDNM), never built: their prefix depends
 "! on the namespace. A characteristic without attribute table gets a view of its SID table alone (SID and key).
+"! A reference characteristic (RSDCHA-CHABASNM, 0SOLD_TO -> 0CUSTOMER) has no tables of its own: its view is one of
+"! the basic characteristic's tables and key field, under its own name.
 "! The views are DDIC-based CDS views, the kind NetWeaver 7.50 has: DDL source ZZXXMLA1_C_ followed by the
 "! characteristic, database view ZZXXMLA1V followed by 7 digits (16 characters at most). The database view is what the schema names; a view keeps its
 "! number when it is generated again, a new one gets the next free number.
@@ -59,6 +61,8 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
       "! has no attribute table.
 
       BEGIN OF ty_tables,
+
+        basic      TYPE rsiobjnm,   " whose tables they are: the characteristic, or the one it references
 
         sids       TYPE tabname,
 
@@ -460,11 +464,23 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
 
     DATA attributes TYPE rschntab.
 
+    " a reference characteristic (0SOLD_TO -> 0CUSTOMER) has no tables of its own: they and their key field are the
+
+    " basic characteristic's
+
+    SELECT SINGLE chabasnm FROM rsdcha WHERE chanm = @characteristic AND objvers = 'A' INTO @result-basic.
+
+    IF result-basic IS INITIAL.
+
+      result-basic = characteristic.
+
+    ENDIF.
+
     CALL FUNCTION 'RSD_CHKTAB_GET_FOR_CHA_BAS'
 
       EXPORTING
 
-        i_chabasnm = characteristic
+        i_chabasnm = result-basic
 
       IMPORTING
 
@@ -484,11 +500,29 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
 
     ENDIF.
 
-    SELECT SINGLE fieldnm FROM rsdiobj WHERE iobjnm = @characteristic AND objvers = 'A' INTO @result-key_field.
+    SELECT SINGLE fieldnm FROM rsdiobj WHERE iobjnm = @result-basic AND objvers = 'A' INTO @result-key_field.
 
     SELECT SINGLE tabname FROM dd02l WHERE tabname = @sids AND as4local = 'A' INTO @result-sids.
 
     SELECT SINGLE tabname FROM dd02l WHERE tabname = @attributes AND as4local = 'A' INTO @result-attributes.
+
+    " the key must be a column of both, else no view can join them
+
+    DATA(sid_columns) = table_columns( result-sids ).
+
+    IF NOT line_exists( sid_columns[ field = result-key_field ] ).
+
+      CLEAR result-sids.
+
+    ENDIF.
+
+    DATA(attribute_columns) = table_columns( result-attributes ).
+
+    IF NOT line_exists( attribute_columns[ field = result-key_field ] ).
+
+      CLEAR result-attributes.
+
+    ENDIF.
 
   ENDMETHOD.
 

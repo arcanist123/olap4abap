@@ -319,9 +319,13 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
     IF result-has_sids = abap_false.
       RETURN.
     ENDIF.
-    result-view = views->existing_view( iobjnm ).
     DATA(columns) = views->columns( tables ).
     READ TABLE columns INTO DATA(key) WITH KEY field = tables-key_field.
+    IF sy-subrc <> 0.
+      result-has_sids = abap_false.
+      RETURN.
+    ENDIF.
+    result-view = views->existing_view( iobjnm ).
     result-key_column = VALUE #( name     = zzxxmla1_cl_bw_view_gen=>view_column( key-field )
                                  datatype = key-datatype
                                  length   = key-length ).
@@ -330,10 +334,9 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
     ENDIF.
 
     " the attributes of its basic characteristic, in BW's order
-    SELECT a~attrinm, a~atrtimfl, o~fieldnm FROM rsdcha AS c
-      INNER JOIN rsdbchatr AS a ON a~chabasnm = c~chabasnm AND a~objvers = 'A'
+    SELECT a~attrinm, a~atrtimfl, o~fieldnm FROM rsdbchatr AS a
       INNER JOIN rsdiobj AS o ON o~iobjnm = a~attrinm AND o~objvers = 'A'
-      WHERE c~chanm = @iobjnm AND c~objvers = 'A'
+      WHERE a~chabasnm = @tables-basic AND a~objvers = 'A'
       ORDER BY a~posit ASCENDING
       INTO TABLE @DATA(attributes).
     LOOP AT attributes INTO DATA(attribute).
