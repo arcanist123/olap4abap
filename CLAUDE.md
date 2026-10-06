@@ -35,8 +35,12 @@ Read before designing anything:
   be stale after multi-step edits; a small re-save of the changed line forces a resync.
 - **No local includes in classes:** a class has only its global source and, if it has tests, its test include
   (`.clas.testclasses.abap`); no local definitions/implementations (`locals_def`/`locals_imp`). A helper class, an
-  exception or a type a class needs is a global object of its own (a `GLOBAL FRIENDS` of the class if it needs its
-  private parts, e.g. `ZZXXMLA1_CL_MDX_SLICER_CALC`). `scripts/sap-sync.sh pull` refuses a local include with code.
+  exception or a type a class needs is a global object of its own. `scripts/sap-sync.sh pull` refuses a local include
+  with code.
+- **No circular dependencies** between classes and interfaces (abaplint's `cyclic_oo`, run by `scripts/abaplint.sh`):
+  a class defines the structures and tables it needs itself, even as a copy of another class's (structurally equal
+  types are compatible); a call back goes through an interface, where the reference has one its port (`Evaluator`,
+  `SchemaReader`). Not `TYPE REF TO object` with a cast, and no `GLOBAL FRIENDS` for helpers that call back.
 - Put logic in small private methods and test those in the class's local test include
   (`.clas.testclasses.abap`, created with `abapfs_create_test_include`); `IF_HTTP_SERVER` is awkward to fake.
 - ABAP SQL via the SQL tool: keep statements multi-line, use `ORDER BY ... ASCENDING/DESCENDING`, functions need
@@ -107,7 +111,9 @@ Read before designing anything:
   and merged (`RolapResult.evalExecute`).
   Calculated members (`WITH MEMBER`) work: created and resolved by the
   validator, evaluated by the evaluator's calculations (scoped solve order) through `ZZXXMLA1_IF_MDX_CALC` (Mondrian's
-  `Calc`, implemented by the engine), with arithmetic, comparisons, logic, `IIf` and string functions. Format strings
+  `Calc`, implemented by the engine; calculations see the evaluator as `ZZXXMLA1_IF_MDX_EVALUATOR`, `Evaluator`, and
+  its schema reader as `ZZXXMLA1_IF_MDX_SCHEMA_READER`, `SchemaReader`; the compiled calculations of members made while
+  the query runs are kept by the root evaluator, `RolapEvaluatorRoot`), with arithmetic, comparisons, logic, `IIf` and string functions. Format strings
   are a port of `mondrian.util.Format` (`ZZXXMLA1_CL_MDX_FORMAT`). `Order` (Mondrian's `Sorter`
   comparators), `Filter`, `TopCount`/`BottomCount`, `:`, `Descendants`, `IsEmpty`, `Cast`, `Aggregate`, the set algebra (`Union`, `Except`,
   `Intersect`, `Head`/`Tail`, `Distinct`, `Item`, `SetToStr`) and the aggregates (`Count`, `Sum`, `Avg`, `Min`, `Max`,

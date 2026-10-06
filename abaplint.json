@@ -26,6 +26,7 @@
     "parser_error": true,
     "check_syntax": {
       "exclude": ["zzxxmla1_main_endpoint\\.clas\\.abap"]
-    }
+    },
+    "cyclic_oo": true
   }
 }

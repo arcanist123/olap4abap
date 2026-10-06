@@ -10,8 +10,7 @@
 * Copyright (C) 2005-2021 Hitachi Vantara and others, Copyright (C) 2021-2025 Sergei Semenkov. See the NOTICE file.
 *----------------------------------------------------------------------------------------------------------------------*
 "! The calculation of a visual total member (VisualTotalMember: Aggregate of the members it totals): the cell of the
-"! context rolled up over its members (AggregateCalc.aggregate with a ValueCalc). Created by ZZXXMLA1_CL_MDX_ENGINE,
-"! whose global friend it is.
+"! context rolled up over its members (AggregateCalc.aggregate with a ValueCalc). Created by ZZXXMLA1_CL_MDX_ENGINE.
 CLASS zzxxmla1_cl_mdx_vtotal_calc DEFINITION
   PUBLIC
   FINAL
@@ -20,17 +19,17 @@ CLASS zzxxmla1_cl_mdx_vtotal_calc DEFINITION
   PUBLIC SECTION.
     INTERFACES zzxxmla1_if_mdx_calc.
     METHODS constructor
-      IMPORTING engine   TYPE REF TO zzxxmla1_cl_mdx_engine
-                member   TYPE zzxxmla1_cl_mdx_engine=>ty_member
-                children TYPE zzxxmla1_cl_mdx_engine=>ty_t_member.
+      IMPORTING engine   TYPE REF TO zzxxmla1_if_mdx_roll_up
+                member   TYPE zzxxmla1_if_mdx_roll_up=>ty_member
+                children TYPE zzxxmla1_if_mdx_roll_up=>ty_t_member.
     "! The member the visual total stands for (VisualTotalMember.getMember).
-    DATA member TYPE zzxxmla1_cl_mdx_engine=>ty_member READ-ONLY.
+    DATA member TYPE zzxxmla1_if_mdx_roll_up=>ty_member READ-ONLY.
     "! The stored members it totals (getChildMemberList).
-    DATA children TYPE zzxxmla1_cl_mdx_engine=>ty_t_member READ-ONLY.
+    DATA children TYPE zzxxmla1_if_mdx_roll_up=>ty_t_member READ-ONLY.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
-    DATA engine TYPE REF TO zzxxmla1_cl_mdx_engine.
+    DATA engine TYPE REF TO zzxxmla1_if_mdx_roll_up.
 ENDCLASS.
 
 

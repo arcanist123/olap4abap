@@ -11,7 +11,7 @@
 *----------------------------------------------------------------------------------------------------------------------*
 "! The calculation of the placeholder of a compound slicer (the CacheCalc around RolapResult's GenericCalc
 "! "EvalForSlicer"): the cell of the context rolled up over the tuples of the slicer (AggregateCalc.aggregate with a
-"! ValueCalc). Created by ZZXXMLA1_CL_MDX_ENGINE, whose global friend it is.
+"! ValueCalc). Created by ZZXXMLA1_CL_MDX_ENGINE.
 CLASS zzxxmla1_cl_mdx_slicer_calc DEFINITION
   PUBLIC
   FINAL
@@ -20,14 +20,14 @@ CLASS zzxxmla1_cl_mdx_slicer_calc DEFINITION
   PUBLIC SECTION.
     INTERFACES zzxxmla1_if_mdx_calc.
     METHODS constructor
-      IMPORTING engine TYPE REF TO zzxxmla1_cl_mdx_engine
-                tuples TYPE zzxxmla1_cl_mdx_engine=>ty_t_tuple.
+      IMPORTING engine TYPE REF TO zzxxmla1_if_mdx_roll_up
+                tuples TYPE zzxxmla1_if_mdx_roll_up=>ty_t_tuple.
     "! The tuples of the slicer (CompoundSlicerRolapMember.tupleList), for isOnSameHierarchyChain.
-    DATA tuples TYPE zzxxmla1_cl_mdx_engine=>ty_t_tuple READ-ONLY.
+    DATA tuples TYPE zzxxmla1_if_mdx_roll_up=>ty_t_tuple READ-ONLY.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
-    DATA engine TYPE REF TO zzxxmla1_cl_mdx_engine.
+    DATA engine TYPE REF TO zzxxmla1_if_mdx_roll_up.
 ENDCLASS.
 
 

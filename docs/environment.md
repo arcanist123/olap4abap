@@ -290,8 +290,7 @@ until it times out, four or five per class. Prefer `scripts/sap-write.py <name>.
 `"$LOCALAPPDATA/pipx/pipx/venvs/sapcli/Scripts/python.exe" scripts/sap-write.py ...`): one connection per object writes
 its includes and activates, then ends the stateful context and logs off, so SM04 stays empty.
 With `--together` it writes all the objects in one session and activates them in one activation, for objects that
-need each other (`ZZXXMLA1_CL_MDX_ENGINE` and its global friends `ZZXXMLA1_CL_MDX_SLICER_CALC`,
-`ZZXXMLA1_CL_MDX_VTOTAL_CALC`). Classes have no local includes (CLAUDE.md): `sap-write.py` empties a local definitions
+need each other (a changed interface such as `ZZXXMLA1_IF_MDX_EVALUATOR` and the classes that implement or use it). Classes have no local includes (CLAUDE.md): `sap-write.py` empties a local definitions
 or implementations include that still holds code in SAP, and `sap-sync.sh pull` drops the template-only ones sapcli
 exports (and template-only test includes) and refuses to pull a local include with code.
 

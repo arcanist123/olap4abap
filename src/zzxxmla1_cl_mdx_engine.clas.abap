@@ -38,11 +38,11 @@
 CLASS zzxxmla1_cl_mdx_engine DEFINITION
   PUBLIC
   FINAL
-  CREATE PUBLIC
-  GLOBAL FRIENDS zzxxmla1_cl_mdx_slicer_calc zzxxmla1_cl_mdx_vtotal_calc.
+  CREATE PUBLIC.
 
   PUBLIC SECTION.
     INTERFACES zzxxmla1_if_mdx_calc.
+    INTERFACES zzxxmla1_if_mdx_roll_up.
     TYPES:
       ty_member   TYPE zzxxmla1_cl_mdx_schema_reader=>ty_member,
       ty_t_member TYPE STANDARD TABLE OF ty_member WITH EMPTY KEY,
@@ -115,7 +115,7 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
 
   PRIVATE SECTION.
     TYPES ty_node TYPE REF TO zzxxmla1_cl_mdx_node.
-    TYPES ty_evaluator TYPE REF TO zzxxmla1_cl_mdx_evaluator.
+    TYPES ty_evaluator TYPE REF TO zzxxmla1_if_mdx_evaluator.
     CONSTANTS:
       BEGIN OF c_category,
         dimension TYPE i VALUE 2,
@@ -135,6 +135,9 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
 
     DATA catalog       TYPE string.
     DATA schema_reader TYPE REF TO zzxxmla1_cl_mdx_schema_reader.
+    "! the root evaluator of the query being executed (RolapEvaluatorRoot): it keeps the calculations of their own of
+    "! the members made while the query runs (compound slicer placeholders, visual totals)
+    DATA root_evaluator TYPE REF TO zzxxmla1_cl_mdx_evaluator.
     TYPES:
       "! The value of a named set (RolapNamedSetEvaluator): its tuples and the position of the current one.
       BEGIN OF ty_named_set_value,
@@ -576,14 +579,6 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       IMPORTING tuples        TYPE ty_t_tuple
                 members       TYPE ty_t_member
       RETURNING VALUE(result) TYPE ty_t_member.
-    "! AggregateCalc.aggregate: the values of the tuples (the expression, else the cell of the context) rolled up with
-    "! the aggregator of the measure of the context (sum; count rolls up as sum; min, max), non-empty off.
-    METHODS roll_up
-      IMPORTING evaluator     TYPE ty_evaluator
-                tuples        TYPE ty_t_tuple
-                value         TYPE ty_node OPTIONAL
-      RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_evaluator=>ty_value
-      RAISING   zzxxmla1_cx_xmla.
     "! Aggregate(set [, numeric]) (AggregateFunDef.AggregateCalc): the values of the tuples of the set rolled up with
     "! the aggregator of the measure of the context (sum; count rolls up as sum; min, max).
     METHODS aggregate
@@ -1231,7 +1226,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     NEW zzxxmla1_cl_mdx_validator( schema_reader )->resolve_query( CHANGING query = resolved ).
     " the subcube of a subselect restricts every read of facts
     fact_reader->set_subcube( subcube_predicate( resolved ) ).
-    DATA(evaluator) = zzxxmla1_cl_mdx_evaluator=>create( schema_reader = schema_reader facts = fact_reader calc = me ).
+    root_evaluator = zzxxmla1_cl_mdx_evaluator=>create( schema_reader = schema_reader facts = fact_reader calc = me ).
+    DATA(evaluator) = CAST zzxxmla1_if_mdx_evaluator( root_evaluator ).
     CLEAR named_set_values.
     slicer_evaluator_context = evaluator->get_members( ).
 
@@ -3435,12 +3431,13 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
                                            level = hierarchy-levels[ 1 ] calculated = abap_true
                                            solve_order = -99999 ).
       schema_reader->add_calculated_member( placeholder ).
-      schema_reader->set_calculated_member( VALUE #( member = placeholder calc = calc cube_scope = abap_true ) ).
+      schema_reader->set_calculated_member( VALUE #( member = placeholder cube_scope = abap_true ) ).
+      root_evaluator->set_compiled( member = placeholder calc = calc ).
       APPEND placeholder TO result.
     ENDLOOP.
   ENDMETHOD.
 
-  METHOD roll_up.
+  METHOD zzxxmla1_if_mdx_roll_up~roll_up.
     " the AGGREGATION_TYPE property: only stored measures have one
     DATA(measure) = evaluator->get_context( zzxxmla1_cl_mdx_schema_reader=>c_measures ).
     IF measure-calculated = abap_true.
@@ -3468,8 +3465,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
             AND node->args[ 2 ]->element-member-calculated = abap_false.
           evaluator->set_context( node->args[ 2 ]->element-member ).
         ENDIF.
-        result = roll_up( evaluator = evaluator tuples = tuples
-                          value = COND #( WHEN lines( node->args ) > 1 THEN node->args[ 2 ] ) ).
+        result = zzxxmla1_if_mdx_roll_up~roll_up( evaluator = evaluator tuples = tuples
+                                                  value = COND #( WHEN lines( node->args ) > 1 THEN node->args[ 2 ] ) ).
       CLEANUP.
         evaluator->restore( savepoint ).
     ENDTRY.
@@ -5001,12 +4998,13 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       wrapped = calc->member.
     ENDIF.
     " not calculated in the query, with Aggregate
-    schema_reader->add_visual_total( VALUE #(
-      member = result cube_scope = abap_true contains_aggregate = abap_true
-      calc = NEW zzxxmla1_cl_mdx_vtotal_calc(
-               engine = me member = wrapped
-               children = real_members( following_descendants( member = member index = index + 1
-                                                                members = members ) ) ) ) ).
+    schema_reader->add_visual_total( VALUE #( member = result cube_scope = abap_true contains_aggregate = abap_true ) ).
+    root_evaluator->set_compiled(
+      member = result
+      calc   = NEW zzxxmla1_cl_mdx_vtotal_calc(
+                 engine = me member = wrapped
+                 children = real_members( following_descendants( member = member index = index + 1
+                                                                  members = members ) ) ) ).
   ENDMETHOD.
 
   METHOD following_descendants.
@@ -5059,7 +5057,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     IF member-calc_name IS INITIAL.
       RETURN.
     ENDIF.
-    DATA(calc) = schema_reader->get_calculation( member )-calc.
+    DATA(calc) = root_evaluator->get_compiled( member ).
     IF calc IS BOUND AND calc IS INSTANCE OF zzxxmla1_cl_mdx_vtotal_calc.
       result = CAST #( calc ).
     ENDIF.
@@ -5709,7 +5707,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     IF member-calculated = abap_false.
       RETURN.
     ENDIF.
-    DATA(calc) = schema_reader->get_calculation( member )-calc.
+    DATA(calc) = root_evaluator->get_compiled( member ).
     IF calc IS BOUND AND calc IS INSTANCE OF zzxxmla1_cl_mdx_slicer_calc.
       result = CAST zzxxmla1_cl_mdx_slicer_calc( calc )->tuples.
     ENDIF.

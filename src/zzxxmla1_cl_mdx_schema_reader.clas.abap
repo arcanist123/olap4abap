@@ -23,6 +23,12 @@ CLASS zzxxmla1_cl_mdx_schema_reader DEFINITION
   CREATE PRIVATE.
 
   PUBLIC SECTION.
+    INTERFACES zzxxmla1_if_mdx_schema_reader.
+    ALIASES get_hierarchies FOR zzxxmla1_if_mdx_schema_reader~get_hierarchies.
+    ALIASES get_default_member FOR zzxxmla1_if_mdx_schema_reader~get_default_member.
+    ALIASES measure_member FOR zzxxmla1_if_mdx_schema_reader~measure_member.
+    ALIASES get_calculation FOR zzxxmla1_if_mdx_schema_reader~get_calculation.
+    ALIASES get_measures FOR zzxxmla1_if_mdx_schema_reader~get_measures.
     TYPES ty_t_id TYPE STANDARD TABLE OF i WITH EMPTY KEY.
     TYPES:
       BEGIN OF ty_member,
@@ -53,13 +59,13 @@ CLASS zzxxmla1_cl_mdx_schema_reader DEFINITION
       "! A calculated member of the query with its formula (Formula): the resolved expression, the format expression
       "! (FORMAT_EXP_PARSED, if any) and whether the expression calls Aggregate (containsAggregateFunction). The
       "! placeholder of a compound slicer (RolapResult.CompoundSlicerRolapMember) has a calculation of its own
-      "! (getCompiledExpression) instead of an expression, and is not calculated in the query (cube scope).
+      "! (getCompiledExpression, kept by the root evaluator) instead of an expression, and is not calculated in the query
+      "! (cube scope).
       BEGIN OF ty_calculated_member,
         member             TYPE ty_member,
         expression         TYPE REF TO zzxxmla1_cl_mdx_node,
         format_expression  TYPE REF TO zzxxmla1_cl_mdx_node,
         contains_aggregate TYPE abap_bool,
-        calc               TYPE REF TO zzxxmla1_if_mdx_calc,
         cube_scope         TYPE abap_bool,
       END OF ty_calculated_member,
       ty_t_calculated_member TYPE STANDARD TABLE OF ty_calculated_member WITH EMPTY KEY.
@@ -127,7 +133,6 @@ CLASS zzxxmla1_cl_mdx_schema_reader DEFINITION
       RAISING   zzxxmla1_cx_xmla.
 
     METHODS get_dimensions RETURNING VALUE(result) TYPE ty_t_dimension.
-    METHODS get_hierarchies RETURNING VALUE(result) TYPE ty_t_hierarchy.
     "! The model hierarchies (without Measures) in model order, as ZZXXMLA1_CL_MODEL=>HIERARCHIES gives them.
     METHODS get_model_hierarchies RETURNING VALUE(result) TYPE zzxxmla1_cl_model=>ty_t_hierarchy.
     METHODS get_dimension
@@ -153,19 +158,10 @@ CLASS zzxxmla1_cl_mdx_schema_reader DEFINITION
     METHODS get_member_children
       IMPORTING member        TYPE ty_member
       RETURNING VALUE(result) TYPE ty_t_member.
-    "! The default member (RolapHierarchy.init): the hierarchy's defaultMember, else the first root member (the All
-    "! member, without one the first member of the first level), for Measures the first measure.
-    METHODS get_default_member
-      IMPORTING hierarchy     TYPE i
-      RETURNING VALUE(result) TYPE ty_member.
     "! The member with the unique name in the hierarchy; initial if there is none.
     METHODS get_member
       IMPORTING hierarchy     TYPE i
                 unique_name   TYPE string
-      RETURNING VALUE(result) TYPE ty_member.
-    "! The member of a measure (1 is the first).
-    METHODS measure_member
-      IMPORTING index         TYPE i
       RETURNING VALUE(result) TYPE ty_member.
     "! SchemaReader.getElementChild: OlapElement.lookupChild of the parent.
     METHODS get_element_child
@@ -206,10 +202,6 @@ CLASS zzxxmla1_cl_mdx_schema_reader DEFINITION
     "! name, and not one of the query's calculated members (get_calculated_members).
     METHODS add_visual_total
       IMPORTING calculated TYPE ty_calculated_member.
-    "! The calculation of a calculated member: a visual total by its calc_name, else by its unique name.
-    METHODS get_calculation
-      IMPORTING member        TYPE ty_member
-      RETURNING VALUE(result) TYPE ty_calculated_member.
     METHODS get_calculated_members
       IMPORTING hierarchy     TYPE i
       RETURNING VALUE(result) TYPE ty_t_member.
@@ -419,7 +411,7 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
     result = dimensions.
   ENDMETHOD.
 
-  METHOD get_hierarchies.
+  METHOD zzxxmla1_if_mdx_schema_reader~get_hierarchies.
     result = hierarchies.
   ENDMETHOD.
 
@@ -461,7 +453,7 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
-  METHOD measure_member.
+  METHOD zzxxmla1_if_mdx_schema_reader~measure_member.
     DATA(level) = levels[ 1 ].
     result = VALUE #( hierarchy = `[Measures]` hier_id = c_measures measure_index = index ordinal = index
                       unique_name = |[Measures].{ zzxxmla1_cl_mdx_node=>quote_identifier( measures[ index ]-name ) }|
@@ -626,7 +618,7 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
     SORT result BY ordinal ASCENDING.
   ENDMETHOD.
 
-  METHOD get_default_member.
+  METHOD zzxxmla1_if_mdx_schema_reader~get_default_member.
     IF hierarchy = c_measures.
       result = measure_member( 1 ).
       RETURN.
@@ -681,7 +673,11 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
     APPEND calculated TO visual_totals.
   ENDMETHOD.
 
-  METHOD get_calculation.
+  METHOD zzxxmla1_if_mdx_schema_reader~get_measures.
+    result = measures.
+  ENDMETHOD.
+
+  METHOD zzxxmla1_if_mdx_schema_reader~get_calculation.
     IF member-calc_name IS INITIAL.
       result = get_calculated_member( member-unique_name ).
     ELSE.

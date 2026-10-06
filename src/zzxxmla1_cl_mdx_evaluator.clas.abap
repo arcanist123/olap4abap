@@ -22,8 +22,28 @@ CLASS zzxxmla1_cl_mdx_evaluator DEFINITION
   CREATE PRIVATE.
 
   PUBLIC SECTION.
-    TYPES ty_member TYPE zzxxmla1_cl_mdx_schema_reader=>ty_member.
-    TYPES ty_t_member TYPE zzxxmla1_cl_mdx_schema_reader=>ty_t_member.
+    INTERFACES zzxxmla1_if_mdx_evaluator.
+    ALIASES push FOR zzxxmla1_if_mdx_evaluator~push.
+    ALIASES get_parent FOR zzxxmla1_if_mdx_evaluator~get_parent.
+    ALIASES get_schema_reader FOR zzxxmla1_if_mdx_evaluator~get_schema_reader.
+    ALIASES savepoint FOR zzxxmla1_if_mdx_evaluator~savepoint.
+    ALIASES restore FOR zzxxmla1_if_mdx_evaluator~restore.
+    ALIASES set_context FOR zzxxmla1_if_mdx_evaluator~set_context.
+    ALIASES set_context_members FOR zzxxmla1_if_mdx_evaluator~set_context_members.
+    ALIASES get_context FOR zzxxmla1_if_mdx_evaluator~get_context.
+    ALIASES get_members FOR zzxxmla1_if_mdx_evaluator~get_members.
+    ALIASES set_slicer_context FOR zzxxmla1_if_mdx_evaluator~set_slicer_context.
+    ALIASES get_slicer_members FOR zzxxmla1_if_mdx_evaluator~get_slicer_members.
+    ALIASES set_cell_reader FOR zzxxmla1_if_mdx_evaluator~set_cell_reader.
+    ALIASES is_non_empty FOR zzxxmla1_if_mdx_evaluator~is_non_empty.
+    ALIASES set_non_empty FOR zzxxmla1_if_mdx_evaluator~set_non_empty.
+    ALIASES is_eval_axes FOR zzxxmla1_if_mdx_evaluator~is_eval_axes.
+    ALIASES set_eval_axes FOR zzxxmla1_if_mdx_evaluator~set_eval_axes.
+    ALIASES evaluate_current FOR zzxxmla1_if_mdx_evaluator~evaluate_current.
+    ALIASES current_is_empty FOR zzxxmla1_if_mdx_evaluator~current_is_empty.
+    ALIASES get_format_string FOR zzxxmla1_if_mdx_evaluator~get_format_string.
+    TYPES ty_member TYPE zzxxmla1_if_mdx_evaluator=>ty_member.
+    TYPES ty_t_member TYPE zzxxmla1_if_mdx_evaluator=>ty_t_member.
     CONSTANTS:
       BEGIN OF c_value,
         numeric TYPE string VALUE `NUMERIC`,
@@ -33,87 +53,26 @@ CLASS zzxxmla1_cl_mdx_evaluator DEFINITION
         error     TYPE string VALUE `ERROR`,
         order_key TYPE string VALUE `ORDERKEY`,
       END OF c_value.
-    TYPES:
-      "! A value (an Object in the reference): empty is null; else a double (number, or special INF, -INF or NAN), an integer
-      "! (number), a string (text), a boolean, an evaluation error (text: the message) or the OrderKey of a member
-      "! (member; text its key).
-      BEGIN OF ty_value,
-        empty   TYPE abap_bool,
-        kind    TYPE string,
-        number  TYPE f,
-        special TYPE string,
-        text    TYPE string,
-        boolean TYPE abap_bool,
-        member  TYPE ty_member,
-      END OF ty_value.
+    TYPES ty_value TYPE zzxxmla1_if_mdx_evaluator=>ty_value.
 
     "! A root evaluator (RolapEvaluator(root)): every hierarchy at its default member.
     "! @parameter calc | evaluates the formulas of calculated members and format expressions
     CLASS-METHODS create
-      IMPORTING schema_reader TYPE REF TO zzxxmla1_cl_mdx_schema_reader
+      IMPORTING schema_reader TYPE REF TO zzxxmla1_if_mdx_schema_reader
                 facts         TYPE REF TO zzxxmla1_cl_mdx_facts
                 calc          TYPE REF TO zzxxmla1_if_mdx_calc OPTIONAL
       RETURNING VALUE(result) TYPE REF TO zzxxmla1_cl_mdx_evaluator.
-
-    "! A child evaluator with a copy of this one's context.
-    METHODS push
-      RETURNING VALUE(result) TYPE REF TO zzxxmla1_cl_mdx_evaluator.
-    METHODS get_parent
-      RETURNING VALUE(result) TYPE REF TO zzxxmla1_cl_mdx_evaluator.
-    METHODS get_schema_reader
-      RETURNING VALUE(result) TYPE REF TO zzxxmla1_cl_mdx_schema_reader.
-    "! A savepoint: restore( savepoint ) undoes the changes made after it.
-    METHODS savepoint
-      RETURNING VALUE(result) TYPE i.
-    METHODS restore
-      IMPORTING savepoint TYPE i.
-    "! Makes the member the current member of its hierarchy.
-    "! @parameter result | the previous current member of the hierarchy
-    METHODS set_context
+    "! RolapCalculation.getCompiledExpression of a member made while the query runs (the placeholder of a compound
+    "! slicer, a visual total): its calculation of its own, kept by the root evaluator for all the evaluators of the
+    "! query (RolapEvaluatorRoot) and found as get_calculation finds the member (a visual total by its calc_name).
+    METHODS set_compiled
+      IMPORTING member TYPE ty_member
+                calc   TYPE REF TO zzxxmla1_if_mdx_calc.
+    "! The calculation of its own of a member (set_compiled); not bound for any other member.
+    METHODS get_compiled
       IMPORTING member        TYPE ty_member
-      RETURNING VALUE(result) TYPE ty_member.
-    "! Makes the members (a tuple) current, in turn.
-    METHODS set_context_members
-      IMPORTING members TYPE ty_t_member.
-    "! The current member of a hierarchy.
-    METHODS get_context
-      IMPORTING hierarchy     TYPE i
-      RETURNING VALUE(result) TYPE ty_member.
-    "! The current members, one per hierarchy in the order of the cube (Measures first).
-    METHODS get_members
-      RETURNING VALUE(result) TYPE ty_t_member.
-    "! Sets the members of the slicer as the context and keeps them as the slicer members.
-    METHODS set_slicer_context
-      IMPORTING members TYPE ty_t_member.
-    METHODS get_slicer_members
-      RETURNING VALUE(result) TYPE ty_t_member.
-    "! setCellReader as RolapResult.executeBody calls it before the cells are computed: the cell reader does not
-    "! change here (the facts), but the command is recorded, so the command stack has the reference's shape (the context
-    "! stack of an infinite loop).
-    METHODS set_cell_reader.
-    METHODS is_non_empty
-      RETURNING VALUE(result) TYPE abap_bool.
-    METHODS set_non_empty
-      IMPORTING non_empty TYPE abap_bool.
-    METHODS is_eval_axes
-      RETURNING VALUE(result) TYPE abap_bool.
-    METHODS set_eval_axes
-      IMPORTING eval_axes TYPE abap_bool.
-    "! The value of the cell of the current context: the formula of the calculation that expands first, with the
-    "! calculation's hierarchy at its default member (setContextIn), or else the value read from the facts.
-    METHODS evaluate_current
-      RETURNING VALUE(result) TYPE ty_value
-      RAISING   zzxxmla1_cx_xmla.
-    "! Whether the cell of the current context is empty: its value is empty, or no fact row is in it (Fact Count 0).
-    METHODS current_is_empty
-      RETURNING VALUE(result) TYPE abap_bool
-      RAISING   zzxxmla1_cx_xmla.
-    "! The format string of the cell (getFormatString): the format of the non-All member with the highest solve order
-    "! that has one (a stored measure's format string, a calculated member's format expression evaluated in the
-    "! context), else Standard.
-    METHODS get_format_string
-      RETURNING VALUE(result) TYPE string
-      RAISING   zzxxmla1_cx_xmla.
+      RETURNING VALUE(result) TYPE REF TO zzxxmla1_if_mdx_calc.
+
     "! String.valueOf: a value as text (a double as Double.toString).
     CLASS-METHODS to_text
       IMPORTING value         TYPE ty_value
@@ -139,7 +98,18 @@ CLASS zzxxmla1_cl_mdx_evaluator DEFINITION
       END OF ty_command,
       ty_t_command TYPE STANDARD TABLE OF ty_command WITH EMPTY KEY.
 
-    DATA schema_reader   TYPE REF TO zzxxmla1_cl_mdx_schema_reader.
+    TYPES:
+      BEGIN OF ty_compiled,
+        name TYPE string,
+        calc TYPE REF TO zzxxmla1_if_mdx_calc,
+      END OF ty_compiled,
+      ty_t_compiled TYPE HASHED TABLE OF ty_compiled WITH UNIQUE KEY name.
+
+    DATA schema_reader   TYPE REF TO zzxxmla1_if_mdx_schema_reader.
+    "! the root evaluator of the query (RolapEvaluatorRoot), which keeps the compiled calculations
+    DATA root            TYPE REF TO zzxxmla1_cl_mdx_evaluator.
+    "! root only: the calculations of their own of members made while the query runs (set_compiled)
+    DATA compiled        TYPE ty_t_compiled.
     DATA facts           TYPE REF TO zzxxmla1_cl_mdx_facts.
     DATA parent          TYPE REF TO zzxxmla1_cl_mdx_evaluator.
     "! the current member of the hierarchy with id n at position n + 1
@@ -161,6 +131,10 @@ CLASS zzxxmla1_cl_mdx_evaluator DEFINITION
     DATA ancestor_command_count TYPE i.
     "! RolapEvaluatorRoot.recursionCheckCommandCount, shared by the evaluators of the query
     DATA recursion_check        TYPE REF TO i.
+    "! The key of a member's calculation: a visual total's calc_name, else its unique name (as get_calculation).
+    CLASS-METHODS calculation_key
+      IMPORTING member        TYPE ty_member
+      RETURNING VALUE(result) TYPE string.
     "! Command.width: the command and its arguments.
     CLASS-METHODS width
       IMPORTING command       TYPE i
@@ -209,6 +183,7 @@ CLASS zzxxmla1_cl_mdx_evaluator IMPLEMENTATION.
 
   METHOD create.
     result = NEW #( ).
+    result->root = result.
     result->schema_reader = schema_reader.
     result->facts = facts.
     result->calc = calc.
@@ -221,33 +196,50 @@ CLASS zzxxmla1_cl_mdx_evaluator IMPLEMENTATION.
     result->recursion_check = NEW #( lines( result->current_members ) * 16 ).
   ENDMETHOD.
 
-  METHOD push.
-    result = NEW #( ).
-    result->schema_reader = schema_reader.
-    result->facts = facts.
-    result->calc = calc.
-    result->expanding = expanding.
-    result->parent = me.
-    result->current_members = current_members.
-    result->slicer_members = slicer_members.
-    result->non_empty = non_empty.
-    result->eval_axes = eval_axes.
-    result->expanding_member = expanding_member.
-    result->commands = VALUE #( ( command = c_command-savepoint ) ).
-    result->command_count = 1.
-    result->ancestor_command_count = ancestor_command_count + command_count.
-    result->recursion_check = recursion_check.
+  METHOD zzxxmla1_if_mdx_evaluator~push.
+    DATA(child) = NEW zzxxmla1_cl_mdx_evaluator( ).
+    child->root = root.
+    child->schema_reader = schema_reader.
+    child->facts = facts.
+    child->calc = calc.
+    child->expanding = expanding.
+    child->parent = me.
+    child->current_members = current_members.
+    child->slicer_members = slicer_members.
+    child->non_empty = non_empty.
+    child->eval_axes = eval_axes.
+    child->expanding_member = expanding_member.
+    child->commands = VALUE #( ( command = c_command-savepoint ) ).
+    child->command_count = 1.
+    child->ancestor_command_count = ancestor_command_count + command_count.
+    child->recursion_check = recursion_check.
+    result = child.
   ENDMETHOD.
 
-  METHOD get_parent.
+  METHOD set_compiled.
+    INSERT VALUE #( name = calculation_key( member ) calc = calc ) INTO TABLE root->compiled.
+  ENDMETHOD.
+
+  METHOD get_compiled.
+    READ TABLE root->compiled INTO DATA(entry) WITH TABLE KEY name = calculation_key( member ).
+    IF sy-subrc = 0.
+      result = entry-calc.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD calculation_key.
+    result = COND #( WHEN member-calc_name IS INITIAL THEN member-unique_name ELSE member-calc_name ).
+  ENDMETHOD.
+
+  METHOD zzxxmla1_if_mdx_evaluator~get_parent.
     result = parent.
   ENDMETHOD.
 
-  METHOD get_schema_reader.
+  METHOD zzxxmla1_if_mdx_evaluator~get_schema_reader.
     result = schema_reader.
   ENDMETHOD.
 
-  METHOD savepoint.
+  METHOD zzxxmla1_if_mdx_evaluator~savepoint.
     result = lines( commands ).
     IF commands[ result ]-command = c_command-savepoint.
       " already at a savepoint
@@ -361,7 +353,7 @@ CLASS zzxxmla1_cl_mdx_evaluator IMPLEMENTATION.
     result = abap_true.
   ENDMETHOD.
 
-  METHOD restore.
+  METHOD zzxxmla1_if_mdx_evaluator~restore.
     WHILE lines( commands ) > savepoint.
       DATA(last) = lines( commands ).
       DATA(command) = commands[ last ].
@@ -380,7 +372,7 @@ CLASS zzxxmla1_cl_mdx_evaluator IMPLEMENTATION.
     ENDWHILE.
   ENDMETHOD.
 
-  METHOD set_context.
+  METHOD zzxxmla1_if_mdx_evaluator~set_context.
     DATA(ordinal) = member-hier_id.
     result = current_members[ ordinal + 1 ].
     " the same member (a visual total member has the unique name of the member it stands for)
@@ -414,56 +406,56 @@ CLASS zzxxmla1_cl_mdx_evaluator IMPLEMENTATION.
     ENDWHILE.
   ENDMETHOD.
 
-  METHOD set_context_members.
+  METHOD zzxxmla1_if_mdx_evaluator~set_context_members.
     LOOP AT members INTO DATA(member).
       set_context( member ).
     ENDLOOP.
   ENDMETHOD.
 
-  METHOD get_context.
+  METHOD zzxxmla1_if_mdx_evaluator~get_context.
     result = current_members[ hierarchy + 1 ].
   ENDMETHOD.
 
-  METHOD get_members.
+  METHOD zzxxmla1_if_mdx_evaluator~get_members.
     result = current_members.
   ENDMETHOD.
 
-  METHOD set_slicer_context.
+  METHOD zzxxmla1_if_mdx_evaluator~set_slicer_context.
     set_context_members( members ).
     APPEND LINES OF members TO slicer_members.
   ENDMETHOD.
 
-  METHOD get_slicer_members.
+  METHOD zzxxmla1_if_mdx_evaluator~get_slicer_members.
     result = slicer_members.
   ENDMETHOD.
 
-  METHOD set_cell_reader.
+  METHOD zzxxmla1_if_mdx_evaluator~set_cell_reader.
     add_command( VALUE #( command = c_command-set_cell_reader ) ).
   ENDMETHOD.
 
-  METHOD is_non_empty.
+  METHOD zzxxmla1_if_mdx_evaluator~is_non_empty.
     result = non_empty.
   ENDMETHOD.
 
-  METHOD set_non_empty.
+  METHOD zzxxmla1_if_mdx_evaluator~set_non_empty.
     IF non_empty <> me->non_empty.
       add_command( VALUE #( command = c_command-set_non_empty flag = me->non_empty ) ).
       me->non_empty = non_empty.
     ENDIF.
   ENDMETHOD.
 
-  METHOD is_eval_axes.
+  METHOD zzxxmla1_if_mdx_evaluator~is_eval_axes.
     result = eval_axes.
   ENDMETHOD.
 
-  METHOD set_eval_axes.
+  METHOD zzxxmla1_if_mdx_evaluator~set_eval_axes.
     IF eval_axes <> me->eval_axes.
       add_command( VALUE #( command = c_command-set_eval_axes flag = me->eval_axes ) ).
       me->eval_axes = eval_axes.
     ENDIF.
   ENDMETHOD.
 
-  METHOD evaluate_current.
+  METHOD zzxxmla1_if_mdx_evaluator~evaluate_current.
     DATA(calculation) = max_solve_calculation( ).
     IF calculation-unique_name IS INITIAL.
       " a null member in the context: no cell request, the value is null (RolapAggregationManager.makeRequest)
@@ -487,7 +479,8 @@ CLASS zzxxmla1_cl_mdx_evaluator IMPLEMENTATION.
     ENDIF.
     DATA(definition) = schema_reader->get_calculation( calculation ).
     " getCompiledExpression: the calculation of its own, else the formula
-    DATA(compiled) = COND #( WHEN definition-calc IS BOUND THEN definition-calc ELSE calc ).
+    DATA(own) = get_compiled( calculation ).
+    DATA(compiled) = COND #( WHEN own IS BOUND THEN own ELSE calc ).
     DATA(saved) = savepoint( ).
     expanding = expanding + 1.
     TRY.
@@ -559,7 +552,7 @@ CLASS zzxxmla1_cl_mdx_evaluator IMPLEMENTATION.
                            AND calculation1-hier_id < calculation2-hier_id ) ).
   ENDMETHOD.
 
-  METHOD get_format_string.
+  METHOD zzxxmla1_if_mdx_evaluator~get_format_string.
     " getProperty(FORMAT_EXP_PARSED): stored members other than measures have no format; a stored measure has the
     " solve order -1 and its format string (empty if none)
     DATA format_expression TYPE REF TO zzxxmla1_cl_mdx_node.
@@ -575,9 +568,10 @@ CLASS zzxxmla1_cl_mdx_evaluator IMPLEMENTATION.
             found = abap_true.
           ENDIF.
         ENDIF.
-      ELSEIF member-hier_id = zzxxmla1_cl_mdx_schema_reader=>c_measures AND -1 > max_solve.
+      ELSEIF member-hier_id = zzxxmla1_if_mdx_schema_reader=>c_measures AND -1 > max_solve.
         CLEAR format_expression.
-        result = schema_reader->measures[ member-measure_index ]-format.
+        DATA(measures) = schema_reader->get_measures( ).
+        result = measures[ member-measure_index ]-format.
         max_solve = -1.
         found = abap_true.
       ENDIF.
@@ -608,13 +602,13 @@ CLASS zzxxmla1_cl_mdx_evaluator IMPLEMENTATION.
     ENDCASE.
   ENDMETHOD.
 
-  METHOD current_is_empty.
+  METHOD zzxxmla1_if_mdx_evaluator~current_is_empty.
     IF evaluate_current( )-empty = abap_true.
       result = abap_true.
       RETURN.
     ENDIF.
     " a value such as zero is empty if no fact row is in the cell
-    DATA(measures) = schema_reader->measures.
+    DATA(measures) = schema_reader->get_measures( ).
     DATA(fact_count) = line_index( measures[ aggregator = `count` ] ).
     IF fact_count = 0.
       RETURN.

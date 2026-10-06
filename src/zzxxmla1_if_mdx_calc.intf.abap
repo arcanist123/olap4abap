@@ -16,9 +16,9 @@ INTERFACE zzxxmla1_if_mdx_calc
 
   "! The value of a scalar expression in the context of the evaluator.
   METHODS evaluate
-    IMPORTING evaluator     TYPE REF TO zzxxmla1_cl_mdx_evaluator
+    IMPORTING evaluator     TYPE REF TO zzxxmla1_if_mdx_evaluator
               node          TYPE REF TO zzxxmla1_cl_mdx_node
-    RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_evaluator=>ty_value
+    RETURNING VALUE(result) TYPE zzxxmla1_if_mdx_evaluator=>ty_value
     RAISING   zzxxmla1_cx_xmla.
 
 ENDINTERFACE.

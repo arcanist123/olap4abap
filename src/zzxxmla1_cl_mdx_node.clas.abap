@@ -106,8 +106,38 @@ CLASS zzxxmla1_cl_mdx_node DEFINITION
         implementation       TYPE string,
         signature            TYPE string,        " FunDef.getSignature
       END OF ty_fun_def.
+    TYPES:
+      "! Copy of ZZXXMLA1_CL_MDX_SCHEMA_READER=>ty_member and ty_element (the classes do not depend on each other)
+      BEGIN OF ty_member,
+        hierarchy     TYPE string,   " unique name of the hierarchy
+        hier_id       TYPE i,        " id of the hierarchy: 0 for Measures, else the position in the model
+        measure_index TYPE i,        " position in the measures (Measures hierarchy only)
+        ordinal       TYPE i,        " position in the hierarchy in hierarchy order, the All member first (0)
+        key           TYPE string,   " value of the level column; empty for the All member
+        key_level     TYPE i,        " the level in the model (1 the first below the All level), 0: the All member
+        path          TYPE string,   " the keys of the model levels down to key_level (ZZXXMLA1_CL_MODEL)
+        unique_name   TYPE string,
+        caption       TYPE string,
+        level         TYPE i,        " id of the level
+        level_name    TYPE string,   " unique name of the level
+        level_number  TYPE i,
+        parent_unique TYPE string,
+        children      TYPE i,
+        display_info  TYPE i,
+        calculated    TYPE abap_bool, " a calculated member of the query (RolapCalculatedMember)
+        solve_order   TYPE i,         " calculated members: SOLVE_ORDER, else 0
+        is_null       TYPE abap_bool, " the null member of the hierarchy (RolapHierarchy.getNullMember)
+        "! a member made while the query runs (VisualTotalMember) has the unique name of the member it stands for: the
+        "! key of its calculation (get_calculation); empty for any other member
+        calc_name     TYPE string,
+      END OF ty_member,
+      BEGIN OF ty_element,
+        kind   TYPE string,
+        id     TYPE i,
+        member TYPE ty_member,
+      END OF ty_element.
     DATA type     TYPE REF TO zzxxmla1_cl_mdx_type READ-ONLY.          " resolved nodes
-    DATA element  TYPE zzxxmla1_cl_mdx_schema_reader=>ty_element READ-ONLY. " MEMBER, LEVEL, HIERARCHY, DIMENSION
+    DATA element  TYPE ty_element READ-ONLY. " MEMBER, LEVEL, HIERARCHY, DIMENSION
     DATA fun_def  TYPE ty_fun_def READ-ONLY.     " RESOLVED_CALL
     DATA set_key        TYPE string READ-ONLY.                       " NAMED_SET: unique within the query
     DATA set_expression TYPE REF TO zzxxmla1_cl_mdx_node READ-ONLY.  " NAMED_SET: the resolved expression
@@ -116,7 +146,7 @@ CLASS zzxxmla1_cl_mdx_node DEFINITION
     "! MemberExpr, LevelExpr, HierarchyExpr, DimensionExpr: kind as c_kind, name the unique name of the element.
     CLASS-METHODS create_element
       IMPORTING kind          TYPE string
-                element       TYPE zzxxmla1_cl_mdx_schema_reader=>ty_element
+                element       TYPE ty_element
                 name          TYPE string
                 type          TYPE REF TO zzxxmla1_cl_mdx_type
       RETURNING VALUE(result) TYPE REF TO zzxxmla1_cl_mdx_node.
