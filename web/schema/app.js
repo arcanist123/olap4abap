@@ -511,7 +511,7 @@ function DimensionPane({ doc, edit, dim, sel, select, suggestions }) {
       <label>Caption</label>
       <${TextField} value=${attr(dim, 'caption')} placeholder=${attr(dim, 'name')} onCommit=${(v) => edit(() => setAttr(dim, 'caption', v))} />
       <label>Table</label>
-      <${TextField} readOnly mono value=${attr(dim, 'table')} title="The view of the characteristic; a DDL name (ZZXXMLA1_C_...) is generated on accept" />
+      <${TextField} readOnly mono value=${attr(dim, 'table')} title="The view of the characteristic; a placeholder (ZZXXMLA1_C_...) is replaced by the view generated on accept" />
       <label>Time</label>
       <span class="row">
         <${Check} checked=${time} label="Time dimension" onChange=${(on) => edit(() => setTimeDimension(dim, on, suggestions))} />

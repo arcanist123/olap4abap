@@ -23,7 +23,7 @@
 "!   The schema file of an existing catalog is its Definition (it is replaced), of a new one
 "!   /WEB-INF/schema/<catalog>.xml. Answers the file, whether the catalog is new and the characteristics whose views
 "!   accept generates;
-"! - POST accept?catalog=X: the checks of check, then the views of the tables named by their DDL source
+"! - POST accept?catalog=X: the checks of check, then the views of the tables named by a placeholder
 "!   (ZZXXMLA1_C_<characteristic>) are generated (ZZXXMLA1_CL_BW_VIEW_GEN) and replaced by their database views,
 "!   the schema file is written, a new catalog added to the first data source of /WEB-INF/datasources.xml, and the
 "!   work is committed. Without catalog the schema's name is the catalog;
@@ -166,7 +166,7 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
                 schema_xml  TYPE string
       RAISING   zzxxmla1_cx_api_refused.
     "! The table names of the schema's dimensions (shared and private, and the Table of their hierarchies), each
-    "! once in the order of the schema; a name that is the DDL source of a view is replaced by its database view.
+    "! once in the order of the schema; a placeholder of a view not generated yet is replaced by its database view.
     METHODS map_tables
       IMPORTING views         TYPE zzxxmla1_cl_bw_view_gen=>ty_t_view OPTIONAL
       CHANGING  !schema       TYPE zzxxmla1_cl_schema_def=>ty_schema
@@ -179,7 +179,7 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
       IMPORTING views TYPE zzxxmla1_cl_bw_view_gen=>ty_t_view
       CHANGING  table TYPE string
                 names TYPE string_table.
-    "! The characteristic whose view's DDL source is the table name, initial for any other name.
+    "! The characteristic whose view the table name is a placeholder of, initial for any other name.
     METHODS characteristic_of
       IMPORTING table         TYPE string
       RETURNING VALUE(result) TYPE string.
@@ -659,18 +659,18 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     IF NOT line_exists( names[ table_line = table ] ).
       APPEND table TO names.
     ENDIF.
-    READ TABLE views INTO DATA(view) WITH KEY ddl_name = table.
+    DATA(characteristic) = characteristic_of( table ).
+    IF characteristic IS INITIAL.
+      RETURN.
+    ENDIF.
+    READ TABLE views INTO DATA(view) WITH KEY characteristic = CONV rsiobjnm( characteristic ).
     IF sy-subrc = 0.
       table = view-view_name.
     ENDIF.
   ENDMETHOD.
 
   METHOD characteristic_of.
-    DATA(prefix) = zzxxmla1_cl_bw_view_gen=>ddl_name( `` ).
-    DATA(length) = strlen( prefix ).
-    IF strlen( table ) > length AND substring( val = table len = length ) = prefix.
-      result = substring( val = table off = length ).
-    ENDIF.
+    result = zzxxmla1_cl_bw_view_gen=>characteristic_of_placeholder( table ).
   ENDMETHOD.
 
   METHOD outline.

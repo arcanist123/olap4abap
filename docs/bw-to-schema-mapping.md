@@ -68,9 +68,12 @@ FoodMart's `store` or `customer`, without snowflake handling. BW-specific parts 
   SID table alone; a reference characteristic (`RSDCHA-CHABASNM` differs, `0SOLD_TO` -> `0CUSTOMER`) has no tables of
   its own: its view, under its own name, is on the basic characteristic's tables and key field (and attributes);
 - NUMC columns as numbers: `INT4` up to 9 digits, `INT8` up to 18, `DEC(31,0)` beyond; other columns as they are;
-- DDL source `ZZXXMLA1_C_<char>`, database view `ZZXXMLA1V` + 7 digits; a view keeps its number when generated
-  again, a new one gets the next free number. An active source cannot rename its database view, so a source with a
-  view name of another form is deleted and created again.
+- named by a number (decided 2026-10-06; a characteristic name does not fit, and one in a namespace such as
+  `/1BW/D01` has slashes): database view `ZZXXMLA1V` + 7 digits, DDL source `ZZXXMLA1_C` + the same digits. The
+  source's description (`BW characteristic <char>: SID with active attributes`) names the characteristic; the view
+  of a characteristic is found by it. A view keeps its number when generated again, a new one gets the next free
+  number. An active source can rename neither itself nor its database view, so a source of another name (the older
+  `ZZXXMLA1_C_<char>`) or with a view name of another form is deleted and created again under its number.
 
 Run it with `sapcli class execute ZZXXMLA1_CL_BW_VIEW_GEN` (generates the views of `ZFMSALES`: `ZZXXMLA1V0000001`
 ZFMPROD, `...2` ZFMCUST, `...3` ZFMSTORE, `...4` ZFMPROMO, `...5` ZFMDATE). In HANA each is a plain SQL view

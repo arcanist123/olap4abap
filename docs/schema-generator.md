@@ -48,7 +48,7 @@ parts:
   like its dimension; a repeated name gets the InfoObject in brackets (`Country (ZFMCNTRY2)`). On an InfoCube the key
   attribute is keyed by the view's `SID` and named by the value (`NameColumn`, which `ZZXXMLA1_CL_SCHEMA` reads for
   this), so members are named by the characteristic, not by BW's numbers; on an aDSO it is keyed by the value. A view
-  not generated yet is named by its DDL source (`ZZXXMLA1_C_<characteristic>`), which acceptance replaces;
+  not generated yet is named by a placeholder (`ZZXXMLA1_C_<characteristic>`, no DDIC name), which acceptance replaces;
 - no user hierarchies: BW's metadata does not say which attributes nest in which order (FoodMart's Store and Product
   hierarchies were written by hand). The UI builds them from the attributes;
 - key figures with aggregation SUM, MIN or MAX become measures with that aggregator. Exception aggregation and
@@ -155,9 +155,9 @@ one named like its dimension are both `[Dimension]`) and loads an ambiguous cube
 a message naming both and asking for a hierarchy name. Renaming one of them would invent names eMondrian does not
 have.
 
-Then the views of the tables named by a DDL source (`ZZXXMLA1_C_<characteristic>`) are generated
-(`ZZXXMLA1_CL_BW_VIEW_GEN->generate`), and the DDL names in the schema (dimension tables, hierarchy `Table`s) are
-replaced by their database views; the schema is written as sent if no name changed, else as Mondrian's toXML. Last
+Then the views of the tables named by a placeholder (`ZZXXMLA1_C_<characteristic>`) are generated
+(`ZZXXMLA1_CL_BW_VIEW_GEN->generate`, numbered: `ZZXXMLA1_C0000026` / `ZZXXMLA1V0000026`), and the placeholders
+in the schema (dimension tables, hierarchy `Table`s) are replaced by their database views; the schema is written as sent if no name changed, else as Mondrian's toXML. Last
 the schema file and, for a new catalog, the data sources file are written and the work is committed.
 The next XMLA request reads the new catalog. View generation runs as the anonymous user of the node, too (checked).
 

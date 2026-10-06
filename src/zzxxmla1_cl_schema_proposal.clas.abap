@@ -358,7 +358,7 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
 
     DATA(table) = COND string( WHEN characteristic-view IS NOT INITIAL THEN characteristic-view
 
-                               ELSE zzxxmla1_cl_bw_view_gen=>ddl_name( CONV #( characteristic-iobjnm ) ) ).
+                               ELSE zzxxmla1_cl_bw_view_gen=>placeholder( characteristic-iobjnm ) ).
 
     open( name = `Dimension` attributes = VALUE #( ( name = `name` value = result ) ( name = `table` value = table ) ) ).
 

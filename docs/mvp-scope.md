@@ -47,9 +47,9 @@ Decisions taken by the project owner on 2026-10-02, with reasons.
 - **One schema, the same table names in both systems; no binding layer, no SQL in the schema.** The fact table is the
   BW table itself (`/BIC/F<cube>`); a dimension's table is a **generated CDS view per characteristic** (SID table
   joined with the active attributes; `ZZXXMLA1_CL_BW_VIEW_GEN`, see `bw-to-schema-mapping.md`). The views are
-  DDIC-based CDS views (7.50 has no view entities); DDL source `ZZXXMLA1_C_<characteristic>`, database view
-  `ZZXXMLA1V` + 7 digits, the name the schema uses (decided 2026-10-04: always a number, 16 characters do not fit the
-  prefix and a characteristic). **All NUMC columns are delivered as numbers** (decided 2026-10-04), so members read
+  DDIC-based CDS views (7.50 has no view entities); database view `ZZXXMLA1V` + 7 digits, the name the
+  schema uses (decided 2026-10-04: always a number, 16 characters do not fit the prefix and a characteristic), DDL
+  source `ZZXXMLA1_C` + the same digits (decided 2026-10-06: a namespace's slashes are not allowed in it). **All NUMC columns are delivered as numbers** (decided 2026-10-04), so members read
   `1997`, not `000...1997`. The eMondrian reference database holds copies of the BW tables and the same views, with
   HANA's view SQL (HSQLDB 2.3.2 accepts it and `/` in quoted names; checked 2026-10-04), so the data is identical.
 - **The engine reads data with native HANA SQL through ADBC** (Mondrian's `SqlQuery` with a dialect), not with

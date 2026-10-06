@@ -12,8 +12,8 @@
 "! The metadata of a BW InfoProvider that a schema is proposed for (docs/schema-generator.md, Providers): a
 "! HANA-optimised InfoCube (RSDCUBE type B, subtype F: flat) or a cube-type aDSO (RSOADSO: activate data, cube delta
 "! only). Every name is BW's, never built: the fact table (RSD_FACTTAB_GET_FOR_CUBE, CL_RSO_ADSO=>GET_TABLNM, the
-"! aDSO's reporting view), the fields (RSDIOBJ-FIELDNM; an InfoCube's characteristics are its SID_<characteristic>
-"! columns) and the characteristics' tables and views (ZZXXMLA1_CL_BW_VIEW_GEN). Each column comes with its DDIC type,
+"! aDSO's reporting view), the fields (RSDIOBJ-FIELDNM; an InfoCube's characteristics are its SID columns,
+"! RSD_SIDNM_GET_FROM_IOBJNM) and the characteristics' tables and views (ZZXXMLA1_CL_BW_VIEW_GEN). Each column comes with its DDIC type,
 "! a characteristic with its time-independent attributes as columns of its view. What a schema cannot use is a note
 "! with the reason: units and currencies, fields without InfoObject, time-dependent attributes. Nothing is changed.
 CLASS zzxxmla1_cl_bw_provider DEFINITION
@@ -221,8 +221,20 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
     LOOP AT characteristics INTO DATA(characteristic).
       CASE characteristic-iobjtp.
         WHEN 'CHA' OR 'TIM'.
-          DATA(sid_column) = |SID_{ characteristic-iobjnm }|.
-          READ TABLE columns INTO DATA(column) WITH TABLE KEY name = sid_column.
+          " BW's name: SID_<characteristic>, in a partner namespace /<generated namespace>/S_<name>
+          DATA sid_column TYPE rs_char30.
+          CALL FUNCTION 'RSD_SIDNM_GET_FROM_IOBJNM'
+            EXPORTING
+              i_iobjnm     = characteristic-iobjnm
+            IMPORTING
+              e_sidfieldnm = sid_column
+            EXCEPTIONS
+              name_error   = 1
+              OTHERS       = 2.
+          IF sy-subrc <> 0 OR sid_column IS INITIAL.
+            fail( |InfoCube { cube }: BW gives no SID column for { characteristic-iobjnm }| ).
+          ENDIF.
+          READ TABLE columns INTO DATA(column) WITH TABLE KEY name = CONV string( sid_column ).
           IF sy-subrc <> 0.
             fail( |InfoCube { cube }: { fact_table } has no column { sid_column }; only HANA-optimised InfoCubes | &&
                   |are supported| ).
