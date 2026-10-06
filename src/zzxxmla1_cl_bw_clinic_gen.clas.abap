@@ -19,6 +19,7 @@
 "! The data comes from a seeded pseudo-random generator: every run gives the same visits. BW's blank member (the initial
 "! key, SID 0) exists in every hierarchy; a few visits use it (no diagnosis recorded yet, no physician assigned at
 "! triage, a patient not identified, no visit type), so it has data.
+"! An upper bound on the visits thins them evenly over the two years, for a smaller demo (a test system).
 "! Every run deletes the aDSO, the cube, the views and the InfoObjects listed here and creates them again: never point it
 "! at objects that hold data you want to keep. Run with program ZZXXMLA1_SETUP or sapcli class execute.
 CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
@@ -34,7 +35,9 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     CONSTANTS c_adso     TYPE rsoadsonm VALUE 'ZCLVISITA'.
 
     "! Generates everything; the log of the run.
+    "! @parameter max_visits | at most this many visits, spread evenly over the days; 0: all of them
     METHODS run
+      IMPORTING max_visits    TYPE i DEFAULT 0
       RETURNING VALUE(result) TYPE string_table.
 
   PROTECTED SECTION.
@@ -173,6 +176,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     "! The diagnoses each department sees, with their weights.
     METHODS diagnosis_weights RETURNING VALUE(result) TYPE ty_t_group_weight.
     METHODS build_visits.
+    "! Keeps max_visits of the visits, evenly spread, in their order.
+    METHODS limit_visits IMPORTING max_visits TYPE i.
     METHODS master_data RETURNING VALUE(result) TYPE ty_t_md.
     METHODS calendar IMPORTING day TYPE d RETURNING VALUE(result) TYPE ty_calendar.
 
@@ -251,6 +256,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     build_physicians( ).
     build_diagnoses( ).
     build_visits( ).
+    limit_visits( max_visits ).
     write( |{ lines( patients ) } patients, { lines( physicians ) } physicians, { lines( diagnoses ) } diagnoses, | &&
            |{ lines( visits ) } visits| ).
 
@@ -667,6 +673,21 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       ENDDO.
       day = day + 1.
     ENDWHILE.
+  ENDMETHOD.
+
+  METHOD limit_visits.
+    DATA(total) = CONV int8( lines( visits ) ).
+    IF max_visits <= 0 OR max_visits >= total.
+      RETURN.
+    ENDIF.
+    DATA kept TYPE ty_t_visit.
+    " the n-th visit is kept when n * max_visits / total reaches the next whole number
+    LOOP AT visits INTO DATA(visit).
+      IF ( sy-tabix * max_visits ) DIV total > ( ( sy-tabix - 1 ) * max_visits ) DIV total.
+        APPEND visit TO kept.
+      ENDIF.
+    ENDLOOP.
+    visits = kept.
   ENDMETHOD.
 
   METHOD master_data.

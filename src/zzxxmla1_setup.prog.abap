@@ -11,18 +11,24 @@
 *----------------------------------------------------------------------------------------------------------------------*
 * Sets up olap4abap after the package is imported (ZZXXMLA1_CL_SETUP): the tables, the schema builder's files and the
 * data sources file; with the checkbox also the clinic demo (ZZXXMLA1_CL_BW_CLINIC_GEN), which deletes and creates
-* InfoArea ZCLINIC's InfoCube ZCLVISIT and aDSO ZCLVISITA with their InfoObjects.
+* InfoArea ZCLINIC's InfoCube ZCLVISIT and aDSO ZCLVISITA with their InfoObjects, with at most p_maxvis visits if that
+* is not 0.
 REPORT zzxxmla1_setup.
 
 SELECTION-SCREEN BEGIN OF LINE.
 PARAMETERS p_clinic AS CHECKBOX.
 SELECTION-SCREEN COMMENT 4(70) t_clinic FOR FIELD p_clinic.
 SELECTION-SCREEN END OF LINE.
+SELECTION-SCREEN BEGIN OF LINE.
+SELECTION-SCREEN COMMENT 1(35) t_maxvis FOR FIELD p_maxvis.
+PARAMETERS p_maxvis TYPE i.
+SELECTION-SCREEN END OF LINE.
 
 INITIALIZATION.
   t_clinic = 'Also generate the clinic demo (BW objects, data, schemas, catalogs)'.
+  t_maxvis = 'Clinic demo: max. visits (0: all)'.
 
 START-OF-SELECTION.
-  LOOP AT NEW zzxxmla1_cl_setup( )->run( clinic = p_clinic ) INTO DATA(line).
+  LOOP AT NEW zzxxmla1_cl_setup( )->run( clinic = p_clinic clinic_max_visits = p_maxvis ) INTO DATA(line).
     WRITE / line.
   ENDLOOP.

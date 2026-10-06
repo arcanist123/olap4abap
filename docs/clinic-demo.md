@@ -10,6 +10,10 @@ Run program `ZZXXMLA1_SETUP` with the checkbox "Also generate the clinic demo", 
 `ZCLINIC`'s objects (the aDSO, the cube, the views of its characteristics and the InfoObjects `ZCL*`); the views of the
 time characteristics `0CAL*` are shared with other providers and only generated again.
 
+"Clinic demo: max. visits" (`run( max_visits = ... )` of the class) caps the number of visits for a smaller demo, e.g.
+on a test system: the visits are thinned evenly over the days, so every day keeps its share; 0 (the default) keeps all
+33,956. Patients, physicians and diagnoses stay the same.
+
 ## What it creates
 
 - InfoCube `ZCLVISIT` (one BW dimension per characteristic) and cube-type aDSO `ZCLVISITA` with the same visits; the

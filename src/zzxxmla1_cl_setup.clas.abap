@@ -14,7 +14,8 @@
 "! - the schema builder's files below /schema/ (ZZXXMLA1_CL_WEB_APP_FILES), written every run, and the files below
 "!   /schema/ the package no longer has deleted;
 "! - /WEB-INF/datasources.xml with one data source and no catalog, only if there is none: it holds the catalogs;
-"! - on request the clinic demo (ZZXXMLA1_CL_BW_CLINIC_GEN): BW objects, data, schemas and catalogs.
+"! - on request the clinic demo (ZZXXMLA1_CL_BW_CLINIC_GEN): BW objects, data, schemas and catalogs, with at most
+"!   clinic_max_visits visits if that is given.
 "! It can run any number of times.
 CLASS zzxxmla1_cl_setup DEFINITION
   PUBLIC
@@ -26,8 +27,9 @@ CLASS zzxxmla1_cl_setup DEFINITION
 
     "! Sets up the server; the log of the run.
     METHODS run
-      IMPORTING clinic        TYPE abap_bool DEFAULT abap_false
-      RETURNING VALUE(result) TYPE string_table.
+      IMPORTING clinic            TYPE abap_bool DEFAULT abap_false
+                clinic_max_visits TYPE i DEFAULT 0
+      RETURNING VALUE(result)     TYPE string_table.
   PROTECTED SECTION.
   PRIVATE SECTION.
     METHODS write_app_files
@@ -52,7 +54,7 @@ CLASS zzxxmla1_cl_setup IMPLEMENTATION.
     APPEND LINES OF write_datasources( ) TO result.
     COMMIT WORK.
     IF clinic = abap_true.
-      APPEND LINES OF NEW zzxxmla1_cl_bw_clinic_gen( )->run( ) TO result.
+      APPEND LINES OF NEW zzxxmla1_cl_bw_clinic_gen( )->run( clinic_max_visits ) TO result.
     ENDIF.
   ENDMETHOD.
 
