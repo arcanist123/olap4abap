@@ -468,6 +468,16 @@ CLASS ltc_engine IMPLEMENTATION.
                    && `select {[Measures].[o]} on 0 from [ZFMSALES]` ).
     cl_abap_unit_assert=>assert_equals( act = values( result )
                                         exp = VALUE string_table( ( `0,1Drink,2Food,3Non-Consumable` ) ) ).
+    " Generate(set, numeric, delimiter): the numbers as Str writes them (answers of the reference server)
+    result = execute( `with member [Measures].[c] as 'Generate(Ascendants([Product].[Drink].[Dairy]), `
+                   && `[Product].CurrentMember.Children.Count, "|")' `
+                   && `member [Measures].[d] as 'Generate({[Product].[Drink], [Product].[Food]}, `
+                   && `-[Measures].[Unit Sales] / 2, ",")' `
+                   && `member [Measures].[e] as 'Generate({[Product].[Drink]}, [Measures].[Unit Sales] / 0, ",")' `
+                   && `select {[Measures].[c], [Measures].[d], [Measures].[e]} on 0 from [ZFMSALES]` ).
+    cl_abap_unit_assert=>assert_equals( act = values( result )
+                                        exp = VALUE string_table( ( ` 1| 3| 4` ) ( `-12298.5,-95970.0` )
+                                                                  ( ` Infinity` ) ) ).
     " Generate: each tuple once, unless ALL
     result = execute( `select Generate({[Product].[Drink], [Product].[Food]}, `
                    && `{[Product].CurrentMember.Children.Item(0), [Product].[Drink]}, ALL) on 0 from [ZFMSALES]` ).

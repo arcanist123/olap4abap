@@ -729,12 +729,18 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       RETURNING VALUE(result) TYPE ty_t_tuple
       RAISING   zzxxmla1_cx_xmla.
     "! Generate(set, string [, delimiter]) (GenerateStringCalcImpl): the string with each tuple as the context, joined
-    "! by the delimiter (evaluated before each one but the first).
+    "! by the delimiter (evaluated before each one but the first). Generate(set, numeric, delimiter) joins the numbers
+    "! as Str writes them (GenerateFunDef.compileCall).
     METHODS generate_string
       IMPORTING evaluator     TYPE ty_evaluator
                 node          TYPE ty_node
       RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_evaluator=>ty_value
       RAISING   zzxxmla1_cx_xmla.
+    "! Vba.str: a number as Number.toString, with a leading space if it is >= 0 (not NaN); null for an empty one
+    "! (JavaFunDef gives null for a null argument, StringBuilder.append writes it as null).
+    CLASS-METHODS vba_str
+      IMPORTING value         TYPE zzxxmla1_cl_mdx_evaluator=>ty_value
+      RETURNING VALUE(result) TYPE string.
     "! RolapHierarchy.getNullMember: the member #null of the hierarchy, on its first level.
     METHODS null_member
       IMPORTING hierarchy     TYPE i
@@ -2257,7 +2263,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         result = format( evaluator = evaluator node = node ).
       WHEN `SETTOSTR|Function|8`.
         result = set_to_str( evaluator = evaluator node = node ).
-      WHEN `GENERATE|Function|8,9` OR `GENERATE|Function|8,9,9`.
+      WHEN `GENERATE|Function|8,9` OR `GENERATE|Function|8,9,9` OR `GENERATE|Function|8,7,9`.
         result = generate_string( evaluator = evaluator node = node ).
       WHEN `CURRENTORDINAL|Property|8`.
         " the named set is evaluated if it is not yet
@@ -3928,14 +3934,25 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
             text = text && zzxxmla1_cl_mdx_evaluator=>to_text( evaluate_string( evaluator = evaluator
                                                                                 node = node->args[ 3 ] ) ).
           ENDIF.
-          text = text && zzxxmla1_cl_mdx_evaluator=>to_text( evaluate_string( evaluator = evaluator
-                                                                              node = node->args[ 2 ] ) ).
+          IF node->fun_def-signature_categories[ 2 ] = c_category-numeric.
+            text = text && vba_str( evaluate_value( evaluator = evaluator node = node->args[ 2 ] ) ).
+          ELSE.
+            text = text && zzxxmla1_cl_mdx_evaluator=>to_text( evaluate_string( evaluator = evaluator
+                                                                                node = node->args[ 2 ] ) ).
+          ENDIF.
         ENDLOOP.
       CLEANUP.
         evaluator->restore( savepoint ).
     ENDTRY.
     evaluator->restore( savepoint ).
     result = VALUE #( kind = zzxxmla1_cl_mdx_evaluator=>c_value-string text = text ).
+  ENDMETHOD.
+
+  METHOD vba_str.
+    result = zzxxmla1_cl_mdx_evaluator=>to_text( value ).
+    IF value-empty = abap_false AND ( value-special = `INF` OR ( value-special IS INITIAL AND value-number >= 0 ) ).
+      result = ` ` && result.
+    ENDIF.
   ENDMETHOD.
 
   METHOD null_member.
