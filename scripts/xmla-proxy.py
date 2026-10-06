@@ -1,17 +1,25 @@
 #!/usr/bin/env python3
-"""A logging proxy between an XMLA client (Excel) and the two XMLA servers: eMondrian and the SAP implementation.
+"""A logging proxy between an XMLA client (Excel) and the XMLA servers: the eMondrian containers and the SAP
+implementation.
 
 Each backend gets its own local port; whatever arrives there (any method, any path) is forwarded to that backend's
 URL and the answer goes back unchanged. Every exchange is printed as one line (method, SOAP action, request type or
 MDX statement, status, time, size, rows/cells or the fault) and saved in full under logs/xmla-proxy/<start time>/ as
 <n>-<backend>.request.txt and <n>-<backend>.response.txt (headers, a blank line, the body).
 
-    python scripts/xmla-proxy.py                  # Mondrian on http://localhost:8081/, SAP on http://localhost:8082/
+    python scripts/xmla-proxy.py                  # all four backends below
     python scripts/xmla-proxy.py --mondrian-port 9081 --sap-url http://vhcala4hci:50000/zzxxmla1?sap-client=001
-    python scripts/xmla-proxy.py --backend release=8083=http://localhost:8090/emondrian/xmla   # a third server
+    python scripts/xmla-proxy.py --backend other=8085=http://localhost:8095/emondrian/xmla   # one more server
+
+By default:
+    http://localhost:8081/  mondrian  container emondrian (8080): the reference, catalog ZFOODMART (our BW FoodMart)
+    http://localhost:8082/  sap       the SAP implementation
+    http://localhost:8083/  git       container emondrian-git (8091): the same build, catalog FoodMart (the sample)
+    http://localhost:8084/  release   container emondrian-release (8090): the released eMondrian
+A backend that is not running answers 502 Bad Gateway.
     python scripts/xmla-proxy.py --sap-url "https://localhost:50001/zzxxmla1?sap-client=001" --insecure
 
-In Excel: Data > Get Data > From Database > From Analysis Services, server http://localhost:8081/ (or 8082).
+In Excel: Data > Get Data > From Database > From Analysis Services, server http://localhost:8081/ (or 8082, ...).
 """
 import argparse
 import datetime
@@ -169,9 +177,13 @@ def main():
     parser.add_argument("--mondrian-url", default="http://localhost:8080/emondrian/xmla")
     parser.add_argument("--sap-port", type=int, default=8082)
     parser.add_argument("--sap-url", default="http://localhost:50000/zzxxmla1?sap-client=001")
+    parser.add_argument("--git-port", type=int, default=8083)
+    parser.add_argument("--git-url", default="http://localhost:8091/emondrian/xmla")
+    parser.add_argument("--release-port", type=int, default=8084)
+    parser.add_argument("--release-url", default="http://localhost:8090/emondrian/xmla")
     parser.add_argument("--bind", default="127.0.0.1", help="address to listen on (0.0.0.0 for other machines)")
     parser.add_argument("--backend", action="append", default=[], metavar="NAME=PORT=URL",
-                        help="one more backend, e.g. release=8083=http://localhost:8090/emondrian/xmla")
+                        help="one more backend, e.g. other=8085=http://localhost:8095/emondrian/xmla")
     parser.add_argument("--insecure", action="store_true",
                         help="do not check the certificates of https backends (self-signed development systems)")
     args = parser.parse_args()
@@ -179,7 +191,8 @@ def main():
     log_dir = ROOT / "logs" / "xmla-proxy" / f"{datetime.datetime.now():%Y%m%d-%H%M%S}"
     log_dir.mkdir(parents=True, exist_ok=True)
     servers = []
-    backends = [("mondrian", args.mondrian_port, args.mondrian_url), ("sap", args.sap_port, args.sap_url)]
+    backends = [("mondrian", args.mondrian_port, args.mondrian_url), ("sap", args.sap_port, args.sap_url),
+                ("git", args.git_port, args.git_url), ("release", args.release_port, args.release_url)]
     for extra in args.backend:
         name, port, target = extra.split("=", 2)
         backends.append((name, int(port), target))

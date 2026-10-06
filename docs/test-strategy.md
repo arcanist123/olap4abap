@@ -44,8 +44,12 @@ SOAP faults.
 
 ## Excel through the proxy
 
-`python scripts/xmla-proxy.py` puts a logging proxy between Excel and the two servers: `http://localhost:8081/` goes to
-eMondrian, `http://localhost:8082/` to SAP (Excel: Data > Get Data > From Analysis Services, that address as server).
+`python scripts/xmla-proxy.py` puts a logging proxy between Excel and the servers: `http://localhost:8081/` goes to
+eMondrian (container `emondrian`, catalog `ZFOODMART`), `http://localhost:8082/` to SAP, `http://localhost:8083/` to
+container `emondrian-git` (port 8091, the same build with the FoodMart sample) and `http://localhost:8084/` to container
+`emondrian-release` (port 8090, the released eMondrian) (Excel: Data > Get Data > From Analysis Services, that address
+as server). All four ports listen whether or not the server behind them runs; a server that is down answers 502 Bad
+Gateway until it is started.
 Each exchange is printed as one line and saved in full under `logs/xmla-proxy/<start time>/` (git-ignored). A
 conversation Excel had with eMondrian can be replayed against SAP from those files to find the gaps before Excel is
 pointed at SAP. What Excel (MSOLAP 17) does: it offers binary XML and compression in
