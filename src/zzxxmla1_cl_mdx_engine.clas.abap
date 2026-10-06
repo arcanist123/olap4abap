@@ -1309,7 +1309,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     ENDDO.
 
     result-cube_name = cube-cube_name.
-    result-last_update = cl_abap_tstmp=>move_to_short( cube-generated_at ).
+    " cut the fraction of the seconds as cl_abap_tstmp=>move_to_short does (not in 7.50); rounding could give second 60
+    result-last_update = trunc( cube-generated_at ).
     " the cell properties: the name of each (its first segment), in upper case
     LOOP AT resolved-cell_properties INTO DATA(cell_property).
       SPLIT cell_property AT `.` INTO cell_property DATA(rest) ##NEEDED.
@@ -2448,6 +2449,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD compare.
+    " the largest double (cl_abap_math=>max_float is not in 7.50)
+    CONSTANTS c_max_float TYPE f VALUE '1.7976931348623157E+308'.
     DATA(name) = node->fun_def-name.
     DATA(order) = 0.
     CASE node->fun_def-signature_categories[ 1 ].
@@ -2470,11 +2473,11 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
           RETURN.
         ENDIF.
         " infinities compare beyond every number
-        DATA(left_number) = COND f( WHEN left-special = `INF` THEN cl_abap_math=>max_float
-                                    WHEN left-special = `-INF` THEN - cl_abap_math=>max_float
+        DATA(left_number) = COND f( WHEN left-special = `INF` THEN c_max_float
+                                    WHEN left-special = `-INF` THEN - c_max_float
                                     ELSE left-number ).
-        DATA(right_number) = COND f( WHEN right-special = `INF` THEN cl_abap_math=>max_float
-                                     WHEN right-special = `-INF` THEN - cl_abap_math=>max_float
+        DATA(right_number) = COND f( WHEN right-special = `INF` THEN c_max_float
+                                     WHEN right-special = `-INF` THEN - c_max_float
                                      ELSE right-number ).
         order = COND #( WHEN left_number < right_number THEN -1 WHEN left_number > right_number THEN 1 ).
     ENDCASE.

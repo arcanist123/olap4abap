@@ -251,7 +251,10 @@ Reading eMondrian's `Foodmart.xml` (54 KB) takes about 40 ms.
 As in Mondrian, the catalogs are configured, not programmed: the server has files, as Mondrian's web application has
 them, and adding a schema or a catalog is writing files. The files are rows of table `ZZXXMLA1_FILE` (path, content,
 changed at/by; created by `ZZXXMLA1_CL_CREATE_TABLES`, which leaves an existing table alone), read by
-`ZZXXMLA1_CL_FILES`:
+`ZZXXMLA1_CL_FILES`. Program `ZZXXMLA1_SETUP` (`ZZXXMLA1_CL_SETUP`, also `sapcli class execute ZZXXMLA1_CL_SETUP`)
+creates the table, writes the schema builder's files from `ZZXXMLA1_CL_WEB_APP_FILES` and, if there is none, a data
+sources file with one data source and no catalog (`ZZXXMLA1_CL_FILES=>default_datasources`); the FoodMart catalog is
+not part of it (`scripts/sap-files.py deploy`):
 
 - `/WEB-INF/datasources.xml`: Mondrian's data sources file, read by `ZZXXMLA1_CL_REPOSITORY` as Mondrian's
   `FileRepository` reads it (`DataSourcesConfig` through the XOM parser): the data sources (`DISCOVER_DATASOURCES`, the
@@ -271,6 +274,7 @@ A new file is read by the next request.
     python scripts/sap-files.py put reference/schema/datasources-sap.xml /WEB-INF/datasources.xml   # datasources-sap.xml
     python scripts/sap-files.py list | get <path> | delete <path>
     python scripts/sap-files.py app                # the schema builder: web/schema/ to /schema/ (served under /zzxxmla1/schema/)
+    python scripts/generate-web-app-abap.py        # web/schema/ into ZZXXMLA1_CL_WEB_APP_FILES, which the setup writes
     scripts/deploy-reference-schema.sh             # the same schema to eMondrian
 
 Limits: a catalog name is one catalog of the server (two data sources may list it only with the same Definition), and a
@@ -300,7 +304,7 @@ failed statement is the SOAP fault `Server.00UE001` with the statement and the d
 The code must run on NetWeaver 7.50 (`docs/mvp-scope.md`), but the development system is ABAP Platform 2025 and
 activates newer syntax. `scripts/abaplint.sh` checks `src/` offline with abaplint's 7.50 grammar (`abaplint.json`,
 version pinned in the script; npx fetches it) and with a syntax check against stubs: SAP's standard objects from
-github.com/abaplint/deps and ours in `abaplint/stubs/` (the model tables and the BW type pools RS, RSD, RSDMD; add a
+github.com/abaplint/deps and ours in `abaplint/stubs/` (table `ZZXXMLA1_FILE` and the BW type pools RS, RSD, RSDMD; add a
 stub when new code uses a DDIC object that `src/` does not contain). Run it after every change; it takes seconds.
 abaplint does not know the parameters of built-in functions, so the script also searches for `pcre =`.
 7.50 replacements used so far: `RAISE EXCEPTION TYPE cx EXPORTING ...` for `RAISE EXCEPTION NEW` (7.52); for a

@@ -46,6 +46,9 @@ CLASS zzxxmla1_cl_files DEFINITION
     "! Deletes the file; the caller commits.
     CLASS-METHODS delete
       IMPORTING !path TYPE csequence.
+    "! The data sources file of a new server: one data source without catalogs (ZZXXMLA1_CL_SETUP writes it).
+    CLASS-METHODS default_datasources
+      RETURNING VALUE(result) TYPE string.
   PROTECTED SECTION.
   PRIVATE SECTION.
 ENDCLASS.
@@ -81,6 +84,25 @@ CLASS zzxxmla1_cl_files IMPLEMENTATION.
     DATA key TYPE zzxxmla1_file-path.
     key = path.
     DELETE FROM zzxxmla1_file WHERE path = @key.
+  ENDMETHOD.
+
+  METHOD default_datasources.
+    " as reference/schema/datasources-sap.xml, without its catalog: an empty URL makes DISCOVER_DATASOURCES give the
+    " URL the request came in on; a catalog is added by the schema builder's accept or by a generator
+    result = |<?xml version="1.0"?>\n| &&
+             |<DataSources>\n| &&
+             |  <DataSource>\n| &&
+             |    <DataSourceName>ABAP BW</DataSourceName>\n| &&
+             |    <DataSourceDescription>SAP BW data served by olap4abap</DataSourceDescription>\n| &&
+             |    <URL></URL>\n| &&
+             |    <DataSourceInfo>Provider=olap4abap</DataSourceInfo>\n| &&
+             |    <ProviderName>olap4abap</ProviderName>\n| &&
+             |    <ProviderType>MDP</ProviderType>\n| &&
+             |    <AuthenticationMode>Unauthenticated</AuthenticationMode>\n| &&
+             |    <Catalogs>\n| &&
+             |    </Catalogs>\n| &&
+             |  </DataSource>\n| &&
+             |</DataSources>\n|.
   ENDMETHOD.
 
 ENDCLASS.

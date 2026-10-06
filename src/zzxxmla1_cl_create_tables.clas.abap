@@ -19,6 +19,10 @@ CLASS zzxxmla1_cl_create_tables DEFINITION
   PUBLIC SECTION.
     INTERFACES if_oo_adt_classrun.
 
+    "! Creates the tables that do not exist; the log, one line per table.
+    METHODS run
+      RETURNING VALUE(result) TYPE string_table.
+
   PRIVATE SECTION.
     CONSTANTS c_package TYPE devclass VALUE '$ZZXXMLA1'.
 
@@ -40,13 +44,19 @@ ENDCLASS.
 
 CLASS zzxxmla1_cl_create_tables IMPLEMENTATION.
   METHOD if_oo_adt_classrun~main.
+    LOOP AT run( ) INTO DATA(line).
+      out->write( line ).
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD run.
     " a table that exists is left as it is: it holds data (the server's files) that a new table would lose
     LOOP AT tables( ) INTO DATA(table).
       SELECT SINGLE tabname FROM dd02l WHERE tabname = @table-name INTO @DATA(existing).
       DATA(error) = COND string( WHEN sy-subrc <> 0 THEN create_table( table ) ).
-      out->write( |{ table-name }: { COND string( WHEN existing IS NOT INITIAL THEN 'exists'
-                                                  WHEN error IS INITIAL THEN 'created'
-                                                  ELSE error ) }| ).
+      APPEND |{ table-name }: { COND string( WHEN existing IS NOT INITIAL THEN 'exists'
+                                             WHEN error IS INITIAL THEN 'created'
+                                             ELSE error ) }| TO result.
       CLEAR existing.
     ENDLOOP.
   ENDMETHOD.

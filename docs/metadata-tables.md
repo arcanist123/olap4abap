@@ -1,13 +1,13 @@
 # Metadata tables (Mondrian model) - no longer used
 
 **Since 2026-10-04 nothing reads these tables:** the model is the Mondrian schema of each catalog (a file of the
-server, read by `ZZXXMLA1_CL_SCHEMA`; `docs/mvp-scope.md`, schema decision). The tables and `ZZXXMLA1_CL_MODEL_GEN`
-remain in SAP (`ZZXXMLA1_CL_CREATE_TABLES` now creates only `ZZXXMLA1_FILE`) until the generator writes schema XML instead. The rules below are what
-`ZZXXMLA1_CL_SCHEMA` now derives from a schema with eMondrian's attribute model.
+server, read by `ZZXXMLA1_CL_SCHEMA`; `docs/mvp-scope.md`, schema decision). **Since 2026-10-06 the tables and their
+generator `ZZXXMLA1_CL_MODEL_GEN` are deleted** (from SAP and from `src/`; git history has them); this file is kept as
+the record of the model rules, which `ZZXXMLA1_CL_SCHEMA` now derives from a schema with eMondrian's attribute model.
 
-sapcli cannot export DDIC tables, so the tables are created from code: run `ZZXXMLA1_CL_CREATE_TABLES`
-(`sapcli class execute ZZXXMLA1_CL_CREATE_TABLES`). Every run deletes the five tables including their rows and creates
-them again (the generator refills them). The field list is in the class; this file describes the meaning. Tables are
+sapcli cannot export DDIC tables, so the tables were created from code by an earlier version of
+`ZZXXMLA1_CL_CREATE_TABLES`, which deleted the five tables including their rows and created them again (the generator
+refilled them). The field list is in the class; this file describes the meaning. Tables are
 cross-client (no client field), delivery class A, in package `$ZZXXMLA1`. The class follows abapGit's table import
 (`DDIF_TABL_PUT`, `DDIF_TABL_ACTIVATE`, `RS_DD_DELETE_OBJ` with object type `T`). Table names are limited to 14 characters.
 
