@@ -5821,7 +5821,16 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       DATA(position) = sy-index.
       LOOP AT tuples[ position ] ASSIGNING FIELD-SYMBOL(<member>).
         DATA(k) = sy-tabix.
-        <member>-display_info = nmin( val1 = <member>-children val2 = 65535 ).
+        DATA(children) = <member>-children.
+        " an All member (or a visual total of one) is made without its children counted (getMemberChildren.size)
+        IF <member>-key_level = 0 AND <member>-is_null = abap_false
+            AND <member>-hier_id <> zzxxmla1_cl_mdx_schema_reader=>c_measures
+            AND ( <member>-calculated = abap_false OR <member>-calc_name IS NOT INITIAL ).
+          DATA(all_member) = <member>.
+          all_member-calculated = abap_false.
+          children = lines( schema_reader->get_member_children( all_member ) ).
+        ENDIF.
+        <member>-display_info = nmin( val1 = children val2 = 65535 ).
         IF position < count AND tuples[ position + 1 ][ k ]-parent_unique IS NOT INITIAL
             AND tuples[ position + 1 ][ k ]-parent_unique = <member>-unique_name.
           <member>-display_info = <member>-display_info + 65536.

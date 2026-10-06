@@ -255,16 +255,21 @@ CLASS zzxxmla1_cl_mdx_schema_reader DEFINITION
       ty_t_member_properties TYPE HASHED TABLE OF ty_member_properties WITH UNIQUE KEY unique_name.
     TYPES:
       BEGIN OF ty_cache,
-        hierarchy      TYPE i,
-        members        TYPE ty_t_member_store,
-        default_member TYPE ty_member,
-        properties     TYPE ty_t_member_properties,  " of the members whose level has properties
+        hierarchy  TYPE i,
+        members    TYPE ty_t_member_store,
+        properties TYPE ty_t_member_properties,  " of the members whose level has properties
       END OF ty_cache.
+    TYPES:
+      BEGIN OF ty_default_member,
+        hierarchy TYPE i,
+        member    TYPE ty_member,
+      END OF ty_default_member.
     DATA dimensions        TYPE ty_t_dimension.
     DATA hierarchies       TYPE ty_t_hierarchy.
     DATA levels            TYPE ty_t_level.
     DATA model_hierarchies TYPE zzxxmla1_cl_model=>ty_t_hierarchy.
     DATA cache             TYPE HASHED TABLE OF ty_cache WITH UNIQUE KEY hierarchy.
+    DATA default_members   TYPE HASHED TABLE OF ty_default_member WITH UNIQUE KEY hierarchy.
     DATA calculated_members TYPE ty_t_calculated_member.
     DATA visual_totals TYPE ty_t_calculated_member.
 
@@ -273,6 +278,11 @@ CLASS zzxxmla1_cl_mdx_schema_reader DEFINITION
     "! Reads the members of a hierarchy once (the All member, then the members of the model in hierarchy order).
     METHODS load_members
       IMPORTING hierarchy TYPE i.
+    "! The All member of a hierarchy that has one, made without reading members (RolapHierarchy.init). Its children
+    "! are not counted: set_display_info counts them with get_member_children.
+    METHODS all_member
+      IMPORTING hierarchy     TYPE i
+      RETURNING VALUE(result) TYPE ty_member.
     "! Resolves the defaultMember of a hierarchy (Util.parseIdentifier and getMemberByUniqueName).
     METHODS resolve_default_member
       IMPORTING hierarchy     TYPE i
@@ -390,10 +400,7 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
     " the defaultMember of a hierarchy is looked up once the cube is complete (RolapHierarchy.init)
     LOOP AT model_hierarchies INTO model WHERE default_member IS NOT INITIAL.
       hier_id = sy-tabix.
-      DATA(default_member) = resolve_default_member( hier_id ).
-      load_members( hier_id ).
-      ASSIGN cache[ hierarchy = hier_id ] TO FIELD-SYMBOL(<cache>).
-      <cache>-default_member = default_member.
+      INSERT VALUE #( hierarchy = hier_id member = resolve_default_member( hier_id ) ) INTO TABLE default_members.
     ENDLOOP.
   ENDMETHOD.
 
@@ -474,13 +481,9 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
     DATA(all_unique) = VALUE string( ).
     IF model-has_all = abap_true.
       offset = 1.
-      DATA(all_level) = levels[ element-levels[ 1 ] ].
-      all_unique = |{ model-unique_name }.{ zzxxmla1_cl_model=>quote_name( model-all_member_name ) }|.
-      APPEND VALUE #( hierarchy = model-unique_name hier_id = hierarchy ordinal = 0 unique_name = all_unique
-                      caption = model-all_member_name level = all_level-id level_name = all_level-unique_name
-                      level_number = 0
-                      children = REDUCE i( INIT n = 0 FOR m IN model_members WHERE ( level_no = 1 ) NEXT n = n + 1 ) )
-             TO members.
+      DATA(all_entry) = all_member( hierarchy ).
+      all_unique = all_entry-unique_name.
+      APPEND all_entry TO members.
     ENDIF.
     LOOP AT model_members INTO DATA(model_member).
       DATA(level) = levels[ element-levels[ model_member-level_no + offset ] ].
@@ -496,6 +499,15 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
     INSERT VALUE #( hierarchy = hierarchy members = members properties = properties ) INTO TABLE cache.
+  ENDMETHOD.
+
+  METHOD all_member.
+    DATA(model) = model_hierarchies[ hierarchy ].
+    DATA(all_level) = levels[ hierarchies[ hierarchy + 1 ]-levels[ 1 ] ].
+    result = VALUE #( hierarchy = model-unique_name hier_id = hierarchy ordinal = 0
+                      unique_name = |{ model-unique_name }.{ zzxxmla1_cl_model=>quote_name( model-all_member_name ) }|
+                      caption = model-all_member_name level = all_level-id level_name = all_level-unique_name
+                      level_number = 0 ).
   ENDMETHOD.
 
   METHOD get_level_properties.
@@ -583,6 +595,10 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
       result = get_hierarchy_members( hierarchy ).
       RETURN.
     ENDIF.
+    IF levels[ level ]-is_all = abap_true.
+      result = VALUE #( ( all_member( hierarchy ) ) ).
+      RETURN.
+    ENDIF.
     load_members( hierarchy ).
     ASSIGN cache[ hierarchy = hierarchy ] TO FIELD-SYMBOL(<cache>).
     LOOP AT <cache>-members INTO DATA(member) WHERE level = level.
@@ -595,6 +611,13 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
       DATA(measure_members) = get_hierarchy_members( hierarchy ).
       READ TABLE measure_members INTO result WITH KEY unique_name = unique_name.
       RETURN.
+    ENDIF.
+    IF model_hierarchies[ hierarchy ]-has_all = abap_true.
+      DATA(all_entry) = all_member( hierarchy ).
+      IF all_entry-unique_name = unique_name.
+        result = all_entry.
+        RETURN.
+      ENDIF.
     ENDIF.
     load_members( hierarchy ).
     ASSIGN cache[ hierarchy = hierarchy ] TO FIELD-SYMBOL(<cache>).
@@ -623,14 +646,14 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
       result = measure_member( 1 ).
       RETURN.
     ENDIF.
-    " a defaultMember of the schema was resolved by build
-    load_members( hierarchy ).
-    ASSIGN cache[ hierarchy = hierarchy ] TO FIELD-SYMBOL(<cache>).
-    IF <cache>-default_member IS INITIAL.
+    " a defaultMember of the schema was resolved by build; else the first root member, the All member needs no read
+    " (RolapHierarchy.getDefaultMember)
+    ASSIGN default_members[ hierarchy = hierarchy ] TO FIELD-SYMBOL(<default>).
+    IF sy-subrc <> 0.
       DATA(roots) = get_hierarchy_root_members( hierarchy ).
-      <cache>-default_member = roots[ 1 ].
+      INSERT VALUE #( hierarchy = hierarchy member = roots[ 1 ] ) INTO TABLE default_members ASSIGNING <default>.
     ENDIF.
-    result = <cache>-default_member.
+    result = <default>-member.
   ENDMETHOD.
 
   METHOD resolve_default_member.
