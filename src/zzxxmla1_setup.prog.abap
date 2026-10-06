@@ -12,7 +12,9 @@
 * Sets up olap4abap after the package is imported (ZZXXMLA1_CL_SETUP): the tables, the schema builder's files and the
 * data sources file; with the checkbox also the clinic demo (ZZXXMLA1_CL_BW_CLINIC_GEN), which deletes and creates
 * InfoArea ZCLINIC's InfoCube ZCLVISIT and aDSO ZCLVISITA with their InfoObjects, with at most p_maxvis visits if that
-* is not 0.
+* is not 0; with the other checkbox the wide demo (ZZXXMLA1_CL_BW_WIDE_GEN), which deletes and creates InfoArea
+* ZXMLWIDE's InfoCube ZXMLWIDE and aDSO ZXMLWIDEA with the characteristics ZXMLAD00 to ZXMLAD99, with p_wrecs
+* records (0: 1,000). Many records take longer than a dialog step may: then run it in the background (F9).
 REPORT zzxxmla1_setup.
 
 SELECTION-SCREEN BEGIN OF LINE.
@@ -23,12 +25,25 @@ SELECTION-SCREEN BEGIN OF LINE.
 SELECTION-SCREEN COMMENT 1(35) t_maxvis FOR FIELD p_maxvis.
 PARAMETERS p_maxvis TYPE i.
 SELECTION-SCREEN END OF LINE.
+SELECTION-SCREEN BEGIN OF LINE.
+PARAMETERS p_wide AS CHECKBOX.
+SELECTION-SCREEN COMMENT 4(70) t_wide FOR FIELD p_wide.
+SELECTION-SCREEN END OF LINE.
+SELECTION-SCREEN BEGIN OF LINE.
+SELECTION-SCREEN COMMENT 1(35) t_wrecs FOR FIELD p_wrecs.
+PARAMETERS p_wrecs TYPE i.
+SELECTION-SCREEN END OF LINE.
 
 INITIALIZATION.
   t_clinic = 'Also generate the clinic demo (BW objects, data, schemas, catalogs)'.
   t_maxvis = 'Clinic demo: max. visits (0: all)'.
+  t_wide = 'Also generate the wide demo (100 characteristics, BW objects, data)'.
+  t_wrecs = 'Wide demo: records (0: 1,000)'.
 
 START-OF-SELECTION.
-  LOOP AT NEW zzxxmla1_cl_setup( )->run( clinic = p_clinic clinic_max_visits = p_maxvis ) INTO DATA(line).
+  LOOP AT NEW zzxxmla1_cl_setup( )->run( clinic            = p_clinic
+                                         clinic_max_visits = p_maxvis
+                                         wide              = p_wide
+                                         wide_records      = p_wrecs ) INTO DATA(line).
     WRITE / line.
   ENDLOOP.

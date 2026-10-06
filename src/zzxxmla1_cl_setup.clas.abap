@@ -15,7 +15,9 @@
 "!   /schema/ the package no longer has deleted;
 "! - /WEB-INF/datasources.xml with one data source and no catalog, only if there is none: it holds the catalogs;
 "! - on request the clinic demo (ZZXXMLA1_CL_BW_CLINIC_GEN): BW objects, data, schemas and catalogs, with at most
-"!   clinic_max_visits visits if that is given.
+"!   clinic_max_visits visits if that is given;
+"! - on request the wide demo (ZZXXMLA1_CL_BW_WIDE_GEN): BW objects with 100 characteristics and their data, with at
+"!   wide_records records if that is given (1,000 if not).
 "! It can run any number of times.
 CLASS zzxxmla1_cl_setup DEFINITION
   PUBLIC
@@ -29,6 +31,8 @@ CLASS zzxxmla1_cl_setup DEFINITION
     METHODS run
       IMPORTING clinic            TYPE abap_bool DEFAULT abap_false
                 clinic_max_visits TYPE i DEFAULT 0
+                wide              TYPE abap_bool DEFAULT abap_false
+                wide_records      TYPE i DEFAULT 0
       RETURNING VALUE(result)     TYPE string_table.
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -55,6 +59,9 @@ CLASS zzxxmla1_cl_setup IMPLEMENTATION.
     COMMIT WORK.
     IF clinic = abap_true.
       APPEND LINES OF NEW zzxxmla1_cl_bw_clinic_gen( )->run( clinic_max_visits ) TO result.
+    ENDIF.
+    IF wide = abap_true.
+      APPEND LINES OF NEW zzxxmla1_cl_bw_wide_gen( )->run( wide_records ) TO result.
     ENDIF.
   ENDMETHOD.
 

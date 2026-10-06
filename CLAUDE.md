@@ -160,6 +160,9 @@ Read before designing anything:
   `/WEB-INF/datasources.xml` without catalogs; with its checkbox also the clinic demo (`docs/clinic-demo.md`): InfoCube
   `ZCLVISIT` and aDSO `ZCLVISITA` with made-up visits of patients to a clinic, their schemas and catalogs
   (`ZZXXMLA1_CL_BW_CLINIC_GEN`). The clinic demo is the project's own demo data; FoodMart stays the test source.
+  With another checkbox the wide demo (`docs/wide-demo.md`, `ZZXXMLA1_CL_BW_WIDE_GEN`): InfoCube
+  `ZXMLWIDE` and aDSO `ZXMLWIDEA` with 100 characteristics `ZXMLAD00`-`ZXMLAD99` of 1,000 members each, one key figure
+  and 1,000 made-up records (more on request), without schema or catalog.
 - Reference: eMondrian built from source and running in Docker; captured exchanges are in `reference/`.
 
 ## Syncing ABAP code with git
