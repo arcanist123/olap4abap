@@ -18,7 +18,14 @@ CLASS zzxxmla1_main_endpoint DEFINITION
     INTERFACES if_http_extension.
   PROTECTED SECTION.
   PRIVATE SECTION.
+    "! The page a browser gets (GET): what the endpoint is and links to the apps below /schema/.
+    "! @parameter base | path of the ICF service (no trailing /)
+    "! @parameter query | query string of the request, kept on the links and the URL (sap-client added if missing)
+    "! @parameter url | the endpoint's URL, for XMLA clients
     METHODS get_description_html
+      IMPORTING base          TYPE string
+                query         TYPE string
+                url           TYPE string
       RETURNING VALUE(result) TYPE string.
     "! Moves a request of the schema generator's API between HTTP and ZZXXMLA1_CL_SCHEMA_API.
     METHODS handle_schema_api
@@ -56,7 +63,11 @@ CLASS zzxxmla1_main_endpoint IMPLEMENTATION.
       WHEN 'GET'.
         server->response->set_status( code = 200 reason = 'OK' ).
         server->response->set_content_type( 'text/html; charset=utf-8' ).
-        server->response->set_cdata( get_description_html( ) ).
+        DATA(base) = server->request->get_header_field( '~script_name' ).
+        server->response->set_cdata( get_description_html(
+                                         base  = COND #( WHEN base CP '*/' THEN substring( val = base len = strlen( base ) - 1 ) ELSE base )
+                                         query = server->request->get_header_field( '~query_string' )
+                                         url   = get_endpoint_url( server ) ) ).
 
       WHEN 'POST'.
         " the handler works on strings only; this method just moves them between HTTP and the handler
@@ -126,15 +137,44 @@ CLASS zzxxmla1_main_endpoint IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_description_html.
+    " the client is always named: a client that is not the server's default (S/4HANA systems) needs it
+    DATA(full_query) = COND string( WHEN to_lower( query ) CS `sap-client=` THEN query
+                                    WHEN query IS INITIAL THEN |sap-client={ sy-mandt }|
+                                    ELSE |{ query }&sap-client={ sy-mandt }| ).
+    DATA(search) = |?{ full_query }|.
+    DATA(apps) = |{ escape( val = base format = cl_abap_format=>e_html_attr ) }/schema/|.
+    DATA(args) = escape( val = search format = cl_abap_format=>e_html_attr ).
     result =
       `<!DOCTYPE html>` &&
-      `<html><head><meta charset="utf-8"><title>olap4abap</title></head>` &&
-      `<body>` &&
+      `<html lang="en"><head><meta charset="utf-8">` &&
+      `<meta name="viewport" content="width=device-width, initial-scale=1"><title>olap4abap</title>` &&
+      |<link rel="stylesheet" href="{ apps }app.css">| &&
+      `<style>` &&
+      `main{max-width:760px;margin:0 auto;padding:24px 16px}` &&
+      `ul.apps{list-style:none;padding:0;display:grid;gap:12px}` &&
+      `ul.apps a{display:block;padding:12px 16px;border:1px solid var(--line);border-radius:var(--radius);` &&
+      `background:var(--panel);color:var(--text);text-decoration:none}` &&
+      `ul.apps a:hover{border-color:var(--accent)}` &&
+      `ul.apps b{color:var(--accent)}ul.apps span{display:block;color:var(--muted);margin-top:4px}` &&
+      `code{font-family:var(--mono);background:var(--sunken);padding:2px 6px;border-radius:4px;word-break:break-all}` &&
+      `</style></head>` &&
+      `<body><main>` &&
       `<h1>olap4abap</h1>` &&
-      `<p>This endpoint is an XMLA (XML for Analysis) server implemented in ABAP.</p>` &&
-      `<p>Send XMLA requests (SOAP envelopes) to this URL using HTTP POST.</p>` &&
-      `<p>Status: under development, request processing is not implemented yet.</p>` &&
-      `</body></html>`.
+      `<p>An XMLA (XML for Analysis) server with its own MDX engine, serving cubes on SAP BW data.</p>` &&
+      `<h2>Applications</h2>` &&
+      `<ul class="apps">` &&
+      |<li><a href="{ apps }{ args }"><b>Schema Builder</b>| &&
+      `<span>Propose a schema for an InfoCube or aDSO, edit it and accept it into a catalog.</span></a></li>` &&
+      |<li><a href="{ apps }console.html{ args }"><b>MDX Console</b>| &&
+      `<span>Browse a catalog's cubes and run MDX queries against this endpoint.</span></a></li>` &&
+      |<li><a href="{ apps }time.html{ args }"><b>Time Master Data</b>| &&
+      `<span>Fill the SID and attribute tables of BW's calendar characteristics.</span></a></li>` &&
+      `</ul>` &&
+      `<h2>XMLA clients</h2>` &&
+      `<p>Excel and other XMLA clients connect to this URL; requests are SOAP envelopes sent with POST:</p>` &&
+      |<p><code>{ escape( val = url && search format = cl_abap_format=>e_html_text ) }</code></p>| &&
+      `<p><a href="https://github.com/arcanist123/olap4abap">olap4abap on GitHub</a></p>` &&
+      `</main></body></html>`.
   ENDMETHOD.
 
 ENDCLASS.

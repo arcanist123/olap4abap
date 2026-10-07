@@ -59,7 +59,8 @@ Read before designing anything:
 - `ZZXXMLA1_CL_HTTP_HELLOWORLD` - hello world HTTP handler with a passing unit test (a leftover `ZCL_HTTP_HELLOWORLD`
   still exists in `$TMP` and can be deleted).
 - `ZZXXMLA1_MAIN_ENDPOINT` - `IF_HTTP_EXTENSION` handler behind ICF service `/zzxxmla1`: `/schema/api/...` goes to
-  `ZZXXMLA1_CL_SCHEMA_API`, the rest of `/schema/...` to `ZZXXMLA1_CL_WEB_APP` (the schema builder's files, from the code); otherwise GET returns an HTML description page, POST hands the SOAP body to `ZZXXMLA1_CL_XMLA_HANDLER` (string in, string out; so far only
+  `ZZXXMLA1_CL_SCHEMA_API`, the rest of `/schema/...` to `ZZXXMLA1_CL_WEB_APP` (the schema builder's files, from the code); otherwise GET returns the start page (links to the schema builder, MDX console and time master data, and the XMLA URL
+  with `sap-client` for clients), POST hands the SOAP body to `ZZXXMLA1_CL_XMLA_HANDLER` (string in, string out; so far only
   DISCOVER_DATASOURCES, anything else is a SOAP fault), other methods 405.
 - XMLA tests: `python scripts/xmla_test.py` replays `reference/<case>/` against SAP (see `docs/test-strategy.md`);
   `python scripts/compare-applicable.py` runs Mondrian's test statements on eMondrian and SAP and groups the gaps.
