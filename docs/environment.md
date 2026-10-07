@@ -291,7 +291,8 @@ and names the step that failed (it stops that object, it does not retry). Every 
 one after the other, and sapcli never closes it: the stateful ADT session of each write (for the lock) stays in SM04
 until it times out, four or five per class. Prefer `scripts/sap-write.py <name>...` (run with sapcli's Python,
 `"$LOCALAPPDATA/pipx/pipx/venvs/sapcli/Scripts/python.exe" scripts/sap-write.py ...`): one connection per object writes
-its includes and activates, then ends the stateful context and logs off, so SM04 stays empty.
+its includes and activates, then ends the stateful context and logs off, so SM04 stays empty. It also writes programs
+(`zzxxmla1_setup`).
 With `--together` it writes all the objects in one session and activates them in one activation, for objects that
 need each other (a changed interface such as `ZZXXMLA1_IF_MDX_EVALUATOR` and the classes that implement or use it). Classes have no local includes (CLAUDE.md): `sap-write.py` empties a local definitions
 or implementations include that still holds code in SAP, and `sap-sync.sh pull` drops the template-only ones sapcli

@@ -1,5 +1,5 @@
-"""Writes ABAP classes and interfaces from src/ into SAP and activates them, like scripts/sap-write.sh, but in one HTTP
-session per object that is closed afterwards.
+"""Writes ABAP classes, interfaces and programs from src/ into SAP and activates them, like scripts/sap-write.sh, but in
+one HTTP session per object that is closed afterwards.
 
     "$LOCALAPPDATA/pipx/pipx/venvs/sapcli/Scripts/python.exe" scripts/sap-write.py zzxxmla1_cl_sql [zzxxmla1_cl_schema ...]
     ... scripts/sap-write.py --together zzxxmla1_cl_mdx_engine zzxxmla1_cl_mdx_slicer_calc
@@ -70,9 +70,13 @@ def has_code(text):
 def write_object(connection, base):
     name = base.upper()
     intf = ROOT / "src" / f"{base}.intf.abap"
+    prog = ROOT / "src" / f"{base}.prog.abap"
     if intf.exists():
         obj = sap.adt.Interface(connection, name)
         write(obj, intf)
+    elif prog.exists():
+        obj = sap.adt.Program(connection, name)
+        write(obj, prog)
     else:
         obj = sap.adt.Class(connection, name)
         for suffix, attribute in CLASS_INCLUDES:

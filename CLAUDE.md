@@ -194,7 +194,7 @@ Read before designing anything:
 `src/` (abapGit file format) mirrors package `$ZZXXMLA1`; only this local repo writes to the git remote, SAP is where
 the code runs. `scripts/sap-sync.sh pull` exports SAP -> `src/` (then review and commit), `scripts/sap-sync.sh push`
 imports `src/` -> SAP (creates the package if missing, activates). Changed classes go to SAP with
-`scripts/sap-write.py <class>...` run in sapcli's Python (one session per class, closed afterwards; the older
+`scripts/sap-write.py <class>...` (also interfaces and programs) run in sapcli's Python (one session per class, closed afterwards; the older
 `sap-write.ps1`/`sap-write.sh` leave a session per include open in SM04): one class at a time, no retry loops
 (`docs/environment.md`, work processes in PRIV mode). Logon data goes in the git-ignored `.env.sap`
 (template `.env.sap.example`). Details and gaps (ICF service not covered) in `docs/environment.md`.
