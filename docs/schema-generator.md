@@ -39,8 +39,8 @@ join column of the schema differs.
 
 ## The proposal
 
-The proposal is a flat schema in Mondrian 4 form, like `reference/schema/FoodmartBW.xml` without its hand-written
-parts:
+The proposal is a flat schema in the reference's format (Mondrian 3 schema XML with eMondrian's `DimensionAttribute`s),
+like `reference/schema/FoodmartBW.xml` without its hand-written parts:
 
 - one `Dimension` per characteristic of the provider, on its generated view, the characteristic as the key attribute
   and every time-independent attribute as a further `DimensionAttribute`. Only the key attribute is a hierarchy: the
