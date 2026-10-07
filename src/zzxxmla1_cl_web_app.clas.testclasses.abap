@@ -16,6 +16,7 @@ CLASS ltc_web_app DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHOR
     METHODS redirect_to_folder FOR TESTING.
     METHODS only_get FOR TESTING.
     METHODS missing_file FOR TESTING.
+    METHODS served_from_code FOR TESTING.
     METHODS file_paths FOR TESTING.
     METHODS content_types FOR TESTING.
 ENDCLASS.
@@ -53,6 +54,16 @@ CLASS ltc_web_app IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = result-status exp = 404 ).
     result = NEW zzxxmla1_cl_web_app( )->handle( method = `GET` path = `/schema/../WEB-INF/datasources.xml` ).
     cl_abap_unit_assert=>assert_equals( act = result-status exp = 404 ).
+  ENDMETHOD.
+
+  METHOD served_from_code.
+    DATA(result) = NEW zzxxmla1_cl_web_app( )->handle( method = `GET` path = `/schema/` ).
+    cl_abap_unit_assert=>assert_equals( act = result-status exp = 200 ).
+    cl_abap_unit_assert=>assert_equals( act = result-content_type exp = `text/html; charset=utf-8` ).
+    cl_abap_unit_assert=>assert_true( xsdbool( result-body CS `<html` ) ).
+    result = NEW zzxxmla1_cl_web_app( )->handle( method = `GET` path = `/schema/vendor/htm-preact-standalone.mjs` ).
+    cl_abap_unit_assert=>assert_equals( act = result-status exp = 200 ).
+    cl_abap_unit_assert=>assert_equals( act = result-content_type exp = `text/javascript; charset=utf-8` ).
   ENDMETHOD.
 
   METHOD file_paths.

@@ -9,12 +9,13 @@
 * olap4abap contains code derived from Mondrian (Eclipse Public License 1.0): Copyright (C) 1998-2005 Julian Hyde,
 * Copyright (C) 2005-2021 Hitachi Vantara and others, Copyright (C) 2021-2025 Sergei Semenkov. See the NOTICE file.
 *----------------------------------------------------------------------------------------------------------------------*
-* Sets up olap4abap after the package is imported (ZZXXMLA1_CL_SETUP): the tables, the schema builder's files and the
-* data sources file; with the checkbox also the clinic demo (ZZXXMLA1_CL_BW_CLINIC_GEN), which deletes and creates
-* InfoArea ZCLINIC's InfoCube ZCLVISIT and aDSO ZCLVISITA with their InfoObjects, with at most p_maxvis visits if that
-* is not 0; with the other checkbox the wide demo (ZZXXMLA1_CL_BW_WIDE_GEN), which deletes and creates InfoArea
-* ZXMLWIDE's InfoCube ZXMLWIDE and aDSO ZXMLWIDEA with the characteristics ZXMLAD00 to ZXMLAD99, with p_wrecs
-* records (0: 1,000). Many records take longer than a dialog step may: then run it in the background (F9).
+* Sets up olap4abap after the package is imported (ZZXXMLA1_CL_SETUP): the tables and the data sources file (and
+* deletes the schema builder's old copies below /schema/: it is served from the code); with the checkbox also the
+* clinic demo (ZZXXMLA1_CL_BW_CLINIC_GEN), which deletes and creates InfoArea ZCLINIC's InfoCube ZCLVISIT and aDSO
+* ZCLVISITA with their InfoObjects, with at most p_maxvis visits if that is not 0; with the other checkbox the wide
+* demo (ZZXXMLA1_CL_BW_WIDE_GEN), which deletes and creates InfoArea ZXMLWIDE's InfoCube ZXMLWIDE and aDSO ZXMLWIDEA
+* with the characteristics ZXMLAD00 to ZXMLAD99, with p_wrecs records (0: 1,000). Many records take longer than a
+* dialog step may: then run it in the background (F9).
 REPORT zzxxmla1_setup.
 
 SELECTION-SCREEN BEGIN OF LINE.

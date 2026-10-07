@@ -11,8 +11,8 @@
 *----------------------------------------------------------------------------------------------------------------------*
 "! Sets up the server after the package is imported (program ZZXXMLA1_SETUP, or sapcli class execute):
 "! - the tables (ZZXXMLA1_CL_CREATE_TABLES);
-"! - the schema builder's files below /schema/ (ZZXXMLA1_CL_WEB_APP_FILES), written every run, and the files below
-"!   /schema/ the package no longer has deleted;
+"! - the files below /schema/ deleted: earlier setups wrote the schema builder there, it is now served from the code
+"!   (ZZXXMLA1_CL_WEB_APP_FILES);
 "! - /WEB-INF/datasources.xml with one data source and no catalog, only if there is none: it holds the catalogs;
 "! - on request the clinic demo (ZZXXMLA1_CL_BW_CLINIC_GEN): BW objects, data, schemas and catalogs, with at most
 "!   clinic_max_visits visits if that is given;
@@ -36,7 +36,7 @@ CLASS zzxxmla1_cl_setup DEFINITION
       RETURNING VALUE(result)     TYPE string_table.
   PROTECTED SECTION.
   PRIVATE SECTION.
-    METHODS write_app_files
+    METHODS delete_app_files
       RETURNING VALUE(result) TYPE string_table.
     METHODS write_datasources
       RETURNING VALUE(result) TYPE string_table.
@@ -54,7 +54,7 @@ CLASS zzxxmla1_cl_setup IMPLEMENTATION.
 
   METHOD run.
     APPEND LINES OF NEW zzxxmla1_cl_create_tables( )->run( ) TO result.
-    APPEND LINES OF write_app_files( ) TO result.
+    APPEND LINES OF delete_app_files( ) TO result.
     APPEND LINES OF write_datasources( ) TO result.
     COMMIT WORK.
     IF clinic = abap_true.
@@ -65,17 +65,12 @@ CLASS zzxxmla1_cl_setup IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
-  METHOD write_app_files.
-    DATA(files) = zzxxmla1_cl_web_app_files=>files( ).
-    LOOP AT files INTO DATA(file).
-      zzxxmla1_cl_files=>write( path = file-path content = file-content ).
-      APPEND |{ file-path }: { strlen( file-content ) } characters written| TO result.
-    ENDLOOP.
+  METHOD delete_app_files.
     DATA(folder) = zzxxmla1_cl_web_app=>c_path && `/`.
     LOOP AT zzxxmla1_cl_files=>list( ) INTO DATA(existing).
-      IF existing-path CP |{ folder }*| AND NOT line_exists( files[ path = existing-path ] ).
+      IF existing-path CP |{ folder }*|.
         zzxxmla1_cl_files=>delete( existing-path ).
-        APPEND |{ existing-path }: deleted, the app no longer has it| TO result.
+        APPEND |{ existing-path }: deleted, the app is served from ZZXXMLA1_CL_WEB_APP_FILES| TO result.
       ENDIF.
     ENDLOOP.
   ENDMETHOD.

@@ -255,7 +255,8 @@ As in Mondrian, the catalogs are configured, not programmed: the server has file
 them, and adding a schema or a catalog is writing files. The files are rows of table `ZZXXMLA1_FILE` (path, content,
 changed at/by; created by `ZZXXMLA1_CL_CREATE_TABLES`, which leaves an existing table alone), read by
 `ZZXXMLA1_CL_FILES`. Program `ZZXXMLA1_SETUP` (`ZZXXMLA1_CL_SETUP`, also `sapcli class execute ZZXXMLA1_CL_SETUP`)
-creates the table, writes the schema builder's files from `ZZXXMLA1_CL_WEB_APP_FILES` and, if there is none, a data
+creates the table (and deletes the schema builder's copies earlier setups wrote below `/schema/`; it is served from
+the code, `ZZXXMLA1_CL_WEB_APP_FILES`) and, if there is none, a data
 sources file with one data source and no catalog (`ZZXXMLA1_CL_FILES=>default_datasources`); the FoodMart catalog is
 not part of it (`scripts/sap-files.py deploy`):
 
@@ -276,8 +277,7 @@ A new file is read by the next request.
     python scripts/sap-files.py put my/Sales.xml /WEB-INF/schema/Sales.xml   # a new schema; then a <Catalog> for it in
     python scripts/sap-files.py put reference/schema/datasources-sap.xml /WEB-INF/datasources.xml   # datasources-sap.xml
     python scripts/sap-files.py list | get <path> | delete <path>
-    python scripts/sap-files.py app                # the schema builder: web/schema/ to /schema/ (served under /zzxxmla1/schema/)
-    python scripts/generate-web-app-abap.py        # web/schema/ into ZZXXMLA1_CL_WEB_APP_FILES, which the setup writes
+    python scripts/generate-web-app-abap.py        # web/schema/ into ZZXXMLA1_CL_WEB_APP_FILES, served under /zzxxmla1/schema/
     scripts/deploy-reference-schema.sh             # the same schema to eMondrian
 
 Limits: a catalog name is one catalog of the server (two data sources may list it only with the same Definition), and a

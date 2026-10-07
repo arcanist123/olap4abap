@@ -6,7 +6,6 @@ A catalog or a schema is added by writing files, without any new ABAP object.
     python scripts/sap-files.py put reference/schema/FoodmartBW.xml /WEB-INF/schema/FoodmartBW.xml
     python scripts/sap-files.py put reference/schema/datasources-sap.xml /WEB-INF/datasources.xml
     python scripts/sap-files.py deploy               # both of the above: the server's files as this repository has them
-    python scripts/sap-files.py app                  # the schema builder: every file of web/schema/ to /schema/...
     python scripts/sap-files.py list
     python scripts/sap-files.py get /WEB-INF/datasources.xml
     python scripts/sap-files.py delete /WEB-INF/schema/Old.xml
@@ -30,8 +29,6 @@ DEPLOY = [
     ("reference/schema/FoodmartBW.xml", "/WEB-INF/schema/FoodmartBW.xml"),
     ("reference/schema/datasources-sap.xml", "/WEB-INF/datasources.xml"),
 ]
-# the schema builder's app (ZZXXMLA1_CL_WEB_APP serves it under /zzxxmla1/schema/): local folder -> server folder
-APP = ("web/schema", "/schema")
 CHUNK = 120  # characters of base64 per source line
 
 
@@ -133,7 +130,6 @@ def main():
     put_parser.add_argument("local")
     put_parser.add_argument("path")
     commands.add_parser("deploy", help="write the server's files as this repository has them")
-    commands.add_parser("app", help="write the schema builder's files (web/schema/) to /schema/ on the server")
     commands.add_parser("list", help="list the server's files")
     get_parser = commands.add_parser("get", help="print a file of the server")
     get_parser.add_argument("path")
@@ -148,10 +144,6 @@ def main():
         # one sapcli call after the other (work processes in PRIV mode, docs/environment.md)
         for local, path in DEPLOY:
             put(ROOT / local, path)
-    elif args.command == "app":
-        local, folder = APP
-        for file in sorted(p for p in (ROOT / local).rglob("*") if p.is_file()):
-            put(file, f"{folder}/{file.relative_to(ROOT / local).as_posix()}")
     elif args.command == "list":
         list_files()
     elif args.command == "get":

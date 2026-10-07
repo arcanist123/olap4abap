@@ -59,7 +59,7 @@ Read before designing anything:
 - `ZZXXMLA1_CL_HTTP_HELLOWORLD` - hello world HTTP handler with a passing unit test (a leftover `ZCL_HTTP_HELLOWORLD`
   still exists in `$TMP` and can be deleted).
 - `ZZXXMLA1_MAIN_ENDPOINT` - `IF_HTTP_EXTENSION` handler behind ICF service `/zzxxmla1`: `/schema/api/...` goes to
-  `ZZXXMLA1_CL_SCHEMA_API`, the rest of `/schema/...` to `ZZXXMLA1_CL_WEB_APP` (the schema builder's files); otherwise GET returns an HTML description page, POST hands the SOAP body to `ZZXXMLA1_CL_XMLA_HANDLER` (string in, string out; so far only
+  `ZZXXMLA1_CL_SCHEMA_API`, the rest of `/schema/...` to `ZZXXMLA1_CL_WEB_APP` (the schema builder's files, from the code); otherwise GET returns an HTML description page, POST hands the SOAP body to `ZZXXMLA1_CL_XMLA_HANDLER` (string in, string out; so far only
   DISCOVER_DATASOURCES, anything else is a SOAP fault), other methods 405.
 - XMLA tests: `python scripts/xmla_test.py` replays `reference/<case>/` against SAP (see `docs/test-strategy.md`);
   `python scripts/compare-applicable.py` runs Mondrian's test statements on eMondrian and SAP and groups the gaps.
@@ -89,12 +89,12 @@ Read before designing anything:
   supported); a time dimension only if the user marks one. Only the key attribute is a hierarchy (as in FoodMart.xml,
   one hierarchy per dimension); the other attributes have `attributeHierarchyEnabled="false"` except on BW's
   standard time characteristics, and the user makes hierarchies in the UI. The UI (`web/schema/`, Preact with htm, no build step) is served from
-  files of the server below `/schema/` by `ZZXXMLA1_CL_WEB_APP`; the files are in the generated class
-  `ZZXXMLA1_CL_WEB_APP_FILES` (`scripts/generate-web-app-abap.py`, run after every change of `web/schema/`) and
-  written by the setup (below); it
+  the code below `/schema/` by `ZZXXMLA1_CL_WEB_APP`: the generated class `ZZXXMLA1_CL_WEB_APP_FILES` has a method per
+  file returning its text (`scripts/generate-web-app-abap.py`, run after every change of `web/schema/`, then
+  `sap-write.py` the class; nothing is uploaded or written by the setup); it
   edits the schema XML as a DOM (rename, remove, time dimensions, user hierarchies with levels and member properties,
   measures, raw XML), lets the server `check` every change and accepts (`scripts/schema_ui_test.py`).
-- MDX console: `/zzxxmla1/schema/console.html` (`web/schema/console.js`, same files and setup as the schema builder)
+- MDX console: `/zzxxmla1/schema/console.html` (`web/schema/console.js`, served from the same generated class as the schema builder)
   sends Execute and Discover requests to the endpoint itself. A catalog's cubes, measures, hierarchies and levels are
   listed from the schema rowsets (a click inserts the unique name); an answer of up to two axes is a grid (Axis0 the
   columns, Axis1 the rows, spanning headers), one of more axes a flat table (a column per hierarchy, highest axis first,
@@ -176,7 +176,8 @@ Read before designing anything:
   reference database holds copies of the BW tables and the same views (`docs/environment.md`, the reference database
   holds the BW tables).
 - Setup: program `ZZXXMLA1_SETUP` (`ZZXXMLA1_CL_SETUP`) makes a system ready after the package is imported: the table
-  `ZZXXMLA1_FILE` (`ZZXXMLA1_CL_CREATE_TABLES`), the schema builder's files and, if there is none, a
+  `ZZXXMLA1_FILE` (`ZZXXMLA1_CL_CREATE_TABLES`; it deletes the schema builder's old copies below `/schema/`) and, if
+  there is none, a
   `/WEB-INF/datasources.xml` without catalogs; with its checkbox also the clinic demo (`docs/clinic-demo.md`): InfoCube
   `ZCLVISIT` and aDSO `ZCLVISITA` with made-up visits of patients to a clinic, their schemas and catalogs
   (`ZZXXMLA1_CL_BW_CLINIC_GEN`). The clinic demo is the project's own demo data; FoodMart stays the test source.

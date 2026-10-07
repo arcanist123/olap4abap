@@ -32,7 +32,7 @@ Design in `schema-generator.md`. Order:
    file), `POST check` (accept's checks, nothing written), and a clear reader error for an unnamed hierarchy next to
    an attribute of the dimension's name.
 5. Done (2026-10-06): the Preact UI (`schema-generator.md`, UI), served as files of the server by
-   `ZZXXMLA1_CL_WEB_APP`, uploaded with `scripts/sap-files.py app`, checked with `scripts/schema_ui_test.py`.
+   `ZZXXMLA1_CL_WEB_APP` (since 2026-10-07 from the code, `ZZXXMLA1_CL_WEB_APP_FILES`), checked with `scripts/schema_ui_test.py`.
    Then (2026-10-06) removing a catalog (`POST remove`, Remove… on the start page; checked end to end with a
    throwaway catalog). One cube per catalog for the MVP (`mvp-scope.md`, Catalog decision).
    Open: an accept through the UI checked by hand (the API's accept was); calculated members of the schema (the
