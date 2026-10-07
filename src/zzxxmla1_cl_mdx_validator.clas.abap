@@ -42,6 +42,10 @@ CLASS zzxxmla1_cl_mdx_validator DEFINITION
                 scalar        TYPE abap_bool DEFAULT abap_false
       RETURNING VALUE(result) TYPE ty_node
       RAISING   zzxxmla1_cx_xmla.
+    "! Query.getMeasuresMembers: the measures the query names (Util.lookup adds each one it finds), each once, in the
+    "! order they were found.
+    METHODS get_measures_members
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_schema_reader=>ty_t_member.
 
   PRIVATE SECTION.
     TYPES ty_t_node TYPE zzxxmla1_cl_mdx_node=>ty_t_node.
@@ -107,6 +111,7 @@ CLASS zzxxmla1_cl_mdx_validator DEFINITION
     DATA stack          TYPE STANDARD TABLE OF ty_frame WITH EMPTY KEY.
     DATA resolved_nodes TYPE HASHED TABLE OF ty_resolved WITH UNIQUE KEY node.
     DATA named_sets     TYPE STANDARD TABLE OF ty_named_set WITH EMPTY KEY.
+    DATA measures_members TYPE zzxxmla1_cl_mdx_schema_reader=>ty_t_member.
 
     "! Query's alias finder (registerAlias): an argument "expression AS name" of a call is an alias whose scope is the
     "! call; in the whole tree.
@@ -572,7 +577,17 @@ CLASS zzxxmla1_cl_mdx_validator IMPLEMENTATION.
       ENDIF.
       fail( |MDX object '{ node->unparse( ) }' not found in cube '{ schema_reader->cube-cube_name }'| ).
     ENDIF.
+    " Query.addMeasuresMembers
+    IF element-kind = zzxxmla1_cl_mdx_schema_reader=>c_element-member
+        AND element-member-hier_id = zzxxmla1_cl_mdx_schema_reader=>c_measures
+        AND NOT line_exists( measures_members[ unique_name = element-member-unique_name ] ).
+      APPEND element-member TO measures_members.
+    ENDIF.
     result = element_expression( element ).
+  ENDMETHOD.
+
+  METHOD get_measures_members.
+    result = measures_members.
   ENDMETHOD.
 
   METHOD lookup_property_reference.

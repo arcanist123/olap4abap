@@ -146,7 +146,12 @@ Read before designing anything:
   evaluator is non-empty (NON EMPTY axes, `NonEmptyCrossJoin`) a crossjoin is native (`RolapNativeCrossJoin` with
   eMondrian's multi-variant expansion): its tuples are the combinations with facts in the context, read with one grouped
   query of `ZZXXMLA1_CL_MDX_FACTS=>non_empty_paths`, in hierarchy order; the variants of a split operand are put back
-  in the order of the operands (our fix of eMondrian, `scripts/patches/multivariant-order.patch`). Execute
+  in the order of the operands (our fix of eMondrian, `scripts/patches/multivariant-order.patch`). A NON EMPTY axis
+  is eMondrian's `NonEmpty(<axis>, {the measures the query names})` (`Query.compile`): each axis is filtered on its
+  own before the cells are evaluated, then empty positions are removed as before. Under a non-empty evaluator
+  `Members`/`AllMembers` (a level of more than 300 members, `LevelPreCacheThreshold`), `Children` and `Descendants`
+  read only the members with facts in the context (`SqlContextConstraint`, `context_members`; `DrilldownLevel`
+  reads all children, as in the reference). Execute
   answers carry the query's `DIMENSION PROPERTIES` (olap4j's standard member properties) and `CELL PROPERTIES`.
   Subselects (`FROM (SELECT ... FROM ...)`, Excel's pivot filters) are eMondrian's subcube: the axes of every inner
   SELECT become a predicate that every fact read adds (`Query.getSubcubePredicates`, `ZZXXMLA1_CL_MDX_FACTS=>set_subcube`),

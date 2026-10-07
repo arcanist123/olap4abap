@@ -59,6 +59,9 @@ CLASS ltc_engine DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT
     METHODS native_crossjoin FOR TESTING RAISING zzxxmla1_cx_xmla.
     "! The multi-variant expansion: a level group of more members than MaxConstraints is still read natively.
     METHODS native_crossjoin_large_level FOR TESTING RAISING zzxxmla1_cx_xmla.
+    "! Native non-empty member reads (SqlContextConstraint): Children and the members of a large level under a
+    "! non-empty evaluator are only those with facts in the context, the level's hierarchy's context member included.
+    METHODS native_non_empty_members FOR TESTING RAISING zzxxmla1_cx_xmla.
 ENDCLASS.
 
 CLASS ltc_engine IMPLEMENTATION.
@@ -817,6 +820,21 @@ CLASS ltc_engine IMPLEMENTATION.
     DATA(names) = tuples( result ).
     cl_abap_unit_assert=>assert_equals( act = names[ 1 ] exp = `[Customers].[All Customers],[Promotions].[All Promotions]` ).
     cl_abap_unit_assert=>assert_true( xsdbool( lines( names ) > 5581 ) ).
+  ENDMETHOD.
+
+  METHOD native_non_empty_members.
+    " answers of the reference server
+    DATA(result) = execute( `select NON EMPTY [Customers].[USA].[WA].[Spokane].Children on 0 from [ZFMSALES] `
+                         && `where [Product].[Drink].[Dairy]` ).
+    DATA(names) = tuples( result ).
+    cl_abap_unit_assert=>assert_equals( act = lines( names ) exp = 64 ).
+    cl_abap_unit_assert=>assert_equals( act = names[ 1 ] exp = `[Customers].[USA].[WA].[Spokane].[Brittany Malik]` ).
+    " Generate sets the city in the context: the names (a level of more than 300 members) are read below it
+    result = execute( `select NON EMPTY Generate({[Customers].[USA].[WA].[Spokane], [Customers].[USA].[OR].[Salem]}, `
+                   && `[Customers].[Name].Members) on 0 from [ZFMSALES] where [Product].[Drink].[Dairy]` ).
+    names = tuples( result ).
+    cl_abap_unit_assert=>assert_equals( act = lines( names ) exp = 99 ).
+    cl_abap_unit_assert=>assert_equals( act = names[ 99 ] exp = `[Customers].[USA].[OR].[Salem].[Kevin Miller]` ).
   ENDMETHOD.
 
 ENDCLASS.

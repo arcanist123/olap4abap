@@ -167,6 +167,18 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       ty_t_cj_args TYPE STANDARD TABLE OF ty_t_cj_arg WITH EMPTY KEY.
     "! the facts of the query, for the native crossjoin
     DATA fact_reader TYPE REF TO zzxxmla1_cl_mdx_facts.
+    "! Query.getMeasuresMembers: the measures the query names, the second set of a NON EMPTY axis' NonEmpty
+    DATA query_measures TYPE ty_t_member.
+    TYPES ty_path_set TYPE HASHED TABLE OF string WITH UNIQUE KEY table_line.
+    TYPES:
+      "! the paths of a level's members with facts in a context, by the filters of the context and the level
+      BEGIN OF ty_context_paths,
+        key   TYPE string,
+        paths TYPE ty_path_set,
+      END OF ty_context_paths.
+    DATA context_paths_cache TYPE HASHED TABLE OF ty_context_paths WITH UNIQUE KEY key.
+    "! LevelPreCacheThreshold: a level of no more members is read whole, also under a non-empty evaluator
+    CONSTANTS c_level_pre_cache_threshold TYPE i VALUE 300.
 
     "! RolapResult.loadSpecialMembers: per hierarchy whose current member is not calculated, not the All member and not
     "! a measure, and that has no All member, its root members (the nonAllMembers). A TimeDimension is skipped.
@@ -212,12 +224,56 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       IMPORTING type          TYPE REF TO zzxxmla1_cl_mdx_type
       RETURNING VALUE(result) TYPE string_table.
     "! An axis or the slicer (RolapResult.executeAxis): the set in the evaluator's context, with the axis' NON EMPTY.
+    "! Query.compile makes the set of a NON EMPTY axis NonEmpty(set, {the query's measures}).
     METHODS execute_axis
       IMPORTING evaluator     TYPE ty_evaluator
                 expression    TYPE ty_node
                 non_empty     TYPE abap_bool
       RETURNING VALUE(result) TYPE ty_t_tuple
       RAISING   zzxxmla1_cx_xmla.
+    "! NonEmpty(set, {the query's measures}) (NonEmptyFunDef, the set evaluated already): the tuples whose cell is not
+    "! empty with one of the measures in the context; with the measure of the context if the query names none.
+    METHODS non_empty_axis
+      IMPORTING evaluator     TYPE ty_evaluator
+                tuples        TYPE ty_t_tuple
+      RETURNING VALUE(result) TYPE ty_t_tuple
+      RAISING   zzxxmla1_cx_xmla.
+    "! FunUtil.getNonEmptyLevelMembers (RolapSchemaReader.getLevelMembers with the evaluator): under a non-empty
+    "! evaluator the members of a level of more than LevelPreCacheThreshold members are read with a
+    "! SqlContextConstraint (context_members); otherwise all of them. The reference constrains them by the other axes
+    "! too (buildConstraintFromAllAxes); NON EMPTY removes the same positions afterwards.
+    METHODS non_empty_level_members
+      IMPORTING evaluator     TYPE ty_evaluator
+                level         TYPE i
+      RETURNING VALUE(result) TYPE ty_t_member.
+    "! FunUtil.getNonEmptyMemberChildren (RolapSchemaReader.getMemberChildren with the evaluator): under a non-empty
+    "! evaluator the children with facts in the context with the member set (SqlContextConstraint.addMemberConstraint).
+    METHODS non_empty_children
+      IMPORTING evaluator     TYPE ty_evaluator
+                member        TYPE ty_member
+      RETURNING VALUE(result) TYPE ty_t_member.
+    "! SqlContextConstraint: under a non-empty evaluator the members (stored ones of one hierarchy) that have facts in
+    "! the context, read once per level and context with ZZXXMLA1_CL_MDX_FACTS=>non_empty_paths. The context
+    "! (makeContextConstraintSet) is the stored members that are not their hierarchy's default member; one of the
+    "! members' hierarchy keeps only the members on its path. All members are kept where the reference does not use the
+    "! constraint (isValidContext: a calculated measure's member in conflict) or where it is not ported (a calculated
+    "! member or the null member in the context: the reference expands an Aggregate, makes no request for the null
+    "! member).
+    METHODS context_members
+      IMPORTING evaluator     TYPE ty_evaluator
+                members       TYPE ty_t_member
+      RETURNING VALUE(result) TYPE ty_t_member.
+    "! The paths of the members of the hierarchy's level with facts with the filters (kept for the query).
+    METHODS context_paths
+      IMPORTING filters       TYPE zzxxmla1_cl_mdx_facts=>ty_t_filter
+                hierarchy     TYPE i
+                key_level     TYPE i
+      RETURNING VALUE(result) TYPE ty_path_set.
+    "! One path is the other or begins with it: the members are on one line of ancestors.
+    CLASS-METHODS on_one_path
+      IMPORTING path1         TYPE string
+                path2         TYPE string
+      RETURNING VALUE(result) TYPE abap_bool.
     "! The cells (RolapResult.executeStripe): each tuple of the axis at the index in turn is set in the context, and
     "! the axes before it are run inside; at index 0 the slicer is set and the cell computed. The first axis runs fastest.
     METHODS execute_stripe
@@ -323,7 +379,8 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
     "! FunUtil.hierarchyMembers / levelMembers with calculated members: each level's members, then its calculated
     "! members.
     METHODS members_with_calculated
-      IMPORTING levels        TYPE zzxxmla1_cl_mdx_schema_reader=>ty_t_id
+      IMPORTING evaluator     TYPE ty_evaluator
+                levels        TYPE zzxxmla1_cl_mdx_schema_reader=>ty_t_id
       RETURNING VALUE(result) TYPE ty_t_tuple.
     "! An argument of * or () as a set: a set, or the member or tuple as a set of one tuple.
     METHODS evaluate_arg_as_set
@@ -434,7 +491,8 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       RAISING   zzxxmla1_cx_xmla.
     "! DescendantsFunDef.descendantsByDepth: the generations before, at and after the depth (0 the member itself).
     METHODS descendants_by_depth
-      IMPORTING member        TYPE ty_member
+      IMPORTING evaluator     TYPE ty_evaluator
+                member        TYPE ty_member
                 depth_limit   TYPE i
                 before        TYPE abap_bool
                 self          TYPE abap_bool
@@ -448,7 +506,8 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
     "! DescendantsFunDef.descendantsByLevel: the members above, at and below the level's depth; LEAVES: the members at
     "! the depth and those above it without children.
     METHODS descendants_by_level
-      IMPORTING ancestor      TYPE ty_member
+      IMPORTING evaluator     TYPE ty_evaluator
+                ancestor      TYPE ty_member
                 level         TYPE i
                 before        TYPE abap_bool
                 self          TYPE abap_bool
@@ -1229,7 +1288,10 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     fact_reader = NEW zzxxmla1_cl_mdx_facts( cube = cube hierarchies = schema_reader->get_model_hierarchies( )
                                              measures = schema_reader->measures ).
     DATA(resolved) = query.
-    NEW zzxxmla1_cl_mdx_validator( schema_reader )->resolve_query( CHANGING query = resolved ).
+    DATA(validator) = NEW zzxxmla1_cl_mdx_validator( schema_reader ).
+    validator->resolve_query( CHANGING query = resolved ).
+    query_measures = validator->get_measures_members( ).
+    CLEAR context_paths_cache.
     " the subcube of a subselect restricts every read of facts
     fact_reader->set_subcube( subcube_predicate( resolved ) ).
     root_evaluator = zzxxmla1_cl_mdx_evaluator=>create( schema_reader = schema_reader facts = fact_reader calc = me ).
@@ -1625,8 +1687,145 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     DATA(savepoint) = evaluator->savepoint( ).
     evaluator->set_non_empty( non_empty ).
     evaluator->set_eval_axes( abap_true ).
-    result = evaluate_set( evaluator = evaluator node = expression ).
+    TRY.
+        result = evaluate_set( evaluator = evaluator node = expression ).
+        IF non_empty = abap_true.
+          result = non_empty_axis( evaluator = evaluator tuples = result ).
+        ENDIF.
+      CLEANUP.
+        evaluator->restore( savepoint ).
+    ENDTRY.
     evaluator->restore( savepoint ).
+  ENDMETHOD.
+
+  METHOD non_empty_axis.
+    " the set is evaluated non-empty (execute_axis); each tuple, then each measure, is set in the context, which is
+    " not restored before the next
+    DATA(savepoint) = evaluator->savepoint( ).
+    TRY.
+        LOOP AT tuples INTO DATA(tuple).
+          IF query_measures IS INITIAL.
+            evaluator->set_context_members( tuple ).
+            IF evaluator->evaluate_current( )-empty = abap_false.
+              APPEND tuple TO result.
+            ENDIF.
+            CONTINUE.
+          ENDIF.
+          LOOP AT query_measures INTO DATA(measure).
+            evaluator->set_context_members( tuple ).
+            evaluator->set_context( measure ).
+            IF evaluator->evaluate_current( )-empty = abap_false.
+              APPEND tuple TO result.
+              EXIT.
+            ENDIF.
+          ENDLOOP.
+        ENDLOOP.
+      CLEANUP.
+        evaluator->restore( savepoint ).
+    ENDTRY.
+    evaluator->restore( savepoint ).
+  ENDMETHOD.
+
+  METHOD non_empty_level_members.
+    result = schema_reader->get_level_members( level ).
+    IF evaluator->is_non_empty( ) = abap_true AND lines( result ) > c_level_pre_cache_threshold.
+      result = context_members( evaluator = evaluator members = result ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD non_empty_children.
+    result = schema_reader->get_member_children( member ).
+    IF evaluator->is_non_empty( ) = abap_false OR result IS INITIAL.
+      RETURN.
+    ENDIF.
+    DATA(savepoint) = evaluator->savepoint( ).
+    evaluator->set_context( member ).
+    result = context_members( evaluator = evaluator members = result ).
+    evaluator->restore( savepoint ).
+  ENDMETHOD.
+
+  METHOD context_members.
+    result = members.
+    IF members IS INITIAL OR evaluator->is_non_empty( ) = abap_false.
+      RETURN.
+    ENDIF.
+    DATA(hierarchy) = members[ 1 ]-hier_id.
+    IF hierarchy = zzxxmla1_cl_mdx_schema_reader=>c_measures.
+      RETURN.
+    ENDIF.
+    DATA(context) = evaluator->get_members( ).
+    IF measures_conflict( context ) = abap_true.
+      RETURN.
+    ENDIF.
+    DATA filters TYPE zzxxmla1_cl_mdx_facts=>ty_t_filter.
+    DATA(own) = VALUE ty_member( ).
+    LOOP AT context INTO DATA(member) WHERE hier_id <> zzxxmla1_cl_mdx_schema_reader=>c_measures.
+      IF member-unique_name = schema_reader->get_default_member( member-hier_id )-unique_name.
+        CONTINUE.
+      ENDIF.
+      IF member-calculated = abap_true OR member-is_null = abap_true.
+        RETURN.
+      ENDIF.
+      IF member-key_level = 0.
+        CONTINUE.
+      ENDIF.
+      IF member-hier_id = hierarchy.
+        own = member.
+      ELSE.
+        APPEND VALUE #( hierarchy = member-hier_id level = member-key_level path = member-path ) TO filters.
+      ENDIF.
+    ENDLOOP.
+
+    CLEAR result.
+    DATA(key_level) = -1.
+    DATA paths TYPE ty_path_set.
+    LOOP AT members INTO member.
+      IF member-hier_id <> hierarchy OR member-calculated = abap_true OR member-key_level = 0.
+        " not read from the facts
+        APPEND member TO result.
+        CONTINUE.
+      ENDIF.
+      IF member-key_level <> key_level.
+        key_level = member-key_level.
+        paths = context_paths( filters = filters hierarchy = hierarchy key_level = key_level ).
+      ENDIF.
+      IF line_exists( paths[ table_line = member-path ] )
+          AND ( own IS INITIAL OR on_one_path( path1 = own-path path2 = member-path ) = abap_true ).
+        APPEND member TO result.
+      ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD context_paths.
+    DATA(all) = filters.
+    APPEND VALUE #( hierarchy = hierarchy level = key_level any = abap_true ) TO all.
+    DATA(key) = ``.
+    LOOP AT all INTO DATA(filter).
+      key = |{ key }{ filter-hierarchy }:{ filter-level }:{ filter-any }:{ filter-path };|.
+    ENDLOOP.
+    ASSIGN context_paths_cache[ key = key ] TO FIELD-SYMBOL(<cached>).
+    IF sy-subrc = 0.
+      result = <cached>-paths.
+      RETURN.
+    ENDIF.
+    LOOP AT fact_reader->non_empty_paths( all ) INTO DATA(paths).
+      INSERT paths[ 1 ] INTO TABLE result.
+    ENDLOOP.
+    INSERT VALUE #( key = key paths = result ) INTO TABLE context_paths_cache.
+  ENDMETHOD.
+
+  METHOD on_one_path.
+    DATA(length1) = strlen( path1 ).
+    DATA(length2) = strlen( path2 ).
+    IF length1 = length2.
+      result = xsdbool( path1 = path2 ).
+    ELSEIF length1 < length2.
+      result = xsdbool( substring( val = path2 len = length1 ) = path1
+                        AND substring( val = path2 off = length1 len = 1 ) = zzxxmla1_cl_model=>c_separator ).
+    ELSE.
+      result = xsdbool( substring( val = path1 len = length2 ) = path2
+                        AND substring( val = path1 off = length2 len = 1 ) = zzxxmla1_cl_model=>c_separator ).
+    ENDIF.
   ENDMETHOD.
 
   METHOD type_hierarchies.
@@ -1690,9 +1889,9 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       result = execute_axis( evaluator = evaluator expression = expression non_empty = non_empty ).
       RETURN.
     ENDIF.
-    " executeAxis marks the axis ordered if its set is an Order call
+    " executeAxis marks the axis ordered if its set is an Order call; a NON EMPTY axis' set is a NonEmpty call
     DATA(ordered) = xsdbool( expression->kind = zzxxmla1_cl_mdx_node=>c_kind-resolved_call
-                             AND to_upper( expression->fun_def-name ) = `ORDER` ).
+                             AND to_upper( expression->fun_def-name ) = `ORDER` AND non_empty = abap_false ).
     DATA(savepoint) = evaluator->savepoint( ).
     LOOP AT lists[ index ] INTO DATA(member).
       evaluator->set_context( member ).
@@ -1892,20 +2091,34 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     CASE key.
       WHEN `MEMBERS|Property|3`.
         DATA(hierarchy) = evaluate_hierarchy( evaluator = evaluator node = node->args[ 1 ] ).
-        result = VALUE #( FOR member IN schema_reader->get_hierarchy_members( hierarchy ) ( VALUE #( ( member ) ) ) ).
+        IF evaluator->is_non_empty( ) = abap_true AND hierarchy <> zzxxmla1_cl_mdx_schema_reader=>c_measures.
+          " FunUtil.hierarchyMembers: the non-empty members of each level, hierarchized
+          DATA(members) = VALUE ty_t_member( ).
+          LOOP AT schema_reader->get_hierarchy( hierarchy )-levels INTO DATA(level).
+            APPEND LINES OF non_empty_level_members( evaluator = evaluator level = level ) TO members.
+          ENDLOOP.
+          SORT members BY ordinal ASCENDING.
+          result = VALUE #( FOR member IN members ( VALUE #( ( member ) ) ) ).
+        ELSE.
+          result = VALUE #( FOR member IN schema_reader->get_hierarchy_members( hierarchy ) ( VALUE #( ( member ) ) ) ).
+        ENDIF.
       WHEN `ALLMEMBERS|Property|3`.
         " with the calculated members
         hierarchy = evaluate_hierarchy( evaluator = evaluator node = node->args[ 1 ] ).
-        result = members_with_calculated( schema_reader->get_hierarchy( hierarchy )-levels ).
+        result = members_with_calculated( evaluator = evaluator levels = schema_reader->get_hierarchy( hierarchy )-levels ).
       WHEN `MEMBERS|Property|4`.
-        result = VALUE #( FOR member IN schema_reader->get_level_members( evaluate_level( evaluator = evaluator
-                                                                                          node = node->args[ 1 ] ) )
+        result = VALUE #( FOR member IN non_empty_level_members(
+                                          evaluator = evaluator
+                                          level     = evaluate_level( evaluator = evaluator node = node->args[ 1 ] ) )
                           ( VALUE #( ( member ) ) ) ).
       WHEN `ALLMEMBERS|Property|4`.
-        result = members_with_calculated( VALUE #( ( evaluate_level( evaluator = evaluator node = node->args[ 1 ] ) ) ) ).
+        result = members_with_calculated(
+                   evaluator = evaluator
+                   levels    = VALUE #( ( evaluate_level( evaluator = evaluator node = node->args[ 1 ] ) ) ) ).
       WHEN `CHILDREN|Property|6`.
         DATA(parent) = evaluate_member( evaluator = evaluator node = node->args[ 1 ] ).
-        result = VALUE #( FOR member IN schema_reader->get_member_children( parent ) ( VALUE #( ( member ) ) ) ).
+        result = VALUE #( FOR member IN non_empty_children( evaluator = evaluator member = parent )
+                          ( VALUE #( ( member ) ) ) ).
       WHEN `NATIVIZESET|Function|8`.
         " NativizeSetFunDef: below NativizeMinThreshold (100,000) the set itself; native evaluation gives the same tuples
         result = evaluate_set( evaluator = evaluator node = node->args[ 1 ] ).
@@ -2520,7 +2733,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
 
   METHOD members_with_calculated.
     LOOP AT levels INTO DATA(level).
-      LOOP AT schema_reader->get_level_members( level ) INTO DATA(member).
+      LOOP AT non_empty_level_members( evaluator = evaluator level = level ) INTO DATA(member).
         APPEND VALUE #( ( member ) ) TO result.
       ENDLOOP.
       LOOP AT schema_reader->get_calculated_members( schema_reader->get_level( level )-hierarchy )
@@ -2806,13 +3019,14 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
                                             depth_limit = COND #( WHEN depth_specified = abap_true AND depth >= 0
                                                                   THEN depth ELSE -1 ) ).
     ELSEIF depth_specified = abap_true.
-      result = descendants_by_depth( member = member depth_limit = depth before = before self = self after = after ).
+      result = descendants_by_depth( evaluator = evaluator member = member depth_limit = depth
+                                     before = before self = self after = after ).
     ELSE.
-      " the context is used only to read the non-empty children natively; the engine reads all children
+      " the evaluator is the context of the children (the non-empty ones under a non-empty evaluator)
       DATA(level) = COND i( WHEN count > 1 THEN evaluate_level( evaluator = evaluator node = node->args[ 2 ] )
                             ELSE member-level ).
-      result = descendants_by_level( ancestor = member level = level before = before self = self after = after
-                                     leaves = leaves ).
+      result = descendants_by_level( evaluator = evaluator ancestor = member level = level
+                                     before = before self = self after = after leaves = leaves ).
     ENDIF.
     " hierarchizeMemberList( result, false ): pre-order
     SORT result BY ordinal ASCENDING.
@@ -2843,6 +3057,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       LOOP AT children INTO DATA(child).
         APPEND LINES OF schema_reader->get_member_children( child ) TO next_members.
       ENDLOOP.
+      " getMemberChildren( children, context ): the non-empty ones under a non-empty evaluator
+      next_members = context_members( evaluator = evaluator members = next_members ).
       IF next_members IS INITIAL.
         EXIT.
       ENDIF.
@@ -2891,7 +3107,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
           IF current_depth = level_depth.
             APPEND member TO result.
           ELSE.
-            DATA(children) = schema_reader->get_member_children( member ).
+            DATA(children) = non_empty_children( evaluator = evaluator member = member ).
             IF children IS INITIAL.
               IF current_depth <= level_depth.
                 APPEND member TO result.
@@ -2930,6 +3146,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       LOOP AT fertile INTO member.
         APPEND LINES OF schema_reader->get_member_children( member ) TO members.
       ENDLOOP.
+      members = context_members( evaluator = evaluator members = members ).
     ENDWHILE.
   ENDMETHOD.
 
