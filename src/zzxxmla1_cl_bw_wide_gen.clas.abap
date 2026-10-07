@@ -11,13 +11,14 @@
 *----------------------------------------------------------------------------------------------------------------------*
 "! The wide demo (docs/wide-demo.md): a provider with many characteristics, for trying the schema builder and the
 "! engine on a wide model. It creates InfoArea ZXMLWIDE with
-"! - the characteristics ZXMLAD00 to ZXMLAD99 (NUMC 4, with master data and no attributes), 1,000 members each,
+"! - the characteristics ZXMLAD00 to ZXMLAD99 (with master data and no attributes): ZXMLAD00 (NUMC 6) with 100,000
+"!   members, for a level larger than eMondrian's bound on a native crossjoin operand, the others (NUMC 4) with 1,000,
 "! - the key figure ZXMLAKF,
 "! - the InfoCube ZXMLWIDE (ten BW dimensions of ten characteristics) and the cube-type aDSO ZXMLWIDEA, each loaded
 "!   with the same records, 1,000 unless another number is given,
 "! and no views, schema or catalog: the schema builder makes those.
 "! The records come from a seeded pseudo-random generator (every run gives the same ones): every characteristic takes
-"! one of its 1,000 members, the key figure a whole number from 1 to 1,000. They are built and loaded in packages, so
+"! one of its members, the key figure a whole number from 1 to 1,000. They are built and loaded in packages, so
 "! the memory needed does not grow with their number.
 "! Every run deletes the aDSO, the cube, the views of the characteristics and the InfoObjects listed here and creates
 "! them again: never point it at objects that hold data you want to keep. A run with many records takes longer than a
@@ -46,6 +47,8 @@ CLASS zzxxmla1_cl_bw_wide_gen DEFINITION
     CONSTANTS c_seed            TYPE int8 VALUE 20261006.
     CONSTANTS c_characteristics TYPE i VALUE 100.
     CONSTANTS c_members         TYPE i VALUE 1000.
+    CONSTANTS c_large           TYPE rsiobjnm VALUE 'ZXMLAD00'.
+    CONSTANTS c_large_members   TYPE i VALUE 100000.
     CONSTANTS c_per_dimension   TYPE i VALUE 10.
     CONSTANTS c_max_amount      TYPE i VALUE 1000.
     CONSTANTS c_package         TYPE i VALUE 100000.
@@ -62,15 +65,19 @@ CLASS zzxxmla1_cl_bw_wide_gen DEFINITION
     "! ZXMLAD00 to ZXMLAD99.
     METHODS characteristics RETURNING VALUE(result) TYPE ty_t_iobjnm.
     METHODS all_iobjnm RETURNING VALUE(result) TYPE ty_t_iobjnm.
+    "! The number of members of a characteristic: c_large_members for c_large, else c_members.
+    METHODS member_count IMPORTING iobjnm TYPE rsiobjnm RETURNING VALUE(result) TYPE i.
 
     "! The next pseudo-random number from 1 to n (Park and Miller's minimal standard generator).
     METHODS random IMPORTING n TYPE i RETURNING VALUE(result) TYPE i.
     "! Appends count records: the next pseudo-random member of each characteristic and the key figure.
     "! @parameter fields | the components of the characteristics, in their order
+    "! @parameter members | the number of members of each characteristic, in the same order
     "! @parameter amount | the component of the key figure
     METHODS fill_package
-      IMPORTING fields TYPE string_table
-                amount TYPE string
+      IMPORTING fields  TYPE string_table
+                members TYPE int4_table
+                amount  TYPE string
                 count  TYPE i
       CHANGING  table  TYPE STANDARD TABLE.
 
@@ -85,7 +92,7 @@ CLASS zzxxmla1_cl_bw_wide_gen DEFINITION
     METHODS activate_infoobjects.
     METHODS create_cube.
     METHODS activate_cube.
-    "! The keys 1 to c_members into the characteristic's attribute table (P table), which gives them their SIDs.
+    "! The keys 1 to member_count( ) into the characteristic's attribute table (P table), which gives them their SIDs.
     METHODS load_master_data IMPORTING iobjnm TYPE rsiobjnm.
     METHODS load_cube IMPORTING records TYPE i.
     METHODS create_adso.
@@ -118,7 +125,8 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
   METHOD run.
     CLEAR log.
     DATA(count) = COND i( WHEN records > 0 THEN records ELSE c_records ).
-    write( |{ c_characteristics } characteristics of { c_members } members, { count } records| ).
+    write( |{ c_characteristics } characteristics ({ c_large } of { c_large_members } members, the others of | &&
+           |{ c_members }), { count } records| ).
 
     delete_all( ).
     ensure_infoarea( ).
@@ -161,6 +169,10 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
     APPEND c_key_figure TO result.
   ENDMETHOD.
 
+  METHOD member_count.
+    result = COND #( WHEN iobjnm = c_large THEN c_large_members ELSE c_members ).
+  ENDMETHOD.
+
   METHOD random.
     seed = ( seed * 48271 ) MOD 2147483647.
     result = seed MOD n + 1.
@@ -173,7 +185,7 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
       APPEND INITIAL LINE TO table ASSIGNING <row>.
       LOOP AT fields INTO DATA(field).
         ASSIGN COMPONENT field OF STRUCTURE <row> TO <value>.
-        <value> = random( c_members ).
+        <value> = random( members[ sy-tabix ] ).
       ENDLOOP.
       DATA(value) = random( c_max_amount ).
       ASSIGN COMPONENT amount OF STRUCTURE <row> TO <value>.
@@ -320,6 +332,8 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
     DATA iobj TYPE bapi6108-infoobject.
     DATA attributes TYPE STANDARD TABLE OF bapi6108at WITH DEFAULT KEY.
     DATA(text) = CONV rstxtlg( |Dimension { iobjnm+6(2) }| ).
+    " NUMC 4 holds up to 9999 members
+    DATA(length) = COND i( WHEN member_count( iobjnm ) > 9999 THEN 6 ELSE 4 ).
     " with master data, so it has an attribute table with its members, but without attributes
     DATA(details) = VALUE bapi6108(
       infoobject = iobjnm
@@ -330,9 +344,9 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
       infoarea   = c_infoarea
       chabasnm   = iobjnm
       datatp     = 'NUMC'
-      intlen     = 4
-      leng       = 4
-      outputlen  = 4
+      intlen     = length
+      leng       = length
+      outputlen  = length
       attribfl   = rs_c_true ).
     CALL FUNCTION 'BAPI_IOBJ_CREATE'
       EXPORTING
@@ -517,7 +531,7 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
     DATA(table_type) = cl_abap_tabledescr=>create( CAST cl_abap_structdescr( descr ) ).
     CREATE DATA data TYPE HANDLE table_type.
     ASSIGN data->* TO <table>.
-    DO c_members TIMES.
+    DO member_count( iobjnm ) TIMES.
       APPEND INITIAL LINE TO <table> ASSIGNING <row>.
       ASSIGN COMPONENT |/BIC/{ iobjnm }| OF STRUCTURE <row> TO <value>.
       <value> = sy-index.
@@ -559,6 +573,7 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
     CREATE DATA data TYPE HANDLE table_type.
     ASSIGN data->* TO <table>.
     DATA(fields) = VALUE string_table( FOR c IN characteristics( ) ( CONV #( c ) ) ).
+    DATA(members) = VALUE int4_table( FOR c IN characteristics( ) ( member_count( c ) ) ).
     seed = c_seed.
     amount_total = 0.
     DATA(left) = records.
@@ -567,7 +582,7 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
       package = package + 1.
       DATA(count) = nmin( val1 = left val2 = c_package ).
       CLEAR <table>.
-      fill_package( EXPORTING fields = fields amount = CONV #( c_key_figure ) count = count
+      fill_package( EXPORTING fields = fields members = members amount = CONV #( c_key_figure ) count = count
                     CHANGING  table  = <table> ).
       CALL FUNCTION 'RSDRI_CUBE_WRITE_PACKAGE'
         EXPORTING
@@ -659,6 +674,7 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
     CREATE DATA data TYPE HANDLE table_type.
     ASSIGN data->* TO <table>.
     DATA(fields) = VALUE string_table( FOR c IN characteristics( ) ( iobj_field( struct = line iobjnm = c ) ) ).
+    DATA(members) = VALUE int4_table( FOR c IN characteristics( ) ( member_count( c ) ) ).
     DATA(amount) = iobj_field( struct = line iobjnm = c_key_figure ).
     seed = c_seed.
     amount_total = 0.
@@ -668,7 +684,7 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
       package = package + 1.
       DATA(count) = nmin( val1 = left val2 = c_package ).
       CLEAR <table>.
-      fill_package( EXPORTING fields = fields amount = amount count = count
+      fill_package( EXPORTING fields = fields members = members amount = amount count = count
                     CHANGING  table  = <table> ).
       CALL FUNCTION 'RSDSO_WRITE_API'
         EXPORTING

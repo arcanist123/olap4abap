@@ -161,7 +161,8 @@ Read before designing anything:
   `ZCLVISIT` and aDSO `ZCLVISITA` with made-up visits of patients to a clinic, their schemas and catalogs
   (`ZZXXMLA1_CL_BW_CLINIC_GEN`). The clinic demo is the project's own demo data; FoodMart stays the test source.
   With another checkbox the wide demo (`docs/wide-demo.md`, `ZZXXMLA1_CL_BW_WIDE_GEN`): InfoCube
-  `ZXMLWIDE` and aDSO `ZXMLWIDEA` with 100 characteristics `ZXMLAD00`-`ZXMLAD99` of 1,000 members each, one key figure
+  `ZXMLWIDE` and aDSO `ZXMLWIDEA` with 100 characteristics `ZXMLAD00`-`ZXMLAD99` of 1,000 members each (`ZXMLAD00`
+  100,000), one key figure
   and 1,000 made-up records (more on request), without schema or catalog.
 - Reference: eMondrian built from source and running in Docker; captured exchanges are in `reference/`.
 

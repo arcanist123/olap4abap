@@ -165,8 +165,6 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       ty_t_cj_arg TYPE STANDARD TABLE OF ty_cj_arg WITH EMPTY KEY,
       "! the alternative arguments of an operand (one per level of its members), or the arguments of a variant
       ty_t_cj_args TYPE STANDARD TABLE OF ty_t_cj_arg WITH EMPTY KEY.
-    "! Properties.MaxConstraints: the most members of a member list argument
-    CONSTANTS c_max_constraints TYPE i VALUE 1000.
     "! the facts of the query, for the native crossjoin
     DATA fact_reader TYPE REF TO zzxxmla1_cl_mdx_facts.
 
@@ -870,12 +868,11 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       IMPORTING node   TYPE ty_node
       EXPORTING arg    TYPE ty_cj_arg
                 found  TYPE abap_bool.
-    "! MemberListCrossJoinArg.create: members of one level (null members left out), at most MaxConstraints;
-    "! without limit for a level group of the multi-variant expansion (the native read has no IN list: it reads
-    "! the level in the database and keeps the listed members, so the database expands the crossjoin).
+    "! MemberListCrossJoinArg.create: members of one level (null members left out), without the reference's bound
+    "! MaxConstraints (our deviation: the bound keeps the reference's IN list small; the native read has none, it
+    "! reads the level in the database and keeps the listed members, so the database expands the crossjoin).
     METHODS member_list_cj_arg
       IMPORTING members TYPE ty_t_member
-                limit   TYPE abap_bool DEFAULT abap_true
       EXPORTING arg     TYPE ty_cj_arg
                 found   TYPE abap_bool.
     "! The position of a member in an evaluated crossjoin operand.
@@ -4564,10 +4561,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         direct_cj_arg( EXPORTING node = args[ 1 ] IMPORTING arg = arg found = found ).
         RETURN.
       ENDIF.
-      " checkEnumeration: stored members (MemberExpr) of one level
-      IF lines( args ) > c_max_constraints.
-        RETURN.
-      ENDIF.
+      " checkEnumeration: stored members (MemberExpr) of one level, any number of them (see member_list_cj_arg)
       DATA(members) = VALUE ty_t_member( ).
       LOOP AT args INTO DATA(item).
         IF item->kind <> zzxxmla1_cl_mdx_node=>c_kind-member OR item->element-member-calculated = abap_true.
@@ -4595,9 +4589,6 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
 
   METHOD member_list_cj_arg.
     CLEAR: arg, found.
-    IF limit = abap_true AND lines( members ) > c_max_constraints.
-      RETURN.
-    ENDIF.
     arg-member_list = abap_true.
     arg-level = -1.
     DATA(null_level) = -1.
@@ -4647,7 +4638,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     LOOP AT tuples INTO DATA(positioned).
       INSERT VALUE #( unique_name = positioned[ 1 ]-unique_name position = lines( positions ) ) INTO TABLE positions.
     ENDLOOP.
-    " the members by level, the levels in the order of their first member (at most 6 levels of 15,000 members)
+    " the members by level, the levels in the order of their first member (at most 6 levels)
     DATA by_level TYPE ty_t_member_lists.
     DATA levels TYPE STANDARD TABLE OF i WITH EMPTY KEY.
     LOOP AT tuples INTO DATA(tuple).
@@ -4666,12 +4657,11 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       RETURN.
     ENDIF.
     LOOP AT by_level INTO DATA(members).
-      IF lines( members ) > 15000.
-        CLEAR result.
-        RETURN.
-      ENDIF.
-      " the group's own bound above, not MaxConstraints (our deviation: the reference's IN list is no limit here)
-      member_list_cj_arg( EXPORTING members = members limit = abap_false IMPORTING arg = arg found = found ).
+      " no bound on the group's members, neither the reference's MAX_MEMBERS_PER_OPERAND_STATE (15,000) nor
+      " MaxConstraints (our deviation: both keep the reference's IN list small; our read has none, it reads the level
+      " grouped and keeps the group's members in ABAP, and they are in memory already. A bound would only send a large
+      " level to the interpreted crossjoin, which builds the whole product and fails on the result limit)
+      member_list_cj_arg( EXPORTING members = members IMPORTING arg = arg found = found ).
       IF found = abap_false.
         CLEAR result.
         RETURN.

@@ -117,14 +117,20 @@ before it is built. More memory would only move the limit; a native NON EMPTY cr
 Then the native crossjoin (`RolapNativeCrossJoin`, `CrossJoinArgFactory`, `SqlTupleReader`): while the evaluator is
 non-empty (a NON EMPTY axis; `NonEmptyCrossJoin`, which also puts the slicer members of its hierarchies at All), a
 `Crossjoin` or `NonEmptyCrossJoin` whose operands are Level.Members, Member.Children, Descendants(member, level or
-depth) or an enumeration of up to 1,000 stored members of one level is read from the facts: the combinations of the
+depth) or an enumeration of stored members of one level is read from the facts: the combinations of the
 operands' level keys with facts in the context, one grouped query (`ZZXXMLA1_CL_MDX_FACTS=>non_empty_paths`, cached
 like the cells), ordered by hierarchy order, the first operand first. The context are the stored non-All members of
 the other hierarchies that are not their hierarchy's default member (`makeContextConstraintSet`,
 `removeCalculatedAndDefaultMembers`); a context with calculated members (an Aggregate or a compound slicer) is not
 ported, the crossjoin is then evaluated as before. Other operands go through eMondrian's multi-variant expansion: each is
 evaluated and split by level (in the order of their first member), every combination of the levels is read natively,
-one after the other, the first operand slowest; this gives eMondrian's order of #41, #144, #155 and #169. Not valid
+one after the other, the first operand slowest; this gives eMondrian's order of #41, #144, #155 and #169. Neither an
+enumeration nor a level group has a bound on its members (our deviation: eMondrian drops the native read for an
+enumeration of more than 1,000 members, `MaxConstraints`, and for a group of more than 15,000,
+`MAX_MEMBERS_PER_OPERAND_STATE`, to keep its SQL `IN` list small; our read has no `IN` list, so the bounds would only
+send Excel's `Hierarchize({DrilldownLevel({[X].[All X]})})` on a large level, or a long member list, to the interpreted
+crossjoin and the result limit). So an enumeration of more than 1,000 members comes back in hierarchy order, as a
+shorter one does, where eMondrian keeps the order it was written in. Not valid
 (and so not native): all operands with the All member or empty, a calculated member, a calculated measure whose formula
 names a member of an operand's hierarchy below none of its members. The seven crossjoins of the result limit answer
 now (about 60,000 combinations instead of 16 million tuples). `Format` with the empty format string (a measure without
