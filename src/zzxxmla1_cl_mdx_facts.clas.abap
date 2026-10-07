@@ -119,17 +119,29 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD value.
-    DATA(sorted) = filters.
-    SORT sorted BY hierarchy ASCENDING.
+    " the filters by hierarchy: as they come if they are in that order already (the evaluator's are)
+    DATA sorted TYPE ty_t_filter.
+    FIELD-SYMBOLS <sorted> TYPE ty_t_filter.
+    ASSIGN filters TO <sorted>.
+    DATA(previous) = -1.
+    LOOP AT filters ASSIGNING FIELD-SYMBOL(<filter>).
+      IF <filter>-hierarchy < previous.
+        sorted = filters.
+        SORT sorted BY hierarchy ASCENDING.
+        ASSIGN sorted TO <sorted>.
+        EXIT.
+      ENDIF.
+      previous = <filter>-hierarchy.
+    ENDLOOP.
     DATA(pattern) = VALUE string( ).
     DATA(key) = VALUE string( ).
-    LOOP AT sorted INTO DATA(filter).
-      pattern = pattern && filter-hierarchy && `:` && filter-level && `,`.
-      key = key && filter-path && zzxxmla1_cl_model=>c_separator.
+    LOOP AT <sorted> ASSIGNING <filter>.
+      pattern = pattern && <filter>-hierarchy && `:` && <filter>-level && `,`.
+      key = key && <filter>-path && zzxxmla1_cl_model=>c_separator.
     ENDLOOP.
 
     IF NOT line_exists( cache[ pattern = pattern ] ).
-      INSERT VALUE #( pattern = pattern groups = load( sorted ) ) INTO TABLE cache.
+      INSERT VALUE #( pattern = pattern groups = load( <sorted> ) ) INTO TABLE cache.
     ENDIF.
     ASSIGN cache[ pattern = pattern ] TO FIELD-SYMBOL(<cache>).
     ASSIGN <cache>-groups[ key = key ] TO FIELD-SYMBOL(<group>).

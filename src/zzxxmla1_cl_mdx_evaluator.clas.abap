@@ -114,6 +114,15 @@ CLASS zzxxmla1_cl_mdx_evaluator DEFINITION
     DATA parent          TYPE REF TO zzxxmla1_cl_mdx_evaluator.
     "! the current member of the hierarchy with id n at position n + 1
     DATA current_members TYPE ty_t_member.
+    "! the number of calculated members and of null members among the current members (set_context_unsafe): a context
+    "! without them needs no search for them in every cell
+    DATA calculated_count TYPE i.
+    DATA null_count       TYPE i.
+    "! the hierarchies (but Measures) whose current member is below the All level, in hierarchy order: the filters of
+    "! the cell reader
+    DATA non_all          TYPE SORTED TABLE OF i WITH UNIQUE KEY table_line.
+    "! the stored measures of the cube, read once
+    DATA measures         TYPE zzxxmla1_cl_model=>ty_t_measure.
     DATA slicer_members  TYPE ty_t_member.
     DATA non_empty       TYPE abap_bool.
     DATA eval_axes       TYPE abap_bool.
@@ -173,6 +182,9 @@ CLASS zzxxmla1_cl_mdx_evaluator DEFINITION
     "! setContext( member, false ): changes the context without recording it.
     METHODS set_context_unsafe
       IMPORTING member TYPE ty_member.
+    "! setContext( member ): set_context without the previous member as result.
+    METHODS change_context
+      IMPORTING member TYPE ty_member.
     "! Whether a change of the hierarchy is already recorded since the last savepoint.
     METHODS exists
       IMPORTING ordinal       TYPE i
@@ -190,6 +202,18 @@ CLASS zzxxmla1_cl_mdx_evaluator IMPLEMENTATION.
     LOOP AT schema_reader->get_hierarchies( ) INTO DATA(hierarchy).
       INSERT schema_reader->get_default_member( hierarchy-id ) INTO result->current_members INDEX hierarchy-id + 1.
     ENDLOOP.
+    LOOP AT result->current_members ASSIGNING FIELD-SYMBOL(<member>).
+      IF <member>-calculated = abap_true.
+        result->calculated_count = result->calculated_count + 1.
+      ENDIF.
+      IF <member>-is_null = abap_true.
+        result->null_count = result->null_count + 1.
+      ENDIF.
+      IF <member>-hier_id > 0 AND <member>-key_level > 0.
+        INSERT <member>-hier_id INTO TABLE result->non_all.
+      ENDIF.
+    ENDLOOP.
+    result->measures = schema_reader->get_measures( ).
     " the sentinel
     result->commands = VALUE #( ( command = c_command-savepoint ) ).
     result->command_count = 1.
@@ -205,6 +229,10 @@ CLASS zzxxmla1_cl_mdx_evaluator IMPLEMENTATION.
     child->expanding = expanding.
     child->parent = me.
     child->current_members = current_members.
+    child->calculated_count = calculated_count.
+    child->null_count = null_count.
+    child->non_all = non_all.
+    child->measures = measures.
     child->slicer_members = slicer_members.
     child->non_empty = non_empty.
     child->eval_axes = eval_axes.
@@ -245,7 +273,9 @@ CLASS zzxxmla1_cl_mdx_evaluator IMPLEMENTATION.
       " already at a savepoint
       RETURN.
     ENDIF.
-    add_command( VALUE #( command = c_command-savepoint ) ).
+    APPEND INITIAL LINE TO commands ASSIGNING FIELD-SYMBOL(<command>).
+    <command>-command = c_command-savepoint.
+    command_count = command_count + 1.
   ENDMETHOD.
 
   METHOD width.
@@ -354,39 +384,72 @@ CLASS zzxxmla1_cl_mdx_evaluator IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD zzxxmla1_if_mdx_evaluator~restore.
-    WHILE lines( commands ) > savepoint.
-      DATA(last) = lines( commands ).
-      DATA(command) = commands[ last ].
-      DELETE commands INDEX last.
-      command_count = command_count - width( command-command ).
-      CASE command-command.
+    " undone in place, from the last command (this runs for every cell)
+    DATA(last) = lines( commands ).
+    WHILE last > savepoint.
+      ASSIGN commands[ last ] TO FIELD-SYMBOL(<command>).
+      CASE <command>-command.
+        WHEN c_command-savepoint.
+          command_count = command_count - 1.
         WHEN c_command-set_context.
-          set_context_unsafe( command-member ).
+          command_count = command_count - 3.
+          set_context_unsafe( <command>-member ).
         WHEN c_command-set_non_empty.
-          non_empty = command-flag.
+          command_count = command_count - 2.
+          non_empty = <command>-flag.
         WHEN c_command-set_eval_axes.
-          eval_axes = command-flag.
+          command_count = command_count - 2.
+          eval_axes = <command>-flag.
         WHEN c_command-set_expanding.
-          expanding_member = command-member.
+          command_count = command_count - 3.
+          expanding_member = <command>-member.
+        WHEN OTHERS.
+          command_count = command_count - width( <command>-command ).
       ENDCASE.
+      DELETE commands INDEX last.
+      last = last - 1.
     ENDWHILE.
   ENDMETHOD.
 
   METHOD zzxxmla1_if_mdx_evaluator~set_context.
+    result = current_members[ member-hier_id + 1 ].
+    change_context( member ).
+  ENDMETHOD.
+
+  METHOD change_context.
     DATA(ordinal) = member-hier_id.
-    result = current_members[ ordinal + 1 ].
+    ASSIGN current_members[ ordinal + 1 ] TO FIELD-SYMBOL(<current>).
     " the same member (a visual total member has the unique name of the member it stands for)
-    IF member-unique_name = result-unique_name AND member-calc_name = result-calc_name.
+    IF member-unique_name = <current>-unique_name AND member-calc_name = <current>-calc_name.
       RETURN.
     ENDIF.
     IF exists( ordinal ) = abap_false.
-      add_command( VALUE #( command = c_command-set_context ordinal = ordinal member = result ) ).
+      " add_command, in place: Command.SET_CONTEXT is 3 wide
+      APPEND INITIAL LINE TO commands ASSIGNING FIELD-SYMBOL(<command>).
+      <command>-command = c_command-set_context.
+      <command>-ordinal = ordinal.
+      <command>-member = <current>.
+      command_count = command_count + 3.
     ENDIF.
     set_context_unsafe( member ).
   ENDMETHOD.
 
   METHOD set_context_unsafe.
-    current_members[ member-hier_id + 1 ] = member.
+    ASSIGN current_members[ member-hier_id + 1 ] TO FIELD-SYMBOL(<current>).
+    IF <current>-calculated <> member-calculated.
+      calculated_count = calculated_count + COND i( WHEN member-calculated = abap_true THEN 1 ELSE -1 ).
+    ENDIF.
+    IF <current>-is_null <> member-is_null.
+      null_count = null_count + COND i( WHEN member-is_null = abap_true THEN 1 ELSE -1 ).
+    ENDIF.
+    IF member-hier_id > 0 AND xsdbool( <current>-key_level > 0 ) <> xsdbool( member-key_level > 0 ).
+      IF member-key_level > 0.
+        INSERT member-hier_id INTO TABLE non_all.
+      ELSE.
+        DELETE TABLE non_all WITH TABLE KEY table_line = member-hier_id.
+      ENDIF.
+    ENDIF.
+    <current> = member.
   ENDMETHOD.
 
   METHOD exists.
@@ -407,8 +470,8 @@ CLASS zzxxmla1_cl_mdx_evaluator IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD zzxxmla1_if_mdx_evaluator~set_context_members.
-    LOOP AT members INTO DATA(member).
-      set_context( member ).
+    LOOP AT members ASSIGNING FIELD-SYMBOL(<member>).
+      change_context( <member> ).
     ENDLOOP.
   ENDMETHOD.
 
@@ -459,14 +522,15 @@ CLASS zzxxmla1_cl_mdx_evaluator IMPLEMENTATION.
     DATA(calculation) = max_solve_calculation( ).
     IF calculation-unique_name IS INITIAL.
       " a null member in the context: no cell request, the value is null (RolapAggregationManager.makeRequest)
-      IF line_exists( current_members[ is_null = abap_true ] ).
+      IF null_count > 0.
         result-empty = abap_true.
         RETURN.
       ENDIF.
       " the cell reader: the measure of the context aggregated over the facts of its other non-All members
       DATA(filters) = VALUE zzxxmla1_cl_mdx_facts=>ty_t_filter( ).
-      LOOP AT current_members INTO DATA(member) WHERE hier_id > 0 AND key_level > 0.
-        APPEND VALUE #( hierarchy = member-hier_id level = member-key_level path = member-path ) TO filters.
+      LOOP AT non_all INTO DATA(hierarchy).
+        ASSIGN current_members[ hierarchy + 1 ] TO FIELD-SYMBOL(<member>).
+        APPEND VALUE #( hierarchy = hierarchy level = <member>-key_level path = <member>-path ) TO filters.
       ENDLOOP.
       DATA(cell) = facts->value( filters = filters measure = current_members[ 1 ]-measure_index ).
       result = VALUE #( empty = cell-empty kind = c_value-numeric number = cell-amount ).
@@ -508,6 +572,9 @@ CLASS zzxxmla1_cl_mdx_evaluator IMPLEMENTATION.
         cube TYPE i VALUE 2,
         query TYPE i VALUE 3,
       END OF c_state.
+    IF calculated_count = 0.
+      RETURN.
+    ENDIF.
     DATA(state) = c_state-start.
     LOOP AT current_members INTO DATA(member) WHERE calculated = abap_true.
       DATA(definition) = schema_reader->get_calculation( member ).
@@ -558,22 +625,27 @@ CLASS zzxxmla1_cl_mdx_evaluator IMPLEMENTATION.
     DATA format_expression TYPE REF TO zzxxmla1_cl_mdx_node.
     DATA(max_solve) = cl_abap_math=>min_int4.
     DATA(found) = abap_false.
-    LOOP AT current_members INTO DATA(member).
-      IF member-calculated = abap_true.
-        IF member-solve_order > max_solve.
-          DATA(expression) = schema_reader->get_calculation( member )-format_expression.
+    " only calculated members and the measure have a format
+    LOOP AT current_members ASSIGNING FIELD-SYMBOL(<member>)
+         WHERE calculated = abap_true OR hier_id = zzxxmla1_if_mdx_schema_reader=>c_measures.
+      IF <member>-calculated = abap_true.
+        IF <member>-solve_order > max_solve.
+          DATA(expression) = schema_reader->get_calculation( <member> )-format_expression.
           IF expression IS BOUND.
             format_expression = expression.
-            max_solve = member-solve_order.
+            max_solve = <member>-solve_order.
             found = abap_true.
           ENDIF.
         ENDIF.
-      ELSEIF member-hier_id = zzxxmla1_if_mdx_schema_reader=>c_measures AND -1 > max_solve.
+      ELSEIF -1 > max_solve.
         CLEAR format_expression.
-        DATA(measures) = schema_reader->get_measures( ).
-        result = measures[ member-measure_index ]-format.
+        result = measures[ <member>-measure_index ]-format.
         max_solve = -1.
         found = abap_true.
+      ENDIF.
+      IF calculated_count = 0.
+        " the measure was the only one
+        EXIT.
       ENDIF.
     ENDLOOP.
     IF found = abap_false.
@@ -608,7 +680,6 @@ CLASS zzxxmla1_cl_mdx_evaluator IMPLEMENTATION.
       RETURN.
     ENDIF.
     " a value such as zero is empty if no fact row is in the cell
-    DATA(measures) = schema_reader->get_measures( ).
     DATA(fact_count) = line_index( measures[ aggregator = `count` ] ).
     IF fact_count = 0.
       RETURN.
