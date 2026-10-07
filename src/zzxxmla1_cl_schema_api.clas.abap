@@ -29,7 +29,13 @@
 "!   work is committed. Without catalog the schema's name is the catalog;
 "! - POST remove?catalog=X: the catalog is removed from every data source of /WEB-INF/datasources.xml and its schema
 "!   file deleted (unless another catalog still names it), and the work is committed. The views stay: they are per
-"!   characteristic, other schemas can use them. Answers the deleted files.
+"!   characteristic, other schemas can use them. Answers the deleted files;
+"! - GET time?from=YYYY-MM-DD&to=YYYY-MM-DD: the master data of the calendar time characteristics
+"!   (ZZXXMLA1_CL_TIME_MD): the interval (without from and to BW's, the one of RSRHIERARCHYVIRT) and, per
+"!   characteristic, its values with SID and with attributes and those of the interval that are missing;
+"! - POST time/fill?from=...&to=...&characteristics=0CALMONTH,0CALYEAR: makes the SIDs of the interval's values and
+"!   writes the attribute rows (without characteristics all of them), committed per characteristic. Answers what was
+"!   done and the state afterwards.
 "! It runs as the XMLA endpoint does (the anonymous logon of the node), accept included, for now.
 CLASS zzxxmla1_cl_schema_api DEFINITION
   PUBLIC
@@ -114,6 +120,35 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
       IMPORTING request       TYPE ty_request
       RETURNING VALUE(result) TYPE string
       RAISING   zzxxmla1_cx_api_refused.
+    METHODS time_status
+      IMPORTING request       TYPE ty_request
+      RETURNING VALUE(result) TYPE string
+      RAISING   zzxxmla1_cx_api_refused.
+    METHODS fill_time
+      IMPORTING request       TYPE ty_request
+      RETURNING VALUE(result) TYPE string
+      RAISING   zzxxmla1_cx_api_refused.
+    "! The interval of the parameters from and to (YYYY-MM-DD or YYYYMMDD), each BW's if it is not given; refused if
+    "! a date is none, from is after to, or the interval is longer than 100 years.
+    METHODS time_interval
+      IMPORTING request       TYPE ty_request
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_time_md=>ty_interval
+      RAISING   zzxxmla1_cx_api_refused.
+    "! A date parameter as a date, initial if it is not given.
+    METHODS date_parameter
+      IMPORTING request       TYPE ty_request
+                !name         TYPE string
+      RETURNING VALUE(result) TYPE d
+      RAISING   zzxxmla1_cx_api_refused.
+    "! The interval and the state of every time characteristic as JSON members (without braces).
+    METHODS time_status_json
+      IMPORTING time_md       TYPE REF TO zzxxmla1_cl_time_md
+                !interval     TYPE zzxxmla1_cl_time_md=>ty_interval
+      RETURNING VALUE(result) TYPE string.
+    "! A date as a JSON string YYYY-MM-DD.
+    METHODS json_date
+      IMPORTING !value        TYPE d
+      RETURNING VALUE(result) TYPE string.
     "! Everything accept checks before it changes anything.
     METHODS check_request
       IMPORTING request       TYPE ty_request
@@ -225,8 +260,8 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
   METHOD handle.
     DATA(resource) = COND string( WHEN is_api( request-path )
                                   THEN substring( val = request-path off = strlen( c_path ) ) ).
-    DATA(allow) = SWITCH string( resource WHEN `providers` OR `proposal` OR `schemas` OR `schema` THEN `GET`
-                                          WHEN `check` OR `accept` OR `remove` THEN `POST` ).
+    DATA(allow) = SWITCH string( resource WHEN `providers` OR `proposal` OR `schemas` OR `schema` OR `time` THEN `GET`
+                                          WHEN `check` OR `accept` OR `remove` OR `time/fill` THEN `POST` ).
     IF allow IS INITIAL.
       result = error_result( status = 404 message = |No resource { request-path }| ).
       RETURN.
@@ -243,6 +278,8 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
                                          WHEN `schema`    THEN schema( request )
                                          WHEN `check`     THEN check( request )
                                          WHEN `accept`    THEN accept( request )
+                                         WHEN `time`      THEN time_status( request )
+                                         WHEN `time/fill` THEN fill_time( request )
                                          ELSE                  remove( request ) ).
         result-status = 200.
         result-content_type = c_json.
@@ -444,6 +481,83 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     ENDLOOP.
     COMMIT WORK.
     result = |\{"catalog":{ json( catalog ) },"removedFiles":{ json_array( removed ) }\}|.
+  ENDMETHOD.
+
+  METHOD time_status.
+    DATA(time_md) = NEW zzxxmla1_cl_time_md( ).
+    result = |\{{ time_status_json( time_md = time_md interval = time_interval( request ) ) }\}|.
+  ENDMETHOD.
+
+  METHOD fill_time.
+    DATA(interval) = time_interval( request ).
+    DATA names TYPE string_table.
+    SPLIT replace( val = parameter( request = request name = `characteristics` ) sub = ` ` with = `` occ = 0 )
+      AT `,` INTO TABLE names.
+    DELETE names WHERE table_line IS INITIAL.
+    DATA(time_md) = NEW zzxxmla1_cl_time_md( ).
+    DATA filled TYPE string_table.
+    LOOP AT time_md->fill( interval = interval names = names ) INTO DATA(entry).
+      APPEND |\{"name":{ json( entry-name ) },"createdSids":{ entry-created_sids },| &&
+             |"attributeRows":{ entry-attribute_rows },| &&
+             |"error":{ COND string( WHEN entry-error IS INITIAL THEN `null` ELSE json( entry-error ) ) }\}| TO filled.
+    ENDLOOP.
+    result = |\{"filled":{ json_array( filled ) },{ time_status_json( time_md = time_md interval = interval ) }\}|.
+  ENDMETHOD.
+
+  METHOD time_interval.
+    result = NEW zzxxmla1_cl_time_md( )->interval( ).
+    DATA(from) = date_parameter( request = request name = `from` ).
+    DATA(to) = date_parameter( request = request name = `to` ).
+    IF from IS NOT INITIAL.
+      result-from = from.
+    ENDIF.
+    IF to IS NOT INITIAL.
+      result-to = to.
+    ENDIF.
+    IF result-from > result-to.
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused
+        EXPORTING status  = 400
+                  message = |The interval starts after it ends: { json_date( result-from ) } to { json_date( result-to ) }|.
+    ENDIF.
+    IF result-to - result-from > 36525.
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused
+        EXPORTING status  = 400
+                  message = `The interval is longer than 100 years`.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD date_parameter.
+    DATA(text) = replace( val = parameter( request = request name = name ) sub = `-` with = `` occ = 0 ).
+    IF text IS INITIAL.
+      RETURN.
+    ENDIF.
+    IF strlen( text ) = 8 AND text CO `0123456789`.
+      result = text.
+    ENDIF.
+    " an impossible date (20260231) is 0 as a number
+    IF result IS INITIAL OR result(4) < `1000` OR CONV d( CONV i( result ) ) <> result.
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused
+        EXPORTING status  = 400
+                  message = |{ name } is not a date (YYYY-MM-DD): { parameter( request = request name = name ) }|.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD time_status_json.
+    DATA entries TYPE string_table.
+    LOOP AT time_md->status( interval ) INTO DATA(entry).
+      APPEND |\{"name":{ json( entry-characteristic-name ) },"sidTable":{ json( entry-characteristic-sid_table ) },| &&
+             |"attributeTable":{ COND string( WHEN entry-characteristic-attribute_table IS INITIAL THEN `null`
+                                               ELSE json( entry-characteristic-attribute_table ) ) },| &&
+             |"sids":{ entry-sids },"attributes":{ entry-attributes },"expected":{ entry-expected },| &&
+             |"missingSids":{ entry-missing_sids },"missingAttributes":{ entry-missing_attributes },| &&
+             |"first":{ json( entry-first ) },"last":{ json( entry-last ) }\}| TO entries.
+    ENDLOOP.
+    result = |"from":{ json_date( interval-from ) },"to":{ json_date( interval-to ) },| &&
+             |"calendar":{ json( interval-calendar ) },"characteristics":{ json_array( entries ) }|.
+  ENDMETHOD.
+
+  METHOD json_date.
+    result = |"{ value(4) }-{ value+4(2) }-{ value+6(2) }"|.
   ENDMETHOD.
 
   METHOD parameter.

@@ -124,6 +124,20 @@ def main():
     check("check refuses an unnamed hierarchy named like an attribute",
           status == 400 and "by an unnamed Hierarchy and by the attribute" in body.get("error", ""), body)
 
+    # the time master data: only read; time/fill is called with what it refuses before writing
+    status, body, _ = call(args.url, args.client, "GET", "time", {"from": "1997-01-01", "to": "1997-12-31"})
+    found = {c["name"]: c for c in body.get("characteristics", [])}
+    check("time: state of the calendar characteristics",
+          status == 200 and body.get("from") == "1997-01-01" and found.get("0CALMONTH", {}).get("expected") == 12
+          and found.get("0CALWEEK", {}).get("expected") == 53 and found.get("0WEEKDAY1", {}).get("attributeTable") is None,
+          body)
+    status, body, _ = call(args.url, args.client, "GET", "time", {"from": "1997-02-30"})
+    check("time refuses an impossible date", status == 400 and "not a date" in body.get("error", ""), body)
+    status, body, headers = call(args.url, args.client, "GET", "time/fill")
+    check("time/fill needs POST", status == 405 and headers.get("allow", headers.get("Allow")) == "POST", body)
+    status, body, _ = call(args.url, args.client, "POST", "time/fill", {"from": "1998-01-01", "to": "1997-01-01"})
+    check("time/fill refuses an interval that ends before it starts", status == 400 and "starts after" in body.get("error", ""), body)
+
     print(f"{'all passed' if not failures else str(len(failures)) + ' failed'} ({args.url})")
     sys.exit(1 if failures else 0)
 

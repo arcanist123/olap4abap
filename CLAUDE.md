@@ -99,6 +99,11 @@ Read before designing anything:
   listed from the schema rowsets (a click inserts the unique name); an answer of up to two axes is a grid (Axis0 the
   columns, Axis1 the rows, spanning headers), one of more axes a flat table (a column per hierarchy, highest axis first,
   a row per cell) (`scripts/console_ui_test.py`).
+- Time master data: `/zzxxmla1/schema/time.html` (`web/schema/time.js`) and `GET time`, `POST time/fill` of the schema
+  API fill the SID and attribute tables of the calendar characteristics (`0CALYEAR`, `0CALQUARTER`, `0CALMONTH`,
+  `0CALWEEK` and the ones without year) for BW's interval of RSRHIERARCHYVIRT (`RSADMINS`) or a given one
+  (`ZZXXMLA1_CL_TIME_MD`). BW fills neither: its Recreate button only fills characteristics that have navigation
+  attributes. Filling adds members to every time view; see `docs/time-master-data.md`.
 - Execute: the MDX parser is a port of Mondrian's JavaCC grammar `MdxParser.jj` (`ZZXXMLA1_CL_MDX_TOKEN_MANAGER`,
   `ZZXXMLA1_CL_MDX_PARSER`, tree `ZZXXMLA1_CL_MDX_NODE`). It parses the whole grammar, with Mondrian's error texts, and its
   unit tests carry Mondrian's `ParserTest`. Keep it in step with `MdxParser.jj`: change the grammar there first, then port.
@@ -178,7 +183,8 @@ Read before designing anything:
   With another checkbox the wide demo (`docs/wide-demo.md`, `ZZXXMLA1_CL_BW_WIDE_GEN`): InfoCube
   `ZXMLWIDE` and aDSO `ZXMLWIDEA` with 100 characteristics `ZXMLAD00`-`ZXMLAD99` of 1,000 members each (`ZXMLAD00`
   100,000), one key figure
-  and 1,000 made-up records (more on request), without schema or catalog.
+  and 1,000 made-up records (more on request), without schema or catalog; the schema made for `ZXMLWIDE` with the
+  schema builder is `reference/schema/ZXMLWIDE.xml`, also served by the reference with copies of its tables and views.
 - Reference: eMondrian built from source and running in Docker; captured exchanges are in `reference/`.
 
 ## Syncing ABAP code with git

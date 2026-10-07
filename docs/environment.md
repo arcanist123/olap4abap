@@ -83,7 +83,10 @@ dimension's default hierarchy `[Store]`, and the key attributes are `[Store.Stor
 
 The schema names the BW tables themselves (`/BIC/FZFMSALES`, `/BIC/S<char>`, `/BIC/P<char>`), so the same file serves
 eMondrian and our engine. Its database (the HSQLDB jar) therefore holds copies of those 11 tables with BW's contents,
-and the generated characteristic views (`ZZXXMLA1V...`) with the SQL HANA has for them:
+and the generated characteristic views (`ZZXXMLA1V...`) with the SQL HANA has for them. The same for the wide demo
+(`docs/wide-demo.md`): its schema `reference/schema/ZXMLWIDE.xml` (made with the schema builder on SAP, catalog
+`ZXMLWIDE` in both servers), the 201 tables of `ZXMLWIDE` (`/BIC/FZXMLWIDE`, `/BIC/S|PZXMLAD00` ... `99`) and its 100
+views (`ZZXXMLA1V0000033` ... `132`). Only views over copied tables are taken; SAP has views of other providers too:
 
     python scripts/add-empty-members.py           # FoodMart data with the empty members (once, from the original jar)
     sapcli class execute ZZXXMLA1_CL_BW_VIEW_GEN  # the CDS views of the characteristics (logon as in sap-sync.sh)

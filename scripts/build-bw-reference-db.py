@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
-"""Copies the BW tables of the cube ZFMSALES, as BW holds them, into the reference database of the eMondrian container.
+"""Copies the BW tables of the cubes ZFMSALES and ZXMLWIDE, as BW holds them, into the reference database of the
+eMondrian container.
 
 Why: the reference schema (reference/schema/FoodmartBW.xml) names the BW tables themselves (/BIC/FZFMSALES,
 /BIC/SZFMSTORE, /BIC/PZFMSTORE, ...), so that the same schema runs in eMondrian and in SAP (docs/mvp-scope.md, schema
 decision). The reference database therefore needs tables of these names with BW's contents: the fact table and the SID
-and attribute tables of the five characteristics of the cube, with BW's columns and values (NUMC zero-padded, blank
-instead of NULL, SIDs equal to the FoodMart ids).
+and attribute tables of the characteristics of the cube, with BW's columns and values (NUMC zero-padded, blank
+instead of NULL, SIDs equal to the FoodMart ids). The same for the wide demo ZXMLWIDE (docs/wide-demo.md), whose schema
+reference/schema/ZXMLWIDE.xml the schema builder made on SAP: 100 characteristics, 201 tables.
 
 1. Export (skipped with --no-export): the columns of the tables from DD03L and their rows, read with
    `sapcli datapreview osql` (logon data from .env.sap), into data/foodmart-bw/bw/<table>.json (git-ignored); and the
    SQL of the generated characteristic views (ZZXXMLA1V..., ZZXXMLA1_CL_BW_VIEW_GEN) from HANA's SYS.VIEWS, read with
    hdbsql in the SAP container (HANA_CONTAINER, HANA_OS_USER, HANA_KEY; defaults a4h, a4hadm, DEFAULT), into
    data/foodmart-bw/bw/views.json. HSQLDB takes HANA's view SQL as it is, so the reference has exactly SAP's views.
+   Only the views over tables copied here are kept (SAP has views of other providers, e.g. the clinic demo's).
 2. Build: adds the tables to data/foodmart-bw/hsqldb-foodmart.jar (the FoodMart data with the empty members, see
    scripts/add-empty-members.py): CREATE MEMORY TABLE after the last CREATE of foodmart.script, the rows at its end.
    Then the characteristic views under their database names, after the tables. Lines of an earlier run (they name
@@ -28,6 +31,7 @@ import argparse
 import json
 import os
 import pathlib
+import re
 import subprocess
 import zipfile
 
@@ -35,9 +39,13 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 JAR = ROOT / "data" / "foodmart-bw" / "hsqldb-foodmart.jar"
 EXPORT = ROOT / "data" / "foodmart-bw" / "bw"
 SCRIPT = "hsqldb-foodmart/foodmart.script"
-CUBE = "ZFMSALES"
-CHARACTERISTICS = ["ZFMPROD", "ZFMCUST", "ZFMSTORE", "ZFMPROMO", "ZFMDATE"]
-TABLES = [f"/BIC/F{CUBE}"] + [f"/BIC/{t}{c}" for c in CHARACTERISTICS for t in "SP"]
+# the cubes and their characteristics; DD03L is read per cube with the LIKE pattern of its tables
+CUBES = {
+    "ZFMSALES": (["ZFMPROD", "ZFMCUST", "ZFMSTORE", "ZFMPROMO", "ZFMDATE"], "/BIC/_ZFM%"),
+    "ZXMLWIDE": ([f"ZXMLAD{n:02}" for n in range(100)], "/BIC/_ZXML%"),
+}
+TABLES = [table for cube, (characteristics, _) in CUBES.items()
+          for table in [f"/BIC/F{cube}"] + [f"/BIC/{t}{c}" for c in characteristics for t in "SP"]]
 CR, NL = "\r", "\n"
 VIEW_PATTERN = "ZZXXMLA1V%"  # the database views of ZZXXMLA1_CL_BW_VIEW_GEN
 CHUNK = 5000  # characters of a view's SQL per hdbsql query
@@ -62,14 +70,18 @@ def sapcli(statement, rows):
 
 def export():
     EXPORT.mkdir(parents=True, exist_ok=True)
+    columns = {}
+    for _, pattern in CUBES.values():
+        for c in sapcli("SELECT tabname, position, fieldname, keyflag, datatype, leng, decimals FROM dd03l "
+                        f"WHERE as4local = 'A' AND tabname LIKE '{pattern}' "
+                        "ORDER BY tabname ASCENDING, position ASCENDING", 100000):
+            columns.setdefault(c["TABNAME"], []).append(c)
     for table in TABLES:
-        # one statement per table: the data preview rejects longer statements
-        columns = sapcli("SELECT position, fieldname, keyflag, datatype, leng, decimals FROM dd03l "
-                         f"WHERE as4local = 'A' AND tabname = '{table}' ORDER BY position ASCENDING", 1000)
         fields = [dict(name=c["FIELDNAME"], key=c["KEYFLAG"] == "X", type=c["DATATYPE"], length=int(c["LENG"]),
-                       decimals=int(c["DECIMALS"])) for c in columns
+                       decimals=int(c["DECIMALS"])) for c in columns.get(table, [])
                   if c["DATATYPE"] and not c["FIELDNAME"].startswith(".")]
         assert fields, table
+        # one statement per table: the data preview rejects longer statements
         rows = sapcli(f"SELECT * FROM {table}", 1000000)
         data = dict(table=table, fields=fields, rows=[[r[f["name"]] for f in fields] for r in rows])
         file = EXPORT / (table.replace("/", "_").strip("_") + ".json")
@@ -112,7 +124,9 @@ def export_views():
                             f"WHERE SCHEMA_NAME = CURRENT_SCHEMA AND VIEW_NAME = '{name}'")[0]
         definition = "".join(parts)
         assert len(definition) == int(length), name
-        views[name] = definition
+        tables = set(re.findall(r'(?:FROM|JOIN)\s+"([^"]+)"', definition))
+        if tables and tables <= set(TABLES):  # only views over the copied tables
+            views[name] = definition
     (EXPORT / "views.json").write_text(json.dumps(views, indent=1), encoding="utf-8")
     print(f"exported {len(views)} views: {', '.join(views)}")
 

@@ -1,0 +1,1008 @@
+<Schema name="ZXMLWIDE">
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000033" name="Dimension 00">
+		<DimensionAttribute name="Dimension 00" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD00">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000034" name="Dimension 01">
+		<DimensionAttribute name="Dimension 01" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD01">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000035" name="Dimension 02">
+		<DimensionAttribute name="Dimension 02" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD02">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000036" name="Dimension 03">
+		<DimensionAttribute name="Dimension 03" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD03">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000037" name="Dimension 04">
+		<DimensionAttribute name="Dimension 04" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD04">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000038" name="Dimension 05">
+		<DimensionAttribute name="Dimension 05" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD05">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000039" name="Dimension 06">
+		<DimensionAttribute name="Dimension 06" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD06">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000040" name="Dimension 07">
+		<DimensionAttribute name="Dimension 07" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD07">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000041" name="Dimension 08">
+		<DimensionAttribute name="Dimension 08" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD08">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000042" name="Dimension 09">
+		<DimensionAttribute name="Dimension 09" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD09">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000043" name="Dimension 10">
+		<DimensionAttribute name="Dimension 10" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD10">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000044" name="Dimension 11">
+		<DimensionAttribute name="Dimension 11" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD11">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000045" name="Dimension 12">
+		<DimensionAttribute name="Dimension 12" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD12">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000046" name="Dimension 13">
+		<DimensionAttribute name="Dimension 13" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD13">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000047" name="Dimension 14">
+		<DimensionAttribute name="Dimension 14" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD14">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000048" name="Dimension 15">
+		<DimensionAttribute name="Dimension 15" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD15">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000049" name="Dimension 16">
+		<DimensionAttribute name="Dimension 16" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD16">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000050" name="Dimension 17">
+		<DimensionAttribute name="Dimension 17" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD17">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000051" name="Dimension 18">
+		<DimensionAttribute name="Dimension 18" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD18">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000052" name="Dimension 19">
+		<DimensionAttribute name="Dimension 19" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD19">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000053" name="Dimension 20">
+		<DimensionAttribute name="Dimension 20" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD20">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000054" name="Dimension 21">
+		<DimensionAttribute name="Dimension 21" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD21">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000055" name="Dimension 22">
+		<DimensionAttribute name="Dimension 22" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD22">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000056" name="Dimension 23">
+		<DimensionAttribute name="Dimension 23" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD23">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000057" name="Dimension 24">
+		<DimensionAttribute name="Dimension 24" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD24">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000058" name="Dimension 25">
+		<DimensionAttribute name="Dimension 25" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD25">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000059" name="Dimension 26">
+		<DimensionAttribute name="Dimension 26" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD26">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000060" name="Dimension 27">
+		<DimensionAttribute name="Dimension 27" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD27">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000061" name="Dimension 28">
+		<DimensionAttribute name="Dimension 28" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD28">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000062" name="Dimension 29">
+		<DimensionAttribute name="Dimension 29" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD29">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000063" name="Dimension 30">
+		<DimensionAttribute name="Dimension 30" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD30">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000064" name="Dimension 31">
+		<DimensionAttribute name="Dimension 31" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD31">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000065" name="Dimension 32">
+		<DimensionAttribute name="Dimension 32" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD32">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000066" name="Dimension 33">
+		<DimensionAttribute name="Dimension 33" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD33">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000067" name="Dimension 34">
+		<DimensionAttribute name="Dimension 34" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD34">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000068" name="Dimension 35">
+		<DimensionAttribute name="Dimension 35" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD35">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000069" name="Dimension 36">
+		<DimensionAttribute name="Dimension 36" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD36">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000070" name="Dimension 37">
+		<DimensionAttribute name="Dimension 37" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD37">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000071" name="Dimension 38">
+		<DimensionAttribute name="Dimension 38" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD38">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000072" name="Dimension 39">
+		<DimensionAttribute name="Dimension 39" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD39">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000073" name="Dimension 40">
+		<DimensionAttribute name="Dimension 40" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD40">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000074" name="Dimension 41">
+		<DimensionAttribute name="Dimension 41" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD41">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000075" name="Dimension 42">
+		<DimensionAttribute name="Dimension 42" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD42">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000076" name="Dimension 43">
+		<DimensionAttribute name="Dimension 43" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD43">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000077" name="Dimension 44">
+		<DimensionAttribute name="Dimension 44" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD44">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000078" name="Dimension 45">
+		<DimensionAttribute name="Dimension 45" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD45">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000079" name="Dimension 46">
+		<DimensionAttribute name="Dimension 46" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD46">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000080" name="Dimension 47">
+		<DimensionAttribute name="Dimension 47" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD47">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000081" name="Dimension 48">
+		<DimensionAttribute name="Dimension 48" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD48">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000082" name="Dimension 49">
+		<DimensionAttribute name="Dimension 49" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD49">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000083" name="Dimension 50">
+		<DimensionAttribute name="Dimension 50" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD50">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000084" name="Dimension 51">
+		<DimensionAttribute name="Dimension 51" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD51">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000085" name="Dimension 52">
+		<DimensionAttribute name="Dimension 52" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD52">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000086" name="Dimension 53">
+		<DimensionAttribute name="Dimension 53" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD53">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000087" name="Dimension 54">
+		<DimensionAttribute name="Dimension 54" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD54">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000088" name="Dimension 55">
+		<DimensionAttribute name="Dimension 55" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD55">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000089" name="Dimension 56">
+		<DimensionAttribute name="Dimension 56" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD56">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000090" name="Dimension 57">
+		<DimensionAttribute name="Dimension 57" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD57">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000091" name="Dimension 58">
+		<DimensionAttribute name="Dimension 58" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD58">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000092" name="Dimension 59">
+		<DimensionAttribute name="Dimension 59" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD59">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000093" name="Dimension 60">
+		<DimensionAttribute name="Dimension 60" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD60">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000094" name="Dimension 61">
+		<DimensionAttribute name="Dimension 61" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD61">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000095" name="Dimension 62">
+		<DimensionAttribute name="Dimension 62" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD62">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000096" name="Dimension 63">
+		<DimensionAttribute name="Dimension 63" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD63">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000097" name="Dimension 64">
+		<DimensionAttribute name="Dimension 64" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD64">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000098" name="Dimension 65">
+		<DimensionAttribute name="Dimension 65" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD65">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000099" name="Dimension 66">
+		<DimensionAttribute name="Dimension 66" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD66">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000100" name="Dimension 67">
+		<DimensionAttribute name="Dimension 67" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD67">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000101" name="Dimension 68">
+		<DimensionAttribute name="Dimension 68" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD68">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000102" name="Dimension 69">
+		<DimensionAttribute name="Dimension 69" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD69">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000103" name="Dimension 70">
+		<DimensionAttribute name="Dimension 70" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD70">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000104" name="Dimension 71">
+		<DimensionAttribute name="Dimension 71" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD71">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000105" name="Dimension 72">
+		<DimensionAttribute name="Dimension 72" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD72">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000106" name="Dimension 73">
+		<DimensionAttribute name="Dimension 73" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD73">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000107" name="Dimension 74">
+		<DimensionAttribute name="Dimension 74" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD74">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000108" name="Dimension 75">
+		<DimensionAttribute name="Dimension 75" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD75">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000109" name="Dimension 76">
+		<DimensionAttribute name="Dimension 76" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD76">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000110" name="Dimension 77">
+		<DimensionAttribute name="Dimension 77" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD77">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000111" name="Dimension 78">
+		<DimensionAttribute name="Dimension 78" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD78">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000112" name="Dimension 79">
+		<DimensionAttribute name="Dimension 79" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD79">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000113" name="Dimension 80">
+		<DimensionAttribute name="Dimension 80" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD80">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000114" name="Dimension 81">
+		<DimensionAttribute name="Dimension 81" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD81">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000115" name="Dimension 82">
+		<DimensionAttribute name="Dimension 82" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD82">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000116" name="Dimension 83">
+		<DimensionAttribute name="Dimension 83" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD83">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000117" name="Dimension 84">
+		<DimensionAttribute name="Dimension 84" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD84">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000118" name="Dimension 85">
+		<DimensionAttribute name="Dimension 85" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD85">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000119" name="Dimension 86">
+		<DimensionAttribute name="Dimension 86" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD86">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000120" name="Dimension 87">
+		<DimensionAttribute name="Dimension 87" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD87">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000121" name="Dimension 88">
+		<DimensionAttribute name="Dimension 88" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD88">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000122" name="Dimension 89">
+		<DimensionAttribute name="Dimension 89" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD89">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000123" name="Dimension 90">
+		<DimensionAttribute name="Dimension 90" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD90">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000124" name="Dimension 91">
+		<DimensionAttribute name="Dimension 91" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD91">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000125" name="Dimension 92">
+		<DimensionAttribute name="Dimension 92" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD92">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000126" name="Dimension 93">
+		<DimensionAttribute name="Dimension 93" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD93">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000127" name="Dimension 94">
+		<DimensionAttribute name="Dimension 94" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD94">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000128" name="Dimension 95">
+		<DimensionAttribute name="Dimension 95" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD95">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000129" name="Dimension 96">
+		<DimensionAttribute name="Dimension 96" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD96">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000130" name="Dimension 97">
+		<DimensionAttribute name="Dimension 97" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD97">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000131" name="Dimension 98">
+		<DimensionAttribute name="Dimension 98" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD98">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Dimension visible="true" highCardinality="false" table="ZZXXMLA1V0000132" name="Dimension 99">
+		<DimensionAttribute name="Dimension 99" usage="Key" levelType="Regular">
+			<KeyColumn dataType="Integer" columnName="SID">
+			</KeyColumn>
+			<NameColumn dataType="Integer" columnName="ZXMLAD99">
+			</NameColumn>
+		</DimensionAttribute>
+	</Dimension>
+	<Cube name="ZXMLWIDE" caption="Wide demo (100 characteristics)" visible="true" defaultMeasure="Amount" cache="true" enabled="true">
+		<Table name="/BIC/FZXMLWIDE">
+		</Table>
+		<DimensionUsage source="Dimension 00" name="Dimension 00" visible="true" foreignKey="SID_ZXMLAD00" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 01" name="Dimension 01" visible="true" foreignKey="SID_ZXMLAD01" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 02" name="Dimension 02" visible="true" foreignKey="SID_ZXMLAD02" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 03" name="Dimension 03" visible="true" foreignKey="SID_ZXMLAD03" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 04" name="Dimension 04" visible="true" foreignKey="SID_ZXMLAD04" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 05" name="Dimension 05" visible="true" foreignKey="SID_ZXMLAD05" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 06" name="Dimension 06" visible="true" foreignKey="SID_ZXMLAD06" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 07" name="Dimension 07" visible="true" foreignKey="SID_ZXMLAD07" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 08" name="Dimension 08" visible="true" foreignKey="SID_ZXMLAD08" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 09" name="Dimension 09" visible="true" foreignKey="SID_ZXMLAD09" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 10" name="Dimension 10" visible="true" foreignKey="SID_ZXMLAD10" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 11" name="Dimension 11" visible="true" foreignKey="SID_ZXMLAD11" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 12" name="Dimension 12" visible="true" foreignKey="SID_ZXMLAD12" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 13" name="Dimension 13" visible="true" foreignKey="SID_ZXMLAD13" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 14" name="Dimension 14" visible="true" foreignKey="SID_ZXMLAD14" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 15" name="Dimension 15" visible="true" foreignKey="SID_ZXMLAD15" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 16" name="Dimension 16" visible="true" foreignKey="SID_ZXMLAD16" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 17" name="Dimension 17" visible="true" foreignKey="SID_ZXMLAD17" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 18" name="Dimension 18" visible="true" foreignKey="SID_ZXMLAD18" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 19" name="Dimension 19" visible="true" foreignKey="SID_ZXMLAD19" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 20" name="Dimension 20" visible="true" foreignKey="SID_ZXMLAD20" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 21" name="Dimension 21" visible="true" foreignKey="SID_ZXMLAD21" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 22" name="Dimension 22" visible="true" foreignKey="SID_ZXMLAD22" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 23" name="Dimension 23" visible="true" foreignKey="SID_ZXMLAD23" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 24" name="Dimension 24" visible="true" foreignKey="SID_ZXMLAD24" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 25" name="Dimension 25" visible="true" foreignKey="SID_ZXMLAD25" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 26" name="Dimension 26" visible="true" foreignKey="SID_ZXMLAD26" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 27" name="Dimension 27" visible="true" foreignKey="SID_ZXMLAD27" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 28" name="Dimension 28" visible="true" foreignKey="SID_ZXMLAD28" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 29" name="Dimension 29" visible="true" foreignKey="SID_ZXMLAD29" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 30" name="Dimension 30" visible="true" foreignKey="SID_ZXMLAD30" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 31" name="Dimension 31" visible="true" foreignKey="SID_ZXMLAD31" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 32" name="Dimension 32" visible="true" foreignKey="SID_ZXMLAD32" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 33" name="Dimension 33" visible="true" foreignKey="SID_ZXMLAD33" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 34" name="Dimension 34" visible="true" foreignKey="SID_ZXMLAD34" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 35" name="Dimension 35" visible="true" foreignKey="SID_ZXMLAD35" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 36" name="Dimension 36" visible="true" foreignKey="SID_ZXMLAD36" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 37" name="Dimension 37" visible="true" foreignKey="SID_ZXMLAD37" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 38" name="Dimension 38" visible="true" foreignKey="SID_ZXMLAD38" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 39" name="Dimension 39" visible="true" foreignKey="SID_ZXMLAD39" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 40" name="Dimension 40" visible="true" foreignKey="SID_ZXMLAD40" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 41" name="Dimension 41" visible="true" foreignKey="SID_ZXMLAD41" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 42" name="Dimension 42" visible="true" foreignKey="SID_ZXMLAD42" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 43" name="Dimension 43" visible="true" foreignKey="SID_ZXMLAD43" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 44" name="Dimension 44" visible="true" foreignKey="SID_ZXMLAD44" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 45" name="Dimension 45" visible="true" foreignKey="SID_ZXMLAD45" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 46" name="Dimension 46" visible="true" foreignKey="SID_ZXMLAD46" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 47" name="Dimension 47" visible="true" foreignKey="SID_ZXMLAD47" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 48" name="Dimension 48" visible="true" foreignKey="SID_ZXMLAD48" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 49" name="Dimension 49" visible="true" foreignKey="SID_ZXMLAD49" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 50" name="Dimension 50" visible="true" foreignKey="SID_ZXMLAD50" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 51" name="Dimension 51" visible="true" foreignKey="SID_ZXMLAD51" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 52" name="Dimension 52" visible="true" foreignKey="SID_ZXMLAD52" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 53" name="Dimension 53" visible="true" foreignKey="SID_ZXMLAD53" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 54" name="Dimension 54" visible="true" foreignKey="SID_ZXMLAD54" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 55" name="Dimension 55" visible="true" foreignKey="SID_ZXMLAD55" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 56" name="Dimension 56" visible="true" foreignKey="SID_ZXMLAD56" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 57" name="Dimension 57" visible="true" foreignKey="SID_ZXMLAD57" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 58" name="Dimension 58" visible="true" foreignKey="SID_ZXMLAD58" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 59" name="Dimension 59" visible="true" foreignKey="SID_ZXMLAD59" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 60" name="Dimension 60" visible="true" foreignKey="SID_ZXMLAD60" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 61" name="Dimension 61" visible="true" foreignKey="SID_ZXMLAD61" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 62" name="Dimension 62" visible="true" foreignKey="SID_ZXMLAD62" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 63" name="Dimension 63" visible="true" foreignKey="SID_ZXMLAD63" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 64" name="Dimension 64" visible="true" foreignKey="SID_ZXMLAD64" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 65" name="Dimension 65" visible="true" foreignKey="SID_ZXMLAD65" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 66" name="Dimension 66" visible="true" foreignKey="SID_ZXMLAD66" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 67" name="Dimension 67" visible="true" foreignKey="SID_ZXMLAD67" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 68" name="Dimension 68" visible="true" foreignKey="SID_ZXMLAD68" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 69" name="Dimension 69" visible="true" foreignKey="SID_ZXMLAD69" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 70" name="Dimension 70" visible="true" foreignKey="SID_ZXMLAD70" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 71" name="Dimension 71" visible="true" foreignKey="SID_ZXMLAD71" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 72" name="Dimension 72" visible="true" foreignKey="SID_ZXMLAD72" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 73" name="Dimension 73" visible="true" foreignKey="SID_ZXMLAD73" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 74" name="Dimension 74" visible="true" foreignKey="SID_ZXMLAD74" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 75" name="Dimension 75" visible="true" foreignKey="SID_ZXMLAD75" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 76" name="Dimension 76" visible="true" foreignKey="SID_ZXMLAD76" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 77" name="Dimension 77" visible="true" foreignKey="SID_ZXMLAD77" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 78" name="Dimension 78" visible="true" foreignKey="SID_ZXMLAD78" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 79" name="Dimension 79" visible="true" foreignKey="SID_ZXMLAD79" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 80" name="Dimension 80" visible="true" foreignKey="SID_ZXMLAD80" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 81" name="Dimension 81" visible="true" foreignKey="SID_ZXMLAD81" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 82" name="Dimension 82" visible="true" foreignKey="SID_ZXMLAD82" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 83" name="Dimension 83" visible="true" foreignKey="SID_ZXMLAD83" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 84" name="Dimension 84" visible="true" foreignKey="SID_ZXMLAD84" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 85" name="Dimension 85" visible="true" foreignKey="SID_ZXMLAD85" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 86" name="Dimension 86" visible="true" foreignKey="SID_ZXMLAD86" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 87" name="Dimension 87" visible="true" foreignKey="SID_ZXMLAD87" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 88" name="Dimension 88" visible="true" foreignKey="SID_ZXMLAD88" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 89" name="Dimension 89" visible="true" foreignKey="SID_ZXMLAD89" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 90" name="Dimension 90" visible="true" foreignKey="SID_ZXMLAD90" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 91" name="Dimension 91" visible="true" foreignKey="SID_ZXMLAD91" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 92" name="Dimension 92" visible="true" foreignKey="SID_ZXMLAD92" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 93" name="Dimension 93" visible="true" foreignKey="SID_ZXMLAD93" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 94" name="Dimension 94" visible="true" foreignKey="SID_ZXMLAD94" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 95" name="Dimension 95" visible="true" foreignKey="SID_ZXMLAD95" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 96" name="Dimension 96" visible="true" foreignKey="SID_ZXMLAD96" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 97" name="Dimension 97" visible="true" foreignKey="SID_ZXMLAD97" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 98" name="Dimension 98" visible="true" foreignKey="SID_ZXMLAD98" highCardinality="false">
+		</DimensionUsage>
+		<DimensionUsage source="Dimension 99" name="Dimension 99" visible="true" foreignKey="SID_ZXMLAD99" highCardinality="false">
+		</DimensionUsage>
+		<Measure name="Amount" column="/BIC/ZXMLAKF" aggregator="sum">
+		</Measure>
+	</Cube>
+</Schema>

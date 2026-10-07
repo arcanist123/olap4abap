@@ -434,6 +434,7 @@ function App() {
       </label>
       <span class="spacer"></span>
       <a href=${`./${location.search}`}>Schema Builder</a>
+      <a href=${`time.html${location.search}`}>Time Master Data</a>
     </div>
     ${error && html`<div class="banner" role="alert">${error}</div>`}
     <div class="editor console">
