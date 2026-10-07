@@ -18,6 +18,7 @@ CLASS ltc_bw_provider DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION 
     METHODS providers FOR TESTING.
     METHODS adso FOR TESTING RAISING cx_static_check.
     METHODS cube FOR TESTING RAISING cx_static_check.
+    METHODS demo_cube FOR TESTING RAISING cx_static_check.
     METHODS unknown_provider FOR TESTING.
 ENDCLASS.
 
@@ -53,8 +54,10 @@ CLASS ltc_bw_provider IMPLEMENTATION.
                                                                                         datatype = `NUMC`
                                                                                         length   = 10 ) ).
     cl_abap_unit_assert=>assert_equals( act = store-has_sids exp = abap_true ).
+    cl_abap_unit_assert=>assert_equals( act = store-basic exp = `ZFMSTORE` ).
     cl_abap_unit_assert=>assert_equals( act = store-view exp = `ZZXXMLA1V0000003` ).
     cl_abap_unit_assert=>assert_equals( act = store-key_column-name exp = `ZFMSTORE` ).
+    cl_abap_unit_assert=>assert_initial( store-text_column ).
     cl_abap_unit_assert=>assert_equals( act = lines( store-attributes ) exp = 12 ).
     cl_abap_unit_assert=>assert_equals( act = store-attributes[ 1 ]
                                         exp = VALUE zzxxmla1_cl_bw_provider=>ty_attribute(
@@ -86,6 +89,27 @@ CLASS ltc_bw_provider IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = lines( date-attributes ) exp = 9 ).
     cl_abap_unit_assert=>assert_equals( act = lines( provider-key_figures ) exp = 3 ).
     cl_abap_unit_assert=>assert_initial( provider-notes ).
+  ENDMETHOD.
+
+  METHOD demo_cube.
+    " docs/bw-schema-design-guide.md, section 5: the cube switches on Country of the company code, none of the
+    " ship-to party (a reference of the customer, whose Country and Industry are navigation attributes in BW)
+    DATA(provider) = cut->read( '0D_NW_C01' ).
+    DATA(code) = provider-characteristics[ iobjnm = `0D_NW_CODE` ].
+    cl_abap_unit_assert=>assert_equals( act = code-text_column exp = `TXTMD` ).
+    cl_abap_unit_assert=>assert_equals(
+      act = VALUE string_table( FOR a IN code-attributes ( |{ a-iobjnm } { a-column-name } { a-text_column } { a-navigation }| ) )
+      exp = VALUE string_table( ( `0D_NW_CNTRY D_NW_CNTRY D_NW_CNTRY_TXT X` ) ) ).
+    DATA(ship) = provider-characteristics[ iobjnm = `0D_NW_SHIP` ].
+    cl_abap_unit_assert=>assert_equals( act = ship-basic exp = `0D_NW_CUST` ).
+    cl_abap_unit_assert=>assert_equals( act = ship-key_column-name exp = `D_NW_CUST` ).
+    cl_abap_unit_assert=>assert_equals( act = VALUE string_table( FOR a IN ship-attributes ( |{ a-iobjnm } { a-navigation }| ) )
+                                        exp = VALUE string_table( ( `0D_NW_CNTRY ` ) ( `0D_NW_IND ` ) ) ).
+    " the time-dependent product group is an attribute like the others, read at the key date
+    DATA(product) = provider-characteristics[ iobjnm = `0D_NW_PROD` ].
+    cl_abap_unit_assert=>assert_equals( act = VALUE string_table( FOR a IN product-attributes ( |{ a-iobjnm } { a-navigation }| ) )
+                                        exp = VALUE string_table( ( `0D_NW_PRDCT X` ) ( `0D_NW_PRDGP X` ) ) ).
+    cl_abap_unit_assert=>assert_false( xsdbool( line_exists( provider-notes[ iobjnm = `0D_NW_PRDGP` ] ) ) ).
   ENDMETHOD.
 
   METHOD unknown_provider.

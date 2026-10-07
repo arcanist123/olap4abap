@@ -178,8 +178,10 @@ only declared properties: the member key is not offered, which is why the text a
 
 ## 4. Views
 
-The generated views (`ZZXXMLA1_CL_BW_VIEW_GEN`) hold the SID, the key and the time-independent attributes. For texts
-and time-dependent attributes write the view by hand (or extend the generator); the demo views are in
+The generated views (`ZZXXMLA1_CL_BW_VIEW_GEN`, one per basic characteristic) follow these rules: SID, the key with
+its compounding, the characteristic's text (`TXTMD`, else `TXTLG`, else `TXTSH`), then each attribute, time-independent
+and time-dependent, followed by its text (`<attribute>_TXT`). A text table that is client-dependent, or whose key has
+a field the view lacks, is left out with a note. The hand-written demo views are in
 [examples/bw-schema/](examples/bw-schema/). Rules, each learnt on the system:
 
 1. **One row per SID.** The facts are joined to the view on `SID`; a second row for a SID counts its facts twice.
@@ -309,10 +311,16 @@ Checklist:
 
 Current limits of olap4abap:
 
-- **The schema generator does not follow this guide yet:** its proposal names dimensions, attributes and measures by
-  InfoObject texts, names members by the key only on the key attribute, treats navigation and display attributes alike,
-  and its views have no texts or time-dependent attributes. Until it does, write the schema and views by hand from the
-  examples.
+- **The schema generator follows this guide** (since 2026-10-08; `schema-generator.md`, The proposal), with these
+  differences:
+  - NUMC keys and attributes are delivered by the views as numbers (as for FoodMart, whose reference numbers depend on
+    it), so a NUMC member is named without its leading zeros (`1000`, not `0000001000`); CHAR keys are internal.
+  - Captions are the InfoObject texts in the logon language of the request; member texts are EN.
+  - An aDSO switches on the navigation attributes of a characteristic together (`navigational_attr_on`), so all of
+    them become hierarchies; an InfoCube switches each on (`RSDDIMEIOBJ`).
+  - Captions are built, not BW's: `All <text>` for the All member, `<text> (Text)` for a text property, the
+    attribute's text for a navigation attribute's hierarchy ("Country", not "Country of Company").
+  - Compounded characteristics are named by their own key only (section 5); their texts are joined on all key fields.
 - **Aggregation:** fact queries sum every measure; only `sum` (and the built-in `Fact Count`) are correct. A measure
   with `aggregator="min"` or `"max"` is read as a sum by `ZZXXMLA1_CL_MDX_FACTS` today. Exception aggregation and
   non-cumulative key figures are not supported.

@@ -71,30 +71,33 @@ def main():
         page.wait_for_selector(".status.busy", timeout=5000)
         check("renamed cube loads", "Loads" in status(page))
 
-        # a user hierarchy with a member property
-        page.click(".tree .item:has-text('Store')")
+        # the proposal's flat hierarchy of the store (docs/bw-schema-design-guide.md), and a user hierarchy with a
+        # member property next to it
+        page.click(".tree .item:has-text('ZFMSTORE') >> nth=0")
+        check("the store is one flat hierarchy", page.locator(".hier").count() == 1)
         page.click("text=Add hierarchy")
-        for level in ["Country", "State Province", "City", "Store Name"]:
-            page.select_option("select[aria-label='Add a level']", level)
+        user = page.locator(".hier").nth(1)
+        for level in ["ZFMCNTRY", "ZFMSTATE", "ZFMCITY", "ZFMSNAME"]:
+            user.locator("select[aria-label='Add a level']").select_option(level)
         page.wait_for_selector(".status.busy", timeout=5000)
         check("hierarchy Country > State > City > Store loads", "Loads" in status(page))
-        page.click("button.link:has-text('0 ▸') >> nth=3")
-        page.select_option("select[aria-label='Add a property']", "Store Type")
+        user.locator("button.link").nth(3).click()
+        user.locator("select[aria-label='Add a property']").select_option("ZFMSTYPE")
         page.wait_for_selector(".status.busy", timeout=5000)
         check("member property loads", "Loads" in status(page))
         shot(page, "2-hierarchy")
 
-        # an unnamed hierarchy clashes with the key attribute named like the dimension
-        name = page.locator(".hier header input[type=text]").first
+        # a second unnamed hierarchy clashes with the proposal's
+        name = user.locator("header input[type=text]").first
         name.fill("")
         name.press("Enter")
         page.wait_for_selector(".status.busy", timeout=5000)
         status(page)
-        check("unnamed hierarchy is refused", "name the Hierarchy" in page.inner_text(".banner"))
-        check("and warned about", page.locator(".hier .notice.warn").count() == 1)
+        check("unnamed hierarchy is refused", "defined twice" in page.inner_text(".banner"), page.inner_text(".banner"))
+        check("and warned about, on both", page.locator(".hier .notice.warn").count() == 2)
         page.click("text=Undo")
         page.wait_for_selector(".status.busy", timeout=5000)
-        check("undo restores the name", "Loads" in status(page) and name.input_value() == "Store Hierarchy",
+        check("undo restores the name", "Loads" in status(page) and name.input_value() == "ZFMSTORE Hierarchy",
               name.input_value())
 
         page.click(".tree .item:has-text('ZFMSALES_UI')")
@@ -105,17 +108,17 @@ def main():
         page.click(".dialog button:has-text('Cancel')")
         page.click("role=tab[name='XML']")
         xml = page.input_value("textarea.xml")
-        check("XML has the hierarchy", '<Hierarchy name="Store Hierarchy" hasAll="true">' in xml
-              and '<Property name="Store Type" sourceAttribute="Store Type"/>' in xml)
-        check("only the key attribute is a hierarchy", re.search(
-            r'<DimensionAttribute name="Store Type"[^>]*attributeHierarchyEnabled="false"', xml) is not None)
+        check("XML has the hierarchy", '<Hierarchy name="ZFMSTORE Hierarchy" hasAll="true">' in xml
+              and '<Property name="ZFMSTYPE" sourceAttribute="ZFMSTYPE"/>' in xml)
+        check("no attribute is a hierarchy", re.search(
+            r'<DimensionAttribute name="ZFMSTYPE"[^>]*attributeHierarchyEnabled="false"', xml) is not None)
 
         # the aDSO: a time characteristic marked as time gets its suggested level type
         page = browser.new_page(viewport={"width": 1400, "height": 900}, color_scheme="dark")
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(f"{args.url}/?sap-client={args.client}#proposal/ZFMSALESA")
         status(page)
-        page.click(".tree .item:has-text('Calendar Year/Month')")
+        page.click(".tree .item:has-text('0CALMONTH')")
         page.click("text=Time dimension")
         page.wait_for_selector(".status.busy", timeout=5000)
         check("time dimension loads", "Loads" in status(page))

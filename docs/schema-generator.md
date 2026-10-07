@@ -32,31 +32,44 @@ Which providers: an InfoCube is HANA-optimised when `RSDCUBE` has type `B` and s
 `0D_NW_C01` are), and its fact table must have a `SID_<characteristic>` column per characteristic (the reader refuses
 the cube otherwise); a cube-type aDSO has `RSOADSO-ACTIVATE_DATA` and `CUBEDELTAONLY` set. An aDSO's text is the
 `RSOADSOT` row of type `EUSR` without column. The package dimension (`DPA`) is left out silently; units and
-currencies (`UNI`), fields without InfoObject and time-dependent attributes are notes.
+currencies (`UNI`), fields without InfoObject and texts a view cannot join (`bw-schema-design-guide.md`, section 4)
+are notes. Navigation attributes the provider switches on: an InfoCube lists each in `RSDDIMEIOBJ` as
+`<characteristic>__<attribute>` (without InfoObject); an aDSO has one flag per characteristic
+(`CL_RSO_ADSO_API` object `navigational_attr_on`), which switches on all navigation attributes (`RSDBCHATR-ATTRITP`
+`NAV`) of its characteristic.
 
 The dimension views come from `ZZXXMLA1_CL_BW_VIEW_GEN` for both kinds: they carry both `SID` and the key, so only the
-join column of the schema differs.
+join column of the schema differs. A reference characteristic uses the view of its basic characteristic.
 
 ## The proposal
 
-The proposal is a flat schema in the reference's format (Mondrian 3 schema XML with eMondrian's `DimensionAttribute`s),
-like `reference/schema/FoodmartBW.xml` without its hand-written parts:
+The proposal models the provider as BW models it (decided on 2026-10-08, `bw-schema-design-guide.md`; it replaces the
+proposal of 2026-10-06, which named everything by InfoObject texts and made only the key attribute a hierarchy). It is
+a schema in the reference's format (Mondrian 3 schema XML with eMondrian's `DimensionAttribute`s), like the demo
+catalogs `NWCOMPANY` and `NWPRODUCT` (`examples/bw-schema/`):
 
-- one `Dimension` per characteristic of the provider, on its generated view, the characteristic as the key attribute
-  and every time-independent attribute as a further `DimensionAttribute`. Only the key attribute is a hierarchy: the
-  others get `attributeHierarchyEnabled="false"` and serve as the levels and properties of the hierarchies the user
-  makes (decided on 2026-10-06, after the reference's `FoodMart.xml`: each dimension there has one hand-written
-  hierarchy, most columns are member properties, and only a few, Gender or Store Type, were made dimensions by hand;
-  an attribute hierarchy per attribute gave dozens of hierarchies per cube). BW's standard time characteristics
-  (`0CALWEEK`, ..., `0FISCVARNT`) keep their attributes' hierarchies. Names are the InfoObject texts; the key attribute is named
-  like its dimension; a repeated name gets the InfoObject in brackets (`Country (ZFMCNTRY2)`). On an InfoCube the key
-  attribute is keyed by the view's `SID` and named by the value (`NameColumn`, which `ZZXXMLA1_CL_SCHEMA` reads for
-  this), so members are named by the characteristic, not by BW's numbers; on an aDSO it is keyed by the value. A view
-  not generated yet is named by a placeholder (`ZZXXMLA1_C_<characteristic>`, no DDIC name), which acceptance replaces;
-- no user hierarchies: BW's metadata does not say which attributes nest in which order (FoodMart's Store and Product
-  hierarchies were written by hand). The UI builds them from the attributes;
-- key figures with aggregation SUM, MIN or MAX become measures with that aggregator. Exception aggregation and
-  non-cumulative key figures are listed as not proposed rather than mapped wrongly. The first measure is the default.
+- one `Dimension` per characteristic of the provider, named by the InfoObject (`0D_NW_CODE`) and captioned by its
+  text, on the view of its basic characteristic (a reference characteristic such as `0D_NW_SHIP` is a dimension of its
+  own on the view of `0D_NW_CUST`). A view not generated yet, or one generated before it had every column the
+  generator gives it now, is named by a placeholder (`ZZXXMLA1_C_<basic characteristic>`, no DDIC name), which
+  acceptance replaces (and so generates the view again, under its number);
+- its `DimensionAttribute`s describe the view's columns, none is an attribute hierarchy
+  (`attributeHierarchyEnabled="false"`): the key attribute `<char> SID` on an InfoCube (keyed by the view's `SID`,
+  named by the key with `NameColumn`) or `<char> Key` on an aDSO (keyed by the value); the text `<char> Text`; each
+  attribute (named by its InfoObject, or `<char>__<attribute>` for a navigation attribute the provider switches on)
+  followed by its text `... Text`. The key attribute is never named like its dimension, so it cannot clash with the
+  unnamed hierarchy;
+- the dimension's first `Hierarchy` is unnamed, so it is the default and `[0D_NW_CODE]` is its unique name: All
+  (`All <text>`) and one level named by the characteristic, uniqueMembers, with the text as property `Text` and every
+  display attribute (and navigation attribute the provider does not switch on) as properties, key and text;
+- each navigation attribute the provider switches on is a flat `Hierarchy` `<char>__<attribute>` of the dimension
+  (`[0D_NW_CODE.0D_NW_CODE__0D_NW_CNTRY]`), its level named by the attribute, its text as property `Text`;
+- no user hierarchies and no nesting: BW's metadata does not say which attributes nest in which order, and BW does not
+  nest them. The UI builds user hierarchies from the attributes, after the flat ones;
+- key figures with aggregation SUM, MIN or MAX become measures with that aggregator, named by the key figure,
+  captioned by its text, with a format string by the decimals of the fact column (`#,##0`, `#,##0.00`, at most 3
+  decimals). Exception aggregation and non-cumulative key figures are listed as not proposed rather than mapped
+  wrongly. The first measure is the default.
 
 ### Time
 
@@ -95,14 +108,19 @@ BW has; no dimension is built on the fact table's own columns, and the proposal 
   hand-built metadata, and two load the real `ZFMSALES` and `ZFMSALESA` proposals through `ZZXXMLA1_CL_SCHEMA`. Run the class (F9,
   or `sapcli class execute`) to print the proposals of the FoodMart providers.
 
-- `ZZXXMLA1_CL_BW_VIEW_GEN`: the view joins the SID table with the attribute table as a left outer join, the key
-  taken from the SID table, so every value with a SID is a member, with or without attributes. An inner join lost
-  the time characteristics' values: their SID tables hold the values in use, their attribute tables only the initial
-  row.
+- `ZZXXMLA1_CL_BW_VIEW_GEN`: the view starts from the SID table and left-outer-joins everything else, the key and its
+  compounding taken from the SID table, so every value with a SID is a member, with or without attributes (an inner
+  join lost the time characteristics' values: their SID tables hold the values in use, their attribute tables only
+  the initial row). It joins the time-independent attributes (`OBJVERS 'A'`), the time-dependent ones (`/BI0/Q...`,
+  also `DATETO '99991231'`), each on all key fields, and the texts of the characteristic and of every attribute with
+  texts (`LANGU 'E'`, `DATETO '99991231'`, `coalesce( text, key )`), as `bw-schema-design-guide.md`, section 4, says.
+  `metadata` reads BW, `build_layout` makes the joins and columns from it without reading anything (the unit tests
+  give it hand-built metadata), `ddl_source` writes the DDL. Checked on `0D_NW_C01` (2026-10-08): the proposal,
+  accepted, answers the guide's queries of section 5 with its numbers.
 
 Also: `ZZXXMLA1_CL_SCHEMA` gives an attribute hierarchy the attribute's name as `hier_name`, so an attribute named like
-its dimension and an unnamed `Hierarchy` of that dimension share it; the UI must not create that (or the reader must
-tell them apart). Compounded characteristics are not handled (the key alone is not unique).
+its dimension and an unnamed `Hierarchy` of that dimension share it; the UI warns about it (and about a second unnamed
+hierarchy). Compounded characteristics are named by their own key only (the key alone is not unique).
 
 ## The API (step 4)
 
@@ -153,8 +171,8 @@ reject later:
    table, a cube name another catalog has, an unnamed `Hierarchy` in a dimension with an attribute of the dimension's
    name, ...).
 
-The last one is a trap of the proposal: it names the key attribute like its dimension, so a user hierarchy added
-without a name clashes with it. eMondrian gives both the same unique name (`HierarchyBase`: an unnamed hierarchy and
+The last one was a trap of the earlier proposal, which named the key attribute like its dimension; now a user
+hierarchy added without a name clashes with the proposal's unnamed one (refused as a hierarchy defined twice). eMondrian gives both the same unique name (`HierarchyBase`: an unnamed hierarchy and
 one named like its dimension are both `[Dimension]`) and loads an ambiguous cube; the reader refuses it instead, with
 a message naming both and asking for a hierarchy name. Renaming one of them would invent names eMondrian does not
 have.

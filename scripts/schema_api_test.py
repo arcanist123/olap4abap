@@ -48,28 +48,36 @@ def main():
     outline = body.get("outline", {})
     cube = (outline.get("cubes") or [{}])[0]
     check("proposal of an InfoCube", status == 200 and body["xml"].startswith("<Schema name=\"ZFMSALES\"")
-          and [m["name"] for m in cube.get("measures", [])] == ["Unit Sales", "Store Cost", "Store Sales"]
+          and [m["name"] for m in cube.get("measures", [])] == ["ZFMUNITS", "ZFMSCOST", "ZFMSSALES"]
           and len(outline.get("dimensions", [])) == len(cube.get("dimensions", [])), body)
 
     status, body, _ = call(args.url, args.client, "GET", "proposal", {"provider": "ZFMSALESA"})
     adso_xml = body.get("xml", "")
     outline = body.get("outline", {})
     usages = outline.get("cubes", [{}])[0].get("dimensions", [])
-    month = [d for d in outline.get("dimensions", []) if d["name"] == "Calendar Year/Month"]
+    month = [d for d in outline.get("dimensions", []) if d["name"] == "0CALMONTH"]
     check("proposal of an aDSO: time characteristics are dimensions on their views",
           status == 200 and all("source" in u for u in usages)
           and all(d["type"] != "TimeDimension" for d in outline.get("dimensions", []))
           and len(month) == 1 and month[0]["table"] and body.get("notes") == [
               {"iobjnm": "0CALDAY", "reason": "no SID table, so no view"}], body)
 
-    # 0D_NW_SOLD, 0D_NW_SHIP and 0D_NW_PAYER of the SAP demo cube reference 0D_NW_CUST: no tables of their own
+    # 0D_NW_SOLD, 0D_NW_SHIP and 0D_NW_PAYER of the SAP demo cube reference 0D_NW_CUST: no tables of their own, each a
+    # dimension on the customer's view (or its placeholder)
     status, body, _ = call(args.url, args.client, "GET", "proposal", {"provider": "0D_NW_C01"})
     references = ["0D_NW_SHIP", "0D_NW_SOLD", "0D_NW_PAYER"]
     xml = body.get("xml", "")
-    check("proposal with reference characteristics: dimensions on the referenced characteristic's tables",
-          status == 200 and all(f'table="ZZXXMLA1_C_{r}"' in xml for r in references)
+    dims = {d["name"]: d for d in body.get("outline", {}).get("dimensions", [])}
+    tables = {dims.get(r, {}).get("table") for r in references}
+    check("proposal with reference characteristics: dimensions on the referenced characteristic's view",
+          status == 200 and len(tables) == 1 and None not in tables
           and xml.count('columnName="D_NW_CUST"') >= len(references)
           and not any(n["iobjnm"] in references for n in body.get("notes", [])), body)
+    # docs/bw-schema-design-guide.md: a navigation attribute the cube switches on is a hierarchy of its own
+    code = dims.get("0D_NW_CODE", {})
+    check("proposal with a navigation attribute: a flat hierarchy CHARACTERISTIC__ATTRIBUTE",
+          [h["name"] for h in code.get("hierarchies", [])] == ["", "0D_NW_CODE__0D_NW_CNTRY"]
+          and all(a["name"] != "0D_NW_CNTRY" for a in code.get("attributes", [])), code)
 
     status, body, _ = call(args.url, args.client, "GET", "proposal", {"provider": "NO_SUCH_PROVIDER"})
     check("proposal of an unknown provider", status == 404 and "error" in body, body)
@@ -121,8 +129,9 @@ def main():
              + f'<Hierarchy hasAll="true"><Level name="L" sourceAttribute="{first.group(1)}"/></Hierarchy>'
              + adso_xml[first.end() - len("</Dimension>"):])
     status, body, _ = call(args.url, args.client, "POST", "check", {"catalog": "ZFMSALESA"}, clash)
-    check("check refuses an unnamed hierarchy named like an attribute",
-          status == 400 and "by an unnamed Hierarchy and by the attribute" in body.get("error", ""), body)
+    check("check refuses an attribute hierarchy named like the unnamed Hierarchy",
+          status == 400 and any(text in body.get("error", "") for text in
+                                ["by an unnamed Hierarchy and by the attribute", "is defined twice"]), body)
 
     # the time master data: only read; time/fill is called with what it refuses before writing
     status, body, _ = call(args.url, args.client, "GET", "time", {"from": "1997-01-01", "to": "1997-12-31"})

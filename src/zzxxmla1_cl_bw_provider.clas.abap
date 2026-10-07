@@ -13,9 +13,13 @@
 "! HANA-optimised InfoCube (RSDCUBE type B, subtype F: flat) or a cube-type aDSO (RSOADSO: activate data, cube delta
 "! only). Every name is BW's, never built: the fact table (RSD_FACTTAB_GET_FOR_CUBE, CL_RSO_ADSO=>GET_TABLNM, the
 "! aDSO's reporting view), the fields (RSDIOBJ-FIELDNM; an InfoCube's characteristics are its SID columns,
-"! RSD_SIDNM_GET_FROM_IOBJNM) and the characteristics' tables and views (ZZXXMLA1_CL_BW_VIEW_GEN). Each column comes with its DDIC type,
-"! a characteristic with its time-independent attributes as columns of its view. What a schema cannot use is a note
-"! with the reason: units and currencies, fields without InfoObject, time-dependent attributes. Nothing is changed.
+"! RSD_SIDNM_GET_FROM_IOBJNM) and the characteristics' tables and views (ZZXXMLA1_CL_BW_VIEW_GEN, the view of the
+"! basic characteristic). Each column comes with its DDIC type, a characteristic with its text and its attributes (with
+"! their texts) as columns of its view, and for each attribute whether the provider switches it on as a navigation
+"! attribute (docs/bw-schema-design-guide.md, section 3.2): an InfoCube lists it as CHARACTERISTIC__ATTRIBUTE in
+"! RSDDIMEIOBJ, an aDSO switches on the navigation attributes of a characteristic together (navigational_attr_on).
+"! What a schema cannot use is a note with the reason: units and currencies, fields without InfoObject, texts a view
+"! cannot join. Nothing is changed.
 CLASS zzxxmla1_cl_bw_provider DEFINITION
   PUBLIC
   FINAL
@@ -49,14 +53,18 @@ CLASS zzxxmla1_cl_bw_provider DEFINITION
         name     TYPE string,
         datatype TYPE string,
         length   TYPE i,
+        decimals TYPE i,
       END OF ty_column.
     TYPES:
-      "! a time-independent attribute of a characteristic; its column is the one of the attribute table, which the
-      "! characteristic's view delivers without namespace (and a NUMC column as a number)
+      "! an attribute of a characteristic, time-independent or time-dependent (at the key date); its column is the one
+      "! of the attribute table, which the characteristic's view delivers without namespace (and a NUMC column as a
+      "! number), its text column the view's column of its text, initial if it has none
       BEGIN OF ty_attribute,
-        iobjnm TYPE string,
-        text   TYPE string,
-        column TYPE ty_column,
+        iobjnm      TYPE string,
+        text        TYPE string,
+        column      TYPE ty_column,
+        text_column TYPE string,
+        navigation  TYPE abap_bool,  " a navigation attribute the provider switches on
       END OF ty_attribute,
       ty_t_attribute TYPE STANDARD TABLE OF ty_attribute WITH EMPTY KEY.
     TYPES:
@@ -64,10 +72,13 @@ CLASS zzxxmla1_cl_bw_provider DEFINITION
         iobjnm      TYPE string,
         text        TYPE string,
         iobjtp      TYPE string,     " CHA, or TIM for BW's time characteristics
+        basic       TYPE string,     " whose tables and view it has: itself, or the one it references
         fact_column TYPE ty_column,  " InfoCube: the SID column; aDSO: the value
         has_sids    TYPE abap_bool,  " it has a SID table, so ZZXXMLA1_CL_BW_VIEW_GEN can generate its view
-        view        TYPE string,     " the database view of its DDL source, initial if not generated yet
-        key_column  TYPE ty_column,  " the characteristic's value as a column of the attribute (or SID) table
+        view        TYPE string,     " the database view of the basic characteristic's DDL source, initial if it is
+                                     " not generated yet or lacks a column it is generated with now
+        key_column  TYPE ty_column,  " the characteristic's value as a column of the view
+        text_column TYPE string,     " the column of its text, initial if it has none
         attributes  TYPE ty_t_attribute,
       END OF ty_characteristic,
       ty_t_characteristic TYPE STANDARD TABLE OF ty_characteristic WITH EMPTY KEY.
@@ -109,6 +120,8 @@ CLASS zzxxmla1_cl_bw_provider DEFINITION
     DATA views TYPE REF TO zzxxmla1_cl_bw_view_gen.
     "! the notes of the attributes, collected while the characteristics are read
     DATA notes TYPE ty_t_note.
+    "! an InfoCube's navigation attributes, CHARACTERISTIC__ATTRIBUTE
+    DATA cube_navigation TYPE STANDARD TABLE OF rsiobjnm WITH EMPTY KEY.
 
     METHODS read_cube
       IMPORTING cube     TYPE rsinfocube
@@ -118,12 +131,13 @@ CLASS zzxxmla1_cl_bw_provider DEFINITION
       IMPORTING adso     TYPE rsoadsonm
       CHANGING  provider TYPE ty_provider
       RAISING   zzxxmla1_cx_bw_provider.
-    "! A characteristic with its view and attributes.
+    "! A characteristic with its view and attributes; adso_navigation: an aDSO switches on its navigation attributes.
     METHODS characteristic
-      IMPORTING iobjnm        TYPE rsiobjnm
-                iobjtp        TYPE rsiobjtp
-                fact_column   TYPE ty_column
-      RETURNING VALUE(result) TYPE ty_characteristic.
+      IMPORTING iobjnm          TYPE rsiobjnm
+                iobjtp          TYPE rsiobjtp
+                fact_column     TYPE ty_column
+                adso_navigation TYPE abap_bool OPTIONAL
+      RETURNING VALUE(result)   TYPE ty_characteristic.
     "! A key figure with its aggregation; aggregation is the aDSO's, initial for the InfoObject's.
     METHODS key_figure
       IMPORTING iobjnm        TYPE rsiobjnm
@@ -170,7 +184,7 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
 
   METHOD read.
     views = NEW #( ).
-    CLEAR notes.
+    CLEAR: notes, cube_navigation.
     DATA(upper) = to_upper( name ).
     DATA cube TYPE rsinfocube.
     DATA adso TYPE rsoadsonm.
@@ -211,6 +225,11 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
     ENDIF.
     provider-fact_table = fact_table.
     DATA(columns) = columns_of( fact_table ).
+
+    " the navigation attributes the cube switches on, which have no InfoObject of their own
+    SELECT iobjnm FROM rsddimeiobj
+      WHERE infocube = @cube AND objvers = 'A' AND iobjnm LIKE '%#_#_%' ESCAPE '#'
+      INTO TABLE @cube_navigation.
 
     " the characteristics: a HANA-optimised InfoCube has one SID column per characteristic, no dimension tables
     SELECT d~iobjnm, o~iobjtp FROM rsddimeiobj AS d
@@ -311,9 +330,10 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
       ENDIF.
       CASE infoobject-iobjtp.
         WHEN 'CHA' OR 'TIM'.
-          APPEND characteristic( iobjnm      = object-iobjnm
-                                 iobjtp      = infoobject-iobjtp
-                                 fact_column = column ) TO provider-characteristics.
+          APPEND characteristic( iobjnm          = object-iobjnm
+                                 iobjtp          = infoobject-iobjtp
+                                 fact_column     = column
+                                 adso_navigation = object-navigational_attr_on ) TO provider-characteristics.
         WHEN 'KYF'.
           APPEND key_figure( iobjnm      = object-iobjnm
                              fact_column = column
@@ -326,48 +346,43 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
 
   METHOD characteristic.
     result = VALUE #( iobjnm = iobjnm text = text_of( iobjnm ) iobjtp = iobjtp fact_column = fact_column ).
-    DATA(tables) = views->tables( iobjnm ).
-    result-has_sids = xsdbool( tables-sids IS NOT INITIAL AND tables-key_field IS NOT INITIAL ).
+    DATA(layout) = views->layout( iobjnm ).
+    result-basic = layout-tables-basic.
+    READ TABLE layout-columns INTO DATA(key) WITH KEY iobjnm = result-basic text = abap_false.
+    result-has_sids = xsdbool( sy-subrc = 0 ).
     IF result-has_sids = abap_false.
       RETURN.
     ENDIF.
-    DATA(columns) = views->columns( tables ).
-    READ TABLE columns INTO DATA(key) WITH KEY field = tables-key_field.
-    IF sy-subrc <> 0.
-      result-has_sids = abap_false.
-      RETURN.
-    ENDIF.
-    result-view = views->existing_view( iobjnm ).
-    result-key_column = VALUE #( name     = zzxxmla1_cl_bw_view_gen=>view_column( key-field )
-                                 datatype = key-datatype
-                                 length   = key-length ).
-    IF tables-attributes IS INITIAL.
-      RETURN.
-    ENDIF.
+    LOOP AT layout-notes INTO DATA(note).
+      APPEND VALUE #( iobjnm = note-iobjnm reason = |{ note-reason } (of { iobjnm })| ) TO notes.
+    ENDLOOP.
+    result-key_column = VALUE #( name = key-name datatype = key-datatype length = key-length ).
+    result-text_column = VALUE #( layout-columns[ iobjnm = result-basic text = abap_true ]-name OPTIONAL ).
 
     " the attributes of its basic characteristic, in BW's order
-    SELECT a~attrinm, a~atrtimfl, o~fieldnm FROM rsdbchatr AS a
-      INNER JOIN rsdiobj AS o ON o~iobjnm = a~attrinm AND o~objvers = 'A'
-      WHERE a~chabasnm = @tables-basic AND a~objvers = 'A'
-      ORDER BY a~posit ASCENDING
-      INTO TABLE @DATA(attributes).
-    LOOP AT attributes INTO DATA(attribute).
-      IF attribute-atrtimfl IS NOT INITIAL AND attribute-atrtimfl <> '0'.
-        APPEND VALUE #( iobjnm = attribute-attrinm reason = |time-dependent attribute of { iobjnm }| ) TO notes.
-        CONTINUE.
-      ENDIF.
-      READ TABLE columns INTO DATA(column) WITH KEY field = attribute-fieldnm.
-      IF sy-subrc <> 0.
-        APPEND VALUE #( iobjnm = attribute-attrinm reason = |attribute of { iobjnm } without column in { tables-attributes }| )
-          TO notes.
-        CONTINUE.
-      ENDIF.
-      APPEND VALUE #( iobjnm = attribute-attrinm
-                      text   = text_of( attribute-attrinm )
-                      column = VALUE #( name     = zzxxmla1_cl_bw_view_gen=>view_column( column-field )
-                                        datatype = column-datatype
-                                        length   = column-length ) ) TO result-attributes.
+    LOOP AT layout-columns INTO DATA(column) WHERE text = abap_false AND iobjnm IS NOT INITIAL
+                                                AND iobjnm <> result-basic.
+      DATA(navigation) = xsdbool( line_exists( cube_navigation[ table_line = |{ iobjnm }__{ column-iobjnm }| ] )
+                                  OR ( adso_navigation = abap_true AND column-navigation = abap_true ) ).
+      APPEND VALUE #( iobjnm      = column-iobjnm
+                      text        = text_of( CONV #( column-iobjnm ) )
+                      column      = VALUE #( name = column-name datatype = column-datatype length = column-length )
+                      text_column = VALUE #( layout-columns[ iobjnm = column-iobjnm text = abap_true ]-name OPTIONAL )
+                      navigation  = navigation ) TO result-attributes.
     ENDLOOP.
+
+    " the view as it is, if it has every column it is generated with now; else the schema names a placeholder, and
+    " accepting it generates the view again (it keeps its name)
+    result-view = views->existing_view( CONV #( result-basic ) ).
+    IF result-view IS NOT INITIAL.
+      DATA(view_columns) = columns_of( result-view ).
+      LOOP AT layout-columns INTO column.
+        IF NOT line_exists( view_columns[ name = column-name ] ).
+          CLEAR result-view.
+          EXIT.
+        ENDIF.
+      ENDLOOP.
+    ENDIF.
   ENDMETHOD.
 
   METHOD key_figure.
@@ -381,11 +396,12 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD columns_of.
-    SELECT fieldname, datatype, leng FROM dd03l
+    SELECT fieldname, datatype, leng, decimals FROM dd03l
       WHERE tabname = @table AND as4local = 'A' AND fieldname NOT LIKE '.%'
       INTO TABLE @DATA(fields).
     LOOP AT fields INTO DATA(field).
-      INSERT VALUE #( name = field-fieldname datatype = field-datatype length = field-leng ) INTO TABLE result.
+      INSERT VALUE #( name = field-fieldname datatype = field-datatype length = field-leng decimals = field-decimals )
+        INTO TABLE result.
     ENDLOOP.
   ENDMETHOD.
 

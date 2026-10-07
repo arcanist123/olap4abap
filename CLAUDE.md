@@ -87,9 +87,12 @@ Read before designing anything:
   `scripts/schema_api_test.py`). Each cube is served from its own catalog for the MVP (`docs/mvp-scope.md`, Catalog
   decision); an aDSO is proposed as an InfoCube is: every characteristic,
   the time ones too, a dimension on its CDS view (no dimensions on fact columns; `0CALDAY` has no SID table and is not
-  supported); a time dimension only if the user marks one. Only the key attribute is a hierarchy (as in FoodMart.xml,
-  one hierarchy per dimension); the other attributes have `attributeHierarchyEnabled="false"` except on BW's
-  standard time characteristics, and the user makes hierarchies in the UI. The UI (`web/schema/`, Preact with htm, no build step) is served from
+  supported); a time dimension only if the user marks one. The proposal follows `docs/bw-schema-design-guide.md`
+  (BW's model): technical names as identifiers, texts as captions; per characteristic a flat unnamed hierarchy
+  (members keyed by SID, named by the key, the EN text and the display attributes as member properties) and a flat
+  hierarchy `<char>__<attribute>` per navigation attribute the provider switches on; no attribute hierarchies, no
+  user hierarchies (the user makes them in the UI). The views (`ZZXXMLA1_CL_BW_VIEW_GEN`, one per basic
+  characteristic) carry the EN texts and the time-dependent attributes at 9999-12-31. The UI (`web/schema/`, Preact with htm, no build step) is served from
   the code below `/schema/` by `ZZXXMLA1_CL_WEB_APP`: the generated class `ZZXXMLA1_CL_WEB_APP_FILES` has a method per
   file returning its text (`scripts/generate-web-app-abap.py`, run after every change of `web/schema/`, then
   `sap-write.py` the class; nothing is uploaded or written by the setup); it

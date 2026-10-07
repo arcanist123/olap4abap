@@ -104,8 +104,9 @@ Decisions taken by the project owner on 2026-10-02, with reasons.
 
 - **BW external hierarchies** (`/BI0/H...` tables) and Mondrian **parent-child hierarchies** (these need a closure
   table).
-- **Time-dependent attributes** and key-date logic (see `mondrian-hierarchies-and-time-dependency.md` for how it could
-  be added later: a key-date view per characteristic).
+- **Key-date logic** (see `mondrian-hierarchies-and-time-dependency.md` for how it could be added later: a key-date
+  view per characteristic). Time-dependent attributes and texts are read as one snapshot, valid on 9999-12-31
+  (`bw-schema-design-guide.md`, decided 2026-10-08), as BW shows them with that key date.
 - **Authorisations** - BW analysis authorisations are not enforced; reading BW tables directly bypasses them. Decided
   out of scope, do not plan an authorisation layer.
 - Key figures with MIN/MAX, exception aggregation (AV0/AV1/LAS) or non-cumulative behaviour; mixed

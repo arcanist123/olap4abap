@@ -562,11 +562,11 @@ function DimensionPane({ doc, edit, dim, sel, select, suggestions }) {
 
     <section class="section">
       <header>
-        <h3>User hierarchies</h3><span class="spacer"></span>
+        <h3>Hierarchies</h3><span class="spacer"></span>
         <button onClick=${addHierarchy}>Add hierarchy</button>
       </header>
       <div class="body">
-        ${!hierarchies.length && html`<span class="muted">None. A user hierarchy nests attributes as levels, top level first.</span>`}
+        ${!hierarchies.length && html`<span class="muted">None. A hierarchy has attributes as levels, top level first; a user hierarchy nests several.</span>`}
         ${hierarchies.map((h, i) => html`<${HierarchyEditor} key=${i} doc=${doc} edit=${edit} dim=${dim} h=${h}
           others=${[...attrNames, ...hierarchies.filter((o) => o !== h).map((o) => attr(o, 'name'))]} />`)}
       </div>
@@ -584,7 +584,8 @@ function HierarchyEditor({ doc, edit, dim, h, others }) {
   const attrNames = attributes.map((a) => attr(a, 'name'));
   const hasAll = isTrue(h, 'hasAll', true);
   const name = attr(h, 'name');
-  const clash = (!name || name === attr(dim, 'name')) && attrNames.includes(attr(dim, 'name'));
+  // an unnamed hierarchy is [dimension], as is one named like the dimension and an attribute of the dimension's name
+  const clash = (!name || name === attr(dim, 'name')) && (others.includes('') || others.includes(attr(dim, 'name')));
   const levelNames = levels.map((l) => attr(l, 'name'));
 
   const addLevel = (source) => edit(() => {
@@ -613,8 +614,8 @@ function HierarchyEditor({ doc, edit, dim, h, others }) {
       <button class="danger" onClick=${() => confirm(`Remove hierarchy '${name || attr(dim, 'name')}'?`) && edit(() => h.remove())}>Remove</button>
     </header>
     <div class="body">
-      ${clash && html`<div class="notice warn">Name the hierarchy: the attribute '${attr(dim, 'name')}' has the dimension's name, so an
-        unnamed hierarchy (or one named like the dimension) would share its unique name.</div>`}
+      ${clash && html`<div class="notice warn">Name the hierarchy: the dimension has another unnamed hierarchy or one (or an attribute)
+        named '${attr(dim, 'name')}', and an unnamed hierarchy (or one named like the dimension) would share its unique name.</div>`}
       ${!hasAll && !attr(h, 'defaultMember') && html`<div class="notice warn">Without an All member the first member is the default; BW's
         empty member (SID 0) may come first, so give a default member.</div>`}
       ${levels.length > 0 && html`<div class="scroll-x"><table>
