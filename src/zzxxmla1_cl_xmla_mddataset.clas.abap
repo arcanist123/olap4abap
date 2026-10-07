@@ -105,10 +105,12 @@ CLASS zzxxmla1_cl_xmla_mddataset IMPLEMENTATION.
       axes_info = axes_info && `          <AxisInfo name="SlicerAxis"/>` && nl.
     ENDIF.
 
-    DATA(cells) = VALUE string( ).
+    " the pieces are joined once: appending a method's result to a string copies the string every time
+    DATA(cell_lines) = VALUE string_table( ).
     LOOP AT result-cells INTO DATA(cell).
-      cells = cells && cell_xml( cell = cell properties = result-cell_properties excel = excel ).
+      APPEND cell_xml( cell = cell properties = result-cell_properties excel = excel ) TO cell_lines.
     ENDLOOP.
+    DATA(cells) = concat_lines_of( cell_lines ).
     DATA(cell_info) = VALUE string( ).
     LOOP AT result-cell_properties INTO DATA(cell_property_name).
       cell_property( EXPORTING name = cell_property_name IMPORTING element = DATA(element) type = DATA(type) ).
@@ -337,12 +339,13 @@ CLASS zzxxmla1_cl_xmla_mddataset IMPLEMENTATION.
     IF tuples IS INITIAL.
       result = result && `          <Tuples/>` && nl.
     ELSE.
-      result = result && `          <Tuples>` && nl.
+      " the pieces are joined once: appending a method's result to a string copies the string every time
+      DATA(tuple_lines) = VALUE string_table( ).
       LOOP AT tuples INTO DATA(tuple).
-        result = result && tuple_xml( tuple = tuple properties = properties values = values
-                                      level_properties = level_properties ).
+        APPEND tuple_xml( tuple = tuple properties = properties values = values
+                          level_properties = level_properties ) TO tuple_lines.
       ENDLOOP.
-      result = result && `          </Tuples>` && nl.
+      result = result && `          <Tuples>` && nl && concat_lines_of( tuple_lines ) && `          </Tuples>` && nl.
     ENDIF.
     result = result && `        </Axis>` && nl.
   ENDMETHOD.

@@ -5838,6 +5838,13 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
   METHOD set_display_info.
     " The reference: the number of children (at most 0xffff), 0x10000 if the next tuple's member is a child of this one,
     " 0x20000 if the parent is the one of the previous tuple's member
+    TYPES:
+      BEGIN OF ty_child_count,
+        unique_name TYPE string,
+        count       TYPE i,
+      END OF ty_child_count.
+    " the children of an All member are counted once, not for every tuple it is in
+    DATA child_counts TYPE HASHED TABLE OF ty_child_count WITH UNIQUE KEY unique_name.
     DATA(count) = lines( tuples ).
     DO count TIMES.
       DATA(position) = sy-index.
@@ -5848,9 +5855,15 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         IF <member>-key_level = 0 AND <member>-is_null = abap_false
             AND <member>-hier_id <> zzxxmla1_cl_mdx_schema_reader=>c_measures
             AND ( <member>-calculated = abap_false OR <member>-calc_name IS NOT INITIAL ).
-          DATA(all_member) = <member>.
-          all_member-calculated = abap_false.
-          children = lines( schema_reader->get_member_children( all_member ) ).
+          ASSIGN child_counts[ unique_name = <member>-unique_name ] TO FIELD-SYMBOL(<child_count>).
+          IF sy-subrc <> 0.
+            DATA(all_member) = <member>.
+            all_member-calculated = abap_false.
+            INSERT VALUE #( unique_name = <member>-unique_name
+                            count = lines( schema_reader->get_member_children( all_member ) ) )
+              INTO TABLE child_counts ASSIGNING <child_count>.
+          ENDIF.
+          children = <child_count>-count.
         ENDIF.
         <member>-display_info = nmin( val1 = children val2 = 65535 ).
         IF position < count AND tuples[ position + 1 ][ k ]-parent_unique IS NOT INITIAL
