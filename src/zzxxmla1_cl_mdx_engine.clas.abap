@@ -2265,27 +2265,28 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
             APPEND LINES OF non_empty_level_members( evaluator = evaluator level = level ) TO members.
           ENDLOOP.
           SORT members BY ordinal ASCENDING.
-          result = VALUE #( FOR member IN members ( VALUE #( ( member ) ) ) ).
+          result = VALUE #( FOR non_empty_member IN members ( VALUE #( ( non_empty_member ) ) ) ).
         ELSE.
-          result = VALUE #( FOR member IN schema_reader->get_hierarchy_members( hierarchy ) ( VALUE #( ( member ) ) ) ).
+          result = VALUE #( FOR hierarchy_member IN schema_reader->get_hierarchy_members( hierarchy )
+                            ( VALUE #( ( hierarchy_member ) ) ) ).
         ENDIF.
       WHEN `ALLMEMBERS|Property|3`.
         " with the calculated members
         hierarchy = evaluate_hierarchy( evaluator = evaluator node = node->args[ 1 ] ).
         result = members_with_calculated( evaluator = evaluator levels = schema_reader->get_hierarchy( hierarchy )-levels ).
       WHEN `MEMBERS|Property|4`.
-        result = VALUE #( FOR member IN non_empty_level_members(
-                                          evaluator = evaluator
-                                          level     = evaluate_level( evaluator = evaluator node = node->args[ 1 ] ) )
-                          ( VALUE #( ( member ) ) ) ).
+        result = VALUE #( FOR level_member IN non_empty_level_members(
+                                                evaluator = evaluator
+                                                level     = evaluate_level( evaluator = evaluator node = node->args[ 1 ] ) )
+                          ( VALUE #( ( level_member ) ) ) ).
       WHEN `ALLMEMBERS|Property|4`.
         result = members_with_calculated(
                    evaluator = evaluator
                    levels    = VALUE #( ( evaluate_level( evaluator = evaluator node = node->args[ 1 ] ) ) ) ).
       WHEN `CHILDREN|Property|6`.
         DATA(parent) = evaluate_member( evaluator = evaluator node = node->args[ 1 ] ).
-        result = VALUE #( FOR member IN non_empty_children( evaluator = evaluator member = parent )
-                          ( VALUE #( ( member ) ) ) ).
+        result = VALUE #( FOR child IN non_empty_children( evaluator = evaluator member = parent )
+                          ( VALUE #( ( child ) ) ) ).
       WHEN `NATIVIZESET|Function|8`.
         " NativizeSetFunDef: below NativizeMinThreshold (100,000) the set itself; native evaluation gives the same tuples
         result = evaluate_set( evaluator = evaluator node = node->args[ 1 ] ).
