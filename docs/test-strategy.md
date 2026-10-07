@@ -109,6 +109,12 @@ cube name and loading once renamed, a user hierarchy with a member property, the
 accept dialog (cancelled), the XML, and a time dimension on the aDSO with its suggested level type. Every edit goes
 through the server's `check`; nothing is written. `--shots <folder>` keeps a screenshot per step.
 
+## MDX console (UI)
+
+`python scripts/console_ui_test.py` drives `/zzxxmla1/schema/console.html` the same way, on catalog `ZFOODMART`: the
+cube browser inserting a unique name, a grid of two axes (Product and Store crossjoined on the rows, the slicer shown)
+and the same answer as a table, a flat table of three axes, a statement without axes and an evaluation error.
+
 ## Mondrian's own tests against our schema
 
 The eMondrian container serves only our reference catalog `ZFOODMART` (`scripts/deploy-reference-schema.sh`, installs

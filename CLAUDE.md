@@ -94,6 +94,11 @@ Read before designing anything:
   written by the setup (below); it
   edits the schema XML as a DOM (rename, remove, time dimensions, user hierarchies with levels and member properties,
   measures, raw XML), lets the server `check` every change and accepts (`scripts/schema_ui_test.py`).
+- MDX console: `/zzxxmla1/schema/console.html` (`web/schema/console.js`, same files and setup as the schema builder)
+  sends Execute and Discover requests to the endpoint itself. A catalog's cubes, measures, hierarchies and levels are
+  listed from the schema rowsets (a click inserts the unique name); an answer of up to two axes is a grid (Axis0 the
+  columns, Axis1 the rows, spanning headers), one of more axes a flat table (a column per hierarchy, highest axis first,
+  a row per cell) (`scripts/console_ui_test.py`).
 - Execute: the MDX parser is a port of Mondrian's JavaCC grammar `MdxParser.jj` (`ZZXXMLA1_CL_MDX_TOKEN_MANAGER`,
   `ZZXXMLA1_CL_MDX_PARSER`, tree `ZZXXMLA1_CL_MDX_NODE`). It parses the whole grammar, with Mondrian's error texts, and its
   unit tests carry Mondrian's `ParserTest`. Keep it in step with `MdxParser.jj`: change the grammar there first, then port.
