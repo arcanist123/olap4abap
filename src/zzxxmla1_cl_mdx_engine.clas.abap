@@ -112,8 +112,33 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       IMPORTING query         TYPE zzxxmla1_cl_mdx_parser=>ty_query
       RETURNING VALUE(result) TYPE ty_result
       RAISING   zzxxmla1_cx_xmla.
+    "! Executes a DRILLTHROUGH statement (MondrianOlap4jStatement.executeQuery2): its query, then the fact rows of the
+    "! first cell (RolapCell.drillThroughInternal with an extended context): every level column of the cube's
+    "! hierarchies and the cell's measure, the columns constrained to the cell's members, at most MAXROWS rows after
+    "! the first FIRSTROWSET; with a RETURN clause only its levels and measures.
+    METHODS drill_through
+      IMPORTING statement     TYPE zzxxmla1_cl_mdx_parser=>ty_statement
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_facts=>ty_drill_through
+      RAISING   zzxxmla1_cx_xmla.
 
   PRIVATE SECTION.
+    "! the context of the slicer that every cell of the executed query has (a compound slicer's placeholders)
+    DATA cell_slicer TYPE ty_t_member.
+    "! RolapCell.replaceTrivialCalcMember: a calculated member defined as another member, or as the Aggregate of a set
+    "! of one member, is that member.
+    METHODS trivial_member
+      IMPORTING member        TYPE ty_member
+      RETURNING VALUE(result) TYPE ty_member.
+    "! The RETURN clause of a drill-through (DrillThrough.resolveReturnList, addNonConstrainingColumns): a level, the
+    "! first level of a hierarchy or of a dimension's default hierarchy, or a stored measure.
+    METHODS drill_through_items
+      IMPORTING return_list   TYPE zzxxmla1_cl_mdx_node=>ty_t_node
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_facts=>ty_t_drill_item
+      RAISING   zzxxmla1_cx_xmla.
+    "! The fault of a failed drill-through (XmlaHandler.executeDrillThroughQuery: HSB_DRILL_THROUGH_SQL).
+    CLASS-METHODS drill_through_error
+      IMPORTING message TYPE string
+      RAISING   zzxxmla1_cx_xmla.
     TYPES ty_node TYPE REF TO zzxxmla1_cl_mdx_node.
     TYPES ty_evaluator TYPE REF TO zzxxmla1_if_mdx_evaluator.
     CONSTANTS:
@@ -1296,7 +1321,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     fact_reader->set_subcube( subcube_predicate( resolved ) ).
     root_evaluator = zzxxmla1_cl_mdx_evaluator=>create( schema_reader = schema_reader facts = fact_reader calc = me ).
     DATA(evaluator) = CAST zzxxmla1_if_mdx_evaluator( root_evaluator ).
-    CLEAR named_set_values.
+    CLEAR: named_set_values, cell_slicer.
     slicer_evaluator_context = evaluator->get_members( ).
 
     DATA(non_all_members) = load_special_members( evaluator ).
@@ -1325,6 +1350,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
                                                ELSE compound_slicer( tuples = slicer members = slicer_members ) ).
       evaluator->set_slicer_context( slicer_context ).
       slicer_evaluator_context = evaluator->get_members( ).
+      cell_slicer = slicer_context.
     ENDIF.
 
     " the axes in the order of their ordinals (the validator made sure they follow each other from 0). The top members
@@ -1410,6 +1436,147 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     LOOP AT result-axes ASSIGNING <axis>.
       axis_properties( EXPORTING query_axis = query_axes[ sy-tabix ] CHANGING axis = <axis> ).
     ENDLOOP.
+  ENDMETHOD.
+
+  METHOD drill_through.
+    DATA(executed) = execute( statement-query ).
+    DATA(items) = drill_through_items( statement-return_list ).
+
+    " the cell of the coordinates 0 (CellSet.getCell): the first tuple of every axis in the context of the slicer, as
+    " execute_stripe sets it; an empty axis has no cell
+    LOOP AT executed-axes TRANSPORTING NO FIELDS WHERE tuples IS INITIAL.
+      drill_through_error( `Cannot do DrillThrough operation on the cell` ).
+    ENDLOOP.
+    DATA(evaluator) = CAST zzxxmla1_if_mdx_evaluator( root_evaluator ).
+    DATA(savepoint) = evaluator->savepoint( ).
+    DATA(axis_index) = lines( executed-axes ).
+    WHILE axis_index > 0.
+      evaluator->set_context_members( executed-axes[ axis_index ]-tuples[ 1 ] ).
+      axis_index = axis_index - 1.
+    ENDWHILE.
+    evaluator->set_context_members( cell_slicer ).
+    " getMembersForDrillThrough: the members of the cell, a trivial calculated member replaced by its member
+    DATA(members) = evaluator->get_members( ).
+    evaluator->restore( savepoint ).
+    LOOP AT members ASSIGNING FIELD-SYMBOL(<member>) WHERE calculated = abap_true.
+      <member> = trivial_member( <member> ).
+    ENDLOOP.
+
+    " a compound slicer (buildDrillthroughSlicerPredicate): the hierarchies whose member is not the one of every
+    " position are not constrained by the cell; the positions restrict the facts instead, each the AND of its members of
+    " those hierarchies, all of them ORed
+    DATA free TYPE STANDARD TABLE OF i WITH EMPTY KEY.
+    DATA slicer TYPE zzxxmla1_cl_mdx_facts=>ty_t_predicate.
+    IF lines( executed-slicer ) > 1.
+      LOOP AT executed-slicer INTO DATA(position).
+        LOOP AT position INTO DATA(slicer_member).
+          IF members[ slicer_member-hier_id + 1 ]-unique_name <> slicer_member-unique_name
+              AND NOT line_exists( free[ table_line = slicer_member-hier_id ] ).
+            APPEND slicer_member-hier_id TO free.
+          ENDIF.
+        ENDLOOP.
+      ENDLOOP.
+      APPEND VALUE #( kind = zzxxmla1_cl_mdx_facts=>c_predicate-or ) TO slicer.
+      DATA disjuncts TYPE zzxxmla1_cl_mdx_facts=>ty_t_index.
+      LOOP AT executed-slicer INTO position.
+        DATA(conjuncts) = VALUE zzxxmla1_cl_mdx_facts=>ty_t_index( ).
+        LOOP AT position INTO slicer_member.
+          IF line_exists( free[ table_line = slicer_member-hier_id ] ) AND slicer_member-key_level > 0.
+            APPEND VALUE #( kind   = zzxxmla1_cl_mdx_facts=>c_predicate-member
+                            member = VALUE #( hierarchy = slicer_member-hier_id level = slicer_member-key_level
+                                              path      = slicer_member-path ) ) TO slicer.
+            APPEND lines( slicer ) TO conjuncts.
+          ENDIF.
+        ENDLOOP.
+        APPEND VALUE #( kind = zzxxmla1_cl_mdx_facts=>c_predicate-and children = conjuncts ) TO slicer.
+        APPEND lines( slicer ) TO disjuncts.
+      ENDLOOP.
+      slicer[ 1 ]-children = disjuncts.
+    ENDIF.
+
+    " canDrillThrough: no calculated member but a measure; a null member has no cell (makeCellRequest)
+    DATA filters TYPE zzxxmla1_cl_mdx_facts=>ty_t_filter.
+    LOOP AT members INTO DATA(member) FROM 2.
+      IF line_exists( free[ table_line = member-hier_id ] ).
+        APPEND VALUE #( hierarchy = member-hier_id ) TO filters.
+        CONTINUE.
+      ENDIF.
+      IF member-calculated = abap_true OR member-is_null = abap_true.
+        drill_through_error( `Cannot do DrillThrough operation on the cell` ).
+      ENDIF.
+      APPEND VALUE #( hierarchy = member-hier_id level = member-key_level path = member-path ) TO filters.
+    ENDLOOP.
+    " the measure of the cell; for a calculated one the first measure of the cube
+    DATA(measure) = members[ 1 ].
+    result = fact_reader->drill_through(
+      members   = filters
+      measure   = COND #( WHEN measure-calculated = abap_false THEN measure-measure_index ELSE 1 )
+      slicer    = slicer
+      items     = items
+      max_rows  = statement-max_rows
+      first_row = statement-first_rowset ).
+  ENDMETHOD.
+
+  METHOD trivial_member.
+    result = member.
+    IF member-calc_name IS NOT INITIAL.
+      RETURN.
+    ENDIF.
+    DATA(expression) = schema_reader->get_calculation( member )-expression.
+    IF expression IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    IF expression->kind = zzxxmla1_cl_mdx_node=>c_kind-member.
+      result = expression->element-member.
+    ELSEIF expression->kind = zzxxmla1_cl_mdx_node=>c_kind-resolved_call
+        AND to_upper( expression->fun_def-name ) = `AGGREGATE` AND expression->args IS NOT INITIAL.
+      DATA(set) = expression->args[ 1 ].
+      IF set->kind = zzxxmla1_cl_mdx_node=>c_kind-resolved_call AND set->fun_def-name = `{}`
+          AND lines( set->args ) = 1 AND set->args[ 1 ]->kind = zzxxmla1_cl_mdx_node=>c_kind-member.
+        result = set->args[ 1 ]->element-member.
+      ENDIF.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD drill_through_items.
+    LOOP AT return_list INTO DATA(node).
+      DATA(element) = schema_reader->lookup_compound( node->segments ).
+      DATA hierarchy TYPE i.
+      hierarchy = -1.
+      CASE element-kind.
+        WHEN zzxxmla1_cl_mdx_schema_reader=>c_element-level.
+          DATA(level) = schema_reader->get_level( element-id ).
+          IF level-key_level > 0.
+            APPEND VALUE #( hierarchy = level-hierarchy level = level-key_level ) TO result.
+          ENDIF.
+        WHEN zzxxmla1_cl_mdx_schema_reader=>c_element-hierarchy.
+          hierarchy = element-id.
+        WHEN zzxxmla1_cl_mdx_schema_reader=>c_element-dimension.
+          DATA(dimension) = schema_reader->get_dimension( element-id ).
+          hierarchy = dimension-hierarchies[ 1 ].
+        WHEN zzxxmla1_cl_mdx_schema_reader=>c_element-member.
+          DATA(member) = element-member.
+          IF member-hier_id <> zzxxmla1_cl_mdx_schema_reader=>c_measures.
+            drill_through_error( `olap4abap Error:Unknown member type in DRILLTHROUGH operation.` ).
+          ELSEIF member-calculated = abap_true.
+            drill_through_error( |olap4abap Error:Can't perform drillthrough operations because | &&
+                                 |'{ member-unique_name }' is a calculated member.| ).
+          ENDIF.
+          APPEND VALUE #( measure = member-measure_index ) TO result.
+        WHEN OTHERS.
+          drill_through_error( |olap4abap Error:MDX object '{ node->unparse( ) }' not found in cube | &&
+                               |'{ schema_reader->cube-cube_name }'| ).
+      ENDCASE.
+      " a hierarchy or a dimension: the first level of the hierarchy below its All level; Measures has none
+      IF hierarchy > 0.
+        APPEND VALUE #( hierarchy = hierarchy level = 1 ) TO result.
+      ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD drill_through_error.
+    zzxxmla1_cx_xmla=>raise_code( kind = `Server` code = `00HSBF02` text = `XMLA Drill Through SQL error`
+                                  description = message ).
   ENDMETHOD.
 
   METHOD subcube_predicate.

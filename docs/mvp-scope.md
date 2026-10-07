@@ -111,7 +111,8 @@ Decisions taken by the project owner on 2026-10-02, with reasons.
 - Key figures with MIN/MAX, exception aggregation (AV0/AV1/LAS) or non-cumulative behaviour; mixed
   currency/unit handling (the demo cube has a single currency and unit); the package dimension and other technical
   characteristics; Composite/MultiProviders; non-HANA cubes (F+E table union); aggregate tables, roles, virtual
-  cubes, drillthrough, ragged hierarchies.
+  cubes, ragged hierarchies. (Drillthrough was out of scope too, but Excel offers it on every cell, so it is done:
+  `DRILLTHROUGH` without the schema's `DrillThroughAction`s.)
 
 ## Open points
 

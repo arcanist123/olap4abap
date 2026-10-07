@@ -26,6 +26,11 @@ CLASS zzxxmla1_cl_xmla_mddataset DEFINITION
                 with_schema   TYPE abap_bool
                 excel         TYPE abap_bool DEFAULT abap_false
       RETURNING VALUE(xml)    TYPE string.
+    "! The element name of a property or a column (XmlaUtil.ElementNameEncoder, encodeElementName): every character
+    "! that the pattern of a valid first character of an XML name does not match becomes _xHHHH_ (a space _x0020_).
+    CLASS-METHODS element_name
+      IMPORTING name          TYPE string
+      RETURNING VALUE(result) TYPE string.
 
   PRIVATE SECTION.
     CONSTANTS c_ns_xmla TYPE string VALUE `urn:schemas-microsoft-com:xml-analysis`.
@@ -40,11 +45,6 @@ CLASS zzxxmla1_cl_xmla_mddataset DEFINITION
                 hierarchies      TYPE string_table OPTIONAL
                 properties       TYPE string_table OPTIONAL
                 level_properties TYPE zzxxmla1_cl_mdx_engine=>ty_t_level_property OPTIONAL
-      RETURNING VALUE(result) TYPE string.
-    "! The element name of a property (XmlaUtil.ElementNameEncoder, encodeElementName): every character that the
-    "! pattern of a valid first character of an XML name does not match becomes _xHHHH_ (e.g. a space _x0020_).
-    CLASS-METHODS element_name
-      IMPORTING name          TYPE string
       RETURNING VALUE(result) TYPE string.
     "! The XML schema type of a standard member property (its olap4j datatype).
     CLASS-METHODS property_type

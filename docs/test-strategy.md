@@ -393,6 +393,22 @@ The native crossjoin: `execute_native_crossjoin_order` (#155: hierarchy order, n
 `execute_native_crossjoin_multi_variant` (#144: an operand split by level), `execute_native_crossjoin_slicer` (#241:
 customers × product names under a slicer, 67 of 16 million combinations; also the format of a value below 1).
 
+Drillthrough (`execute_drillthrough_*`, captured with `-p Format=Tabular` as Excel sends it): Excel's statement shape
+(`execute_drillthrough_excel`, `DRILLTHROUGH MAXROWS 1000 SELECT FROM [cube] WHERE (((measure, ...), ...))`), a slicer,
+axes, the first cell after `NON EMPTY`, a compound slicer, a subselect, `RETURN` (a level gives its key column before
+its name column), `FIRSTROWSET` (skips that many of the `MAXROWS` rows), no `MAXROWS`, an empty cell (the schema without
+rows), a trivial calculated member (replaced by its member), a calculated measure (the cube's first measure is read),
+attribute hierarchies, the Weekly hierarchy, two members that constrain the same column differently (the column is then
+not constrained at all, as `CellRequest.addConstrainedColumn` leaves an unsatisfiable drill-through request) and the
+format fault of a request that is not Tabular. What the captures show of eMondrian: the columns are the star's, in the
+order its levels register them (per dimension the user hierarchies' levels, then the attribute hierarchies'), each
+named by the first level that uses its column (`Product Id`, but `Name (Key)` for the customer key), duplicates with
+`_0`, `_1`; the rows are ordered by all columns but the measure; no total-count row (`EnableTotalCount` is off). A
+non-trivial calculated member fails in eMondrian with a Java NullPointerException text
+(`execute_drillthrough_calc_member`, faultstring and description ignored); ours says
+`Cannot do DrillThrough operation on the cell` with the same fault code. Not ported: the schema's `DrillThroughAction`s
+(FoodmartBW.xml has none), virtual cubes, `Format` property values other than the exact `Tabular`.
+
 ## Error cases (faults)
 
 Clients depend on the exact faults, so they are test cases too. `python scripts/capture-error-cases.py` takes the bad

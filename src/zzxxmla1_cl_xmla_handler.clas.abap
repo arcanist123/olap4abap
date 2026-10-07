@@ -48,6 +48,13 @@ CLASS zzxxmla1_cl_xmla_handler DEFINITION
                 url           TYPE string
       RETURNING VALUE(result) TYPE string
       RAISING   zzxxmla1_cx_xmla.
+    "! XmlaHandler.executeDrillThroughQuery: the format must be Tabular (checkFormat), the answer is the tabular rowset
+    "! of the first cell's facts.
+    METHODS drill_through
+      IMPORTING request       TYPE ty_request
+                statement     TYPE zzxxmla1_cl_mdx_parser=>ty_statement
+      RETURNING VALUE(result) TYPE string
+      RAISING   zzxxmla1_cx_xmla.
     "! What the reference checks of a Discover request before it answers: the request type is one of its rowsets, the
     "! restrictions are columns of that rowset, then the data source and the catalog exist.
     METHODS check_discover
@@ -343,6 +350,10 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
         RETURN.
       ENDIF.
       DATA(statement) = zzxxmla1_cl_mdx_parser=>parse( request-statement ).
+      IF statement-kind = `DRILLTHROUGH`.
+        result = drill_through( request = request statement = statement ).
+        RETURN.
+      ENDIF.
       IF statement-kind <> `SELECT`.
         zzxxmla1_cx_xmla=>raise_code(
           kind = `Server` code = `00HSBB01` text = `XMLA SOAP Body processing error`
@@ -423,6 +434,20 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
           description = |Rowset { request-type } is not implemented yet| ).
     ENDCASE.
     result = discover_response( request = request rows = rows ).
+  ENDMETHOD.
+
+  METHOD drill_through.
+    IF VALUE string( request-properties[ name = 'Format' ]-value OPTIONAL ) <> `Tabular`.
+      zzxxmla1_cx_xmla=>raise_code(
+        kind = `Client` code = `00HSBE02` text = `XMLA Drill Through format error`
+        description = `<Format>: only 'Tabular' allowed when drilling through` error_code = `3238789130` ).
+    ENDIF.
+    DATA(engine) = NEW zzxxmla1_cl_mdx_engine( default_catalog( request ) ).
+    DATA(content) = VALUE string( request-properties[ name = 'Content' ]-value OPTIONAL ).
+    result = zzxxmla1_cl_xmla_tabular=>build(
+      rowset      = engine->drill_through( statement )
+      with_schema = xsdbool( content IS INITIAL OR content = `SchemaData` OR content = `Schema` )
+      with_data   = xsdbool( content <> `Schema` ) ).
   ENDMETHOD.
 
   METHOD check_discover.
