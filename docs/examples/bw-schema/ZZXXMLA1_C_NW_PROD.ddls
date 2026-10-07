@@ -1,0 +1,21 @@
+@AbapCatalog.sqlViewName: 'ZZXXMLA1VNWPROD'
+@AbapCatalog.compiler.compareFilter: true
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Demo: product 0D_NW_PROD with EN texts at 9999-12-31'
+define view ZZXXMLA1_C_NW_PROD
+  as select from /bi0/sd_nw_prod as s
+    left outer join /bi0/pd_nw_prod  as p  on  p.d_nw_prod = s.d_nw_prod and p.objvers = 'A'
+    left outer join /bi0/qd_nw_prod  as q  on  q.d_nw_prod = s.d_nw_prod and q.objvers = 'A'
+                                           and q.dateto = '99991231'
+    left outer join /bi0/td_nw_prod  as t  on  t.d_nw_prod = s.d_nw_prod
+    left outer join /bi0/td_nw_prdct as ct on  ct.d_nw_prdct = p.d_nw_prdct and ct.langu = 'E'
+    left outer join /bi0/td_nw_prdgp as gt on  gt.d_nw_prdgp = q.d_nw_prdgp and gt.langu = 'E'
+{
+  key s.sid       as SID,
+      s.d_nw_prod as D_NW_PROD,
+      coalesce( t.txtmd, s.d_nw_prod )   as TXTMD,
+      p.d_nw_prdct                       as D_NW_PRDCT,
+      coalesce( ct.txtmd, p.d_nw_prdct ) as PRDCT_TXT,
+      q.d_nw_prdgp                       as D_NW_PRDGP,
+      coalesce( gt.txtmd, q.d_nw_prdgp ) as PRDGP_TXT
+}

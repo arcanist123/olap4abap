@@ -1,272 +1,210 @@
 # Designing olap4abap schemas for SAP BW cubes
 
 A guide for BW developers who write or review the schema of a cube served by olap4abap. Example throughout: the SAP
-demo InfoCube `0D_NW_C01` on the development system `a4h_http` (figures read on 2026-10-07).
+demo InfoCube `0D_NW_C01` on the development system `a4h_http`. The rules were worked out on 2026-10-07/08 with two
+demo catalogs on that system, `NWCOMPANY` and `NWPRODUCT`, whose schemas and views are in
+[examples/bw-schema/](examples/bw-schema/).
 
-An InfoCube shows an MDX client a flat list of characteristics. A schema can show the same data with names instead of
-keys, drill paths, member properties, a real time dimension and shared role dimensions. Nothing in BW changes for
-that: the schema sits on the cube's fact table and on one CDS view per characteristic.
+**The decision: model a cube as BW models it.** A characteristic is a dimension, a navigation attribute is a field of
+its own under it, a display attribute is a property, nothing is nested that BW does not nest. Everything is identified
+by BW's technical names and keys; texts are captions and properties. Users see technical keys by default; that is a
+deliberate trade-off for identifiers that never change, and texts can be added for display later (section 3.4).
 
 Scope:
 
 - **Format:** Mondrian 3 schema XML with eMondrian's attribute extensions (`DimensionAttribute`), as eMondrian
   9.3.0-emondrian.38 defines it. The Mondrian 4 metamodel (`PhysicalSchema`, `MeasureGroup`) is not supported.
 - **Providers:** HANA-optimised InfoCubes and cube-type aDSOs.
-- **Master data:** time-independent attributes and texts. External BW hierarchies (`/BI0/H...`) are out of scope:
-  hierarchies are built from attributes. Time-dependent attributes and texts are read as one snapshot, the record
-  valid on the key date 9999-12-31. Texts are read in language EN only.
+- **Master data:** time-independent and time-dependent attributes and texts, read as one snapshot: the record valid on
+  the key date 9999-12-31, texts in language EN. External BW hierarchies (`/BI0/H...`) are out of scope.
 - Analysis authorisations are out of scope.
 
 Related documents: [bw-to-schema-mapping.md](bw-to-schema-mapping.md) (the BW tables), [schema-generator.md](schema-generator.md)
 (the generator and its UI), [mvp-scope.md](mvp-scope.md).
 
-## 1. How a BW cube becomes a schema
+## 1. The rules at a glance
+
+| BW | Schema | MDX name | Excel shows |
+|---|---|---|---|
+| Characteristic `0D_NW_CODE` | `Dimension name="0D_NW_CODE"` with one flat `Hierarchy` (All + one level) | `[0D_NW_CODE]` | Company |
+| Characteristic value (internal key) | member, keyed by the SID, named by the key | `[0D_NW_CODE].[1111]` | 1111 |
+| Text (EN) | member property `Text` | `.Properties("Text")` | Company Name (via *Show Properties*) |
+| Navigation attribute switched on in the provider | flat `Hierarchy name="0D_NW_CODE__0D_NW_CNTRY"` in the characteristic's dimension | `[0D_NW_CODE.0D_NW_CODE__0D_NW_CNTRY]` | Country of Company |
+| Display attribute, or navigation attribute not switched on in the provider | member properties (key and text) of the characteristic's level | `.Properties("0D_NW_CNTRY")` | Country, Country Name |
+| Reference characteristic (`0D_NW_SHIP` -> `0D_NW_CUST`) | a dimension of its own on the basic characteristic's view | `[0D_NW_SHIP]` | Ship-to Party |
+| Key figure `0D_NW_NETV` | `Measure name="0D_NW_NETV"` | `[Measures].[0D_NW_NETV]` | Net Value |
+| InfoObject texts | `caption` of dimension, hierarchy, level, property, measure | | the captions |
+| Fact table, SID column | `Table`, `DimensionUsage foreignKey="SID_<char>"` | | |
+
+Not modelled by default, because BW does not model it: user hierarchies (drill paths over attributes), nesting of
+navigation attributes, a time hierarchy over separate time characteristics. They can be added when the business asks
+(section 3.5).
+
+## 2. How a BW cube becomes a schema
 
 ```
- /BI0/F0D_NW_C01 (fact table)                    one CDS view per characteristic
- ┌──────────────────────────┐                    ┌──────────────────────────────────────┐
- │ SID_0D_NW_PROD  ─────────┼── foreignKey ────► │ SID │ D_NW_PROD │ D_NW_PRDCT │ texts │
- │ SID_0D_NW_SOLD  ─────────┼──┐                 └──────────────────────────────────────┘
- │ SID_0D_NW_SHIP  ─────────┼──┼─► one customer view, three DimensionUsages
- │ SID_0D_NW_PAYER ─────────┼──┘
- │ SID_0CALMONTH   ─────────┼──────────────────► time view (year, quarter, month)
- │ D_NW_NETV, D_NW_QUANT ...│ ── Measure column
+ /BI0/F0D_NW_C01 (fact table)              one CDS view per basic characteristic, one row per SID
+ ┌──────────────────────────┐              ┌──────────────────────────────────────────────────────┐
+ │ SID_0D_NW_PROD  ─────────┼─ foreignKey ►│ SID │ D_NW_PROD │ TXTMD │ D_NW_PRDCT │ ... │ texts │
+ │ SID_0D_NW_SHIP  ─────────┼─ foreignKey ►│ SID │ D_NW_CUST │ TXTMD │ D_NW_CNTRY │ ... │       │ (0D_NW_CUST)
+ │ D_NW_NETV, D_NW_QUANT ...│─ Measure     └──────────────────────────────────────────────────────┘
  └──────────────────────────┘
 ```
 
-| BW | Schema | Notes |
-|---|---|---|
-| InfoCube fact table `/BI0/F<cube>` (aDSO: view `/BIC/A<adso>7`) | `<Cube><Table name="..."/>` | The only fact source; aggregate tables (`AggName`) are not used. |
-| Characteristic column `SID_<char>` | `DimensionUsage foreignKey="SID_<char>"` | aDSO: the value column instead of the SID. |
-| SID table `/BI0/S<char>` + attributes `/BI0/P<char>` | `Dimension table="<view>"` | The view has one row per SID, key column `SID`. |
-| Characteristic value | key `DimensionAttribute` (`usage="Key"`) | Keyed by `SID`; named by the value or the text. |
-| Display or navigation attribute | `DimensionAttribute` | Becomes a level, a member property, or both. |
-| Texts `/BI0/T<char>` | `NameColumn` of an attribute or `nameColumn` of a level | Not in the generated views yet (section 5). |
-| Key figure with aggregation SUM | `Measure aggregator="sum"` | See section 7 for MIN/MAX. |
-| BW query restriction (value type, version) | `defaultMember` of a hierarchy | Applies to every query that does not name the hierarchy. |
-| Calculated or restricted key figure | `WITH MEMBER` in the MDX query | Schema `CalculatedMember` is not read yet (section 7). |
-| InfoArea | catalog | One cube per catalog for now. |
+- **Fact:** the InfoCube's `/BI0/F<cube>` (`/BIC/F...` in the customer namespace), or an aDSO's view `/BIC/A<adso>7`.
+  Each characteristic is a `SID_<char>` column (aDSO: the value column), each key figure a column.
+- **Dimension table:** a CDS view per basic characteristic: the SID table, left-outer-joined with attributes and texts
+  (section 4). The schema needs only its SQL view name and its columns.
+- **Join:** the dimension's key attribute is the view's `SID` (aDSO: the key), matched with the fact column. The engine
+  joins the view once for every hierarchy of the dimension a query uses.
 
-The views are generated by `ZZXXMLA1_CL_BW_VIEW_GEN` when a schema is accepted in the schema builder
-(`/zzxxmla1/schema`): SID table left-outer-joined with the active attribute table, NUMC columns cast to numbers,
-namespaces removed from column names. A hand-written view can take its place (section 5); the schema only needs its
-SQL view name and its columns.
+## 3. Characteristics and attributes
 
-## 2. Schema elements
-
-| Element | What it does | Use it for |
-|---|---|---|
-| `Schema` | Root; its name is the catalog's schema. | One per catalog. |
-| `Dimension` (shared, at schema level) | A dimension on one table, reusable by several cubes and usages. `type="TimeDimension"` enables the time functions. | One per characteristic, or one per basic characteristic for role characteristics. |
-| `DimensionAttribute` | A column of the dimension's table (`KeyColumn`, optional `NameColumn`). `usage="Key"` marks the key. With `attributeHierarchyEnabled="false"` it is no hierarchy of its own, only a source for levels and properties. `levelType` in time dimensions. | Every column the dimension exposes. |
-| `Hierarchy` | A drill path. `hasAll`, `allMemberName`, `defaultMember`, `name` (the first unnamed one is the dimension's default hierarchy). | One per meaningful drill path. |
-| `Level` | One step of the path; `sourceAttribute` names the attribute, `uniqueMembers="true"` when the key is unique across the whole level, `nameColumn` overrides the names, `levelType` in time dimensions. | Country > Sales org, Category > Product group > Product. |
-| `Property` | A member property of a level (`sourceAttribute`). Shown with `DIMENSION PROPERTIES`, read with `.Properties`. | Descriptive attributes that nobody drills by. |
-| `Cube` | Fact `Table`, `DimensionUsage`s, `Measure`s, `defaultMeasure`, `caption`. | One per InfoCube or aDSO. |
-| `DimensionUsage` | Puts a shared dimension in a cube under a name with a fact column (`foreignKey`). | The same dimension several times: Sold-to, Ship-to, Payer. |
-| `Measure` | A fact column with `aggregator`, `formatString`, `caption`, `visible`. | One per key figure. |
-
-Not supported by olap4abap and refused when loading: virtual cubes, roles, user-defined functions, schema-level named
-sets and parameters, joins or SQL in hierarchies, level `captionColumn`/`ordinalColumn`/expressions/`parentColumn`,
-`hideMemberIf`, property formatters, measures without a column.
-
-## 3. The example: 0D_NW_C01
-
-7,005 fact rows, 2010-01 to 2020-12 (132 months), one value type, one version, currency EUR, unit ST.
-
-| BW dimension | Characteristic | Basic characteristic | Attributes (time-dependent marked) | Texts | Values in facts |
-|---|---|---|---|---|---|
-| 1 | `0D_NW_CODE` Company code | itself | `0D_NW_CNTRY` (nav) | short, medium; language-independent | 4 |
-| 1 | `0D_NW_PLANT` Plant | itself | none | short, medium | 5 |
-| 1 | `0D_NW_SGRP` Sales group | itself | none | short, medium | |
-| 2 | `0D_NW_SOLD` Sold-to | `0D_NW_CUST` | `0D_NW_CNTRY` (nav), `0D_NW_IND` | short, medium | 19 |
-| 2 | `0D_NW_SHIP` Ship-to | `0D_NW_CUST` | same | same | 19 |
-| 2 | `0D_NW_PAYER` Payer | `0D_NW_CUST` | same | same | 19 |
-| 3 | `0D_NW_PROD` Product | itself | `0D_NW_PRDCT` (nav), `0D_NW_PRDGP` (nav, **time-dependent**) | short, medium | 12 |
-| 4 | `0D_NW_VTYPE` Value type | itself | none | short, medium | 1 |
-| 5 | `0D_NW_VERS` Version | itself | none | short, medium | 1 |
-| 6 | `0D_NW_CHANN` Distribution channel | itself | none | short, medium | |
-| 6 | `0D_NW_DIV` Division | itself | none | short, medium | |
-| 6 | `0D_NW_SORG` Sales organisation | itself | `0D_NW_CNTRY` (nav) | short, medium | 5 |
-| 7 | `0D_NW_CNTRY` Country | itself | none | medium, **language-dependent** | 4 |
-| 7 | `0D_NW_REGIO` Region | compounded with `0D_NW_CNTRY` | none | short, medium | 5 |
-| T | `0CALMONTH`, `0CALYEAR` | | | | 132 / 11 |
-| U | `0CURRENCY`, `0UNIT` | | | | 1 / 1 |
-
-Key figures, all SUM/SUM: `0D_NW_NETV` net value, `0D_NW_COSTV` cost, `0D_NW_OORV` open order value (currency
-`0CURRENCY`), `0D_NW_QUANT` quantity, `0D_NW_OORQT` open order quantity (unit `0UNIT`), `0D_NW_DOCUM` number of
-documents.
-
-Texts of `0D_NW_PRDCT` and `0D_NW_PRDGP` are language-dependent too. No characteristic of the cube has time-dependent
-texts.
-
-### What the generated proposal gives
-
-The proposal (`GET /zzxxmla1/schema/api/proposal?provider=0D_NW_C01`) is deliberately flat: 19 dimensions, one per
-characteristic, each with one hierarchy keyed by SID and named by the characteristic value. A user sees `CN00S1`
-instead of "Notebook Standard 15", three unrelated customer dimensions, two unrelated time dimensions, and the
-navigation attributes only as unused attributes. It loads and answers correctly; the rest of this guide is how to make
-it a model people can use.
-
-## 4. Describing the cube better
-
-### 4.1 Name members by their texts
-
-Put the EN medium text in the view and make it the name of the key attribute and of the leaf level. The key stays the
-SID, so grouping and joins do not change:
+### 3.1 The characteristic
 
 ```xml
-<DimensionAttribute name="Product" usage="Key">
-  <KeyColumn dataType="Integer" columnName="SID"/>
-  <NameColumn dataType="String" columnName="TXTMD"/>
-</DimensionAttribute>
-```
-
-A member's unique name is built from its name, so names must be unique among siblings. Product texts in the demo are;
-customer names in real systems often are not. Where they are not, keep the key as the name and the text as a property,
-or build a name column such as `TXTMD || ' (' || key || ')'` in the view.
-
-### 4.2 Turn navigation attributes into drill paths
-
-BW lists navigation attributes as flat characteristics (`0D_NW_PROD__0D_NW_PRDCT`). In the schema they become levels
-of one hierarchy, so a user drills Category > Product group > Product and totals add up at every level:
-
-```xml
-<Hierarchy hasAll="true" allMemberName="All Products">
-  <Level name="Category" uniqueMembers="true" sourceAttribute="Category"/>
-  <Level name="Product Group" uniqueMembers="false" sourceAttribute="Product Group"/>
-  <Level name="Product" uniqueMembers="true" sourceAttribute="Product"/>
-</Hierarchy>
-```
-
-The same for Country > Sales organisation, Country > Company code and Country > Customer. Give an attribute its own
-hierarchy (`attributeHierarchyEnabled` left at its default) only when users slice by it on its own, for example
-Industry across all customers.
-
-### 4.3 Use member properties for descriptive attributes
-
-An attribute nobody drills by is a `Property` of the level, with `attributeHierarchyEnabled="false"` on the attribute.
-It appears in the client's member tooltip or with `DIMENSION PROPERTIES`, and costs no hierarchy:
-
-```xml
-<Level name="Customer" uniqueMembers="true" sourceAttribute="Customer">
-  <Property name="Customer Number" sourceAttribute="Customer Number"/>
-  <Property name="Industry" sourceAttribute="Industry"/>
-</Level>
-```
-
-Showing the BW key as a property ("Customer Number") keeps it available after the name became the text.
-
-### 4.4 One shared dimension for role characteristics
-
-`0D_NW_SOLD`, `0D_NW_SHIP` and `0D_NW_PAYER` reference `0D_NW_CUST` and share its SID table, so their fact SIDs are
-the same numbers. Define one `Customer` dimension on one view and use it three times:
-
-```xml
-<DimensionUsage name="Sold-to Party" source="Customer" foreignKey="SID_0D_NW_SOLD"/>
-<DimensionUsage name="Ship-to Party" source="Customer" foreignKey="SID_0D_NW_SHIP"/>
-<DimensionUsage name="Payer" source="Customer" foreignKey="SID_0D_NW_PAYER"/>
-```
-
-The proposal currently generates three views (one per role, identical content). One view is less to maintain, and
-any change to the customer model applies to all roles at once.
-
-### 4.5 A real time dimension
-
-`0CALMONTH` and `0CALYEAR` are separate characteristics in BW, so in a flat schema they cannot be nested and time
-functions do not work. Build one `TimeDimension` on a view of `/BI0/SCALMONTH` that derives year, quarter and month
-from `CALMONTH`:
-
-```xml
-<Dimension name="Time" type="TimeDimension" table="ZZXXMLA1VNWMON">
-  <DimensionAttribute name="Month Id" usage="Key" levelType="TimeMonths">
+<Dimension name="0D_NW_CODE" caption="Company" table="ZZXXMLA1VNWCOMP">
+  <DimensionAttribute name="0D_NW_CODE SID" usage="Key" attributeHierarchyEnabled="false">
     <KeyColumn dataType="Integer" columnName="SID"/>
+    <NameColumn dataType="String" columnName="D_NW_CODE"/>
   </DimensionAttribute>
-  <DimensionAttribute name="Year" levelType="TimeYears" attributeHierarchyEnabled="false">
-    <KeyColumn dataType="Integer" columnName="CALYEAR"/>
+  <DimensionAttribute name="0D_NW_CODE Text" attributeHierarchyEnabled="false">
+    <KeyColumn dataType="String" columnName="TXTMD"/>
   </DimensionAttribute>
-  <DimensionAttribute name="Quarter" levelType="TimeQuarters" attributeHierarchyEnabled="false">
-    <KeyColumn dataType="String" columnName="QUARTER"/>
-  </DimensionAttribute>
-  <DimensionAttribute name="Month" levelType="TimeMonths" attributeHierarchyEnabled="false">
-    <KeyColumn dataType="Integer" columnName="CALMONTH2"/>
-  </DimensionAttribute>
-  <Hierarchy hasAll="false" defaultMember="[Time].[2020]">
-    <Level name="Year" uniqueMembers="true" sourceAttribute="Year" levelType="TimeYears"/>
-    <Level name="Quarter" uniqueMembers="false" sourceAttribute="Quarter" levelType="TimeQuarters"/>
-    <Level name="Month" uniqueMembers="false" sourceAttribute="Month" levelType="TimeMonths"/>
+  ...
+  <Hierarchy hasAll="true" allMemberName="All Companies" caption="Company">
+    <Level name="0D_NW_CODE" caption="Company" uniqueMembers="true" sourceAttribute="0D_NW_CODE SID">
+      <Property name="Text" caption="Company Name" sourceAttribute="0D_NW_CODE Text"/>
+    </Level>
   </Hierarchy>
 </Dimension>
 ```
 
-This enables `Ytd`, `ParallelPeriod`, `PeriodsToDate`, `OpeningPeriod`/`ClosingPeriod` and `Lag` over months.
-`0CALYEAR` can then be left out of the cube: its value is the year of `0CALMONTH` in every row of this cube (checked:
-each year's facts have months of that year only). Every level of a time dimension needs a `levelType`; the reader
-refuses the schema otherwise. The SID 0 row ("not assigned", `CALMONTH = 000000`) sorts first, so a hierarchy without
-All member needs an explicit `defaultMember`.
+- The `DimensionAttribute`s describe the view's columns. All of them have `attributeHierarchyEnabled="false"`: what
+  users see are the `Hierarchy` elements, so that each can carry properties and a proper All member name.
+- The key attribute is keyed by `SID` (the join) and named by the BW key in its **internal format** (`0000001000`,
+  not BW's display `1000`): the internal key is what BW stores and what never changes.
+- The one-level `Hierarchy` is flat. It is written out only because a member property needs a level; an attribute
+  hierarchy (`attributeHierarchyEnabled="true"`) cannot carry properties, and its All member gets a generated name
+  ("All Company.Countrys").
+- The first `Hierarchy` of a dimension is its default hierarchy, unnamed, so its unique name is the dimension's:
+  `[0D_NW_CODE]`.
 
-### 4.6 Fix the scope of constant characteristics
+### 3.2 Navigation attributes
 
-Value type, version, currency and unit have one value each in this cube, but in BW a query on such a cube normally
-restricts value type and version, because mixing plan and actual gives wrong totals. Keep them as dimensions and set
-`defaultMember` on their hierarchies to the value BW queries restrict to (for example actual, version 000). Every MDX
-query that does not mention them is then restricted the same way, and a user can still switch.
-
-Amounts in different currencies must not be summed. With one currency, as here, a `Currency` dimension is enough.
-With several currencies, keep `Currency` as a dimension that users must slice by, or convert in BW before loading.
-
-### 4.7 Compounded characteristics
-
-`0D_NW_REGIO` is compounded with `0D_NW_CNTRY`: the region key alone is not unique. Key the dimension by SID (unique
-per country and region) and build Country > Region:
+A navigation attribute switched on in the provider (`RSDDIMEIOBJ` lists it as `<char>__<attribute>`) is a flat
+hierarchy of the characteristic's dimension, named as BW names it:
 
 ```xml
-<Hierarchy hasAll="true">
-  <Level name="Country" uniqueMembers="true" sourceAttribute="Country"/>
-  <Level name="Region" uniqueMembers="false" sourceAttribute="Region"/>
+<Hierarchy name="0D_NW_CODE__0D_NW_CNTRY" caption="Country of Company" hasAll="true"
+           allMemberName="All Countries of Companies">
+  <Level name="0D_NW_CNTRY" caption="Country of Company" uniqueMembers="true"
+         sourceAttribute="0D_NW_CODE__0D_NW_CNTRY">
+    <Property name="Text" caption="Country Name" sourceAttribute="0D_NW_CODE__0D_NW_CNTRY Text"/>
+  </Level>
 </Hierarchy>
 ```
 
-`uniqueMembers="false"` on Region tells the engine that the same region key can appear under several countries.
+What the demos showed:
 
-### 4.8 Measures for people
+- **It behaves as in BW: an independent field.** `[0D_NW_CODE.0D_NW_CODE__0D_NW_CNTRY]` on its own lists countries;
+  crossed with the companies it gives every pair, and `NON EMPTY` keeps those with facts (DE / 1111, FR / 3333, ...).
+  Nothing in the schema says that a company belongs to a country; the facts do.
+- **It is the country of the company, not a country.** Its name says so, and a characteristic `0D_NW_CNTRY` of the
+  cube would be a separate dimension `[0D_NW_CNTRY]`, as in BW.
+- **No SQL difference** between a navigation attribute in the characteristic's dimension and a dimension of its own on
+  the same view: both are one join of the same view, grouped by the attribute's column. The placement is about
+  meaning, not performance.
+- **Several navigation attributes are independent of each other.** Product Category and Product Group of
+  `0D_NW_PROD` happen to nest in the data (each group belongs to one category), but BW does not model that, so the
+  schema does not either.
 
-Use business names, captions and format strings, and choose the default measure:
+### 3.3 Display attributes and attributes not switched on
+
+A display attribute, or a navigation attribute that the provider does not switch on, is a member property of the
+characteristic's level, as key and text:
 
 ```xml
-<Cube name="0D_NW_C01" caption="Sales Overview (SAP NW Demo)" defaultMeasure="Net Value">
-  ...
-  <Measure name="Net Value" column="D_NW_NETV" aggregator="sum" formatString="#,##0.00"/>
-  <Measure name="Quantity" column="D_NW_QUANT" aggregator="sum" formatString="#,##0"/>
-</Cube>
+<Level name="0D_NW_SHIP" caption="Ship-to Party" uniqueMembers="true" sourceAttribute="0D_NW_SHIP SID">
+  <Property name="Text" caption="Ship-to Party Name" sourceAttribute="0D_NW_SHIP Text"/>
+  <Property name="0D_NW_CNTRY" caption="Country" sourceAttribute="0D_NW_CNTRY"/>
+  <Property name="0D_NW_CNTRY Text" caption="Country Name" sourceAttribute="0D_NW_CNTRY Text"/>
+  <Property name="0D_NW_IND" caption="Industry" sourceAttribute="0D_NW_IND"/>
+  <Property name="0D_NW_IND Text" caption="Industry Name" sourceAttribute="0D_NW_IND Text"/>
+</Level>
 ```
 
-Margin, average price and similar calculated key figures belong in the MDX query (`WITH MEMBER [Measures].[Margin]
-AS [Measures].[Net Value] - [Measures].[Cost]`) until schema `CalculatedMember`s are read (section 7).
+In `0D_NW_C01`, `0D_NW_SHIP` has no navigation attribute switched on although customer has two (Country, Industry), so
+they are properties. Excel shows them with right-click > *Show Properties in Report* or in the tooltip. Excel lists
+only declared properties: the member key is not offered, which is why the text and every attribute must be a
+`Property`.
 
-## 5. Time-dependent attributes and texts
+### 3.4 Names: technical keys, texts as captions
 
-The generated views contain the SID, the key and the time-independent attributes only. For texts and time-dependent
-attributes, write the view by hand (or extend the generator) with these rules:
+- **Identifiers** (dimension, hierarchy, level, measure names) are BW technical names: `0D_NW_CODE`,
+  `0D_NW_CODE__0D_NW_CNTRY`, `0D_NW_NETV`. **Captions** are the InfoObject texts: Company, Country of Company, Net Value.
+  Excel and the MDX console show captions; typed MDX uses names.
+- **Members are named by their internal BW key.** A member's unique name is built from its name, so
+  `[0D_NW_CODE].[1111]` stays valid when the company's text changes. Saved queries, Excel filters and calculated
+  members refer to keys that never change. Named by text, they break with every text maintenance, and two members with
+  the same text under one parent collide.
+- **Texts are properties** (`Text`, the EN medium text), shown next to the key on request.
+- **Texts later, if the business wants them:** the caption shown for a member is its name, so showing texts means
+  naming members by the text column (`NameColumn` = `TXTMD`), at the price of unique names that change with the text.
+  The SID key, joins and numbers stay the same. Decide per characteristic.
 
-- **One row per SID.** The fact table is joined to the view on `SID`; a second row for a SID duplicates every fact
-  of it, and all totals are wrong.
-- **Time-dependent attributes:** join `/BI0/Q<char>` with `OBJVERS = 'A'` and `DATETO = '99991231'`. Every value
-  then shows its current assignment, also for old facts: product `CN00S1` was in group `NB1` until 2012-12-31 and is in
-  `UB1` since; all its sales, also those of 2010-2012, are reported under `UB1`. This is BW's behaviour with a
-  navigation attribute and key date 9999-12-31.
-- **Texts:** join `/BI0/T<char>`; for a language-dependent text table add `LANGU = 'E'`; for time-dependent texts
-  also `DATETO = '99991231'`. Use a left outer join so that a value without text keeps its row; fall back to the key
-  for the name (`coalesce`).
-- **Every SID stays:** start from the SID table and left-outer-join everything else. A SID missing in the view drops
-  its facts from every query (the engine inner-joins).
+### 3.5 What BW does not have, and when to add it
 
-Example for `0D_NW_PROD` (CDS, NetWeaver 7.50 syntax):
+- **User hierarchies** (a drill path such as Category > Group > Product): only on request, for attributes that really
+  nest, next to the flat fields, never instead of them. A user hierarchy placed first becomes the dimension's default
+  and pushes the flat fields into Excel's "More Fields"; in the first demo it made the companies look as if they could
+  only be seen under their countries.
+- **External BW hierarchies:** out of scope.
+- **A time hierarchy:** `0CALMONTH` and `0CALYEAR` are separate characteristics in BW and stay separate dimensions.
+  Time functions (`Ytd`, `ParallelPeriod`, `PeriodsToDate`) need one `TimeDimension` with Year > Quarter > Month levels
+  on a view that derives them from `0CALMONTH`; every level of a time dimension needs a `levelType`. Add it when
+  the business needs those functions.
+- **Default members** for value type and version (BW queries restrict them; the schema can make every MDX query do the
+  same with `defaultMember`): a schema addition, not a BW object; useful when a cube mixes plan and actual.
+
+### 3.6 Traps
+
+- **A dimension's default hierarchy is its first one.** `[0D_NW_CODE].[0D_NW_CODE]` resolves in the default
+  hierarchy; a hierarchy named like the dimension but defined later cannot be reached that way.
+- **An unnamed `Hierarchy` and an attribute named like the dimension** get the same unique name; the reader refuses it.
+  Name key attributes `<char> SID`, as above.
+- **BW's "not assigned" value (SID 0)** is a member with an empty key; it appears without `NON EMPTY`.
+- **Hierarchy unique names** of non-default hierarchies are `[Dimension.Hierarchy]`, not `[Dimension].[Hierarchy]`.
+
+## 4. Views
+
+The generated views (`ZZXXMLA1_CL_BW_VIEW_GEN`) hold the SID, the key and the time-independent attributes. For texts
+and time-dependent attributes write the view by hand (or extend the generator); the demo views are in
+[examples/bw-schema/](examples/bw-schema/). Rules, each learnt on the system:
+
+1. **One row per SID.** The facts are joined to the view on `SID`; a second row for a SID counts its facts twice.
+   Check with native SQL: `SELECT "SID", COUNT(*) FROM "<view>" GROUP BY "SID" HAVING COUNT(*) > 1`.
+2. **Never join a client-dependent table without a client filter.** The engine reads with native SQL, which does not
+   filter `MANDT`. Joining `T005T` (country names) made HANA's view `CROSS JOIN T000`: one row per client, every fact
+   counted twice (DE showed 2,083,508,356.00 instead of 1,041,754,178.00), while ABAP SQL checks, which do filter the
+   client, showed one row. BW's `/BI0/` and `/BIC/` tables are client-independent; take texts from them.
+3. **Every SID stays:** start from the SID table, left-outer-join everything else. A SID missing in the view drops its
+   facts (the engine inner-joins).
+4. **Texts:** join `/BI0/T<char>`; a language-dependent text table (`LANGU` in its key) with `LANGU = 'E'`; the demo's
+   category and group texts exist in DE and EN, so without the filter every product appears twice. A time-dependent
+   text table also with `DATETO = '99991231'`. `coalesce( text, key )` so that a value without text is named by its key.
+5. **Time-dependent attributes:** join `/BI0/Q<char>` with `OBJVERS = 'A'` and `DATETO = '99991231'`. Every value then
+   shows its current assignment, also for old facts: product `CN00S1` was in group `NB1` until 2012-12-31 and is in
+   `UB1` since, so all its sales from 2010 are under `UB1` (NB1 shows only `HT1000`, 85,742,741.00). This is BW with
+   key date 9999-12-31.
+6. **Reference characteristics** have no tables of their own: `0D_NW_SHIP`, `0D_NW_SOLD`, `0D_NW_PAYER` all use the
+   view of `0D_NW_CUST`, and their fact columns hold its SIDs.
+7. Check the text flags in `RSDCHABAS` (`TXTTABFL`, `NOLANGU`, `TXTTIMFL`) and the attribute types in `RSDBCHATR`
+   (`ATTRITP` `NAV`/`DIS`, `ATRTIMFL`) before writing the joins.
+
+Example, product with category (time-independent) and group (time-dependent):
 
 ```
-@AbapCatalog.sqlViewName: 'ZZXXMLA1VNWPROD'
-@AccessControl.authorizationCheck: #NOT_REQUIRED
-@EndUserText.label: 'BW characteristic 0D_NW_PROD: SID, attributes, EN texts at 9999-12-31'
 define view ZZXXMLA1_C_NW_PROD
   as select from /bi0/sd_nw_prod as s
     left outer join /bi0/pd_nw_prod  as p  on  p.d_nw_prod = s.d_nw_prod and p.objvers = 'A'
@@ -286,70 +224,101 @@ define view ZZXXMLA1_C_NW_PROD
 }
 ```
 
-The `0D_NW_PROD` text table is language-independent (no `LANGU`), the category and group text tables are
-language-dependent. Check the flags in `RSDCHABAS` (`TXTTABFL`, `NOLANGU`, `TXTTIMFL`) or the table's key
-columns before writing the join. A level that should show the text uses the key column for grouping and the text
-column for the name:
+## 5. The example: 0D_NW_C01
+
+7,005 fact rows, 2010-01 to 2020-12, one value type, one version, currency EUR, unit ST.
+
+| BW dimension | Characteristic | Basic characteristic | Navigation attributes switched on in the cube | Other attributes | Values in facts |
+|---|---|---|---|---|---|
+| 1 | `0D_NW_CODE` Company code | itself | `0D_NW_CNTRY` | | 4 |
+| 1 | `0D_NW_PLANT` Plant | itself | | | 5 |
+| 1 | `0D_NW_SGRP` Sales group | itself | | | |
+| 2 | `0D_NW_SOLD` Sold-to | `0D_NW_CUST` | none | `0D_NW_CNTRY`, `0D_NW_IND` (NAV in master data) | 19 |
+| 2 | `0D_NW_SHIP` Ship-to | `0D_NW_CUST` | none | same | 19 |
+| 2 | `0D_NW_PAYER` Payer | `0D_NW_CUST` | none | same | 19 |
+| 3 | `0D_NW_PROD` Product | itself | `0D_NW_PRDCT`, `0D_NW_PRDGP` (time-dependent) | | 12 |
+| 4 | `0D_NW_VTYPE` Value type | itself | | | 1 |
+| 5 | `0D_NW_VERS` Version | itself | | | 1 |
+| 6 | `0D_NW_CHANN`, `0D_NW_DIV` | itself | | | |
+| 6 | `0D_NW_SORG` Sales organisation | itself | `0D_NW_CNTRY` | | 5 |
+| 7 | `0D_NW_CNTRY` Country | itself | | | 4 |
+| 7 | `0D_NW_REGIO` Region | compounded with `0D_NW_CNTRY` | | | 5 |
+| T | `0CALMONTH`, `0CALYEAR` | | | | 132 / 11 |
+| U | `0CURRENCY`, `0UNIT` | | | | 1 / 1 |
+
+Key figures, all SUM/SUM: `0D_NW_NETV`, `0D_NW_COSTV`, `0D_NW_OORV` (currency), `0D_NW_QUANT`, `0D_NW_OORQT` (unit),
+`0D_NW_DOCUM`.
+
+The demo catalog `NWPRODUCT` (cube `NW Product Sales`) has Product with its two navigation attributes and Ship-to with
+its display attributes ([NWPRODUCT.xml](examples/bw-schema/NWPRODUCT.xml)); `NWCOMPANY` has the company code with its
+country ([NWCOMPANY.xml](examples/bw-schema/NWCOMPANY.xml)). Answers on the system:
+
+| Query (NON EMPTY, Net Value) | Result |
+|---|---|
+| `[0D_NW_PROD.0D_NW_PROD__0D_NW_PRDCT]` | MOB 1,550,415,790.00 · MON 1,589,641,940.00 · NB 1,534,753,565.00 |
+| `[0D_NW_PROD.0D_NW_PROD__0D_NW_PRDGP]` | UB1 712,365,431.00 (CN00S1, all years) · NB1 85,742,741.00 (HT1000 only) · ... |
+| `[0D_NW_SHIP]` with properties | 0000001000 · Adecom SA · GB · 1111: 102,625,813.00 · ... (19 parties) |
+| `[0D_NW_CODE.0D_NW_CODE__0D_NW_CNTRY]` × `[0D_NW_CODE]` | DE / 1111 · FR / 3333 · GB / 2222 · US / 4444, totals 4,674,811,295.00 |
+
+Compounding: `0D_NW_REGIO` is compounded with `0D_NW_CNTRY`, so its key alone is not unique. The SID is unique; name
+the member by both keys, concatenated in the view (`concat_with_space( d_nw_cntry, d_nw_regio, 1 )`), so that unique
+names are unique too. Not tried on the system yet.
+
+## 6. Measures
 
 ```xml
-<DimensionAttribute name="Product Group" attributeHierarchyEnabled="false">
-  <KeyColumn dataType="String" columnName="D_NW_PRDGP"/>
-  <NameColumn dataType="String" columnName="PRDGP_TXT"/>
-</DimensionAttribute>
+<Cube name="NW Product Sales" caption="0D_NW_C01 by product and ship-to party" defaultMeasure="0D_NW_NETV">
+  <Table name="/BI0/F0D_NW_C01"/>
+  <DimensionUsage name="0D_NW_PROD" caption="Product" source="0D_NW_PROD" foreignKey="SID_0D_NW_PROD"/>
+  <Measure name="0D_NW_NETV" caption="Net Value" column="D_NW_NETV" aggregator="sum" formatString="#,##0.00"/>
+</Cube>
 ```
 
-Members are ordered by their key columns (ordinal and caption columns are not supported), so choose keys whose order
-makes sense: numbers for months, the BW key for products.
+- Name = key figure, caption = its text, a format string per key figure type.
+- Amounts in different currencies must not be summed: with several currencies keep `0CURRENCY` as a dimension users
+  slice by, or convert in BW.
+- Calculated and restricted key figures belong in the MDX query (`WITH MEMBER`) until schema `CalculatedMember`s are
+  read (section 8).
 
-## 6. Performance
-
-How the engine reads BW, and what follows for the design:
+## 7. Performance
 
 | What the engine does | Design consequence |
 |---|---|
-| **Members:** the first time a hierarchy is used, `SELECT DISTINCT <level keys, names, properties> FROM <view> ORDER BY <level keys>`, all rows of the view. | Cost grows with master data, not facts. A characteristic with millions of values (customers, documents) is expensive to put in a hierarchy; keep such views lean and give them few properties. |
-| **Cells:** one grouped query per combination of levels: fact table inner-joined with the view of each hierarchy involved on `SID`, `GROUP BY` the level key columns, `SUM` of every measure plus `COUNT(*)`, kept for the rest of the query. | Every hierarchy on an axis or in the slicer adds one join. Views must be cheap to join: 1:1 joins on keys, no aggregation, no `DISTINCT`, no `UNION` in the view. HANA does the aggregation on the fact table. |
-| Grouping uses key columns only; name and property columns are read with the members. | Texts as `NameColumn` cost nothing in fact queries. Short integer keys (SID, NUMC cast to int) group faster than long strings. |
-| Members of a level list every row of the view, not only values with facts. `0CALMONTH`'s SID table has 231 months, the facts 132. | Use `NON EMPTY` on axes. Under `NON EMPTY`, levels of more than 300 members, `Children` and `Descendants` read only members with facts (`SqlContextConstraint`), and crossjoins are computed in the database from the facts. |
-| A crossjoin larger than 1,000,000 tuples fails before it is built. | Product x customer x month on one axis needs `NON EMPTY` (only existing combinations) or a `Filter`/`TopCount`. |
-| Each enabled attribute hierarchy is one more hierarchy in metadata (`MDSCHEMA_*` rowsets) and in client field lists. | Leave `attributeHierarchyEnabled="false"` unless users slice by the attribute alone. The proposal already does. |
+| **Members:** the first time a hierarchy is used, `SELECT DISTINCT <level key, name, properties> FROM <view> ORDER BY <level key>`, all rows of the view. | Cost grows with master data, not facts. Many properties on a characteristic with millions of values (customers, documents) make this read large. |
+| **Cells:** one grouped query per combination of levels: the fact table inner-joined with the view once per hierarchy used, `GROUP BY` the level key columns, `SUM` of every measure plus `COUNT(*)`, kept for the rest of the query. | Every hierarchy on an axis or in the slicer is one join, whether or not two hierarchies share a dimension. Views must be cheap to join: 1:1 joins on keys, no aggregation, no `DISTINCT`, no `UNION`. HANA aggregates. |
+| Grouping uses key columns only (the SID); names and properties are read with the members. | Texts and keys as names or properties cost nothing in fact queries. |
+| Levels list every row of the view, not only values with facts (`0CALMONTH`'s SID table has 231 months, the facts 132). | Use `NON EMPTY`, as Excel does. Under `NON EMPTY`, levels of more than 300 members, `Children` and `Descendants` read only members with facts, and crossjoins are computed in the database. |
+| A crossjoin larger than 1,000,000 tuples fails before it is built. | Large combinations need `NON EMPTY`, `Filter` or `TopCount`. |
 | Subselects (Excel pivot filters) add their hierarchies' joins and a `WHERE` to every fact query. | Same rule as axes: cheap views. |
-| aDSO facts come from the view `/BIC/A<adso>7`, a union of inbound and active table. | Activate requests regularly; a large inbound table slows every query. |
-| Generated views on HANA are plain SQL views; joins to the S, P, Q and T tables run in the column store. | A hand-written view with computed columns (substring, `case`) is fine; keep computed columns out of the join condition. |
+| aDSO facts come from `/BIC/A<adso>7`, a union of inbound and active table. | Activate requests regularly. |
 
-Practical rules:
+## 8. Checklist and current limits
 
-1. One row per SID in every view; verify with `SELECT sid, COUNT(*) ... GROUP BY sid HAVING COUNT(*) > 1`.
-2. Join facts on the SID (InfoCube) or the value column (aDSO), never on a text or a computed column.
-3. Few hierarchies per dimension, few properties per level on large characteristics.
-4. Constant characteristics with a `defaultMember` cost one join each in every query. If a characteristic has only
-   one value forever, leaving it out of the schema is cheaper.
-5. Test with the MDX console (`/zzxxmla1/schema/console.html`) using `NON EMPTY`, as clients such as Excel do.
+Checklist:
 
-## 7. Checklist and current limits
+- [ ] One dimension per characteristic of the provider (technical ones such as package and request left out), named by
+      the InfoObject, captioned by its text.
+- [ ] Members keyed by SID, named by the internal BW key, the EN text as property `Text`.
+- [ ] Each navigation attribute switched on in the provider is a flat hierarchy `<char>__<attribute>`; display
+      attributes and attributes not switched on are properties (key and text).
+- [ ] Reference characteristics are dimensions of their own on the basic characteristic's view.
+- [ ] No user hierarchies unless the business asks; never first in a dimension.
+- [ ] Measures named by key figure, captioned, formatted; no sums across currencies.
+- [ ] Every view: one row per SID (checked with native SQL), every SID kept, no client-dependent table, texts in EN,
+      time-dependent data at 9999-12-31.
 
-Checklist for a schema:
+Current limits of olap4abap:
 
-- [ ] Every characteristic users need is a dimension; technical ones (package, request) are not.
-- [ ] Role characteristics share one dimension through `DimensionUsage`.
-- [ ] Members are named by EN texts, names are unique among siblings, the BW key is a property.
-- [ ] Navigation attributes form hierarchies; descriptive attributes are properties.
-- [ ] Time is one `TimeDimension` with level types on every level and a `defaultMember` if it has no All member.
-- [ ] Value type and version have a `defaultMember`; currencies are not summed across.
-- [ ] Measures have business names, format strings and a default measure.
-- [ ] Every view has exactly one row per SID and keeps every SID.
-
-Current limits of olap4abap, to design around:
-
+- **The schema generator does not follow this guide yet:** its proposal names dimensions, attributes and measures by
+  InfoObject texts, names members by the key only on the key attribute, treats navigation and display attributes alike,
+  and its views have no texts or time-dependent attributes. Until it does, write the schema and views by hand from the
+  examples.
 - **Aggregation:** fact queries sum every measure; only `sum` (and the built-in `Fact Count`) are correct. A measure
-  with `aggregator="min"` or `"max"` is read as a sum by `ZZXXMLA1_CL_MDX_FACTS` today, so leave MIN/MAX key figures
-  out. Exception aggregation and non-cumulative key figures are not supported.
-- **Schema calculated members** (`CalculatedMember` in a cube) are not read; define them in the query. Schema
-  `NamedSet`s, virtual cubes, roles and parameters are refused.
-- **Generated views** have no texts, no time-dependent attributes and no navigation attributes of other
-  characteristics; write those views by hand (section 5).
-- **BW hierarchies** (`/BI0/H...`) and **compounded characteristics** in the generator are not supported; model
-  compounding as in 4.7.
-- **`0CALDAY`** has no SID table and is not proposed; use `0CALMONTH` or a date characteristic with attributes.
-- **Member order** is the key order; `ordinalColumn` and `captionColumn` are not supported.
+  with `aggregator="min"` or `"max"` is read as a sum by `ZZXXMLA1_CL_MDX_FACTS` today. Exception aggregation and
+  non-cumulative key figures are not supported.
+- **Schema calculated members** (`CalculatedMember` in a cube) are not read; schema `NamedSet`s, virtual cubes, roles
+  and parameters are refused.
+- **Not supported in levels:** `captionColumn`, `ordinalColumn` (members are ordered by key), expressions,
+  `parentColumn`, `hideMemberIf`; property formatters.
+- **`0CALDAY`** has no SID table and is not proposed.
 - One cube per catalog.

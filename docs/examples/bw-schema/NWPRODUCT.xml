@@ -1,0 +1,93 @@
+<?xml version="1.0"?>
+<!--
+  Demo, modelled as BW shows it: the characteristic product 0D_NW_PROD of 0D_NW_C01 with its navigation attributes
+  Product Category (0D_NW_PROD__0D_NW_PRDCT) and Product Group (0D_NW_PROD__0D_NW_PRDGP, time-dependent, read at the
+  key date 9999-12-31), on the view ZZXXMLA1VNWPROD (SID, D_NW_PROD, TXTMD, D_NW_PRDCT, PRDCT_TXT, D_NW_PRDGP,
+  PRDGP_TXT; texts in EN).
+  Identifiers are BW's technical names, members are named by their BW keys, texts are captions and member properties.
+  Ship-to party 0D_NW_SHIP (a reference of customer 0D_NW_CUST, view ZZXXMLA1VNWCUST) with its display attributes.
+  Nothing is nested: each is a flat hierarchy of one level, written out only because a member property needs a level.
+-->
+<Schema name="NWPRODUCT">
+  <Dimension name="0D_NW_PROD" caption="Product" table="ZZXXMLA1VNWPROD">
+    <DimensionAttribute name="0D_NW_PROD SID" usage="Key" attributeHierarchyEnabled="false">
+      <KeyColumn dataType="Integer" columnName="SID"/>
+      <NameColumn dataType="String" columnName="D_NW_PROD"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="0D_NW_PROD Text" attributeHierarchyEnabled="false">
+      <KeyColumn dataType="String" columnName="TXTMD"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="0D_NW_PROD__0D_NW_PRDCT" attributeHierarchyEnabled="false">
+      <KeyColumn dataType="String" columnName="D_NW_PRDCT"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="0D_NW_PROD__0D_NW_PRDCT Text" attributeHierarchyEnabled="false">
+      <KeyColumn dataType="String" columnName="PRDCT_TXT"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="0D_NW_PROD__0D_NW_PRDGP" attributeHierarchyEnabled="false">
+      <KeyColumn dataType="String" columnName="D_NW_PRDGP"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="0D_NW_PROD__0D_NW_PRDGP Text" attributeHierarchyEnabled="false">
+      <KeyColumn dataType="String" columnName="PRDGP_TXT"/>
+    </DimensionAttribute>
+    <Hierarchy hasAll="true" allMemberName="All Products" caption="Product">
+      <Level name="0D_NW_PROD" caption="Product" uniqueMembers="true" sourceAttribute="0D_NW_PROD SID">
+        <Property name="Text" caption="Product Name" sourceAttribute="0D_NW_PROD Text"/>
+      </Level>
+    </Hierarchy>
+    <Hierarchy name="0D_NW_PROD__0D_NW_PRDCT" caption="Product Category" hasAll="true"
+               allMemberName="All Product Categories">
+      <Level name="0D_NW_PRDCT" caption="Product Category" uniqueMembers="true"
+             sourceAttribute="0D_NW_PROD__0D_NW_PRDCT">
+        <Property name="Text" caption="Product Category Name" sourceAttribute="0D_NW_PROD__0D_NW_PRDCT Text"/>
+      </Level>
+    </Hierarchy>
+    <Hierarchy name="0D_NW_PROD__0D_NW_PRDGP" caption="Product Group" hasAll="true"
+               allMemberName="All Product Groups">
+      <Level name="0D_NW_PRDGP" caption="Product Group" uniqueMembers="true"
+             sourceAttribute="0D_NW_PROD__0D_NW_PRDGP">
+        <Property name="Text" caption="Product Group Name" sourceAttribute="0D_NW_PROD__0D_NW_PRDGP Text"/>
+      </Level>
+    </Hierarchy>
+  </Dimension>
+  <!-- Ship-to party 0D_NW_SHIP references customer 0D_NW_CUST: the fact column SID_0D_NW_SHIP holds SIDs of
+       0D_NW_CUST, the view ZZXXMLA1VNWCUST is the customer's (SID, D_NW_CUST, TXTMD, D_NW_CNTRY, CNTRY_TXT, D_NW_IND,
+       IND_TXT). 0D_NW_C01 switches on no navigation attribute of 0D_NW_SHIP, so its Country and Industry are display
+       attributes: member properties of the ship-to party, not fields of their own. -->
+  <Dimension name="0D_NW_SHIP" caption="Ship-to Party" table="ZZXXMLA1VNWCUST">
+    <DimensionAttribute name="0D_NW_SHIP SID" usage="Key" attributeHierarchyEnabled="false">
+      <KeyColumn dataType="Integer" columnName="SID"/>
+      <NameColumn dataType="String" columnName="D_NW_CUST"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="0D_NW_SHIP Text" attributeHierarchyEnabled="false">
+      <KeyColumn dataType="String" columnName="TXTMD"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="0D_NW_CNTRY" attributeHierarchyEnabled="false">
+      <KeyColumn dataType="String" columnName="D_NW_CNTRY"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="0D_NW_CNTRY Text" attributeHierarchyEnabled="false">
+      <KeyColumn dataType="String" columnName="CNTRY_TXT"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="0D_NW_IND" attributeHierarchyEnabled="false">
+      <KeyColumn dataType="String" columnName="D_NW_IND"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="0D_NW_IND Text" attributeHierarchyEnabled="false">
+      <KeyColumn dataType="String" columnName="IND_TXT"/>
+    </DimensionAttribute>
+    <Hierarchy hasAll="true" allMemberName="All Ship-to Parties" caption="Ship-to Party">
+      <Level name="0D_NW_SHIP" caption="Ship-to Party" uniqueMembers="true" sourceAttribute="0D_NW_SHIP SID">
+        <Property name="Text" caption="Ship-to Party Name" sourceAttribute="0D_NW_SHIP Text"/>
+        <Property name="0D_NW_CNTRY" caption="Country" sourceAttribute="0D_NW_CNTRY"/>
+        <Property name="0D_NW_CNTRY Text" caption="Country Name" sourceAttribute="0D_NW_CNTRY Text"/>
+        <Property name="0D_NW_IND" caption="Industry" sourceAttribute="0D_NW_IND"/>
+        <Property name="0D_NW_IND Text" caption="Industry Name" sourceAttribute="0D_NW_IND Text"/>
+      </Level>
+    </Hierarchy>
+  </Dimension>
+  <Cube name="NW Product Sales" caption="0D_NW_C01 by product and ship-to party" defaultMeasure="0D_NW_NETV">
+    <Table name="/BI0/F0D_NW_C01"/>
+    <DimensionUsage name="0D_NW_PROD" caption="Product" source="0D_NW_PROD" foreignKey="SID_0D_NW_PROD"/>
+    <DimensionUsage name="0D_NW_SHIP" caption="Ship-to Party" source="0D_NW_SHIP" foreignKey="SID_0D_NW_SHIP"/>
+    <Measure name="0D_NW_NETV" caption="Net Value" column="D_NW_NETV" aggregator="sum" formatString="#,##0.00"/>
+    <Measure name="0D_NW_QUANT" caption="Quantity" column="D_NW_QUANT" aggregator="sum" formatString="#,##0"/>
+  </Cube>
+</Schema>
