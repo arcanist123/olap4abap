@@ -9,7 +9,9 @@ app changes with it. Run it after every change of web/schema/, then write the cl
 Each file is one method named after it (app_js, console_html, ...; file( ) picks it by the path, so a request builds
 only its own file) that appends string templates (|...|) to a table and joins them: a template keeps every
 character as it is once \\ | { } are escaped, the line feeds are written as \\n, and an ABAP source line stays below 255
-characters. The files are served as UTF-8 with LF line ends.
+characters. The source is ASCII only: a character outside ASCII (the icons, an ellipsis) is an embedded expression
+cl_abap_conv_in_ce=>uccp( ), because another system that imports the class would otherwise show it as '?'. The files
+are served as UTF-8 with LF line ends.
 """
 import pathlib
 import re
@@ -27,9 +29,16 @@ def escape(text):
     """The text as pieces of string template content, none longer than CHUNK and no escape sequence split."""
     pieces, current = [], ""
     for char in text:
-        token = {"\\": "\\\\", "|": "\\|", "{": "\\{", "}": "\\}", "\n": "\\n", "\t": "\\t"}.get(char, char)
         if char == "\r":
             continue
+        if ord(char) > 127:
+            # The source stays ASCII: a character outside it is built at runtime from its UTF-16 code units, since
+            # moving source to another system (abapGit, a transport, a code page without it) turns it into '?'.
+            units = char.encode("utf-16-be")
+            token = "".join("{ cl_abap_conv_in_ce=>uccp( '" + units[i:i + 2].hex().upper() + "' ) }"
+                            for i in range(0, len(units), 2))
+        else:
+            token = {"\\": "\\\\", "|": "\\|", "{": "\\{", "}": "\\}", "\n": "\\n", "\t": "\\t"}.get(char, char)
         if len(current) + len(token) > CHUNK:
             pieces.append(current)
             current = ""

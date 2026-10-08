@@ -228,250 +228,259 @@ CLASS zzxxmla1_cl_web_app_files IMPLEMENTATION.
     APPEND |$\{(e) => setText(e.target.value)\} onChange=$\{commit\}\n      onKeyDown=$\{(e) => \{ if (e.key === 'Escape') \{ setText(value); setError(''); \} \}\} />\n    $\{error && html`<di| TO parts.
     APPEND |v class="field-error">$\{error\}</div>`\}\n  </span>`;\n\}\n\nfunction Select(\{ value, options, onChange, title \}) \{\n  const values = options.includes(value) \|\| value === '' | TO parts.
     APPEND |? options : [value, ...options];\n  return html`<select value=$\{value\} title=$\{title\} onChange=$\{(e) => onChange(e.target.value)\}>\n    $\{value === '' && html`<option value=| TO parts.
-    APPEND |"">–</option>`\}\n    $\{values.map((o) => html`<option value=$\{o\}>$\{o\}</option>`)\}\n  </select>`;\n\}\n\nfunction Check(\{ checked, onChange, label, title, disabled \}) \{\n | TO parts.
-    APPEND | return html`<label class="switch" title=$\{title\}>\n    <input type="checkbox" checked=$\{checked\} disabled=$\{disabled\} onChange=$\{(e) => onChange(e.target.checked)\} />$\{la| TO parts.
-    APPEND |bel\}\n  </label>`;\n\}\n\nfunction Dialog(\{ title, children, footer, onClose \}) \{\n  useEffect(() => \{\n    const onKey = (e) => e.key === 'Escape' && onClose && onClose();\n | TO parts.
-    APPEND |   addEventListener('keydown', onKey);\n    return () => removeEventListener('keydown', onKey);\n  \}, [onClose]);\n  return html`<div class="backdrop" onClick=$\{(e) => e.target =| TO parts.
-    APPEND |== e.currentTarget && onClose && onClose()\}>\n    <div class="dialog" role="dialog" aria-modal="true">\n      <header><h2>$\{title\}</h2></header>\n      <div class="body">$\{chil| TO parts.
-    APPEND |dren\}</div>\n      <footer>$\{footer\}</footer>\n    </div>\n  </div>`;\n\}\n\n// -------------------------------------------------------------------------------------------------| TO parts.
-    APPEND | start page\n\nfunction formatTime(iso) \{\n  if (!iso) return '';\n  const d = new Date(iso);\n  return isNaN(d) ? iso : d.toLocaleString();\n\}\n\nfunction Start(\{ onOpen, openi| TO parts.
-    APPEND |ng, error \}) \{\n  const [providers, setProviders] = useState(null);\n  const [schemas, setSchemas] = useState(null);\n  const [loadError, setLoadError] = useState('');\n  const [| TO parts.
-    APPEND |filter, setFilter] = useState('');\n  const [removing, setRemoving] = useState(null);\n  const loadSchemas = () => api('GET', 'schemas').then((d) => setSchemas(d.schemas), (e) => s| TO parts.
-    APPEND |etLoadError(e.message));\n  useEffect(() => \{\n    api('GET', 'providers').then((d) => setProviders(d.providers), (e) => setLoadError(e.message));\n    loadSchemas();\n  \}, []);| TO parts.
-    APPEND |\n  const words = filter.toLowerCase().split(/\\s+/).filter(Boolean);\n  const shown = (providers \|\| []).filter((p) =>\n    words.every((w) => `$\{p.name\} $\{p.text\} $\{p.infoa| TO parts.
-    APPEND |rea\} $\{p.kind\}`.toLowerCase().includes(w)));\n\n  return html`\n    <div class="topbar"><h1>Schema Builder</h1><span class="muted">Mondrian schemas for BW InfoProviders</span>\n| TO parts.
-    APPEND |      <span class="spacer"></span><a href=$\{`console.html$\{location.search\}`\}>MDX Console</a><a href=$\{`time.html$\{location.search\}`\}>Time Master Data</a></div>\n    <div c| TO parts.
-    APPEND |lass="page">\n    $\{(error \|\| loadError) && html`<div style="padding: 16px 16px 0"><div class="notice err">$\{error \|\| loadError\}</div></div>`\}\n    $\{opening && html`<div | TO parts.
-    APPEND |style="padding: 16px 16px 0"><div class="notice info">$\{opening\}</div></div>`\}\n    <div class="start">\n      <section class="card">\n        <header><h2>Accepted schemas</h2><| TO parts.
-    APPEND |span class="spacer"></span><span class="muted small">catalogs of /WEB-INF/datasources.xml</span></header>\n        <div class="scroll">\n          $\{schemas == null ? html`<div cl| TO parts.
-    APPEND |ass="body muted">Loading…</div>` : !schemas.length ? html`<div class="body muted">No catalogs yet.</div>` : html`\n          <table>\n            <thead><tr><th>Catalog</th><th>Sch| TO parts.
-    APPEND |ema file</th><th>Changed</th><th></th></tr></thead>\n            <tbody>$\{schemas.map((s) => html`\n              <tr class=$\{s.exists ? 'clickable' : ''\} title=$\{s.exists ? `E| TO parts.
-    APPEND |dit $\{s.catalog\}` : 'The schema file is missing'\}\n                onClick=$\{() => s.exists && !opening && onOpen(\{ kind: 'schema', name: s.catalog \})\}>\n                <td| TO parts.
-    APPEND |><strong>$\{s.catalog\}</strong><div class="muted small">$\{s.dataSource\}</div></td>\n                <td class="mono">$\{s.file\}$\{!s.exists && html` <span class="kind">missing<| TO parts.
-    APPEND |/span>`\}</td>\n                <td class="small">$\{formatTime(s.changedAt)\}<div class="muted">$\{s.changedBy\}</div></td>\n                <td><button class="danger" title=$\{`R| TO parts.
-    APPEND |emove catalog $\{s.catalog\}`\} disabled=$\{!!opening\}\n                  onClick=$\{(e) => \{ e.stopPropagation(); setRemoving(\{ kind: 'confirm', schema: s \}); \}\}>Remove…</bu| TO parts.
-    APPEND |tton></td>\n              </tr>`)\}\n            </tbody>\n          </table>`\}\n        </div>\n      </section>\n      <section class="card">\n        <header>\n          <h2>Pr| TO parts.
-    APPEND |opose from a provider</h2><span class="spacer"></span>\n          <input type="search" placeholder="Filter by name, text, InfoArea" value=$\{filter\} onInput=$\{(e) => setFilter(e.| TO parts.
-    APPEND |target.value)\}\n            aria-label="Filter providers" style="width: min(260px, 100%)" />\n        </header>\n        <div class="scroll">\n          $\{providers == null ? htm| TO parts.
-    APPEND |l`<div class="body muted">Loading…</div>` : html`\n          <table>\n            <thead><tr><th>Provider</th><th>Text</th><th>InfoArea</th></tr></thead>\n            <tbody>$\{sho| TO parts.
-    APPEND |wn.map((p) => html`\n              <tr class="clickable" title=$\{`Propose a schema for $\{p.name\}`\} onClick=$\{() => !opening && onOpen(\{ kind: 'proposal', name: p.name \})\}>| TO parts.
-    APPEND |\n                <td><strong class="mono">$\{p.name\}</strong> <span class="kind">$\{p.kind\}</span></td>\n                <td>$\{p.text\}</td>\n                <td class="mono sm| TO parts.
-    APPEND |all">$\{p.infoarea\}</td>\n              </tr>`)\}\n            </tbody>\n          </table>\n          $\{!shown.length && html`<div class="body muted">No provider matches.</div>`| TO parts.
-    APPEND |\}`\}\n        </div>\n      </section>\n    </div>\n    </div>\n    $\{removing && html`<$\{RemoveDialog\} dialog=$\{removing\} onClose=$\{() => setRemoving(null)\}\n      onRemov| TO parts.
-    APPEND |e=$\{async () => \{\n        const s = removing.schema;\n        setRemoving(\{ kind: 'removing', schema: s \});\n        try \{\n          const result = await api('POST', 'remove| TO parts.
-    APPEND |', \{ catalog: s.catalog \});\n          setRemoving(\{ kind: 'done', schema: s, result \});\n        \} catch (e) \{\n          setRemoving(\{ kind: 'failed', schema: s, message: | TO parts.
-    APPEND |e.message \});\n        \}\n        loadSchemas();\n      \}\} />`\}`;\n\}\n\nfunction RemoveDialog(\{ dialog, onRemove, onClose \}) \{\n  const s = dialog.schema;\n  if (dialog.ki| TO parts.
-    APPEND |nd === 'confirm') \{\n    return html`<$\{Dialog\} title="Remove the schema" onClose=$\{onClose\} footer=$\{html`\n      <button onClick=$\{onClose\}>Cancel</button>\n      <button| TO parts.
-    APPEND | class="primary" onClick=$\{onRemove\}>Remove $\{s.catalog\}</button>`\}>\n      <div class="notice warn">Catalog <strong class="mono">$\{s.catalog\}</strong> and its cubes are rem| TO parts.
-    APPEND |oved: the next XMLA request\n        does not see them. This cannot be undone here; the schema can be proposed and accepted again.</div>\n      <div class="form">\n        <label>D| TO parts.
-    APPEND |ata source</label><span>$\{s.dataSource\}</span>\n        <label>Schema file</label><span class="mono">$\{s.file\}$\{s.exists ? ' (deleted)' : ' (missing)'\}</span>\n        <label| TO parts.
-    APPEND |>Views</label><span>kept: other schemas can use them</span>\n      </div>\n    <//>`;\n  \}\n  if (dialog.kind === 'removing') \{\n    return html`<$\{Dialog\} title="Removing…" fo| TO parts.
-    APPEND |oter=$\{''\}><span class="muted">Removing $\{s.catalog\}…</span><//>`;\n  \}\n  if (dialog.kind === 'failed') \{\n    return html`<$\{Dialog\} title="Not removed" onClose=$\{onClos| TO parts.
-    APPEND |e\} footer=$\{html`<button onClick=$\{onClose\}>Close</button>`\}>\n      <div class="notice err">$\{dialog.message\}</div><span class="muted">Nothing was changed.</span>\n    <//>| TO parts.
-    APPEND |`;\n  \}\n  const r = dialog.result;\n  return html`<$\{Dialog\} title="Removed" onClose=$\{onClose\} footer=$\{html`<button class="primary" onClick=$\{onClose\}>Close</button>`\}>| TO parts.
-    APPEND |\n    <div class="notice ok">Catalog <strong class="mono">$\{r.catalog\}</strong> is removed from /WEB-INF/datasources.xml.</div>\n    <span class="muted">$\{r.removedFiles.length | TO parts.
-    APPEND |? html`Deleted $\{r.removedFiles.map((f, i) => html`$\{i > 0 && ', '\}<span class="mono">$\{f\}</span>`)\}.` : 'No schema file deleted.'\}</span>\n  <//>`;\n\}\n\n// --------------| TO parts.
-    APPEND |--------------------------------------------------------------------------------------- panes\n\nfunction SchemaPane(\{ doc, edit, source, catalog, notes \}) \{\n  const schema = s| TO parts.
-    APPEND |chemaOf(doc);\n  return html`<div class="pane">\n    <div class="form">\n      <label>Schema name</label>\n      <$\{TextField\} value=$\{attr(schema, 'name')\} validate=$\{require| TO parts.
-    APPEND |d('The schema')\} onCommit=$\{(v) => edit(() => schema.setAttribute('name', v))\} />\n      <label>Description</label>\n      <$\{TextField\} value=$\{attr(schema, 'description')\}| TO parts.
-    APPEND | onCommit=$\{(v) => edit(() => setAttr(schema, 'description', v))\} />\n      $\{source.kind === 'proposal' && html`\n        <label>Provider</label><span><strong class="mono">$\{s| TO parts.
-    APPEND |ource.name\}</strong> <span class="kind">$\{source.providerKind\}</span> $\{source.text\}</span>\n        <label>Fact table</label><span class="mono">$\{source.factTable\}</span>`| TO parts.
-    APPEND |\}\n      $\{source.kind === 'schema' && html`\n        <label>Schema file</label><span class="mono">$\{source.file\}</span>\n        <label>Last accepted</label><span>$\{formatTim| TO parts.
-    APPEND |e(source.changedAt)\} $\{source.changedBy && html`<span class="muted">by $\{source.changedBy\}</span>`\}</span>`\}\n    </div>\n    <div class="notice info">\n      Every attribute| TO parts.
-    APPEND | of a dimension is already an attribute hierarchy, so the schema is usable as proposed. Rename what\n      reads badly, drop what nobody needs, mark a dimension as time, and build | TO parts.
-    APPEND |user hierarchies (e.g. Country › State ›\n      City) from attributes. The server checks the schema as you edit; <strong>Accept</strong> generates the views,\n      writes the sche| TO parts.
-    APPEND |ma file and registers catalog <strong class="mono">$\{catalog \|\| '?'\}</strong>.\n    </div>\n    $\{notes.length > 0 && html`<section class="section">\n      <header><h3>Not pro| TO parts.
-    APPEND |posed</h3></header>\n      <div class="body"><ul class="plain">$\{notes.map((n) => html`<li><span class="mono">$\{n.iobjnm\}</span>: $\{n.reason\}</li>`)\}</ul></div>\n    </sectio| TO parts.
-    APPEND |n>`\}\n  </div>`;\n\}\n\nfunction CubePane(\{ doc, edit, cube, select \}) \{\n  const measures = kids(cube, 'Measure');\n  const usages = kids(cube, 'DimensionUsage');\n  const pri| TO parts.
-    APPEND |vates = kids(cube, 'Dimension');\n  const known = ['Table', 'DimensionUsage', 'Dimension', 'Measure', 'Annotations'];\n  const others = [...cube.children].filter((c) => !known.incl| TO parts.
-    APPEND |udes(c.tagName)).map((c) => c.tagName);\n  const measureNames = measures.map((m) => attr(m, 'name'));\n  const dimNames = [...usages, ...privates].map((u) => attr(u, 'name'));\n  c| TO parts.
-    APPEND |onst defaultMeasure = attr(cube, 'defaultMeasure');\n\n  const removeMeasure = (m) => edit(() => \{\n    const name = attr(m, 'name');\n    m.remove();\n    if (defaultMeasure === | TO parts.
-    APPEND |name) setAttr(cube, 'defaultMeasure', attr(kids(cube, 'Measure')[0], 'name'));\n  \});\n\n  return html`<div class="pane">\n    <div class="form">\n      <label>Cube name</label>\n| TO parts.
-    APPEND |      <$\{TextField\} value=$\{attr(cube, 'name')\} validate=$\{unique('A cube', cubesOf(doc).filter((c) => c !== cube).map((c) => attr(c, 'name')))\}\n        onCommit=$\{(v) => e| TO parts.
-    APPEND |dit(() => cube.setAttribute('name', v))\} />\n      <label>Caption</label>\n      <$\{TextField\} value=$\{attr(cube, 'caption')\} placeholder=$\{attr(cube, 'name')\} onCommit=$\{(| TO parts.
-    APPEND |v) => edit(() => setAttr(cube, 'caption', v))\} />\n      <label>Fact table</label>\n      <$\{TextField\} readOnly mono value=$\{attr(kids(cube, 'Table')[0], 'name')\} />\n      <| TO parts.
-    APPEND |label>Default measure</label>\n      <$\{Select\} value=$\{defaultMeasure\} options=$\{measureNames\} onChange=$\{(v) => edit(() => setAttr(cube, 'defaultMeasure', v))\} />\n    </| TO parts.
-    APPEND |div>\n\n    <section class="section">\n      <header><h3>Measures</h3><span class="spacer"></span><span class="muted small">key figures of the fact table</span></header>\n      <di| TO parts.
-    APPEND |v class="body scroll-x"><table>\n        <thead><tr><th>Name</th><th>Column</th><th>Aggregator</th><th>Format string</th><th>Visible</th><th></th></tr></thead>\n        <tbody>$\{m| TO parts.
-    APPEND |easures.map((m, i) => html`<tr key=$\{i\}>\n          <td><$\{TextField\} value=$\{attr(m, 'name')\} validate=$\{unique('A measure', measureNames.filter((n) => n !== attr(m, 'name'| TO parts.
-    APPEND |)))\}\n            onCommit=$\{(v) => edit(() => \{ if (defaultMeasure === attr(m, 'name')) cube.setAttribute('defaultMeasure', v); m.setAttribute('name', v); \})\} /></td>\n      | TO parts.
-    APPEND |    <td class="mono small">$\{attr(m, 'column')\}</td>\n          <td><$\{Select\} value=$\{attr(m, 'aggregator')\} options=$\{AGGREGATORS\} onChange=$\{(v) => edit(() => m.setAttr| TO parts.
-    APPEND |ibute('aggregator', v))\}\n            title="The engine evaluates sum and count" /></td>\n          <td><$\{TextField\} value=$\{attr(m, 'formatString')\} list="formats" placehold| TO parts.
-    APPEND |er="Standard" mono\n            onCommit=$\{(v) => edit(() => setAttr(m, 'formatString', v))\} /></td>\n          <td><input type="checkbox" checked=$\{isTrue(m, 'visible', true)\}| TO parts.
-    APPEND | aria-label="Visible"\n            onChange=$\{(e) => edit(() => m.setAttribute('visible', String(e.target.checked)))\} /></td>\n          <td class="actions">\n            <button| TO parts.
-    APPEND | class="icon" title="Up" disabled=$\{i === 0\} onClick=$\{() => edit(() => move(m, -1))\}>↑</button>\n            <button class="icon" title="Down" disabled=$\{i === measures.lengt| TO parts.
-    APPEND |h - 1\} onClick=$\{() => edit(() => move(m, 1))\}>↓</button>\n            <button class="icon danger" title="Remove the measure" disabled=$\{measures.length === 1\} onClick=$\{() =| TO parts.
-    APPEND |> removeMeasure(m)\}>✕</button>\n          </td>\n        </tr>`)\}</tbody>\n      </table></div>\n    </section>\n\n    <section class="section">\n      <header><h3>Dimensions of | TO parts.
-    APPEND |the cube</h3><span class="spacer"></span><span class="muted small">joined on the fact table's foreign key</span></header>\n      <div class="body scroll-x"><table>\n        <thead>| TO parts.
-    APPEND |<tr><th>Name in the cube</th><th>Dimension</th><th>Foreign key</th><th></th></tr></thead>\n        <tbody>\n          $\{usages.map((u, i) => \{\n            const di = sharedDims(| TO parts.
-    APPEND |doc).findIndex((d) => attr(d, 'name') === attr(u, 'source'));\n            return html`<tr key=$\{'u' + i\}>\n              <td><$\{TextField\} value=$\{attr(u, 'name')\} validate=| TO parts.
-    APPEND |$\{unique('A dimension', dimNames.filter((n) => n !== attr(u, 'name')))\}\n                onCommit=$\{(v) => edit(() => u.setAttribute('name', v))\} /></td>\n              <td>$\{| TO parts.
-    APPEND |di >= 0 ? html`<button class="link" onClick=$\{() => select(\{ kind: 'dim', ci: null, di \})\}>$\{attr(u, 'source')\}</button>`\n                : html`<span class="field-error">$| TO parts.
-    APPEND |\{attr(u, 'source')\} (missing)</span>`\}</td>\n              <td class="mono small">$\{attr(u, 'foreignKey')\}</td>\n              <td class="actions"><button class="icon danger" | TO parts.
-    APPEND |title="Remove from the cube (the dimension stays)"\n                onClick=$\{() => confirm(`Remove '$\{attr(u, 'name')\}' from cube '$\{attr(cube, 'name')\}'?`) && edit(() => u.r| TO parts.
-    APPEND |emove())\}>✕</button></td>\n            </tr>`;\n          \})\}\n          $\{privates.map((d, i) => html`<tr key=$\{'p' + i\}>\n            <td>$\{attr(d, 'name')\}</td>\n       | TO parts.
-    APPEND |     <td><button class="link" onClick=$\{() => select(\{ kind: 'dim', ci: cubesOf(doc).indexOf(cube), di: i \})\}>private dimension</button></td>\n            <td class="mono small| TO parts.
-    APPEND |">$\{attr(d, 'foreignKey')\}</td><td></td>\n          </tr>`)\}\n        </tbody>\n      </table></div>\n    </section>\n    $\{others.length > 0 && html`<div class="notice warn">T| TO parts.
-    APPEND |he cube also has $\{[...new Set(others)].join(', ')\}; edit them on the XML tab.</div>`\}\n  </div>`;\n\}\n\nfunction DimensionPane(\{ doc, edit, dim, sel, select, suggestions \}) | TO parts.
-    APPEND |\{\n  const time = isTime(dim);\n  const attributes = attributesOf(dim);\n  const hierarchies = hierarchiesOf(dim);\n  const usages = isShared(dim) ? usagesOf(doc, dim) : [];\n  co| TO parts.
-    APPEND |nst attrNames = attributes.map((a) => attr(a, 'name'));\n  const used = new Set(hierarchies.flatMap((h) => kids(h, 'Level').flatMap((l) =>\n    [attr(l, 'sourceAttribute'), ...kids| TO parts.
-    APPEND |(l, 'Property').map((p) => attr(p, 'sourceAttribute'))])));\n  const siblings = isShared(dim) ? sharedDims(doc) : kids(dim.parentNode, 'Dimension');\n  const hierarchyCount = hiera| TO parts.
-    APPEND |rchies.length + attributes.filter(hasHierarchy).length;\n\n  const remove = () => \{\n    const what = usages.length ? ` and its $\{usages.length\} cube usage(s)` : '';\n    if (!c| TO parts.
-    APPEND |onfirm(`Remove dimension '$\{attr(dim, 'name')\}'$\{what\}?`)) return;\n    edit(() => \{\n      usages.forEach((\{ usage \}) => usage.remove());\n      dim.remove();\n    \});\n  | TO parts.
-    APPEND |  select(\{ kind: 'schema' \});\n  \};\n  const addHierarchy = () => edit(() => \{\n    const names = [...attrNames, ...hierarchies.map((h) => attr(h, 'name'))];\n    let name = `$| TO parts.
-    APPEND |\{attr(dim, 'name')\} Hierarchy`;\n    for (let n = 2; names.includes(name); n++) name = `$\{attr(dim, 'name')\} Hierarchy $\{n\}`;\n    insertAfterLast(dim, create(doc, 'Hierarchy| TO parts.
-    APPEND |', \{ name, hasAll: 'true' \}), ['Hierarchy', 'DimensionAttribute']);\n  \});\n\n  return html`<div class="pane">\n    <div class="form">\n      <label>Dimension name</label>\n    | TO parts.
-    APPEND |  <$\{TextField\} value=$\{attr(dim, 'name')\} validate=$\{unique('A dimension', siblings.filter((d) => d !== dim).map((d) => attr(d, 'name')))\}\n        onCommit=$\{(v) => edit((| TO parts.
-    APPEND |) => renameDimension(doc, dim, v))\} />\n      <label>Caption</label>\n      <$\{TextField\} value=$\{attr(dim, 'caption')\} placeholder=$\{attr(dim, 'name')\} onCommit=$\{(v) => e| TO parts.
-    APPEND |dit(() => setAttr(dim, 'caption', v))\} />\n      <label>Table</label>\n      <$\{TextField\} readOnly mono value=$\{attr(dim, 'table')\} title="The view of the characteristic; a p| TO parts.
-    APPEND |laceholder (ZZXXMLA1_C_...) is replaced by the view generated on accept" />\n      <label>Time</label>\n      <span class="row">\n        <$\{Check\} checked=$\{time\} label="Time | TO parts.
-    APPEND |dimension" onChange=$\{(on) => edit(() => setTimeDimension(dim, on, suggestions))\} />\n        <span class="muted small">enables the time functions (Ytd, ParallelPeriod, …); every| TO parts.
-    APPEND | level then needs a time level type</span>\n      </span>\n      $\{isShared(dim) && html`<label>Used by</label>\n        <span>$\{usages.length ? usages.map((\{ cube, usage \}, i)| TO parts.
-    APPEND | => html`$\{i > 0 && ', '\}<button class="link"\n          onClick=$\{() => select(\{ kind: 'cube', ci: cubesOf(doc).indexOf(cube) \})\}>$\{attr(cube, 'name')\}</button>\n         | TO parts.
-    APPEND | <span class="muted small"> as $\{attr(usage, 'name')\} on <span class="mono">$\{attr(usage, 'foreignKey')\}</span></span>`)\n          : html`<span class="muted">no cube – not vis| TO parts.
-    APPEND |ible in MDX</span>`\}</span>`\}\n    </div>\n\n    <section class="section">\n      <header><h3>Attributes</h3><span class="spacer"></span><span class="muted small">a ticked attrib| TO parts.
-    APPEND |ute is a hierarchy of its own; the others serve as levels and properties</span></header>\n      <div class="body scroll-x"><table>\n        <thead><tr><th>Name</th><th>Key column</| TO parts.
-    APPEND |th><th>Name column</th><th>Hierarchy</th>$\{time && html`<th>Level type</th>`\}<th></th></tr></thead>\n        <tbody>$\{attributes.map((a, i) => \{\n          const suggestion = s| TO parts.
-    APPEND |uggestionFor(suggestions, dim, a);\n          const isKey = attr(a, 'usage') === 'Key';\n          return html`<tr key=$\{i\}>\n            <td><$\{TextField\} value=$\{attr(a, 'na| TO parts.
-    APPEND |me')\} validate=$\{unique('An attribute', attrNames.filter((n) => n !== attr(a, 'name')))\}\n              onCommit=$\{(v) => edit(() => renameAttribute(dim, a, v))\} /></td>\n    | TO parts.
-    APPEND |        <td class="mono small">$\{keyColumn(a)\} $\{isKey && html`<span class="kind">key</span>`\}</td>\n            <td class="mono small">$\{attr(kids(a, 'NameColumn')[0], 'colum| TO parts.
-    APPEND |nName')\}</td>\n            <td><$\{Check\} checked=$\{hasHierarchy(a)\} disabled=$\{hasHierarchy(a) && hierarchyCount === 1\}\n              title=$\{hasHierarchy(a) && hierarchyC| TO parts.
-    APPEND |ount === 1 ? 'The dimension needs a hierarchy' : 'The attribute is a hierarchy of its own'\}\n              onChange=$\{(on) => edit(() => setAttributeHierarchy(a, on))\} /></td>\n| TO parts.
-    APPEND |            $\{time && html`<td><div class="row">\n              <$\{Select\} value=$\{attr(a, 'levelType')\} options=$\{TIME_TYPES\} onChange=$\{(v) => edit(() => setAttributeLeve| TO parts.
-    APPEND |lType(dim, a, v))\} />\n              $\{suggestion && suggestion !== attr(a, 'levelType') && html`<button class="link small"\n                onClick=$\{() => edit(() => setAttrib| TO parts.
-    APPEND |uteLevelType(dim, a, suggestion))\}>suggested: $\{suggestion\}</button>`\}\n            </div></td>`\}\n            <td class="actions"><button class="icon danger" disabled=$\{isKe| TO parts.
-    APPEND |y \|\| used.has(attr(a, 'name'))\}\n              title=$\{isKey ? 'The key attribute stays' : used.has(attr(a, 'name')) ? 'A hierarchy uses it' : 'Remove the attribute'\}\n       | TO parts.
-    APPEND |       onClick=$\{() => edit(() => a.remove())\}>✕</button></td>\n          </tr>`;\n        \})\}</tbody>\n      </table></div>\n    </section>\n\n    <section class="section">\n | TO parts.
-    APPEND |     <header>\n        <h3>Hierarchies</h3><span class="spacer"></span>\n        <button onClick=$\{addHierarchy\}>Add hierarchy</button>\n      </header>\n      <div class="body">| TO parts.
-    APPEND |\n        $\{!hierarchies.length && html`<span class="muted">None. A hierarchy has attributes as levels, top level first; a user hierarchy nests several.</span>`\}\n        $\{hier| TO parts.
-    APPEND |archies.map((h, i) => html`<$\{HierarchyEditor\} key=$\{i\} doc=$\{doc\} edit=$\{edit\} dim=$\{dim\} h=$\{h\}\n          others=$\{[...attrNames, ...hierarchies.filter((o) => o !==| TO parts.
-    APPEND | h).map((o) => attr(o, 'name'))]\} />`)\}\n      </div>\n    </section>\n\n    <div class="row"><button class="danger" onClick=$\{remove\}>Remove dimension</button></div>\n  </div>| TO parts.
-    APPEND |`;\n\}\n\nfunction HierarchyEditor(\{ doc, edit, dim, h, others \}) \{\n  const [open, setOpen] = useState(\{\});\n  const time = isTime(dim);\n  const levels = kids(h, 'Level');\n| TO parts.
-    APPEND |  const attributes = attributesOf(dim);\n  const attrNames = attributes.map((a) => attr(a, 'name'));\n  const hasAll = isTrue(h, 'hasAll', true);\n  const name = attr(h, 'name');\n| TO parts.
-    APPEND |  // an unnamed hierarchy is [dimension], as is one named like the dimension and an attribute of the dimension's name\n  const clash = (!name \|\| name === attr(dim, 'name')) && (o| TO parts.
-    APPEND |thers.includes('') \|\| others.includes(attr(dim, 'name')));\n  const levelNames = levels.map((l) => attr(l, 'name'));\n\n  const addLevel = (source) => edit(() => \{\n    const a | TO parts.
-    APPEND |= attributes.find((x) => attr(x, 'name') === source);\n    let levelName = source;\n    for (let n = 2; levelNames.includes(levelName); n++) levelName = `$\{source\} $\{n\}`;\n    | TO parts.
-    APPEND |h.appendChild(create(doc, 'Level', \{\n      name: levelName,\n      uniqueMembers: levels.length === 0 ? 'true' : 'false',\n      sourceAttribute: source,\n      levelType: time ?| TO parts.
-    APPEND | attr(a, 'levelType') \|\| 'TimeUndefined' : '',\n    \}));\n  \});\n\n  return html`<div class="hier">\n    <header>\n      <$\{TextField\} value=$\{name\} placeholder=$\{`(unname| TO parts.
-    APPEND |d: [$\{attr(dim, 'name')\}])`\}\n        validate=$\{(v) => (v && others.includes(v) ? `'$\{v\}' is already an attribute or hierarchy of the dimension` : '')\}\n        onCommit=$| TO parts.
-    APPEND |\{(v) => edit(() => setAttr(h, 'name', v))\} />\n      <$\{Check\} checked=$\{hasAll\} label="All member" onChange=$\{(on) => edit(() => h.setAttribute('hasAll', String(on)))\} />| TO parts.
-    APPEND |\n      $\{hasAll && html`<$\{TextField\} value=$\{attr(h, 'allMemberName')\} placeholder="All member name" size="16"\n        onCommit=$\{(v) => edit(() => setAttr(h, 'allMemberNa| TO parts.
-    APPEND |me', v))\} />`\}\n      <$\{TextField\} value=$\{attr(h, 'defaultMember')\} mono placeholder=$\{hasAll ? 'default member: the All member' : `default member, e.g. [$\{attr(dim, 'nam| TO parts.
-    APPEND |e')\}].[1997]`\}\n        title="A unique member name" onCommit=$\{(v) => edit(() => setAttr(h, 'defaultMember', v))\} />\n      <span class="spacer"></span>\n      <button class="| TO parts.
-    APPEND |danger" onClick=$\{() => confirm(`Remove hierarchy '$\{name \|\| attr(dim, 'name')\}'?`) && edit(() => h.remove())\}>Remove</button>\n    </header>\n    <div class="body">\n      $| TO parts.
-    APPEND |\{clash && html`<div class="notice warn">Name the hierarchy: the dimension has another unnamed hierarchy or one (or an attribute)\n        named '$\{attr(dim, 'name')\}', and an un| TO parts.
-    APPEND |named hierarchy (or one named like the dimension) would share its unique name.</div>`\}\n      $\{!hasAll && !attr(h, 'defaultMember') && html`<div class="notice warn">Without an A| TO parts.
-    APPEND |ll member the first member is the default; BW's\n        empty member (SID 0) may come first, so give a default member.</div>`\}\n      $\{levels.length > 0 && html`<div class="scr| TO parts.
-    APPEND |oll-x"><table>\n        <thead><tr><th>#</th><th>Level</th><th>Attribute</th>$\{time && html`<th>Level type</th>`\}<th title="Members are unique within the level, not only within t| TO parts.
-    APPEND |heir parent">Unique</th><th>Properties</th><th></th></tr></thead>\n        <tbody>$\{levels.map((l, i) => \{\n          const props = kids(l, 'Property');\n          return html`\n| TO parts.
-    APPEND |          <tr key=$\{'l' + i\}>\n            <td class="num muted">$\{i + 1\}</td>\n            <td><$\{TextField\} value=$\{attr(l, 'name')\} validate=$\{unique('A level', levelNa| TO parts.
-    APPEND |mes.filter((n) => n !== attr(l, 'name')))\}\n              onCommit=$\{(v) => edit(() => l.setAttribute('name', v))\} /></td>\n            <td><$\{Select\} value=$\{attr(l, 'source| TO parts.
-    APPEND |Attribute')\} options=$\{attrNames\} onChange=$\{(v) => edit(() => l.setAttribute('sourceAttribute', v))\} /></td>\n            $\{time && html`<td><$\{Select\} value=$\{attr(l, 'l| TO parts.
-    APPEND |evelType')\} options=$\{TIME_TYPES\} onChange=$\{(v) => edit(() => l.setAttribute('levelType', v))\} /></td>`\}\n            <td><input type="checkbox" checked=$\{isTrue(l, 'unique| TO parts.
-    APPEND |Members', false)\} aria-label="Unique members"\n              onChange=$\{(e) => edit(() => l.setAttribute('uniqueMembers', String(e.target.checked)))\} /></td>\n            <td><b| TO parts.
-    APPEND |utton class="link" onClick=$\{() => setOpen(\{ ...open, [i]: !open[i] \})\}>$\{props.length\} $\{open[i] ? '▾' : '▸'\}</button></td>\n            <td class="actions">\n            | TO parts.
-    APPEND |  <button class="icon" title="Up" disabled=$\{i === 0\} onClick=$\{() => edit(() => move(l, -1))\}>↑</button>\n              <button class="icon" title="Down" disabled=$\{i === lev| TO parts.
-    APPEND |els.length - 1\} onClick=$\{() => edit(() => move(l, 1))\}>↓</button>\n              <button class="icon danger" title="Remove the level" onClick=$\{() => edit(() => l.remove())\}>| TO parts.
-    APPEND |✕</button>\n            </td>\n          </tr>\n          $\{open[i] && html`<tr key=$\{'p' + i\}><td></td><td colspan=$\{time ? 6 : 5\}><div class="props">\n            $\{props.m| TO parts.
-    APPEND |ap((p, j) => html`<div class="row" key=$\{j\}>\n              <$\{TextField\} value=$\{attr(p, 'name')\} validate=$\{required('A property')\} onCommit=$\{(v) => edit(() => p.setAtt| TO parts.
-    APPEND |ribute('name', v))\} />\n              <span class="muted">from</span>\n              <$\{Select\} value=$\{attr(p, 'sourceAttribute')\} options=$\{attrNames\} onChange=$\{(v) => e| TO parts.
-    APPEND |dit(() => p.setAttribute('sourceAttribute', v))\} />\n              <button class="icon danger" title="Remove the property" onClick=$\{() => edit(() => p.remove())\}>✕</button>\n  | TO parts.
-    APPEND |          </div>`)\}\n            <div class="row"><select value="" aria-label="Add a property" onChange=$\{(e) => \{\n              const source = e.target.value;\n              e| TO parts.
-    APPEND |.target.value = '';\n              if (source) edit(() => l.appendChild(create(doc, 'Property', \{ name: source, sourceAttribute: source \})));\n            \}\}>\n              <o| TO parts.
-    APPEND |ption value="">Add a member property…</option>\n              $\{attrNames.filter((n) => !props.some((p) => attr(p, 'sourceAttribute') === n)).map((n) => html`<option value=$\{n\}>| TO parts.
-    APPEND |$\{n\}</option>`)\}\n            </select><span class="muted small">attributes shown with each member of this level</span></div>\n          </div></td></tr>`\}`;\n        \})\}</tb| TO parts.
-    APPEND |ody>\n      </table></div>`\}\n      <div class="row">\n        <select value="" aria-label="Add a level" onChange=$\{(e) => \{\n          const source = e.target.value;\n         | TO parts.
-    APPEND | e.target.value = '';\n          if (source) addLevel(source);\n        \}\}>\n          <option value="">Add a level…</option>\n          $\{attrNames.map((n) => html`<option valu| TO parts.
-    APPEND |e=$\{n\}>$\{n\}$\{levels.some((l) => attr(l, 'sourceAttribute') === n) ? ' (used)' : ''\}</option>`)\}\n        </select>\n        $\{!levels.length && html`<span class="muted smal| TO parts.
-    APPEND |l">start with the top level</span>`\}\n      </div>\n    </div>\n  </div>`;\n\}\n\nfunction XmlPane(\{ xml, replace \}) \{\n  const [text, setText] = useState(xml);\n  const [error| TO parts.
-    APPEND |, setError] = useState('');\n  useEffect(() => \{\n    setText(xml);\n    setError('');\n  \}, [xml]);\n  const apply = () => \{\n    try \{\n      replace(parseXml(text));\n    \}| TO parts.
-    APPEND | catch (e) \{\n      setError(e.message);\n    \}\n  \};\n  const download = () => \{\n    const link = document.createElement('a');\n    link.href = URL.createObjectURL(new Blob([| TO parts.
-    APPEND |xml], \{ type: 'application/xml' \}));\n    link.download = `$\{attr(parseXml(xml).documentElement, 'name') \|\| 'schema'\}.xml`;\n    link.click();\n    URL.revokeObjectURL(link.h| TO parts.
-    APPEND |ref);\n  \};\n  return html`<div class="pane" style="max-width: none">\n    <div class="row">\n      <button class="primary" disabled=$\{text === xml\} onClick=$\{apply\}>Apply</bu| TO parts.
-    APPEND |tton>\n      <button disabled=$\{text === xml\} onClick=$\{() => \{ setText(xml); setError(''); \}\}>Revert</button>\n      <button onClick=$\{download\}>Download</button>\n      <| TO parts.
-    APPEND |span class="muted small">Anything the outline does not cover (calculated members, captions, annotations, …) is edited here.</span>\n    </div>\n    $\{error && html`<div class="not| TO parts.
-    APPEND |ice err">$\{error\}</div>`\}\n    <textarea class="xml" spellcheck="false" value=$\{text\} onInput=$\{(e) => setText(e.target.value)\}\n      onKeyDown=$\{(e) => \{\n        if ((e| TO parts.
-    APPEND |.ctrlKey \|\| e.metaKey) && e.key === 's') \{ e.preventDefault(); apply(); \}\n      \}\}></textarea>\n  </div>`;\n\}\n\n// --------------------------------------------------------| TO parts.
-    APPEND |---------------------------------------------- editor\n\nfunction Tree(\{ doc, sel, select, notes \}) \{\n  const item = (target, label, badge, sub) => \{\n    const selected = JSO| TO parts.
-    APPEND |N.stringify(target) === JSON.stringify(sel);\n    return html`<button class=$\{`item$\{sub ? ' sub' : ''\}$\{selected ? ' selected' : ''\}`\} onClick=$\{() => select(target)\}>\n  | TO parts.
-    APPEND |    <span>$\{label\}</span>$\{badge && html`<span class="badge">$\{badge\}</span>`\}\n    </button>`;\n  \};\n  const usedNames = new Set(cubesOf(doc).flatMap((c) => kids(c, 'Dimen| TO parts.
-    APPEND |sionUsage').map((u) => attr(u, 'source'))));\n  return html`<nav class="tree" aria-label="Schema outline">\n    $\{item(\{ kind: 'schema' \}, html`<strong>$\{attr(schemaOf(doc), 'n| TO parts.
-    APPEND |ame') \|\| 'Schema'\}</strong>`, notes.length ? `$\{notes.length\} note$\{notes.length > 1 ? 's' : ''\}` : '')\}\n    <div class="group"><h3>Cubes</h3></div>\n    $\{cubesOf(doc).m| TO parts.
-    APPEND |ap((cube, ci) => html`\n      $\{item(\{ kind: 'cube', ci \}, attr(cube, 'name'), `$\{kids(cube, 'Measure').length\} measures`)\}\n      $\{kids(cube, 'Dimension').map((d, di) => i| TO parts.
-    APPEND |tem(\{ kind: 'dim', ci, di \}, attr(d, 'name'), isTime(d) ? 'time' : '', true))\}`)\}\n    <div class="group"><h3>Dimensions</h3></div>\n    $\{sharedDims(doc).map((d, di) => item(| TO parts.
-    APPEND |\{ kind: 'dim', ci: null, di \}, attr(d, 'name'),\n      [isTime(d) && 'time', hierarchiesOf(d).length && `$\{hierarchiesOf(d).length\} hier.`, !usedNames.has(attr(d, 'name')) && '| TO parts.
-    APPEND |unused']\n        .filter(Boolean).join(' · ')))\}\n  </nav>`;\n\}\n\nfunction Editor(\{ session, onClose, onAccepted \}) \{\n  const [doc, setDoc] = useState(session.doc);\n  cons| TO parts.
-    APPEND |t [version, setVersion] = useState(0);\n  const [source, setSource] = useState(session.source);\n  const [catalog, setCatalog] = useState(session.catalog);\n  const [dirty, setDirt| TO parts.
-    APPEND |y] = useState(false);\n  const [sel, setSel] = useState(\{ kind: 'schema' \});\n  const [tab, setTab] = useState('outline');\n  const [check, setCheck] = useState(\{ state: 'busy' | TO parts.
-    APPEND |\});\n  const [dialog, setDialog] = useState(null);\n  const undoStack = useRef([]);\n  const xml = useMemo(() => serialize(doc), [doc, version]);\n\n  const edit = useCallback((ch| TO parts.
-    APPEND |ange) => \{\n    undoStack.current.push(serialize(doc));\n    if (undoStack.current.length > 100) undoStack.current.shift();\n    change(doc);\n    setVersion((v) => v + 1);\n    s| TO parts.
-    APPEND |etDirty(true);\n  \}, [doc]);\n  const replace = useCallback((next) => \{\n    undoStack.current.push(serialize(doc));\n    setDoc(next);\n    setVersion((v) => v + 1);\n    setDir| TO parts.
-    APPEND |ty(true);\n  \}, [doc]);\n  const undo = useCallback(() => \{\n    const previous = undoStack.current.pop();\n    if (previous == null) return;\n    setDoc(parseXml(previous));\n  | TO parts.
-    APPEND |  setVersion((v) => v + 1);\n  \}, []);\n\n  // Ctrl+Z outside of input fields (they have their own undo)\n  useEffect(() => \{\n    const onKey = (e) => \{\n      if ((e.ctrlKey | TO parts.
-    APPEND |\|\| e.metaKey) && e.key === 'z' && !/^(INPUT\|TEXTAREA\|SELECT)$/.test(document.activeElement.tagName)) \{\n        e.preventDefault();\n        undo();\n      \}\n    \};\n    ad| TO parts.
-    APPEND |dEventListener('keydown', onKey);\n    return () => removeEventListener('keydown', onKey);\n  \}, [undo]);\n  useEffect(() => \{\n    const onLeave = (e) => \{ if (dirty) \{ e.prev| TO parts.
-    APPEND |entDefault(); e.returnValue = ''; \} \};\n    addEventListener('beforeunload', onLeave);\n    return () => removeEventListener('beforeunload', onLeave);\n  \}, [dirty]);\n\n  // th| TO parts.
-    APPEND |e server's checks of accept, nothing written; the last request wins\n  const sequence = useRef(0);\n  useEffect(() => \{\n    const mine = ++sequence.current;\n    setCheck((c) => | TO parts.
-    APPEND |(\{ ...c, state: 'busy' \}));\n    const timer = setTimeout(async () => \{\n      try \{\n        if (!CATALOG_NAME.test(catalog)) throw new Error('A catalog name has letters, digi| TO parts.
-    APPEND |ts, _, - and . (not first)');\n        const result = await api('POST', 'check', \{ catalog \}, xml);\n        if (mine === sequence.current) setCheck(\{ state: 'ok', result, xml, | TO parts.
-    APPEND |catalog \});\n      \} catch (e) \{\n        if (mine === sequence.current) setCheck(\{ state: 'err', message: e.message \});\n      \}\n    \}, 500);\n    return () => clearTimeou| TO parts.
-    APPEND |t(timer);\n  \}, [xml, catalog]);\n\n  const current = check.state === 'ok' && check.xml === xml && check.catalog === catalog;\n  const accept = async () => \{\n    setDialog(\{ ki| TO parts.
-    APPEND |nd: 'accepting' \});\n    try \{\n      const result = await api('POST', 'accept', \{ catalog \}, xml);\n      undoStack.current = [];\n      setDoc(parseXml(result.xml));\n      s| TO parts.
-    APPEND |etVersion((v) => v + 1);\n      setDirty(false);\n      const reopened = \{ kind: 'schema', name: result.catalog, file: result.file, changedAt: new Date().toISOString(), changedBy:| TO parts.
-    APPEND | '' \};\n      setSource(reopened);\n      setDialog(\{ kind: 'accepted', result \});\n      onAccepted(reopened);\n    \} catch (e) \{\n      setDialog(\{ kind: 'failed', message:| TO parts.
-    APPEND | e.message \});\n    \}\n  \};\n\n  let target = resolve(doc, sel);\n  const shownSel = target ? sel : \{ kind: 'schema' \};\n  if (!target) target = schemaOf(doc);\n  const status| TO parts.
-    APPEND | = check.state === 'busy' ? html`<span class="status busy">Checking…</span>`\n    : check.state === 'err' ? html`<span class="status err" title=$\{check.message\}>✕ Does not load</| TO parts.
-    APPEND |span>`\n      : html`<span class="status ok" title=$\{check.result.file\}>✓ Loads$\{check.result.newCatalog ? ' · new catalog' : ' · replaces the catalog\\'s schema'\}</span>`;\n\n| TO parts.
-    APPEND |  return html`\n    <div class="topbar">\n      <button onClick=$\{() => (!dirty \|\| confirm('Leave without accepting? Your changes are lost.')) && onClose()\} title="Back to the | TO parts.
-    APPEND |list">←</button>\n      <div class="title">\n        <h1>Schema Builder</h1>\n        <span class="src">$\{source.kind === 'proposal' ? html`proposal for <span class="mono">$\{sour| TO parts.
-    APPEND |ce.name\}</span>` : html`catalog <span class="mono">$\{source.name\}</span>`\}$\{dirty && ' · edited'\}</span>\n      </div>\n      <span class="spacer"></span>\n      <label class| TO parts.
-    APPEND |="inline">Catalog\n        <input type="text" class=$\{`mono$\{CATALOG_NAME.test(catalog) ? '' : ' invalid'\}`\} value=$\{catalog\} size="16"\n          onInput=$\{(e) => setCatalo| TO parts.
-    APPEND |g(e.target.value.trim())\} />\n      </label>\n      $\{status\}\n      <button disabled=$\{!undoStack.current.length\} onClick=$\{undo\} title="Undo (Ctrl+Z)">Undo</button>\n     | TO parts.
-    APPEND | <button class="primary" disabled=$\{!current\} onClick=$\{() => setDialog(\{ kind: 'confirm' \})\}\n        title=$\{current ? 'Generate the views, write the schema file and regis| TO parts.
-    APPEND |ter the catalog' : 'Waiting for a successful check'\}>Accept…</button>\n    </div>\n    $\{check.state === 'err' && html`<div class="banner" role="alert">$\{check.message\}</div>`| TO parts.
-    APPEND |\}\n    <div class="editor">\n      <$\{Tree\} doc=$\{doc\} sel=$\{shownSel\} select=$\{(s) => \{ setSel(s); setTab('outline'); \}\} notes=$\{session.notes\} />\n      <main class=| TO parts.
-    APPEND |"main">\n        <div class="tabs" role="tablist">\n          <button role="tab" class=$\{tab === 'outline' ? 'active' : ''\} onClick=$\{() => setTab('outline')\}>Outline</button>| TO parts.
-    APPEND |\n          <button role="tab" class=$\{tab === 'xml' ? 'active' : ''\} onClick=$\{() => setTab('xml')\}>XML</button>\n        </div>\n        $\{tab === 'xml' ? html`<$\{XmlPane\}| TO parts.
-    APPEND | xml=$\{xml\} replace=$\{replace\} />`\n          : shownSel.kind === 'cube' ? html`<$\{CubePane\} key=$\{JSON.stringify(shownSel)\} doc=$\{doc\} edit=$\{edit\} cube=$\{target\} se| TO parts.
-    APPEND |lect=$\{setSel\} />`\n            : shownSel.kind === 'dim' ? html`<$\{DimensionPane\} key=$\{JSON.stringify(shownSel)\} doc=$\{doc\} edit=$\{edit\} dim=$\{target\} sel=$\{shownSel| TO parts.
-    APPEND |\}\n                select=$\{setSel\} suggestions=$\{session.suggestions\} />`\n              : html`<$\{SchemaPane\} doc=$\{doc\} edit=$\{edit\} source=$\{source\} catalog=$\{cat| TO parts.
-    APPEND |alog\} notes=$\{session.notes\} />`\}\n      </main>\n    </div>\n    <datalist id="formats">$\{FORMATS.map((f) => html`<option value=$\{f\} />`)\}</datalist>\n    $\{dialog && htm| TO parts.
-    APPEND |l`<$\{AcceptDialog\} dialog=$\{dialog\} check=$\{check\} catalog=$\{catalog\} onAccept=$\{accept\} onClose=$\{() => setDialog(null)\} />`\}`;\n\}\n\nfunction AcceptDialog(\{ dialog| TO parts.
-    APPEND |, check, catalog, onAccept, onClose \}) \{\n  if (dialog.kind === 'confirm') \{\n    const r = check.result;\n    return html`<$\{Dialog\} title="Accept the schema" onClose=$\{onCl| TO parts.
-    APPEND |ose\} footer=$\{html`\n      <button onClick=$\{onClose\}>Cancel</button>\n      <button class="primary" onClick=$\{onAccept\}>$\{r.newCatalog ? 'Accept' : 'Replace the schema'\}</| TO parts.
-    APPEND |button>`\}>\n      $\{r.newCatalog ? html`<div class="notice info">Catalog <strong class="mono">$\{r.catalog\}</strong> is new: it is added to the first data source.</div>`\n      | TO parts.
-    APPEND |  : html`<div class="notice warn">Catalog <strong class="mono">$\{r.catalog\}</strong> exists: its schema file is replaced, and the next\n          XMLA request serves the new sche| TO parts.
-    APPEND |ma.</div>`\}\n      <div class="form">\n        <label>Schema file</label><span class="mono">$\{r.file\}</span>\n        <label>Views</label>\n        <span>$\{r.views.length ? htm| TO parts.
-    APPEND |l`generated for $\{r.views.map((v, i) => html`$\{i > 0 && ', '\}<span class="mono">$\{v\}</span>`)\}` : 'none to generate'\}</span>\n      </div>\n    <//>`;\n  \}\n  if (dialog.ki| TO parts.
-    APPEND |nd === 'accepting') \{\n    return html`<$\{Dialog\} title="Accepting…" footer=$\{''\}><span class="muted">Generating the views and writing $\{catalog\}…</span><//>`;\n  \}\n  if (| TO parts.
-    APPEND |dialog.kind === 'failed') \{\n    return html`<$\{Dialog\} title="Not accepted" onClose=$\{onClose\} footer=$\{html`<button onClick=$\{onClose\}>Close</button>`\}>\n      <div clas| TO parts.
-    APPEND |s="notice err">$\{dialog.message\}</div><span class="muted">Nothing was written.</span>\n    <//>`;\n  \}\n  const r = dialog.result;\n  return html`<$\{Dialog\} title="Accepted" o| TO parts.
-    APPEND |nClose=$\{onClose\} footer=$\{html`<button class="primary" onClick=$\{onClose\}>Close</button>`\}>\n    <div class="notice ok">Catalog <strong class="mono">$\{r.catalog\}</strong> | TO parts.
-    APPEND |is written to <span class="mono">$\{r.file\}</span>; the next XMLA\n      request reads it.</div>\n    $\{r.views.length > 0 && html`<table>\n      <thead><tr><th>Characteristic</t| TO parts.
-    APPEND |h><th>DDL source</th><th>View</th></tr></thead>\n      <tbody>$\{r.views.map((v) => html`<tr><td class="mono">$\{v.characteristic\}</td><td class="mono">$\{v.ddlName\}</td><td clas| TO parts.
-    APPEND |s="mono">$\{v.viewName\}</td></tr>`)\}</tbody>\n    </table>`\}\n  <//>`;\n\}\n\n// ------------------------------------------------------------------------------------------------| TO parts.
-    APPEND |--------- app\n\n// #proposal/<provider> or #schema/<catalog>, so a reload opens the same thing again\nconst readHash = () => \{\n  const m = /^#(proposal\|schema)\\/(.+)$/.exec(lo| TO parts.
-    APPEND |cation.hash);\n  return m ? \{ kind: m[1], name: decodeURIComponent(m[2]) \} : null;\n\};\nconst writeHash = (what) => history.replaceState(null, '', what ? `#$\{what.kind\}/$\{enc| TO parts.
-    APPEND |odeURIComponent(what.name)\}` : location.pathname + location.search);\n\nfunction App() \{\n  const [session, setSession] = useState(null);\n  const [opening, setOpening] = useStat| TO parts.
-    APPEND |e('');\n  const [error, setError] = useState('');\n  const counter = useRef(0);\n\n  const open = async (what) => \{\n    setError('');\n    setOpening(what.kind === 'proposal' ? `| TO parts.
-    APPEND |Proposing a schema for $\{what.name\}…` : `Opening catalog $\{what.name\}…`);\n    try \{\n      let next;\n      if (what.kind === 'proposal') \{\n        const d = await api('GET| TO parts.
-    APPEND |', 'proposal', \{ provider: what.name \});\n        const doc = parseXml(d.xml);\n        next = \{\n          doc,\n          catalog: catalogNameOf(attr(schemaOf(doc), 'name')),| TO parts.
-    APPEND |\n          source: \{ kind: 'proposal', name: d.provider.name, providerKind: d.provider.kind, text: d.provider.text, factTable: d.provider.factTable \},\n          notes: d.notes | TO parts.
-    APPEND |\|\| [],\n          suggestions: suggestionKeys(doc, d.suggestions),\n        \};\n      \} else \{\n        const d = await api('GET', 'schema', \{ catalog: what.name \});\n      | TO parts.
-    APPEND |  next = \{\n          doc: parseXml(d.xml),\n          catalog: d.catalog,\n          source: \{ kind: 'schema', name: d.catalog, file: d.file, changedAt: d.changedAt, changedBy: | TO parts.
-    APPEND |d.changedBy \},\n          notes: [],\n          suggestions: new Map(),\n        \};\n      \}\n      next.id = ++counter.current;\n      writeHash(what);\n      setSession(next);| TO parts.
-    APPEND |\n    \} catch (e) \{\n      writeHash(null);\n      setError(`$\{what.name\}: $\{e.message\}`);\n    \} finally \{\n      setOpening('');\n    \}\n  \};\n\n  useEffect(() => \{\n | TO parts.
-    APPEND |   const what = readHash();\n    if (what) open(what);\n  \}, []);\n\n  if (session) \{\n    return html`<$\{Editor\} key=$\{session.id\} session=$\{session\}\n      onClose=$\{() | TO parts.
-    APPEND |=> \{ writeHash(null); setSession(null); \}\}\n      onAccepted=$\{(source) => writeHash(source)\} />`;\n  \}\n  return html`<$\{Start\} onOpen=$\{open\} opening=$\{opening\} error| TO parts.
-    APPEND |=$\{error\} />`;\n\}\n\nconst root = document.getElementById('app');\nroot.textContent = '';\nrender(html`<$\{App\} />`, root);\n| TO parts.
+    APPEND |"">{ cl_abap_conv_in_ce=>uccp( '2013' ) }</option>`\}\n    $\{values.map((o) => html`<option value=$\{o\}>$\{o\}</option>`)\}\n  </select>`;\n\}\n\nfunction Check(\{ checked, onCha| TO parts.
+    APPEND |nge, label, title, disabled \}) \{\n  return html`<label class="switch" title=$\{title\}>\n    <input type="checkbox" checked=$\{checked\} disabled=$\{disabled\} onChange=$\{(e) =>| TO parts.
+    APPEND | onChange(e.target.checked)\} />$\{label\}\n  </label>`;\n\}\n\nfunction Dialog(\{ title, children, footer, onClose \}) \{\n  useEffect(() => \{\n    const onKey = (e) => e.key ===| TO parts.
+    APPEND | 'Escape' && onClose && onClose();\n    addEventListener('keydown', onKey);\n    return () => removeEventListener('keydown', onKey);\n  \}, [onClose]);\n  return html`<div class="b| TO parts.
+    APPEND |ackdrop" onClick=$\{(e) => e.target === e.currentTarget && onClose && onClose()\}>\n    <div class="dialog" role="dialog" aria-modal="true">\n      <header><h2>$\{title\}</h2></hea| TO parts.
+    APPEND |der>\n      <div class="body">$\{children\}</div>\n      <footer>$\{footer\}</footer>\n    </div>\n  </div>`;\n\}\n\n// ------------------------------------------------------------| TO parts.
+    APPEND |------------------------------------- start page\n\nfunction formatTime(iso) \{\n  if (!iso) return '';\n  const d = new Date(iso);\n  return isNaN(d) ? iso : d.toLocaleString();\n| TO parts.
+    APPEND |\}\n\nfunction Start(\{ onOpen, opening, error \}) \{\n  const [providers, setProviders] = useState(null);\n  const [schemas, setSchemas] = useState(null);\n  const [loadError, set| TO parts.
+    APPEND |LoadError] = useState('');\n  const [filter, setFilter] = useState('');\n  const [removing, setRemoving] = useState(null);\n  const loadSchemas = () => api('GET', 'schemas').then((| TO parts.
+    APPEND |d) => setSchemas(d.schemas), (e) => setLoadError(e.message));\n  useEffect(() => \{\n    api('GET', 'providers').then((d) => setProviders(d.providers), (e) => setLoadError(e.messag| TO parts.
+    APPEND |e));\n    loadSchemas();\n  \}, []);\n  const words = filter.toLowerCase().split(/\\s+/).filter(Boolean);\n  const shown = (providers \|\| []).filter((p) =>\n    words.every((w) =>| TO parts.
+    APPEND | `$\{p.name\} $\{p.text\} $\{p.infoarea\} $\{p.kind\}`.toLowerCase().includes(w)));\n\n  return html`\n    <div class="topbar"><h1>Schema Builder</h1><span class="muted">Mondrian s| TO parts.
+    APPEND |chemas for BW InfoProviders</span>\n      <span class="spacer"></span><a href=$\{`console.html$\{location.search\}`\}>MDX Console</a><a href=$\{`time.html$\{location.search\}`\}>Ti| TO parts.
+    APPEND |me Master Data</a></div>\n    <div class="page">\n    $\{(error \|\| loadError) && html`<div style="padding: 16px 16px 0"><div class="notice err">$\{error \|\| loadError\}</div></d| TO parts.
+    APPEND |iv>`\}\n    $\{opening && html`<div style="padding: 16px 16px 0"><div class="notice info">$\{opening\}</div></div>`\}\n    <div class="start">\n      <section class="card">\n      | TO parts.
+    APPEND |  <header><h2>Accepted schemas</h2><span class="spacer"></span><span class="muted small">catalogs of /WEB-INF/datasources.xml</span></header>\n        <div class="scroll">\n       | TO parts.
+    APPEND |   $\{schemas == null ? html`<div class="body muted">Loading{ cl_abap_conv_in_ce=>uccp( '2026' ) }</div>` : !schemas.length ? html`<div class="body muted">No catalogs yet.</div>` :| TO parts.
+    APPEND | html`\n          <table>\n            <thead><tr><th>Catalog</th><th>Schema file</th><th>Changed</th><th></th></tr></thead>\n            <tbody>$\{schemas.map((s) => html`\n      | TO parts.
+    APPEND |        <tr class=$\{s.exists ? 'clickable' : ''\} title=$\{s.exists ? `Edit $\{s.catalog\}` : 'The schema file is missing'\}\n                onClick=$\{() => s.exists && !opening| TO parts.
+    APPEND | && onOpen(\{ kind: 'schema', name: s.catalog \})\}>\n                <td><strong>$\{s.catalog\}</strong><div class="muted small">$\{s.dataSource\}</div></td>\n                <td | TO parts.
+    APPEND |class="mono">$\{s.file\}$\{!s.exists && html` <span class="kind">missing</span>`\}</td>\n                <td class="small">$\{formatTime(s.changedAt)\}<div class="muted">$\{s.chang| TO parts.
+    APPEND |edBy\}</div></td>\n                <td><button class="danger" title=$\{`Remove catalog $\{s.catalog\}`\} disabled=$\{!!opening\}\n                  onClick=$\{(e) => \{ e.stopPropa| TO parts.
+    APPEND |gation(); setRemoving(\{ kind: 'confirm', schema: s \}); \}\}>Remove{ cl_abap_conv_in_ce=>uccp( '2026' ) }</button></td>\n              </tr>`)\}\n            </tbody>\n          <| TO parts.
+    APPEND |/table>`\}\n        </div>\n      </section>\n      <section class="card">\n        <header>\n          <h2>Propose from a provider</h2><span class="spacer"></span>\n          <inp| TO parts.
+    APPEND |ut type="search" placeholder="Filter by name, text, InfoArea" value=$\{filter\} onInput=$\{(e) => setFilter(e.target.value)\}\n            aria-label="Filter providers" style="widt| TO parts.
+    APPEND |h: min(260px, 100%)" />\n        </header>\n        <div class="scroll">\n          $\{providers == null ? html`<div class="body muted">Loading| TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '2026' ) }</div>` : html`\n          <table>\n            <thead><tr><th>Provider</th><th>Text</th><th>InfoArea</th></tr></thead>\n            <tbody>$| TO parts.
+    APPEND |\{shown.map((p) => html`\n              <tr class="clickable" title=$\{`Propose a schema for $\{p.name\}`\} onClick=$\{() => !opening && onOpen(\{ kind: 'proposal', name: p.name \}| TO parts.
+    APPEND |)\}>\n                <td><strong class="mono">$\{p.name\}</strong> <span class="kind">$\{p.kind\}</span></td>\n                <td>$\{p.text\}</td>\n                <td class="mon| TO parts.
+    APPEND |o small">$\{p.infoarea\}</td>\n              </tr>`)\}\n            </tbody>\n          </table>\n          $\{!shown.length && html`<div class="body muted">No provider matches.</d| TO parts.
+    APPEND |iv>`\}`\}\n        </div>\n      </section>\n    </div>\n    </div>\n    $\{removing && html`<$\{RemoveDialog\} dialog=$\{removing\} onClose=$\{() => setRemoving(null)\}\n      onR| TO parts.
+    APPEND |emove=$\{async () => \{\n        const s = removing.schema;\n        setRemoving(\{ kind: 'removing', schema: s \});\n        try \{\n          const result = await api('POST', 're| TO parts.
+    APPEND |move', \{ catalog: s.catalog \});\n          setRemoving(\{ kind: 'done', schema: s, result \});\n        \} catch (e) \{\n          setRemoving(\{ kind: 'failed', schema: s, messa| TO parts.
+    APPEND |ge: e.message \});\n        \}\n        loadSchemas();\n      \}\} />`\}`;\n\}\n\nfunction RemoveDialog(\{ dialog, onRemove, onClose \}) \{\n  const s = dialog.schema;\n  if (dialo| TO parts.
+    APPEND |g.kind === 'confirm') \{\n    return html`<$\{Dialog\} title="Remove the schema" onClose=$\{onClose\} footer=$\{html`\n      <button onClick=$\{onClose\}>Cancel</button>\n      <bu| TO parts.
+    APPEND |tton class="primary" onClick=$\{onRemove\}>Remove $\{s.catalog\}</button>`\}>\n      <div class="notice warn">Catalog <strong class="mono">$\{s.catalog\}</strong> and its cubes are| TO parts.
+    APPEND | removed: the next XMLA request\n        does not see them. This cannot be undone here; the schema can be proposed and accepted again.</div>\n      <div class="form">\n        <lab| TO parts.
+    APPEND |el>Data source</label><span>$\{s.dataSource\}</span>\n        <label>Schema file</label><span class="mono">$\{s.file\}$\{s.exists ? ' (deleted)' : ' (missing)'\}</span>\n        <l| TO parts.
+    APPEND |abel>Views</label><span>kept: other schemas can use them</span>\n      </div>\n    <//>`;\n  \}\n  if (dialog.kind === 'removing') \{\n    return html`<$\{Dialog\} title="Removing| TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '2026' ) }" footer=$\{''\}><span class="muted">Removing $\{s.catalog\}{ cl_abap_conv_in_ce=>uccp( '2026' ) }</span><//>`;\n  \}\n  if (dialog.kind === '| TO parts.
+    APPEND |failed') \{\n    return html`<$\{Dialog\} title="Not removed" onClose=$\{onClose\} footer=$\{html`<button onClick=$\{onClose\}>Close</button>`\}>\n      <div class="notice err">$\{| TO parts.
+    APPEND |dialog.message\}</div><span class="muted">Nothing was changed.</span>\n    <//>`;\n  \}\n  const r = dialog.result;\n  return html`<$\{Dialog\} title="Removed" onClose=$\{onClose\}| TO parts.
+    APPEND | footer=$\{html`<button class="primary" onClick=$\{onClose\}>Close</button>`\}>\n    <div class="notice ok">Catalog <strong class="mono">$\{r.catalog\}</strong> is removed from /WE| TO parts.
+    APPEND |B-INF/datasources.xml.</div>\n    <span class="muted">$\{r.removedFiles.length ? html`Deleted $\{r.removedFiles.map((f, i) => html`$\{i > 0 && ', '\}<span class="mono">$\{f\}</span| TO parts.
+    APPEND |>`)\}.` : 'No schema file deleted.'\}</span>\n  <//>`;\n\}\n\n// ----------------------------------------------------------------------------------------------------- panes\n\nfunc| TO parts.
+    APPEND |tion SchemaPane(\{ doc, edit, source, catalog, notes \}) \{\n  const schema = schemaOf(doc);\n  return html`<div class="pane">\n    <div class="form">\n      <label>Schema name</la| TO parts.
+    APPEND |bel>\n      <$\{TextField\} value=$\{attr(schema, 'name')\} validate=$\{required('The schema')\} onCommit=$\{(v) => edit(() => schema.setAttribute('name', v))\} />\n      <label>De| TO parts.
+    APPEND |scription</label>\n      <$\{TextField\} value=$\{attr(schema, 'description')\} onCommit=$\{(v) => edit(() => setAttr(schema, 'description', v))\} />\n      $\{source.kind === 'pro| TO parts.
+    APPEND |posal' && html`\n        <label>Provider</label><span><strong class="mono">$\{source.name\}</strong> <span class="kind">$\{source.providerKind\}</span> $\{source.text\}</span>\n   | TO parts.
+    APPEND |     <label>Fact table</label><span class="mono">$\{source.factTable\}</span>`\}\n      $\{source.kind === 'schema' && html`\n        <label>Schema file</label><span class="mono">$| TO parts.
+    APPEND |\{source.file\}</span>\n        <label>Last accepted</label><span>$\{formatTime(source.changedAt)\} $\{source.changedBy && html`<span class="muted">by $\{source.changedBy\}</span>`| TO parts.
+    APPEND |\}</span>`\}\n    </div>\n    <div class="notice info">\n      Every attribute of a dimension is already an attribute hierarchy, so the schema is usable as proposed. Rename what\n | TO parts.
+    APPEND |     reads badly, drop what nobody needs, mark a dimension as time, and build user hierarchies (e.g. Country { cl_abap_conv_in_ce=>uccp( '203A' ) } State | TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '203A' ) }\n      City) from attributes. The server checks the schema as you edit; <strong>Accept</strong> generates the views,\n      writes the schema| TO parts.
+    APPEND | file and registers catalog <strong class="mono">$\{catalog \|\| '?'\}</strong>.\n    </div>\n    $\{notes.length > 0 && html`<section class="section">\n      <header><h3>Not propo| TO parts.
+    APPEND |sed</h3></header>\n      <div class="body"><ul class="plain">$\{notes.map((n) => html`<li><span class="mono">$\{n.iobjnm\}</span>: $\{n.reason\}</li>`)\}</ul></div>\n    </section>| TO parts.
+    APPEND |`\}\n  </div>`;\n\}\n\nfunction CubePane(\{ doc, edit, cube, select \}) \{\n  const measures = kids(cube, 'Measure');\n  const usages = kids(cube, 'DimensionUsage');\n  const priva| TO parts.
+    APPEND |tes = kids(cube, 'Dimension');\n  const known = ['Table', 'DimensionUsage', 'Dimension', 'Measure', 'Annotations'];\n  const others = [...cube.children].filter((c) => !known.includ| TO parts.
+    APPEND |es(c.tagName)).map((c) => c.tagName);\n  const measureNames = measures.map((m) => attr(m, 'name'));\n  const dimNames = [...usages, ...privates].map((u) => attr(u, 'name'));\n  con| TO parts.
+    APPEND |st defaultMeasure = attr(cube, 'defaultMeasure');\n\n  const removeMeasure = (m) => edit(() => \{\n    const name = attr(m, 'name');\n    m.remove();\n    if (defaultMeasure === na| TO parts.
+    APPEND |me) setAttr(cube, 'defaultMeasure', attr(kids(cube, 'Measure')[0], 'name'));\n  \});\n\n  return html`<div class="pane">\n    <div class="form">\n      <label>Cube name</label>\n  | TO parts.
+    APPEND |    <$\{TextField\} value=$\{attr(cube, 'name')\} validate=$\{unique('A cube', cubesOf(doc).filter((c) => c !== cube).map((c) => attr(c, 'name')))\}\n        onCommit=$\{(v) => edi| TO parts.
+    APPEND |t(() => cube.setAttribute('name', v))\} />\n      <label>Caption</label>\n      <$\{TextField\} value=$\{attr(cube, 'caption')\} placeholder=$\{attr(cube, 'name')\} onCommit=$\{(v)| TO parts.
+    APPEND | => edit(() => setAttr(cube, 'caption', v))\} />\n      <label>Fact table</label>\n      <$\{TextField\} readOnly mono value=$\{attr(kids(cube, 'Table')[0], 'name')\} />\n      <la| TO parts.
+    APPEND |bel>Default measure</label>\n      <$\{Select\} value=$\{defaultMeasure\} options=$\{measureNames\} onChange=$\{(v) => edit(() => setAttr(cube, 'defaultMeasure', v))\} />\n    </di| TO parts.
+    APPEND |v>\n\n    <section class="section">\n      <header><h3>Measures</h3><span class="spacer"></span><span class="muted small">key figures of the fact table</span></header>\n      <div | TO parts.
+    APPEND |class="body scroll-x"><table>\n        <thead><tr><th>Name</th><th>Column</th><th>Aggregator</th><th>Format string</th><th>Visible</th><th></th></tr></thead>\n        <tbody>$\{mea| TO parts.
+    APPEND |sures.map((m, i) => html`<tr key=$\{i\}>\n          <td><$\{TextField\} value=$\{attr(m, 'name')\} validate=$\{unique('A measure', measureNames.filter((n) => n !== attr(m, 'name'))| TO parts.
+    APPEND |)\}\n            onCommit=$\{(v) => edit(() => \{ if (defaultMeasure === attr(m, 'name')) cube.setAttribute('defaultMeasure', v); m.setAttribute('name', v); \})\} /></td>\n        | TO parts.
+    APPEND |  <td class="mono small">$\{attr(m, 'column')\}</td>\n          <td><$\{Select\} value=$\{attr(m, 'aggregator')\} options=$\{AGGREGATORS\} onChange=$\{(v) => edit(() => m.setAttrib| TO parts.
+    APPEND |ute('aggregator', v))\}\n            title="The engine evaluates sum and count" /></td>\n          <td><$\{TextField\} value=$\{attr(m, 'formatString')\} list="formats" placeholder| TO parts.
+    APPEND |="Standard" mono\n            onCommit=$\{(v) => edit(() => setAttr(m, 'formatString', v))\} /></td>\n          <td><input type="checkbox" checked=$\{isTrue(m, 'visible', true)\} a| TO parts.
+    APPEND |ria-label="Visible"\n            onChange=$\{(e) => edit(() => m.setAttribute('visible', String(e.target.checked)))\} /></td>\n          <td class="actions">\n            <button c| TO parts.
+    APPEND |lass="icon" title="Up" disabled=$\{i === 0\} onClick=$\{() => edit(() => move(m, -1))\}>{ cl_abap_conv_in_ce=>uccp( '2191' ) }</button>\n            <button class="icon" title="Dow| TO parts.
+    APPEND |n" disabled=$\{i === measures.length - 1\} onClick=$\{() => edit(() => move(m, 1))\}>{ cl_abap_conv_in_ce=>uccp( '2193' ) }</button>\n            <button class="icon danger" title=| TO parts.
+    APPEND |"Remove the measure" disabled=$\{measures.length === 1\} onClick=$\{() => removeMeasure(m)\}>{ cl_abap_conv_in_ce=>uccp( '2715' ) }</button>\n          </td>\n        </tr>`)\}</tb| TO parts.
+    APPEND |ody>\n      </table></div>\n    </section>\n\n    <section class="section">\n      <header><h3>Dimensions of the cube</h3><span class="spacer"></span><span class="muted small">join| TO parts.
+    APPEND |ed on the fact table's foreign key</span></header>\n      <div class="body scroll-x"><table>\n        <thead><tr><th>Name in the cube</th><th>Dimension</th><th>Foreign key</th><th>| TO parts.
+    APPEND |</th></tr></thead>\n        <tbody>\n          $\{usages.map((u, i) => \{\n            const di = sharedDims(doc).findIndex((d) => attr(d, 'name') === attr(u, 'source'));\n        | TO parts.
+    APPEND |    return html`<tr key=$\{'u' + i\}>\n              <td><$\{TextField\} value=$\{attr(u, 'name')\} validate=$\{unique('A dimension', dimNames.filter((n) => n !== attr(u, 'name')))| TO parts.
+    APPEND |\}\n                onCommit=$\{(v) => edit(() => u.setAttribute('name', v))\} /></td>\n              <td>$\{di >= 0 ? html`<button class="link" onClick=$\{() => select(\{ kind: 'd| TO parts.
+    APPEND |im', ci: null, di \})\}>$\{attr(u, 'source')\}</button>`\n                : html`<span class="field-error">$\{attr(u, 'source')\} (missing)</span>`\}</td>\n              <td class=| TO parts.
+    APPEND |"mono small">$\{attr(u, 'foreignKey')\}</td>\n              <td class="actions"><button class="icon danger" title="Remove from the cube (the dimension stays)"\n                onCl| TO parts.
+    APPEND |ick=$\{() => confirm(`Remove '$\{attr(u, 'name')\}' from cube '$\{attr(cube, 'name')\}'?`) && edit(() => u.remove())\}>{ cl_abap_conv_in_ce=>uccp( '2715' ) }</button></td>\n       | TO parts.
+    APPEND |     </tr>`;\n          \})\}\n          $\{privates.map((d, i) => html`<tr key=$\{'p' + i\}>\n            <td>$\{attr(d, 'name')\}</td>\n            <td><button class="link" onCli| TO parts.
+    APPEND |ck=$\{() => select(\{ kind: 'dim', ci: cubesOf(doc).indexOf(cube), di: i \})\}>private dimension</button></td>\n            <td class="mono small">$\{attr(d, 'foreignKey')\}</td><t| TO parts.
+    APPEND |d></td>\n          </tr>`)\}\n        </tbody>\n      </table></div>\n    </section>\n    $\{others.length > 0 && html`<div class="notice warn">The cube also has $\{[...new Set(oth| TO parts.
+    APPEND |ers)].join(', ')\}; edit them on the XML tab.</div>`\}\n  </div>`;\n\}\n\nfunction DimensionPane(\{ doc, edit, dim, sel, select, suggestions \}) \{\n  const time = isTime(dim);\n  | TO parts.
+    APPEND |const attributes = attributesOf(dim);\n  const hierarchies = hierarchiesOf(dim);\n  const usages = isShared(dim) ? usagesOf(doc, dim) : [];\n  const attrNames = attributes.map((a) | TO parts.
+    APPEND |=> attr(a, 'name'));\n  const used = new Set(hierarchies.flatMap((h) => kids(h, 'Level').flatMap((l) =>\n    [attr(l, 'sourceAttribute'), ...kids(l, 'Property').map((p) => attr(p, | TO parts.
+    APPEND |'sourceAttribute'))])));\n  const siblings = isShared(dim) ? sharedDims(doc) : kids(dim.parentNode, 'Dimension');\n  const hierarchyCount = hierarchies.length + attributes.filter(h| TO parts.
+    APPEND |asHierarchy).length;\n\n  const remove = () => \{\n    const what = usages.length ? ` and its $\{usages.length\} cube usage(s)` : '';\n    if (!confirm(`Remove dimension '$\{attr(d| TO parts.
+    APPEND |im, 'name')\}'$\{what\}?`)) return;\n    edit(() => \{\n      usages.forEach((\{ usage \}) => usage.remove());\n      dim.remove();\n    \});\n    select(\{ kind: 'schema' \});\n  | TO parts.
+    APPEND |\};\n  const addHierarchy = () => edit(() => \{\n    const names = [...attrNames, ...hierarchies.map((h) => attr(h, 'name'))];\n    let name = `$\{attr(dim, 'name')\} Hierarchy`;\n| TO parts.
+    APPEND |    for (let n = 2; names.includes(name); n++) name = `$\{attr(dim, 'name')\} Hierarchy $\{n\}`;\n    insertAfterLast(dim, create(doc, 'Hierarchy', \{ name, hasAll: 'true' \}), ['H| TO parts.
+    APPEND |ierarchy', 'DimensionAttribute']);\n  \});\n\n  return html`<div class="pane">\n    <div class="form">\n      <label>Dimension name</label>\n      <$\{TextField\} value=$\{attr(dim| TO parts.
+    APPEND |, 'name')\} validate=$\{unique('A dimension', siblings.filter((d) => d !== dim).map((d) => attr(d, 'name')))\}\n        onCommit=$\{(v) => edit(() => renameDimension(doc, dim, v))| TO parts.
+    APPEND |\} />\n      <label>Caption</label>\n      <$\{TextField\} value=$\{attr(dim, 'caption')\} placeholder=$\{attr(dim, 'name')\} onCommit=$\{(v) => edit(() => setAttr(dim, 'caption', | TO parts.
+    APPEND |v))\} />\n      <label>Table</label>\n      <$\{TextField\} readOnly mono value=$\{attr(dim, 'table')\} title="The view of the characteristic; a placeholder (ZZXXMLA1_C_...) is rep| TO parts.
+    APPEND |laced by the view generated on accept" />\n      <label>Time</label>\n      <span class="row">\n        <$\{Check\} checked=$\{time\} label="Time dimension" onChange=$\{(on) => edi| TO parts.
+    APPEND |t(() => setTimeDimension(dim, on, suggestions))\} />\n        <span class="muted small">enables the time functions (Ytd, ParallelPeriod, { cl_abap_conv_in_ce=>uccp( '2026' ) }); ev| TO parts.
+    APPEND |ery level then needs a time level type</span>\n      </span>\n      $\{isShared(dim) && html`<label>Used by</label>\n        <span>$\{usages.length ? usages.map((\{ cube, usage \},| TO parts.
+    APPEND | i) => html`$\{i > 0 && ', '\}<button class="link"\n          onClick=$\{() => select(\{ kind: 'cube', ci: cubesOf(doc).indexOf(cube) \})\}>$\{attr(cube, 'name')\}</button>\n      | TO parts.
+    APPEND |    <span class="muted small"> as $\{attr(usage, 'name')\} on <span class="mono">$\{attr(usage, 'foreignKey')\}</span></span>`)\n          : html`<span class="muted">no cube | TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '2013' ) } not visible in MDX</span>`\}</span>`\}\n    </div>\n\n    <section class="section">\n      <header><h3>Attributes</h3><span class="spacer"></| TO parts.
+    APPEND |span><span class="muted small">a ticked attribute is a hierarchy of its own; the others serve as levels and properties</span></header>\n      <div class="body scroll-x"><table>\n  | TO parts.
+    APPEND |      <thead><tr><th>Name</th><th>Key column</th><th>Name column</th><th>Hierarchy</th>$\{time && html`<th>Level type</th>`\}<th></th></tr></thead>\n        <tbody>$\{attributes.ma| TO parts.
+    APPEND |p((a, i) => \{\n          const suggestion = suggestionFor(suggestions, dim, a);\n          const isKey = attr(a, 'usage') === 'Key';\n          return html`<tr key=$\{i\}>\n      | TO parts.
+    APPEND |      <td><$\{TextField\} value=$\{attr(a, 'name')\} validate=$\{unique('An attribute', attrNames.filter((n) => n !== attr(a, 'name')))\}\n              onCommit=$\{(v) => edit(() | TO parts.
+    APPEND |=> renameAttribute(dim, a, v))\} /></td>\n            <td class="mono small">$\{keyColumn(a)\} $\{isKey && html`<span class="kind">key</span>`\}</td>\n            <td class="mono s| TO parts.
+    APPEND |mall">$\{attr(kids(a, 'NameColumn')[0], 'columnName')\}</td>\n            <td><$\{Check\} checked=$\{hasHierarchy(a)\} disabled=$\{hasHierarchy(a) && hierarchyCount === 1\}\n      | TO parts.
+    APPEND |        title=$\{hasHierarchy(a) && hierarchyCount === 1 ? 'The dimension needs a hierarchy' : 'The attribute is a hierarchy of its own'\}\n              onChange=$\{(on) => edit((| TO parts.
+    APPEND |) => setAttributeHierarchy(a, on))\} /></td>\n            $\{time && html`<td><div class="row">\n              <$\{Select\} value=$\{attr(a, 'levelType')\} options=$\{TIME_TYPES\} | TO parts.
+    APPEND |onChange=$\{(v) => edit(() => setAttributeLevelType(dim, a, v))\} />\n              $\{suggestion && suggestion !== attr(a, 'levelType') && html`<button class="link small"\n       | TO parts.
+    APPEND |         onClick=$\{() => edit(() => setAttributeLevelType(dim, a, suggestion))\}>suggested: $\{suggestion\}</button>`\}\n            </div></td>`\}\n            <td class="actions| TO parts.
+    APPEND |"><button class="icon danger" disabled=$\{isKey \|\| used.has(attr(a, 'name'))\}\n              title=$\{isKey ? 'The key attribute stays' : used.has(attr(a, 'name')) ? 'A hierarch| TO parts.
+    APPEND |y uses it' : 'Remove the attribute'\}\n              onClick=$\{() => edit(() => a.remove())\}>{ cl_abap_conv_in_ce=>uccp( '2715' ) }</button></td>\n          </tr>`;\n        \})| TO parts.
+    APPEND |\}</tbody>\n      </table></div>\n    </section>\n\n    <section class="section">\n      <header>\n        <h3>Hierarchies</h3><span class="spacer"></span>\n        <button onClick| TO parts.
+    APPEND |=$\{addHierarchy\}>Add hierarchy</button>\n      </header>\n      <div class="body">\n        $\{!hierarchies.length && html`<span class="muted">None. A hierarchy has attributes as| TO parts.
+    APPEND | levels, top level first; a user hierarchy nests several.</span>`\}\n        $\{hierarchies.map((h, i) => html`<$\{HierarchyEditor\} key=$\{i\} doc=$\{doc\} edit=$\{edit\} dim=$\{d| TO parts.
+    APPEND |im\} h=$\{h\}\n          others=$\{[...attrNames, ...hierarchies.filter((o) => o !== h).map((o) => attr(o, 'name'))]\} />`)\}\n      </div>\n    </section>\n\n    <div class="row">| TO parts.
+    APPEND |<button class="danger" onClick=$\{remove\}>Remove dimension</button></div>\n  </div>`;\n\}\n\nfunction HierarchyEditor(\{ doc, edit, dim, h, others \}) \{\n  const [open, setOpen] | TO parts.
+    APPEND |= useState(\{\});\n  const time = isTime(dim);\n  const levels = kids(h, 'Level');\n  const attributes = attributesOf(dim);\n  const attrNames = attributes.map((a) => attr(a, 'name| TO parts.
+    APPEND |'));\n  const hasAll = isTrue(h, 'hasAll', true);\n  const name = attr(h, 'name');\n  // an unnamed hierarchy is [dimension], as is one named like the dimension and an attribute of| TO parts.
+    APPEND | the dimension's name\n  const clash = (!name \|\| name === attr(dim, 'name')) && (others.includes('') \|\| others.includes(attr(dim, 'name')));\n  const levelNames = levels.map((l| TO parts.
+    APPEND |) => attr(l, 'name'));\n\n  const addLevel = (source) => edit(() => \{\n    const a = attributes.find((x) => attr(x, 'name') === source);\n    let levelName = source;\n    for (let| TO parts.
+    APPEND | n = 2; levelNames.includes(levelName); n++) levelName = `$\{source\} $\{n\}`;\n    h.appendChild(create(doc, 'Level', \{\n      name: levelName,\n      uniqueMembers: levels.lengt| TO parts.
+    APPEND |h === 0 ? 'true' : 'false',\n      sourceAttribute: source,\n      levelType: time ? attr(a, 'levelType') \|\| 'TimeUndefined' : '',\n    \}));\n  \});\n\n  return html`<div class=| TO parts.
+    APPEND |"hier">\n    <header>\n      <$\{TextField\} value=$\{name\} placeholder=$\{`(unnamed: [$\{attr(dim, 'name')\}])`\}\n        validate=$\{(v) => (v && others.includes(v) ? `'$\{v\}'| TO parts.
+    APPEND | is already an attribute or hierarchy of the dimension` : '')\}\n        onCommit=$\{(v) => edit(() => setAttr(h, 'name', v))\} />\n      <$\{Check\} checked=$\{hasAll\} label="All| TO parts.
+    APPEND | member" onChange=$\{(on) => edit(() => h.setAttribute('hasAll', String(on)))\} />\n      $\{hasAll && html`<$\{TextField\} value=$\{attr(h, 'allMemberName')\} placeholder="All mem| TO parts.
+    APPEND |ber name" size="16"\n        onCommit=$\{(v) => edit(() => setAttr(h, 'allMemberName', v))\} />`\}\n      <$\{TextField\} value=$\{attr(h, 'defaultMember')\} mono placeholder=$\{ha| TO parts.
+    APPEND |sAll ? 'default member: the All member' : `default member, e.g. [$\{attr(dim, 'name')\}].[1997]`\}\n        title="A unique member name" onCommit=$\{(v) => edit(() => setAttr(h, 'd| TO parts.
+    APPEND |efaultMember', v))\} />\n      <span class="spacer"></span>\n      <button class="danger" onClick=$\{() => confirm(`Remove hierarchy '$\{name \|\| attr(dim, 'name')\}'?`) && edit((| TO parts.
+    APPEND |) => h.remove())\}>Remove</button>\n    </header>\n    <div class="body">\n      $\{clash && html`<div class="notice warn">Name the hierarchy: the dimension has another unnamed hie| TO parts.
+    APPEND |rarchy or one (or an attribute)\n        named '$\{attr(dim, 'name')\}', and an unnamed hierarchy (or one named like the dimension) would share its unique name.</div>`\}\n      $\{| TO parts.
+    APPEND |!hasAll && !attr(h, 'defaultMember') && html`<div class="notice warn">Without an All member the first member is the default; BW's\n        empty member (SID 0) may come first, so g| TO parts.
+    APPEND |ive a default member.</div>`\}\n      $\{levels.length > 0 && html`<div class="scroll-x"><table>\n        <thead><tr><th>#</th><th>Level</th><th>Attribute</th>$\{time && html`<th>L| TO parts.
+    APPEND |evel type</th>`\}<th title="Members are unique within the level, not only within their parent">Unique</th><th>Properties</th><th></th></tr></thead>\n        <tbody>$\{levels.map((l| TO parts.
+    APPEND |, i) => \{\n          const props = kids(l, 'Property');\n          return html`\n          <tr key=$\{'l' + i\}>\n            <td class="num muted">$\{i + 1\}</td>\n            <t| TO parts.
+    APPEND |d><$\{TextField\} value=$\{attr(l, 'name')\} validate=$\{unique('A level', levelNames.filter((n) => n !== attr(l, 'name')))\}\n              onCommit=$\{(v) => edit(() => l.setAttr| TO parts.
+    APPEND |ibute('name', v))\} /></td>\n            <td><$\{Select\} value=$\{attr(l, 'sourceAttribute')\} options=$\{attrNames\} onChange=$\{(v) => edit(() => l.setAttribute('sourceAttribute| TO parts.
+    APPEND |', v))\} /></td>\n            $\{time && html`<td><$\{Select\} value=$\{attr(l, 'levelType')\} options=$\{TIME_TYPES\} onChange=$\{(v) => edit(() => l.setAttribute('levelType', v))| TO parts.
+    APPEND |\} /></td>`\}\n            <td><input type="checkbox" checked=$\{isTrue(l, 'uniqueMembers', false)\} aria-label="Unique members"\n              onChange=$\{(e) => edit(() => l.setA| TO parts.
+    APPEND |ttribute('uniqueMembers', String(e.target.checked)))\} /></td>\n            <td><button class="link" onClick=$\{() => setOpen(\{ ...open, [i]: !open[i] \})\}>$\{props.length\} $\{o| TO parts.
+    APPEND |pen[i] ? '{ cl_abap_conv_in_ce=>uccp( '25BE' ) }' : '{ cl_abap_conv_in_ce=>uccp( '25B8' ) }'\}</button></td>\n            <td class="actions">\n              <button class="icon" t| TO parts.
+    APPEND |itle="Up" disabled=$\{i === 0\} onClick=$\{() => edit(() => move(l, -1))\}>{ cl_abap_conv_in_ce=>uccp( '2191' ) }</button>\n              <button class="icon" title="Down" disabled| TO parts.
+    APPEND |=$\{i === levels.length - 1\} onClick=$\{() => edit(() => move(l, 1))\}>{ cl_abap_conv_in_ce=>uccp( '2193' ) }</button>\n              <button class="icon danger" title="Remove the| TO parts.
+    APPEND | level" onClick=$\{() => edit(() => l.remove())\}>{ cl_abap_conv_in_ce=>uccp( '2715' ) }</button>\n            </td>\n          </tr>\n          $\{open[i] && html`<tr key=$\{'p' +| TO parts.
+    APPEND | i\}><td></td><td colspan=$\{time ? 6 : 5\}><div class="props">\n            $\{props.map((p, j) => html`<div class="row" key=$\{j\}>\n              <$\{TextField\} value=$\{attr(p| TO parts.
+    APPEND |, 'name')\} validate=$\{required('A property')\} onCommit=$\{(v) => edit(() => p.setAttribute('name', v))\} />\n              <span class="muted">from</span>\n              <$\{Sel| TO parts.
+    APPEND |ect\} value=$\{attr(p, 'sourceAttribute')\} options=$\{attrNames\} onChange=$\{(v) => edit(() => p.setAttribute('sourceAttribute', v))\} />\n              <button class="icon dange| TO parts.
+    APPEND |r" title="Remove the property" onClick=$\{() => edit(() => p.remove())\}>{ cl_abap_conv_in_ce=>uccp( '2715' ) }</button>\n            </div>`)\}\n            <div class="row"><sele| TO parts.
+    APPEND |ct value="" aria-label="Add a property" onChange=$\{(e) => \{\n              const source = e.target.value;\n              e.target.value = '';\n              if (source) edit(() =| TO parts.
+    APPEND |> l.appendChild(create(doc, 'Property', \{ name: source, sourceAttribute: source \})));\n            \}\}>\n              <option value="">Add a member property| TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '2026' ) }</option>\n              $\{attrNames.filter((n) => !props.some((p) => attr(p, 'sourceAttribute') === n)).map((n) => html`<option value=$\{n\}| TO parts.
+    APPEND |>$\{n\}</option>`)\}\n            </select><span class="muted small">attributes shown with each member of this level</span></div>\n          </div></td></tr>`\}`;\n        \})\}</t| TO parts.
+    APPEND |body>\n      </table></div>`\}\n      <div class="row">\n        <select value="" aria-label="Add a level" onChange=$\{(e) => \{\n          const source = e.target.value;\n        | TO parts.
+    APPEND |  e.target.value = '';\n          if (source) addLevel(source);\n        \}\}>\n          <option value="">Add a level{ cl_abap_conv_in_ce=>uccp( '2026' ) }</option>\n          $\{| TO parts.
+    APPEND |attrNames.map((n) => html`<option value=$\{n\}>$\{n\}$\{levels.some((l) => attr(l, 'sourceAttribute') === n) ? ' (used)' : ''\}</option>`)\}\n        </select>\n        $\{!levels.| TO parts.
+    APPEND |length && html`<span class="muted small">start with the top level</span>`\}\n      </div>\n    </div>\n  </div>`;\n\}\n\nfunction XmlPane(\{ xml, replace \}) \{\n  const [text, set| TO parts.
+    APPEND |Text] = useState(xml);\n  const [error, setError] = useState('');\n  useEffect(() => \{\n    setText(xml);\n    setError('');\n  \}, [xml]);\n  const apply = () => \{\n    try \{\n| TO parts.
+    APPEND |      replace(parseXml(text));\n    \} catch (e) \{\n      setError(e.message);\n    \}\n  \};\n  const download = () => \{\n    const link = document.createElement('a');\n    link| TO parts.
+    APPEND |.href = URL.createObjectURL(new Blob([xml], \{ type: 'application/xml' \}));\n    link.download = `$\{attr(parseXml(xml).documentElement, 'name') \|\| 'schema'\}.xml`;\n    link.cl| TO parts.
+    APPEND |ick();\n    URL.revokeObjectURL(link.href);\n  \};\n  return html`<div class="pane" style="max-width: none">\n    <div class="row">\n      <button class="primary" disabled=$\{text | TO parts.
+    APPEND |=== xml\} onClick=$\{apply\}>Apply</button>\n      <button disabled=$\{text === xml\} onClick=$\{() => \{ setText(xml); setError(''); \}\}>Revert</button>\n      <button onClick=$| TO parts.
+    APPEND |\{download\}>Download</button>\n      <span class="muted small">Anything the outline does not cover (calculated members, captions, annotations, | TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '2026' ) }) is edited here.</span>\n    </div>\n    $\{error && html`<div class="notice err">$\{error\}</div>`\}\n    <textarea class="xml" spellcheck="| TO parts.
+    APPEND |false" value=$\{text\} onInput=$\{(e) => setText(e.target.value)\}\n      onKeyDown=$\{(e) => \{\n        if ((e.ctrlKey \|\| e.metaKey) && e.key === 's') \{ e.preventDefault(); ap| TO parts.
+    APPEND |ply(); \}\n      \}\}></textarea>\n  </div>`;\n\}\n\n// ------------------------------------------------------------------------------------------------------ editor\n\nfunction Tr| TO parts.
+    APPEND |ee(\{ doc, sel, select, notes \}) \{\n  const item = (target, label, badge, sub) => \{\n    const selected = JSON.stringify(target) === JSON.stringify(sel);\n    return html`<butto| TO parts.
+    APPEND |n class=$\{`item$\{sub ? ' sub' : ''\}$\{selected ? ' selected' : ''\}`\} onClick=$\{() => select(target)\}>\n      <span>$\{label\}</span>$\{badge && html`<span class="badge">$\{b| TO parts.
+    APPEND |adge\}</span>`\}\n    </button>`;\n  \};\n  const usedNames = new Set(cubesOf(doc).flatMap((c) => kids(c, 'DimensionUsage').map((u) => attr(u, 'source'))));\n  return html`<nav cla| TO parts.
+    APPEND |ss="tree" aria-label="Schema outline">\n    $\{item(\{ kind: 'schema' \}, html`<strong>$\{attr(schemaOf(doc), 'name') \|\| 'Schema'\}</strong>`, notes.length ? `$\{notes.length\} n| TO parts.
+    APPEND |ote$\{notes.length > 1 ? 's' : ''\}` : '')\}\n    <div class="group"><h3>Cubes</h3></div>\n    $\{cubesOf(doc).map((cube, ci) => html`\n      $\{item(\{ kind: 'cube', ci \}, attr(c| TO parts.
+    APPEND |ube, 'name'), `$\{kids(cube, 'Measure').length\} measures`)\}\n      $\{kids(cube, 'Dimension').map((d, di) => item(\{ kind: 'dim', ci, di \}, attr(d, 'name'), isTime(d) ? 'time' :| TO parts.
+    APPEND | '', true))\}`)\}\n    <div class="group"><h3>Dimensions</h3></div>\n    $\{sharedDims(doc).map((d, di) => item(\{ kind: 'dim', ci: null, di \}, attr(d, 'name'),\n      [isTime(d) | TO parts.
+    APPEND |&& 'time', hierarchiesOf(d).length && `$\{hierarchiesOf(d).length\} hier.`, !usedNames.has(attr(d, 'name')) && 'unused']\n        .filter(Boolean).join(' | TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '00B7' ) } ')))\}\n  </nav>`;\n\}\n\nfunction Editor(\{ session, onClose, onAccepted \}) \{\n  const [doc, setDoc] = useState(session.doc);\n  const [ve| TO parts.
+    APPEND |rsion, setVersion] = useState(0);\n  const [source, setSource] = useState(session.source);\n  const [catalog, setCatalog] = useState(session.catalog);\n  const [dirty, setDirty] = | TO parts.
+    APPEND |useState(false);\n  const [sel, setSel] = useState(\{ kind: 'schema' \});\n  const [tab, setTab] = useState('outline');\n  const [check, setCheck] = useState(\{ state: 'busy' \});| TO parts.
+    APPEND |\n  const [dialog, setDialog] = useState(null);\n  const undoStack = useRef([]);\n  const xml = useMemo(() => serialize(doc), [doc, version]);\n\n  const edit = useCallback((change| TO parts.
+    APPEND |) => \{\n    undoStack.current.push(serialize(doc));\n    if (undoStack.current.length > 100) undoStack.current.shift();\n    change(doc);\n    setVersion((v) => v + 1);\n    setDi| TO parts.
+    APPEND |rty(true);\n  \}, [doc]);\n  const replace = useCallback((next) => \{\n    undoStack.current.push(serialize(doc));\n    setDoc(next);\n    setVersion((v) => v + 1);\n    setDirty(t| TO parts.
+    APPEND |rue);\n  \}, [doc]);\n  const undo = useCallback(() => \{\n    const previous = undoStack.current.pop();\n    if (previous == null) return;\n    setDoc(parseXml(previous));\n    se| TO parts.
+    APPEND |tVersion((v) => v + 1);\n  \}, []);\n\n  // Ctrl+Z outside of input fields (they have their own undo)\n  useEffect(() => \{\n    const onKey = (e) => \{\n      if ((e.ctrlKey \|\| | TO parts.
+    APPEND |e.metaKey) && e.key === 'z' && !/^(INPUT\|TEXTAREA\|SELECT)$/.test(document.activeElement.tagName)) \{\n        e.preventDefault();\n        undo();\n      \}\n    \};\n    addEven| TO parts.
+    APPEND |tListener('keydown', onKey);\n    return () => removeEventListener('keydown', onKey);\n  \}, [undo]);\n  useEffect(() => \{\n    const onLeave = (e) => \{ if (dirty) \{ e.preventDe| TO parts.
+    APPEND |fault(); e.returnValue = ''; \} \};\n    addEventListener('beforeunload', onLeave);\n    return () => removeEventListener('beforeunload', onLeave);\n  \}, [dirty]);\n\n  // the ser| TO parts.
+    APPEND |ver's checks of accept, nothing written; the last request wins\n  const sequence = useRef(0);\n  useEffect(() => \{\n    const mine = ++sequence.current;\n    setCheck((c) => (\{ .| TO parts.
+    APPEND |..c, state: 'busy' \}));\n    const timer = setTimeout(async () => \{\n      try \{\n        if (!CATALOG_NAME.test(catalog)) throw new Error('A catalog name has letters, digits, _| TO parts.
+    APPEND |, - and . (not first)');\n        const result = await api('POST', 'check', \{ catalog \}, xml);\n        if (mine === sequence.current) setCheck(\{ state: 'ok', result, xml, catal| TO parts.
+    APPEND |og \});\n      \} catch (e) \{\n        if (mine === sequence.current) setCheck(\{ state: 'err', message: e.message \});\n      \}\n    \}, 500);\n    return () => clearTimeout(tim| TO parts.
+    APPEND |er);\n  \}, [xml, catalog]);\n\n  const current = check.state === 'ok' && check.xml === xml && check.catalog === catalog;\n  const accept = async () => \{\n    setDialog(\{ kind: '| TO parts.
+    APPEND |accepting' \});\n    try \{\n      const result = await api('POST', 'accept', \{ catalog \}, xml);\n      undoStack.current = [];\n      setDoc(parseXml(result.xml));\n      setVer| TO parts.
+    APPEND |sion((v) => v + 1);\n      setDirty(false);\n      const reopened = \{ kind: 'schema', name: result.catalog, file: result.file, changedAt: new Date().toISOString(), changedBy: '' | TO parts.
+    APPEND |\};\n      setSource(reopened);\n      setDialog(\{ kind: 'accepted', result \});\n      onAccepted(reopened);\n    \} catch (e) \{\n      setDialog(\{ kind: 'failed', message: e.m| TO parts.
+    APPEND |essage \});\n    \}\n  \};\n\n  let target = resolve(doc, sel);\n  const shownSel = target ? sel : \{ kind: 'schema' \};\n  if (!target) target = schemaOf(doc);\n  const status = c| TO parts.
+    APPEND |heck.state === 'busy' ? html`<span class="status busy">Checking{ cl_abap_conv_in_ce=>uccp( '2026' ) }</span>`\n    : check.state === 'err' ? html`<span class="status err" title=$\{| TO parts.
+    APPEND |check.message\}>{ cl_abap_conv_in_ce=>uccp( '2715' ) } Does not load</span>`\n      : html`<span class="status ok" title=$\{check.result.file\}>| TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '2713' ) } Loads$\{check.result.newCatalog ? ' { cl_abap_conv_in_ce=>uccp( '00B7' ) } new catalog' : ' { cl_abap_conv_in_ce=>uccp( '00B7' ) } replaces t| TO parts.
+    APPEND |he catalog\\'s schema'\}</span>`;\n\n  return html`\n    <div class="topbar">\n      <button onClick=$\{() => (!dirty \|\| confirm('Leave without accepting? Your changes are lost.'| TO parts.
+    APPEND |)) && onClose()\} title="Back to the list">{ cl_abap_conv_in_ce=>uccp( '2190' ) }</button>\n      <div class="title">\n        <h1>Schema Builder</h1>\n        <span class="src">$| TO parts.
+    APPEND |\{source.kind === 'proposal' ? html`proposal for <span class="mono">$\{source.name\}</span>` : html`catalog <span class="mono">$\{source.name\}</span>`\}$\{dirty && ' | TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '00B7' ) } edited'\}</span>\n      </div>\n      <span class="spacer"></span>\n      <label class="inline">Catalog\n        <input type="text" class=$\{| TO parts.
+    APPEND |`mono$\{CATALOG_NAME.test(catalog) ? '' : ' invalid'\}`\} value=$\{catalog\} size="16"\n          onInput=$\{(e) => setCatalog(e.target.value.trim())\} />\n      </label>\n      $| TO parts.
+    APPEND |\{status\}\n      <button disabled=$\{!undoStack.current.length\} onClick=$\{undo\} title="Undo (Ctrl+Z)">Undo</button>\n      <button class="primary" disabled=$\{!current\} onClic| TO parts.
+    APPEND |k=$\{() => setDialog(\{ kind: 'confirm' \})\}\n        title=$\{current ? 'Generate the views, write the schema file and register the catalog' : 'Waiting for a successful check'\}>| TO parts.
+    APPEND |Accept{ cl_abap_conv_in_ce=>uccp( '2026' ) }</button>\n    </div>\n    $\{check.state === 'err' && html`<div class="banner" role="alert">$\{check.message\}</div>`\}\n    <div class| TO parts.
+    APPEND |="editor">\n      <$\{Tree\} doc=$\{doc\} sel=$\{shownSel\} select=$\{(s) => \{ setSel(s); setTab('outline'); \}\} notes=$\{session.notes\} />\n      <main class="main">\n        <| TO parts.
+    APPEND |div class="tabs" role="tablist">\n          <button role="tab" class=$\{tab === 'outline' ? 'active' : ''\} onClick=$\{() => setTab('outline')\}>Outline</button>\n          <button| TO parts.
+    APPEND | role="tab" class=$\{tab === 'xml' ? 'active' : ''\} onClick=$\{() => setTab('xml')\}>XML</button>\n        </div>\n        $\{tab === 'xml' ? html`<$\{XmlPane\} xml=$\{xml\} repla| TO parts.
+    APPEND |ce=$\{replace\} />`\n          : shownSel.kind === 'cube' ? html`<$\{CubePane\} key=$\{JSON.stringify(shownSel)\} doc=$\{doc\} edit=$\{edit\} cube=$\{target\} select=$\{setSel\} />| TO parts.
+    APPEND |`\n            : shownSel.kind === 'dim' ? html`<$\{DimensionPane\} key=$\{JSON.stringify(shownSel)\} doc=$\{doc\} edit=$\{edit\} dim=$\{target\} sel=$\{shownSel\}\n               | TO parts.
+    APPEND | select=$\{setSel\} suggestions=$\{session.suggestions\} />`\n              : html`<$\{SchemaPane\} doc=$\{doc\} edit=$\{edit\} source=$\{source\} catalog=$\{catalog\} notes=$\{ses| TO parts.
+    APPEND |sion.notes\} />`\}\n      </main>\n    </div>\n    <datalist id="formats">$\{FORMATS.map((f) => html`<option value=$\{f\} />`)\}</datalist>\n    $\{dialog && html`<$\{AcceptDialog| TO parts.
+    APPEND |\} dialog=$\{dialog\} check=$\{check\} catalog=$\{catalog\} onAccept=$\{accept\} onClose=$\{() => setDialog(null)\} />`\}`;\n\}\n\nfunction AcceptDialog(\{ dialog, check, catalog, | TO parts.
+    APPEND |onAccept, onClose \}) \{\n  if (dialog.kind === 'confirm') \{\n    const r = check.result;\n    return html`<$\{Dialog\} title="Accept the schema" onClose=$\{onClose\} footer=$\{ht| TO parts.
+    APPEND |ml`\n      <button onClick=$\{onClose\}>Cancel</button>\n      <button class="primary" onClick=$\{onAccept\}>$\{r.newCatalog ? 'Accept' : 'Replace the schema'\}</button>`\}>\n     | TO parts.
+    APPEND | $\{r.newCatalog ? html`<div class="notice info">Catalog <strong class="mono">$\{r.catalog\}</strong> is new: it is added to the first data source.</div>`\n        : html`<div clas| TO parts.
+    APPEND |s="notice warn">Catalog <strong class="mono">$\{r.catalog\}</strong> exists: its schema file is replaced, and the next\n          XMLA request serves the new schema.</div>`\}\n    | TO parts.
+    APPEND |  <div class="form">\n        <label>Schema file</label><span class="mono">$\{r.file\}</span>\n        <label>Views</label>\n        <span>$\{r.views.length ? html`generated for $| TO parts.
+    APPEND |\{r.views.map((v, i) => html`$\{i > 0 && ', '\}<span class="mono">$\{v\}</span>`)\}` : 'none to generate'\}</span>\n      </div>\n    <//>`;\n  \}\n  if (dialog.kind === 'accepting| TO parts.
+    APPEND |') \{\n    return html`<$\{Dialog\} title="Accepting{ cl_abap_conv_in_ce=>uccp( '2026' ) }" footer=$\{''\}><span class="muted">Generating the views and writing $\{catalog\}| TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '2026' ) }</span><//>`;\n  \}\n  if (dialog.kind === 'failed') \{\n    return html`<$\{Dialog\} title="Not accepted" onClose=$\{onClose\} footer=$\{html| TO parts.
+    APPEND |`<button onClick=$\{onClose\}>Close</button>`\}>\n      <div class="notice err">$\{dialog.message\}</div><span class="muted">Nothing was written.</span>\n    <//>`;\n  \}\n  const | TO parts.
+    APPEND |r = dialog.result;\n  return html`<$\{Dialog\} title="Accepted" onClose=$\{onClose\} footer=$\{html`<button class="primary" onClick=$\{onClose\}>Close</button>`\}>\n    <div class=| TO parts.
+    APPEND |"notice ok">Catalog <strong class="mono">$\{r.catalog\}</strong> is written to <span class="mono">$\{r.file\}</span>; the next XMLA\n      request reads it.</div>\n    $\{r.views.l| TO parts.
+    APPEND |ength > 0 && html`<table>\n      <thead><tr><th>Characteristic</th><th>DDL source</th><th>View</th></tr></thead>\n      <tbody>$\{r.views.map((v) => html`<tr><td class="mono">$\{v.| TO parts.
+    APPEND |characteristic\}</td><td class="mono">$\{v.ddlName\}</td><td class="mono">$\{v.viewName\}</td></tr>`)\}</tbody>\n    </table>`\}\n  <//>`;\n\}\n\n// -------------------------------| TO parts.
+    APPEND |-------------------------------------------------------------------------- app\n\n// #proposal/<provider> or #schema/<catalog>, so a reload opens the same thing again\nconst readHa| TO parts.
+    APPEND |sh = () => \{\n  const m = /^#(proposal\|schema)\\/(.+)$/.exec(location.hash);\n  return m ? \{ kind: m[1], name: decodeURIComponent(m[2]) \} : null;\n\};\nconst writeHash = (what)| TO parts.
+    APPEND | => history.replaceState(null, '', what ? `#$\{what.kind\}/$\{encodeURIComponent(what.name)\}` : location.pathname + location.search);\n\nfunction App() \{\n  const [session, setSe| TO parts.
+    APPEND |ssion] = useState(null);\n  const [opening, setOpening] = useState('');\n  const [error, setError] = useState('');\n  const counter = useRef(0);\n\n  const open = async (what) => | TO parts.
+    APPEND |\{\n    setError('');\n    setOpening(what.kind === 'proposal' ? `Proposing a schema for $\{what.name\}{ cl_abap_conv_in_ce=>uccp( '2026' ) }` : `Opening catalog $\{what.name\}| TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '2026' ) }`);\n    try \{\n      let next;\n      if (what.kind === 'proposal') \{\n        const d = await api('GET', 'proposal', \{ provider: what.nam| TO parts.
+    APPEND |e \});\n        const doc = parseXml(d.xml);\n        next = \{\n          doc,\n          catalog: catalogNameOf(attr(schemaOf(doc), 'name')),\n          source: \{ kind: 'proposa| TO parts.
+    APPEND |l', name: d.provider.name, providerKind: d.provider.kind, text: d.provider.text, factTable: d.provider.factTable \},\n          notes: d.notes \|\| [],\n          suggestions: sugg| TO parts.
+    APPEND |estionKeys(doc, d.suggestions),\n        \};\n      \} else \{\n        const d = await api('GET', 'schema', \{ catalog: what.name \});\n        next = \{\n          doc: parseXml(| TO parts.
+    APPEND |d.xml),\n          catalog: d.catalog,\n          source: \{ kind: 'schema', name: d.catalog, file: d.file, changedAt: d.changedAt, changedBy: d.changedBy \},\n          notes: [],| TO parts.
+    APPEND |\n          suggestions: new Map(),\n        \};\n      \}\n      next.id = ++counter.current;\n      writeHash(what);\n      setSession(next);\n    \} catch (e) \{\n      writeHas| TO parts.
+    APPEND |h(null);\n      setError(`$\{what.name\}: $\{e.message\}`);\n    \} finally \{\n      setOpening('');\n    \}\n  \};\n\n  useEffect(() => \{\n    const what = readHash();\n    if (| TO parts.
+    APPEND |what) open(what);\n  \}, []);\n\n  if (session) \{\n    return html`<$\{Editor\} key=$\{session.id\} session=$\{session\}\n      onClose=$\{() => \{ writeHash(null); setSession(nul| TO parts.
+    APPEND |l); \}\}\n      onAccepted=$\{(source) => writeHash(source)\} />`;\n  \}\n  return html`<$\{Start\} onOpen=$\{open\} opening=$\{opening\} error=$\{error\} />`;\n\}\n\nconst root = | TO parts.
+    APPEND |document.getElementById('app');\nroot.textContent = '';\nrender(html`<$\{App\} />`, root);\n| TO parts.
     result = concat_lines_of( parts ).
   ENDMETHOD.
 
   METHOD console_html.
     DATA parts TYPE string_table.
     APPEND |<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="utf-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1">\n  <title>MDX Console</title>\n  <link r| TO parts.
-    APPEND |el="stylesheet" href="app.css">\n  <script type="module" src="console.js"></script>\n</head>\n<body>\n  <div id="app"><p class="boot">Loading…</p></div>\n  <noscript>The MDX consol| TO parts.
-    APPEND |e needs JavaScript.</noscript>\n</body>\n</html>\n| TO parts.
+    APPEND |el="stylesheet" href="app.css">\n  <script type="module" src="console.js"></script>\n</head>\n<body>\n  <div id="app"><p class="boot">Loading{ cl_abap_conv_in_ce=>uccp( '2026' ) }<| TO parts.
+    APPEND |/p></div>\n  <noscript>The MDX console needs JavaScript.</noscript>\n</body>\n</html>\n| TO parts.
     result = concat_lines_of( parts ).
   ENDMETHOD.
 
@@ -539,98 +548,101 @@ CLASS zzxxmla1_cl_web_app_files IMPLEMENTATION.
     APPEND |l`<tr>\n      $\{members.map((m) => html`<td title=$\{m.uname\}>$\{caption(m)\}</td>`)\}\n      <$\{Cell\} cell=$\{result.cells.get(ordinal)\} />\n    </tr>`);\n  \}\n  return html| TO parts.
     APPEND |`<table class="grid flat">\n    <thead><tr>\n      $\{axes.map((a) => a.hierarchies.map((h) => html`<th title=$\{`$\{a.name\}: $\{h\}`\} data-axis=$\{a.name\}>$\{hierarchyLabel(h)| TO parts.
     APPEND |\}</th>`))\}\n      <th class="num">Value</th>\n    </tr></thead>\n    <tbody>$\{rows\}</tbody>\n  </table>`;\n\}\n\nfunction Result(\{ run, view, setView \}) \{\n  const tableRef | TO parts.
-    APPEND |= useRef(null);\n  const [copied, setCopied] = useState(false);\n  if (run.state === 'busy') return html`<div class="result-msg muted">Running…</div>`;\n  if (run.state === 'err') | TO parts.
-    APPEND |\{\n    return html`<div class="result-msg"><div class="notice err">$\{run.message\}</div></div>`;\n  \}\n  const \{ result \} = run;\n  const grid = result.axes.length <= 2 && vie| TO parts.
-    APPEND |w !== 'flat';\n  const truncated = grid\n    ? (result.axes[0]?.tuples.length > MAX_GRID_COLUMNS \|\| result.axes[1]?.tuples.length > MAX_GRID_ROWS)\n    : result.size > MAX_FLAT_R| TO parts.
-    APPEND |OWS;\n  const copy = async () => \{\n    try \{\n      await navigator.clipboard.writeText(tableRef.current.innerText);\n      setCopied(true);\n      setTimeout(() => setCopied(fa| TO parts.
-    APPEND |lse), 1500);\n    \} catch \{\n      setCopied(false);\n    \}\n  \};\n  const slicer = result.slicer?.tuples.flat() \|\| [];\n\n  return html`<div class="result">\n    <div class=| TO parts.
-    APPEND |"result-bar">\n      <span class="muted small">\n        $\{result.cube && html`<span class="mono">$\{result.cube\}</span> · `\}\n        $\{`$\{result.axes.length\} $\{result.axes| TO parts.
-    APPEND |.length === 1 ? 'axis' : 'axes'\} ($\{result.axes.map((a) => a.tuples.length).join(' × ') \|\| '–'\})`\n          + ` · $\{result.size.toLocaleString()\} cell$\{result.size === 1 ?| TO parts.
-    APPEND | '' : 's'\} · $\{Math.round(run.ms).toLocaleString()\} ms`\}\n      </span>\n      $\{slicer.length > 0 && html`<span class="small" title="The slicer (WHERE)">where $\{slicer.map((| TO parts.
-    APPEND |m, i) => html`$\{i > 0 && ', '\}<span\n        class="kind" title=$\{m.uname\}>$\{caption(m)\}</span>`)\}</span>`\}\n      <span class="spacer"></span>\n      $\{result.axes.length| TO parts.
-    APPEND | <= 2 && result.axes.length > 0 && html`<div class="segmented" role="group" aria-label="View">\n        <button class=$\{grid ? 'active' : ''\} onClick=$\{() => setView('grid')\}>G| TO parts.
-    APPEND |rid</button>\n        <button class=$\{grid ? '' : 'active'\} onClick=$\{() => setView('flat')\}>Table</button>\n      </div>`\}\n      <button onClick=$\{copy\} title="Copy the ta| TO parts.
-    APPEND |ble as tab-separated text">$\{copied ? 'Copied' : 'Copy'\}</button>\n    </div>\n    $\{truncated && html`<div class="notice warn">The answer is too large to show in full: $\{grid| TO parts.
-    APPEND |\n      ? `the first $\{MAX_GRID_ROWS.toLocaleString()\} rows and $\{MAX_GRID_COLUMNS.toLocaleString()\} columns are shown`\n      : `the first $\{MAX_FLAT_ROWS.toLocaleString()\} | TO parts.
-    APPEND |of $\{result.size.toLocaleString()\} rows are shown`\}.</div>`\}\n    <div class="result-table" ref=$\{tableRef\}>\n      $\{grid ? html`<$\{Grid\} result=$\{result\} />` : html`<$| TO parts.
-    APPEND |\{Flat\} result=$\{result\} limit=$\{MAX_FLAT_ROWS\} />`\}\n    </div>\n  </div>`;\n\}\n\n// ---------------------------------------------------------------------------------------| TO parts.
-    APPEND |----------- cube browser\n\nfunction Browser(\{ dataSource, catalog, onInsert \}) \{\n  const [cubes, setCubes] = useState(null);\n  const [open, setOpen] = useState(\{\});\n  cons| TO parts.
-    APPEND |t [content, setContent] = useState(\{\});\n  const [error, setError] = useState('');\n  useEffect(() => \{\n    setCubes(null);\n    setOpen(\{\});\n    setContent(\{\});\n    setE| TO parts.
-    APPEND |rror('');\n    if (!catalog) return;\n    discover('MDSCHEMA_CUBES', \{ CATALOG_NAME: catalog \}, \{ DataSourceInfo: dataSource, Catalog: catalog \})\n      .then(setCubes, (e) => | TO parts.
-    APPEND |setError(e.message));\n  \}, [catalog]);\n\n  const loadCube = async (cube) => \{\n    const restrictions = \{ CATALOG_NAME: catalog, CUBE_NAME: cube \};\n    const properties = \{| TO parts.
-    APPEND | DataSourceInfo: dataSource, Catalog: catalog \};\n    try \{\n      const [measures, hierarchies, levels] = await Promise.all([\n        discover('MDSCHEMA_MEASURES', restrictions| TO parts.
-    APPEND |, properties),\n        discover('MDSCHEMA_HIERARCHIES', restrictions, properties),\n        discover('MDSCHEMA_LEVELS', restrictions, properties),\n      ]);\n      const dimensio| TO parts.
-    APPEND |ns = [];\n      for (const h of hierarchies.filter((x) => x.DIMENSION_UNIQUE_NAME !== '[Measures]')) \{\n        let d = dimensions.find((x) => x.uname === h.DIMENSION_UNIQUE_NAME)| TO parts.
-    APPEND |;\n        if (!d) dimensions.push(d = \{ uname: h.DIMENSION_UNIQUE_NAME, hierarchies: [] \});\n        d.hierarchies.push(\{\n          uname: h.HIERARCHY_UNIQUE_NAME,\n          | TO parts.
-    APPEND |caption: h.HIERARCHY_CAPTION \|\| h.HIERARCHY_NAME,\n          levels: levels.filter((l) => l.HIERARCHY_UNIQUE_NAME === h.HIERARCHY_UNIQUE_NAME && l.LEVEL_TYPE !== '1')\n          | TO parts.
-    APPEND |  .sort((a, b) => a.LEVEL_NUMBER - b.LEVEL_NUMBER)\n            .map((l) => (\{ uname: l.LEVEL_UNIQUE_NAME, caption: l.LEVEL_CAPTION \|\| l.LEVEL_NAME \})),\n        \});\n      \}| TO parts.
-    APPEND |\n      setContent((c) => (\{\n        ...c,\n        [cube]: \{\n          measures: measures.map((m) => (\{ uname: m.MEASURE_UNIQUE_NAME, caption: m.MEASURE_CAPTION \|\| m.MEASUR| TO parts.
-    APPEND |E_NAME \})),\n          dimensions,\n        \},\n      \}));\n    \} catch (e) \{\n      setContent((c) => (\{ ...c, [cube]: \{ error: e.message \} \}));\n    \}\n  \};\n  const t| TO parts.
-    APPEND |oggle = (key, load) => \{\n    setOpen((o) => (\{ ...o, [key]: !o[key] \}));\n    if (load && !open[key]) load();\n  \};\n\n  const leaf = (uname, label, kind, depth) => html`<butt| TO parts.
-    APPEND |on class="item" style=$\{`padding-left: $\{14 + depth * 14\}px`\} draggable="true"\n    title=$\{`$\{uname\} – click to insert, or drag`\} onClick=$\{() => onInsert(uname)\}\n    o| TO parts.
-    APPEND |nDragStart=$\{(e) => e.dataTransfer.setData('text/plain', uname)\}>\n    <span class=$\{`glyph $\{kind\}`\}></span><span class="label">$\{label\}</span>\n  </button>`;\n  const nod| TO parts.
-    APPEND |e = (key, label, kind, depth, load, uname) => html`<button class="item" style=$\{`padding-left: $\{14 + depth * 14\}px`\}\n    onClick=$\{() => toggle(key, load)\} onDblClick=$\{()| TO parts.
-    APPEND | => uname && onInsert(uname)\} title=$\{uname ? `$\{uname\} – double-click to insert` : ''\}\n    draggable=$\{!!uname\} onDragStart=$\{(e) => uname && e.dataTransfer.setData('text| TO parts.
-    APPEND |/plain', uname)\}>\n    <span class="twisty">$\{open[key] ? '▾' : '▸'\}</span><span class=$\{`glyph $\{kind\}`\}></span><span class="label">$\{label\}</span>\n  </button>`;\n\n  re| TO parts.
-    APPEND |turn html`<nav class="tree browser" aria-label="Cubes">\n    <div class="group"><h3>Cubes</h3></div>\n    $\{error && html`<div class="notice err small" style="margin: 0 14px">$\{e| TO parts.
-    APPEND |rror\}</div>`\}\n    $\{!catalog ? html`<div class="muted small pad">No catalog.</div>` : cubes == null && !error ? html`<div class="muted small pad">Loading…</div>` : null\}\n    | TO parts.
-    APPEND |$\{(cubes \|\| []).map((cube) => \{\n      const name = cube.CUBE_NAME;\n      const c = content[name];\n      return html`\n        $\{node(name, html`<strong>$\{name\}</strong>$| TO parts.
-    APPEND |\{cube.CUBE_CAPTION && cube.CUBE_CAPTION !== name\n          && html` <span class="muted small">$\{cube.CUBE_CAPTION\}</span>`\}`, 'cube', 0, () => loadCube(name), `[$\{name\}]`)\}| TO parts.
-    APPEND |\n        $\{open[name] && (c == null ? html`<div class="muted small pad">Loading…</div>`\n          : c.error ? html`<div class="notice err small" style="margin: 0 14px">$\{c.erro| TO parts.
-    APPEND |r\}</div>` : html`\n          $\{node(`$\{name\}\|m`, 'Measures', 'folder', 1, null, '[Measures]')\}\n          $\{open[`$\{name\}\|m`] && c.measures.map((m) => leaf(m.uname, m.cap| TO parts.
-    APPEND |tion, 'measure', 2))\}\n          $\{c.dimensions.map((d) => \{\n            const key = `$\{name\}\|$\{d.uname\}`;\n            // a dimension with one hierarchy of its name shows| TO parts.
-    APPEND | the levels right away\n            const single = d.hierarchies.length === 1 && d.hierarchies[0].uname === d.uname;\n            return html`\n              $\{node(key, hierarchy| TO parts.
-    APPEND |Label(d.uname), 'dimension', 1, null, d.uname)\}\n              $\{open[key] && (single ? d.hierarchies[0].levels.map((l) => leaf(l.uname, l.caption, 'level', 2))\n                | TO parts.
-    APPEND |: d.hierarchies.map((h) => html`\n                  $\{node(`$\{key\}\|$\{h.uname\}`, h.caption, 'hierarchy', 2, null, h.uname)\}\n                  $\{open[`$\{key\}\|$\{h.uname\}| TO parts.
-    APPEND |`] && h.levels.map((l) => leaf(l.uname, l.caption, 'level', 3))\}`))\}`;\n          \})\}`)\}`;\n    \})\}\n  </nav>`;\n\}\n\n// ---------------------------------------------------| TO parts.
-    APPEND |------------------------------------------------------- app\n\nfunction load(key, fallback) \{\n  try \{\n    const value = localStorage.getItem(`olap4abap.console.$\{key\}`);\n   | TO parts.
-    APPEND | return value == null ? fallback : JSON.parse(value);\n  \} catch \{\n    return fallback;\n  \}\n\}\nfunction save(key, value) \{\n  try \{\n    localStorage.setItem(`olap4abap.co| TO parts.
-    APPEND |nsole.$\{key\}`, JSON.stringify(value));\n  \} catch \{\n    // private window or blocked storage: the console works without it\n  \}\n\}\n\nfunction App() \{\n  const [sources, se| TO parts.
-    APPEND |tSources] = useState(null);\n  const [catalogs, setCatalogs] = useState([]);\n  const [catalog, setCatalog] = useState(load('catalog', ''));\n  const [statement, setStatement] = us| TO parts.
-    APPEND |eState(load('statement', ''));\n  const [history, setHistory] = useState(load('history', []));\n  const [run, setRun] = useState(null);\n  const [view, setView] = useState('grid');| TO parts.
-    APPEND |\n  const [error, setError] = useState('');\n  const editor = useRef(null);\n  const dataSource = sources?.[0]?.DataSourceName \|\| '';\n\n  useEffect(() => \{\n    (async () => \{| TO parts.
-    APPEND |\n      try \{\n        const ds = await discover('DISCOVER_DATASOURCES');\n        setSources(ds);\n        const rows = await discover('DBSCHEMA_CATALOGS', \{\}, \{ DataSourceInf| TO parts.
-    APPEND |o: ds[0]?.DataSourceName \});\n        const names = rows.map((r) => r.CATALOG_NAME);\n        setCatalogs(names);\n        setCatalog((c) => (names.includes(c) ? c : names[0] \|\|| TO parts.
-    APPEND | ''));\n      \} catch (e) \{\n        setError(e.message);\n      \}\n    \})();\n  \}, []);\n  useEffect(() => save('catalog', catalog), [catalog]);\n  useEffect(() => save('stat| TO parts.
-    APPEND |ement', statement), [statement]);\n\n  const runStatement = useCallback(async () => \{\n    const area = editor.current;\n    const selected = area && area.selectionStart !== area.| TO parts.
-    APPEND |selectionEnd\n      ? area.value.slice(area.selectionStart, area.selectionEnd) : statement;\n    const mdx = selected.trim();\n    if (!mdx \|\| !catalog) return;\n    setRun(\{ st| TO parts.
-    APPEND |ate: 'busy' \});\n    try \{\n      const \{ doc, ms \} = await execute(mdx, dataSource, catalog);\n      setRun(\{ state: 'ok', result: parseCellset(doc), ms \});\n    \} catch (e| TO parts.
-    APPEND |) \{\n      setRun(\{ state: 'err', message: e.message, ms: e.ms \});\n    \}\n    setHistory((h) => \{\n      const next = [mdx, ...h.filter((x) => x !== mdx)].slice(0, HISTORY_SI| TO parts.
-    APPEND |ZE);\n      save('history', next);\n      return next;\n    \});\n  \}, [statement, catalog, dataSource]);\n\n  const insert = (piece) => \{\n    const area = editor.current;\n    | TO parts.
-    APPEND |const start = area ? area.selectionStart : statement.length;\n    const end = area ? area.selectionEnd : statement.length;\n    const next = statement.slice(0, start) + piece + sta| TO parts.
-    APPEND |tement.slice(end);\n    setStatement(next);\n    requestAnimationFrame(() => \{\n      if (!area) return;\n      area.focus();\n      area.setSelectionRange(start + piece.length, s| TO parts.
-    APPEND |tart + piece.length);\n    \});\n  \};\n\n  const busy = run?.state === 'busy';\n  return html`\n    <div class="topbar">\n      <div class="title"><h1>MDX Console</h1><span class=| TO parts.
-    APPEND |"src">olap4abap</span></div>\n      <label class="inline">Catalog\n        <select value=$\{catalog\} onChange=$\{(e) => setCatalog(e.target.value)\} disabled=$\{!catalogs.length\}| TO parts.
-    APPEND |>\n          $\{!catalogs.length && html`<option value="">–</option>`\}\n          $\{catalogs.map((c) => html`<option value=$\{c\}>$\{c\}</option>`)\}\n        </select>\n      </| TO parts.
-    APPEND |label>\n      <span class="spacer"></span>\n      <a href=$\{`./$\{location.search\}`\}>Schema Builder</a>\n      <a href=$\{`time.html$\{location.search\}`\}>Time Master Data</a>| TO parts.
-    APPEND |\n    </div>\n    $\{error && html`<div class="banner" role="alert">$\{error\}</div>`\}\n    <div class="editor console">\n      <$\{Browser\} dataSource=$\{dataSource\} catalog=$| TO parts.
-    APPEND |\{catalog\} onInsert=$\{insert\} />\n      <main class="main console-main">\n        <div class="query">\n          <textarea ref=$\{editor\} class="mdx" spellcheck="false" value=$| TO parts.
-    APPEND |\{statement\} aria-label="MDX statement"\n            placeholder=$\{'SELECT \{[Measures].Members\} ON COLUMNS\\nFROM [Cube]'\}\n            onInput=$\{(e) => setStatement(e.target| TO parts.
-    APPEND |.value)\}\n            onKeyDown=$\{(e) => \{\n              if ((e.ctrlKey \|\| e.metaKey) && e.key === 'Enter') \{ e.preventDefault(); runStatement(); \}\n            \}\}></text| TO parts.
-    APPEND |area>\n          <div class="row">\n            <button class="primary" disabled=$\{busy \|\| !catalog \|\| !statement.trim()\} onClick=$\{runStatement\}\n              title="Run | TO parts.
-    APPEND |the statement, or the selected part of it (Ctrl+Enter)">$\{busy ? 'Running…' : 'Run'\}</button>\n            <select value="" aria-label="History" disabled=$\{!history.length\} onC| TO parts.
-    APPEND |hange=$\{(e) => \{\n              const i = e.target.value;\n              e.target.value = '';\n              if (i !== '') setStatement(history[Number(i)]);\n            \}\}>\n | TO parts.
-    APPEND |             <option value="">History…</option>\n              $\{history.map((h, i) => html`<option value=$\{i\}>$\{h.replace(/\\s+/g, ' ').slice(0, 90)\}</option>`)\}\n          | TO parts.
-    APPEND |  </select>\n            <span class="muted small">Ctrl+Enter runs the statement or the selection; click a name on the left to insert it.</span>\n          </div>\n        </div>\n| TO parts.
-    APPEND |        $\{run ? html`<$\{Result\} run=$\{run\} view=$\{view\} setView=$\{setView\} />`\n          : html`<div class="result-msg muted">Write a statement and run it. Up to two axes| TO parts.
-    APPEND | show as a grid, more as a table.</div>`\}\n      </main>\n    </div>`;\n\}\n\nconst root = document.getElementById('app');\nroot.textContent = '';\nrender(html`<$\{App\} />`, root| TO parts.
-    APPEND |);\n| TO parts.
+    APPEND |= useRef(null);\n  const [copied, setCopied] = useState(false);\n  if (run.state === 'busy') return html`<div class="result-msg muted">Running{ cl_abap_conv_in_ce=>uccp( '2026' ) }| TO parts.
+    APPEND |</div>`;\n  if (run.state === 'err') \{\n    return html`<div class="result-msg"><div class="notice err">$\{run.message\}</div></div>`;\n  \}\n  const \{ result \} = run;\n  const | TO parts.
+    APPEND |grid = result.axes.length <= 2 && view !== 'flat';\n  const truncated = grid\n    ? (result.axes[0]?.tuples.length > MAX_GRID_COLUMNS \|\| result.axes[1]?.tuples.length > MAX_GRID_| TO parts.
+    APPEND |ROWS)\n    : result.size > MAX_FLAT_ROWS;\n  const copy = async () => \{\n    try \{\n      await navigator.clipboard.writeText(tableRef.current.innerText);\n      setCopied(true);| TO parts.
+    APPEND |\n      setTimeout(() => setCopied(false), 1500);\n    \} catch \{\n      setCopied(false);\n    \}\n  \};\n  const slicer = result.slicer?.tuples.flat() \|\| [];\n\n  return html`| TO parts.
+    APPEND |<div class="result">\n    <div class="result-bar">\n      <span class="muted small">\n        $\{result.cube && html`<span class="mono">$\{result.cube\}</span> | TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '00B7' ) } `\}\n        $\{`$\{result.axes.length\} $\{result.axes.length === 1 ? 'axis' : 'axes'\} ($\{result.axes.map((a) => a.tuples.length).join(' | TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '00D7' ) } ') \|\| '{ cl_abap_conv_in_ce=>uccp( '2013' ) }'\})`\n          + ` { cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{result.size.toLocaleString()\} | TO parts.
+    APPEND |cell$\{result.size === 1 ? '' : 's'\} { cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{Math.round(run.ms).toLocaleString()\} ms`\}\n      </span>\n      $\{slicer.length > 0 && html`<span| TO parts.
+    APPEND | class="small" title="The slicer (WHERE)">where $\{slicer.map((m, i) => html`$\{i > 0 && ', '\}<span\n        class="kind" title=$\{m.uname\}>$\{caption(m)\}</span>`)\}</span>`\}\n| TO parts.
+    APPEND |      <span class="spacer"></span>\n      $\{result.axes.length <= 2 && result.axes.length > 0 && html`<div class="segmented" role="group" aria-label="View">\n        <button class| TO parts.
+    APPEND |=$\{grid ? 'active' : ''\} onClick=$\{() => setView('grid')\}>Grid</button>\n        <button class=$\{grid ? '' : 'active'\} onClick=$\{() => setView('flat')\}>Table</button>\n    | TO parts.
+    APPEND |  </div>`\}\n      <button onClick=$\{copy\} title="Copy the table as tab-separated text">$\{copied ? 'Copied' : 'Copy'\}</button>\n    </div>\n    $\{truncated && html`<div class=| TO parts.
+    APPEND |"notice warn">The answer is too large to show in full: $\{grid\n      ? `the first $\{MAX_GRID_ROWS.toLocaleString()\} rows and $\{MAX_GRID_COLUMNS.toLocaleString()\} columns are s| TO parts.
+    APPEND |hown`\n      : `the first $\{MAX_FLAT_ROWS.toLocaleString()\} of $\{result.size.toLocaleString()\} rows are shown`\}.</div>`\}\n    <div class="result-table" ref=$\{tableRef\}>\n  | TO parts.
+    APPEND |    $\{grid ? html`<$\{Grid\} result=$\{result\} />` : html`<$\{Flat\} result=$\{result\} limit=$\{MAX_FLAT_ROWS\} />`\}\n    </div>\n  </div>`;\n\}\n\n// -------------------------| TO parts.
+    APPEND |------------------------------------------------------------------------- cube browser\n\nfunction Browser(\{ dataSource, catalog, onInsert \}) \{\n  const [cubes, setCubes] = useS| TO parts.
+    APPEND |tate(null);\n  const [open, setOpen] = useState(\{\});\n  const [content, setContent] = useState(\{\});\n  const [error, setError] = useState('');\n  useEffect(() => \{\n    setCub| TO parts.
+    APPEND |es(null);\n    setOpen(\{\});\n    setContent(\{\});\n    setError('');\n    if (!catalog) return;\n    discover('MDSCHEMA_CUBES', \{ CATALOG_NAME: catalog \}, \{ DataSourceInfo: d| TO parts.
+    APPEND |ataSource, Catalog: catalog \})\n      .then(setCubes, (e) => setError(e.message));\n  \}, [catalog]);\n\n  const loadCube = async (cube) => \{\n    const restrictions = \{ CATALOG| TO parts.
+    APPEND |_NAME: catalog, CUBE_NAME: cube \};\n    const properties = \{ DataSourceInfo: dataSource, Catalog: catalog \};\n    try \{\n      const [measures, hierarchies, levels] = await Pro| TO parts.
+    APPEND |mise.all([\n        discover('MDSCHEMA_MEASURES', restrictions, properties),\n        discover('MDSCHEMA_HIERARCHIES', restrictions, properties),\n        discover('MDSCHEMA_LEVELS| TO parts.
+    APPEND |', restrictions, properties),\n      ]);\n      const dimensions = [];\n      for (const h of hierarchies.filter((x) => x.DIMENSION_UNIQUE_NAME !== '[Measures]')) \{\n        let d| TO parts.
+    APPEND | = dimensions.find((x) => x.uname === h.DIMENSION_UNIQUE_NAME);\n        if (!d) dimensions.push(d = \{ uname: h.DIMENSION_UNIQUE_NAME, hierarchies: [] \});\n        d.hierarchies.| TO parts.
+    APPEND |push(\{\n          uname: h.HIERARCHY_UNIQUE_NAME,\n          caption: h.HIERARCHY_CAPTION \|\| h.HIERARCHY_NAME,\n          levels: levels.filter((l) => l.HIERARCHY_UNIQUE_NAME ==| TO parts.
+    APPEND |= h.HIERARCHY_UNIQUE_NAME && l.LEVEL_TYPE !== '1')\n            .sort((a, b) => a.LEVEL_NUMBER - b.LEVEL_NUMBER)\n            .map((l) => (\{ uname: l.LEVEL_UNIQUE_NAME, caption: l| TO parts.
+    APPEND |.LEVEL_CAPTION \|\| l.LEVEL_NAME \})),\n        \});\n      \}\n      setContent((c) => (\{\n        ...c,\n        [cube]: \{\n          measures: measures.map((m) => (\{ uname: m| TO parts.
+    APPEND |.MEASURE_UNIQUE_NAME, caption: m.MEASURE_CAPTION \|\| m.MEASURE_NAME \})),\n          dimensions,\n        \},\n      \}));\n    \} catch (e) \{\n      setContent((c) => (\{ ...c, | TO parts.
+    APPEND |[cube]: \{ error: e.message \} \}));\n    \}\n  \};\n  const toggle = (key, load) => \{\n    setOpen((o) => (\{ ...o, [key]: !o[key] \}));\n    if (load && !open[key]) load();\n  | TO parts.
+    APPEND |\};\n\n  const leaf = (uname, label, kind, depth) => html`<button class="item" style=$\{`padding-left: $\{14 + depth * 14\}px`\} draggable="true"\n    title=$\{`$\{uname\} | TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '2013' ) } click to insert, or drag`\} onClick=$\{() => onInsert(uname)\}\n    onDragStart=$\{(e) => e.dataTransfer.setData('text/plain', uname)\}>\n   | TO parts.
+    APPEND | <span class=$\{`glyph $\{kind\}`\}></span><span class="label">$\{label\}</span>\n  </button>`;\n  const node = (key, label, kind, depth, load, uname) => html`<button class="item" | TO parts.
+    APPEND |style=$\{`padding-left: $\{14 + depth * 14\}px`\}\n    onClick=$\{() => toggle(key, load)\} onDblClick=$\{() => uname && onInsert(uname)\} title=$\{uname ? `$\{uname\} | TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '2013' ) } double-click to insert` : ''\}\n    draggable=$\{!!uname\} onDragStart=$\{(e) => uname && e.dataTransfer.setData('text/plain', uname)\}>\n   | TO parts.
+    APPEND | <span class="twisty">$\{open[key] ? '{ cl_abap_conv_in_ce=>uccp( '25BE' ) }' : '{ cl_abap_conv_in_ce=>uccp( '25B8' ) }'\}</span><span class=$\{`glyph $\{kind\}`\}></span><span cla| TO parts.
+    APPEND |ss="label">$\{label\}</span>\n  </button>`;\n\n  return html`<nav class="tree browser" aria-label="Cubes">\n    <div class="group"><h3>Cubes</h3></div>\n    $\{error && html`<div c| TO parts.
+    APPEND |lass="notice err small" style="margin: 0 14px">$\{error\}</div>`\}\n    $\{!catalog ? html`<div class="muted small pad">No catalog.</div>` : cubes == null && !error ? html`<div cla| TO parts.
+    APPEND |ss="muted small pad">Loading{ cl_abap_conv_in_ce=>uccp( '2026' ) }</div>` : null\}\n    $\{(cubes \|\| []).map((cube) => \{\n      const name = cube.CUBE_NAME;\n      const c = con| TO parts.
+    APPEND |tent[name];\n      return html`\n        $\{node(name, html`<strong>$\{name\}</strong>$\{cube.CUBE_CAPTION && cube.CUBE_CAPTION !== name\n          && html` <span class="muted smal| TO parts.
+    APPEND |l">$\{cube.CUBE_CAPTION\}</span>`\}`, 'cube', 0, () => loadCube(name), `[$\{name\}]`)\}\n        $\{open[name] && (c == null ? html`<div class="muted small pad">Loading| TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '2026' ) }</div>`\n          : c.error ? html`<div class="notice err small" style="margin: 0 14px">$\{c.error\}</div>` : html`\n          $\{node(`$\{na| TO parts.
+    APPEND |me\}\|m`, 'Measures', 'folder', 1, null, '[Measures]')\}\n          $\{open[`$\{name\}\|m`] && c.measures.map((m) => leaf(m.uname, m.caption, 'measure', 2))\}\n          $\{c.dimen| TO parts.
+    APPEND |sions.map((d) => \{\n            const key = `$\{name\}\|$\{d.uname\}`;\n            // a dimension with one hierarchy of its name shows the levels right away\n            const si| TO parts.
+    APPEND |ngle = d.hierarchies.length === 1 && d.hierarchies[0].uname === d.uname;\n            return html`\n              $\{node(key, hierarchyLabel(d.uname), 'dimension', 1, null, d.unam| TO parts.
+    APPEND |e)\}\n              $\{open[key] && (single ? d.hierarchies[0].levels.map((l) => leaf(l.uname, l.caption, 'level', 2))\n                : d.hierarchies.map((h) => html`\n          | TO parts.
+    APPEND |        $\{node(`$\{key\}\|$\{h.uname\}`, h.caption, 'hierarchy', 2, null, h.uname)\}\n                  $\{open[`$\{key\}\|$\{h.uname\}`] && h.levels.map((l) => leaf(l.uname, l.ca| TO parts.
+    APPEND |ption, 'level', 3))\}`))\}`;\n          \})\}`)\}`;\n    \})\}\n  </nav>`;\n\}\n\n// -----------------------------------------------------------------------------------------------| TO parts.
+    APPEND |----------- app\n\nfunction load(key, fallback) \{\n  try \{\n    const value = localStorage.getItem(`olap4abap.console.$\{key\}`);\n    return value == null ? fallback : JSON.pars| TO parts.
+    APPEND |e(value);\n  \} catch \{\n    return fallback;\n  \}\n\}\nfunction save(key, value) \{\n  try \{\n    localStorage.setItem(`olap4abap.console.$\{key\}`, JSON.stringify(value));\n  | TO parts.
+    APPEND |\} catch \{\n    // private window or blocked storage: the console works without it\n  \}\n\}\n\nfunction App() \{\n  const [sources, setSources] = useState(null);\n  const [catalo| TO parts.
+    APPEND |gs, setCatalogs] = useState([]);\n  const [catalog, setCatalog] = useState(load('catalog', ''));\n  const [statement, setStatement] = useState(load('statement', ''));\n  const [his| TO parts.
+    APPEND |tory, setHistory] = useState(load('history', []));\n  const [run, setRun] = useState(null);\n  const [view, setView] = useState('grid');\n  const [error, setError] = useState('');| TO parts.
+    APPEND |\n  const editor = useRef(null);\n  const dataSource = sources?.[0]?.DataSourceName \|\| '';\n\n  useEffect(() => \{\n    (async () => \{\n      try \{\n        const ds = await di| TO parts.
+    APPEND |scover('DISCOVER_DATASOURCES');\n        setSources(ds);\n        const rows = await discover('DBSCHEMA_CATALOGS', \{\}, \{ DataSourceInfo: ds[0]?.DataSourceName \});\n        cons| TO parts.
+    APPEND |t names = rows.map((r) => r.CATALOG_NAME);\n        setCatalogs(names);\n        setCatalog((c) => (names.includes(c) ? c : names[0] \|\| ''));\n      \} catch (e) \{\n        setE| TO parts.
+    APPEND |rror(e.message);\n      \}\n    \})();\n  \}, []);\n  useEffect(() => save('catalog', catalog), [catalog]);\n  useEffect(() => save('statement', statement), [statement]);\n\n  cons| TO parts.
+    APPEND |t runStatement = useCallback(async () => \{\n    const area = editor.current;\n    const selected = area && area.selectionStart !== area.selectionEnd\n      ? area.value.slice(area| TO parts.
+    APPEND |.selectionStart, area.selectionEnd) : statement;\n    const mdx = selected.trim();\n    if (!mdx \|\| !catalog) return;\n    setRun(\{ state: 'busy' \});\n    try \{\n      const | TO parts.
+    APPEND |\{ doc, ms \} = await execute(mdx, dataSource, catalog);\n      setRun(\{ state: 'ok', result: parseCellset(doc), ms \});\n    \} catch (e) \{\n      setRun(\{ state: 'err', messag| TO parts.
+    APPEND |e: e.message, ms: e.ms \});\n    \}\n    setHistory((h) => \{\n      const next = [mdx, ...h.filter((x) => x !== mdx)].slice(0, HISTORY_SIZE);\n      save('history', next);\n      | TO parts.
+    APPEND |return next;\n    \});\n  \}, [statement, catalog, dataSource]);\n\n  const insert = (piece) => \{\n    const area = editor.current;\n    const start = area ? area.selectionStart :| TO parts.
+    APPEND | statement.length;\n    const end = area ? area.selectionEnd : statement.length;\n    const next = statement.slice(0, start) + piece + statement.slice(end);\n    setStatement(next)| TO parts.
+    APPEND |;\n    requestAnimationFrame(() => \{\n      if (!area) return;\n      area.focus();\n      area.setSelectionRange(start + piece.length, start + piece.length);\n    \});\n  \};\n\n| TO parts.
+    APPEND |  const busy = run?.state === 'busy';\n  return html`\n    <div class="topbar">\n      <div class="title"><h1>MDX Console</h1><span class="src">olap4abap</span></div>\n      <label| TO parts.
+    APPEND | class="inline">Catalog\n        <select value=$\{catalog\} onChange=$\{(e) => setCatalog(e.target.value)\} disabled=$\{!catalogs.length\}>\n          $\{!catalogs.length && html`<| TO parts.
+    APPEND |option value="">{ cl_abap_conv_in_ce=>uccp( '2013' ) }</option>`\}\n          $\{catalogs.map((c) => html`<option value=$\{c\}>$\{c\}</option>`)\}\n        </select>\n      </label| TO parts.
+    APPEND |>\n      <span class="spacer"></span>\n      <a href=$\{`./$\{location.search\}`\}>Schema Builder</a>\n      <a href=$\{`time.html$\{location.search\}`\}>Time Master Data</a>\n    | TO parts.
+    APPEND |</div>\n    $\{error && html`<div class="banner" role="alert">$\{error\}</div>`\}\n    <div class="editor console">\n      <$\{Browser\} dataSource=$\{dataSource\} catalog=$\{catal| TO parts.
+    APPEND |og\} onInsert=$\{insert\} />\n      <main class="main console-main">\n        <div class="query">\n          <textarea ref=$\{editor\} class="mdx" spellcheck="false" value=$\{state| TO parts.
+    APPEND |ment\} aria-label="MDX statement"\n            placeholder=$\{'SELECT \{[Measures].Members\} ON COLUMNS\\nFROM [Cube]'\}\n            onInput=$\{(e) => setStatement(e.target.value)| TO parts.
+    APPEND |\}\n            onKeyDown=$\{(e) => \{\n              if ((e.ctrlKey \|\| e.metaKey) && e.key === 'Enter') \{ e.preventDefault(); runStatement(); \}\n            \}\}></textarea>\n| TO parts.
+    APPEND |          <div class="row">\n            <button class="primary" disabled=$\{busy \|\| !catalog \|\| !statement.trim()\} onClick=$\{runStatement\}\n              title="Run the sta| TO parts.
+    APPEND |tement, or the selected part of it (Ctrl+Enter)">$\{busy ? 'Running{ cl_abap_conv_in_ce=>uccp( '2026' ) }' : 'Run'\}</button>\n            <select value="" aria-label="History" dis| TO parts.
+    APPEND |abled=$\{!history.length\} onChange=$\{(e) => \{\n              const i = e.target.value;\n              e.target.value = '';\n              if (i !== '') setStatement(history[Numb| TO parts.
+    APPEND |er(i)]);\n            \}\}>\n              <option value="">History{ cl_abap_conv_in_ce=>uccp( '2026' ) }</option>\n              $\{history.map((h, i) => html`<option value=$\{i\}| TO parts.
+    APPEND |>$\{h.replace(/\\s+/g, ' ').slice(0, 90)\}</option>`)\}\n            </select>\n            <span class="muted small">Ctrl+Enter runs the statement or the selection; click a name o| TO parts.
+    APPEND |n the left to insert it.</span>\n          </div>\n        </div>\n        $\{run ? html`<$\{Result\} run=$\{run\} view=$\{view\} setView=$\{setView\} />`\n          : html`<div cl| TO parts.
+    APPEND |ass="result-msg muted">Write a statement and run it. Up to two axes show as a grid, more as a table.</div>`\}\n      </main>\n    </div>`;\n\}\n\nconst root = document.getElementBy| TO parts.
+    APPEND |Id('app');\nroot.textContent = '';\nrender(html`<$\{App\} />`, root);\n| TO parts.
     result = concat_lines_of( parts ).
   ENDMETHOD.
 
   METHOD index_html.
     DATA parts TYPE string_table.
     APPEND |<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="utf-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1">\n  <title>Schema Builder</title>\n  <lin| TO parts.
-    APPEND |k rel="stylesheet" href="app.css">\n  <script type="module" src="app.js"></script>\n</head>\n<body>\n  <div id="app"><p class="boot">Loading…</p></div>\n  <noscript>The schema buil| TO parts.
-    APPEND |der needs JavaScript.</noscript>\n</body>\n</html>\n| TO parts.
+    APPEND |k rel="stylesheet" href="app.css">\n  <script type="module" src="app.js"></script>\n</head>\n<body>\n  <div id="app"><p class="boot">Loading{ cl_abap_conv_in_ce=>uccp( '2026' ) }</| TO parts.
+    APPEND |p></div>\n  <noscript>The schema builder needs JavaScript.</noscript>\n</body>\n</html>\n| TO parts.
     result = concat_lines_of( parts ).
   ENDMETHOD.
 
   METHOD time_html.
     DATA parts TYPE string_table.
     APPEND |<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="utf-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1">\n  <title>Time Master Data</title>\n  <l| TO parts.
-    APPEND |ink rel="stylesheet" href="app.css">\n  <script type="module" src="time.js"></script>\n</head>\n<body>\n  <div id="app"><p class="boot">Loading…</p></div>\n  <noscript>The time mas| TO parts.
-    APPEND |ter data page needs JavaScript.</noscript>\n</body>\n</html>\n| TO parts.
+    APPEND |ink rel="stylesheet" href="app.css">\n  <script type="module" src="time.js"></script>\n</head>\n<body>\n  <div id="app"><p class="boot">Loading| TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '2026' ) }</p></div>\n  <noscript>The time master data page needs JavaScript.</noscript>\n</body>\n</html>\n| TO parts.
     result = concat_lines_of( parts ).
   ENDMETHOD.
 
@@ -645,37 +657,38 @@ CLASS zzxxmla1_cl_web_app_files IMPLEMENTATION.
     APPEND |\} $\{response.statusText\}`);\n  return data;\n\}\n\nconst complete = (c) => c.missingSids === 0 && c.missingAttributes === 0;\n\nfunction App() \{\n  const [state, setState] = us| TO parts.
     APPEND |eState(null);       // the answer of GET time (or of the last fill)\n  const [from, setFrom] = useState('');\n  const [to, setTo] = useState('');\n  const [selected, setSelected] =| TO parts.
     APPEND | useState(new Set());\n  const [busy, setBusy] = useState('');\n  const [error, setError] = useState('');\n  const [filled, setFilled] = useState(null);\n\n  const show = (data) =>| TO parts.
-    APPEND | \{\n    setState(data);\n    setFrom(data.from);\n    setTo(data.to);\n  \};\n  const load = (params = \{\}) => \{\n    setBusy('Reading the tables…');\n    setError('');\n    ret| TO parts.
-    APPEND |urn api('GET', 'time', params).then(show, (e) => setError(e.message)).finally(() => setBusy(''));\n  \};\n  useEffect(() => \{ load(); \}, []);\n  // what is incomplete is selected| TO parts.
-    APPEND | when the state arrives the first time\n  useEffect(() => \{\n    if (state && !selected.size && !filled) setSelected(new Set(state.characteristics.filter((c) => !complete(c)).map(| TO parts.
-    APPEND |(c) => c.name)));\n  \}, [state]);\n\n  const toggle = (name) => setSelected((s) => \{\n    const next = new Set(s);\n    if (next.has(name)) next.delete(name); else next.add(name)| TO parts.
-    APPEND |;\n    return next;\n  \});\n  const fill = () => \{\n    const names = state.characteristics.map((c) => c.name).filter((n) => selected.has(n));\n    if (!confirm(`Create the SIDs | TO parts.
-    APPEND |and attribute rows of $\{names.join(', ')\} for $\{from\} to $\{to\}?\\n\\n`\n      + 'Every view on these tables then has the new periods as members.')) return;\n    setBusy('Fill| TO parts.
-    APPEND |ing…');\n    setError('');\n    api('POST', 'time/fill', \{ from, to, characteristics: names.join(',') \})\n      .then((data) => \{ setFilled(data.filled); show(data); \}, (e) => | TO parts.
-    APPEND |setError(e.message))\n      .finally(() => setBusy(''));\n  \};\n\n  const changed = state && (from !== state.from \|\| to !== state.to);\n  return html`\n    <div class="topbar"><| TO parts.
-    APPEND |h1>Time Master Data</h1><span class="muted">SIDs and attributes of BW's calendar characteristics</span>\n      <span class="spacer"></span><a href=$\{`./$\{location.search\}`\}>Sch| TO parts.
-    APPEND |ema Builder</a><a href=$\{`console.html$\{location.search\}`\}>MDX Console</a></div>\n    <div class="page"><div class="pane">\n      $\{error && html`<div class="notice err">$\{er| TO parts.
-    APPEND |ror\}</div>`\}\n      <section class="section">\n        <header><h2>Interval</h2><span class="spacer"></span>\n          <span class="muted small">default: BW's interval of the vi| TO parts.
-    APPEND |rtual time hierarchies (RSRHIERARCHYVIRT)</span></header>\n        <div class="body"><div class="row">\n          <label class="muted" for="from">From</label><input id="from" type=| TO parts.
-    APPEND |"date" value=$\{from\} onInput=$\{(e) => setFrom(e.target.value)\} />\n          <label class="muted" for="to">to</label><input id="to" type="date" value=$\{to\} onInput=$\{(e) => | TO parts.
-    APPEND |setTo(e.target.value)\} />\n          <button onClick=$\{() => load(\{ from, to \})\} disabled=$\{!!busy\}>$\{changed ? 'Show for this interval' : 'Refresh'\}</button>\n          $| TO parts.
-    APPEND |\{state && html`<span class="muted small">working days: factory calendar <span class="mono">$\{state.calendar\}</span></span>`\}\n        </div></div>\n      </section>\n      <sec| TO parts.
-    APPEND |tion class="section">\n        <header><h2>Characteristics</h2><span class="spacer"></span>\n          $\{busy && html`<span class="status busy">$\{busy\}</span>`\}\n          <but| TO parts.
-    APPEND |ton class="primary" onClick=$\{fill\} disabled=$\{!!busy \|\| !state \|\| !selected.size \|\| changed\}\n            title=$\{changed ? 'Show the state for this interval first' : '| TO parts.
-    APPEND |'\}>Fill selected</button></header>\n        <div class="scroll-x">$\{!state ? html`<div class="body muted">$\{busy \|\| 'No data.'\}</div>` : html`\n          <table>\n           | TO parts.
-    APPEND | <thead><tr><th></th><th>Characteristic</th><th>Tables</th><th class="num">With SID</th><th class="num">In interval</th>\n              <th class="num">Missing SIDs</th><th class="| TO parts.
-    APPEND |num">Attribute rows</th><th class="num">Missing rows</th><th>Values with SID</th></tr></thead>\n            <tbody>$\{state.characteristics.map((c) => html`\n              <tr clas| TO parts.
-    APPEND |s="clickable" onClick=$\{() => toggle(c.name)\}>\n                <td><input type="checkbox" checked=$\{selected.has(c.name)\} onClick=$\{(e) => e.stopPropagation()\} onChange=$\{(| TO parts.
-    APPEND |) => toggle(c.name)\}\n                  aria-label=$\{`Select $\{c.name\}`\} /></td>\n                <td><strong class="mono">$\{c.name\}</strong>$\{complete(c) && html` <span cl| TO parts.
-    APPEND |ass="status ok">complete</span>`\}</td>\n                <td class="mono small">$\{c.sidTable\}$\{c.attributeTable && html`<br />$\{c.attributeTable\}`\}</td>\n                <td | TO parts.
-    APPEND |class="num">$\{c.sids\}</td>\n                <td class="num">$\{c.expected\}</td>\n                <td class="num">$\{c.missingSids \|\| ''\}</td>\n                <td class="num"| TO parts.
-    APPEND |>$\{c.attributeTable ? c.attributes : html`<span class="muted">none</span>`\}</td>\n                <td class="num">$\{c.missingAttributes \|\| ''\}</td>\n                <td class| TO parts.
-    APPEND |="mono small">$\{c.first && `$\{c.first\} … $\{c.last\}`\}</td>\n              </tr>`)\}\n            </tbody>\n          </table>`\}\n        </div>\n      </section>\n      $\{fi| TO parts.
-    APPEND |lled && html`<section class="section">\n        <header><h2>Last fill</h2></header>\n        <div class="body">$\{filled.map((f) => html`<div class=$\{`notice $\{f.error ? 'err' : | TO parts.
-    APPEND |'ok'\}`\}>\n          <span class="mono">$\{f.name\}</span>: $\{f.error \|\| `$\{f.createdSids\} SIDs created, $\{f.attributeRows\} attribute rows written`\}</div>`)\}\n        </d| TO parts.
-    APPEND |iv>\n      </section>`\}\n      <p class="muted small">The fiscal characteristics (0FISC*, they depend on a fiscal year variant) and 0CALDAY are not filled here.\n        Values wi| TO parts.
-    APPEND |th a SID outside the interval get their attribute rows too.</p>\n    </div></div>`;\n\}\n\nconst root = document.getElementById('app');\nroot.textContent = '';\nrender(html`<$\{App| TO parts.
-    APPEND |\} />`, root);\n| TO parts.
+    APPEND | \{\n    setState(data);\n    setFrom(data.from);\n    setTo(data.to);\n  \};\n  const load = (params = \{\}) => \{\n    setBusy('Reading the tables| TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '2026' ) }');\n    setError('');\n    return api('GET', 'time', params).then(show, (e) => setError(e.message)).finally(() => setBusy(''));\n  \};\n  use| TO parts.
+    APPEND |Effect(() => \{ load(); \}, []);\n  // what is incomplete is selected when the state arrives the first time\n  useEffect(() => \{\n    if (state && !selected.size && !filled) setSe| TO parts.
+    APPEND |lected(new Set(state.characteristics.filter((c) => !complete(c)).map((c) => c.name)));\n  \}, [state]);\n\n  const toggle = (name) => setSelected((s) => \{\n    const next = new Se| TO parts.
+    APPEND |t(s);\n    if (next.has(name)) next.delete(name); else next.add(name);\n    return next;\n  \});\n  const fill = () => \{\n    const names = state.characteristics.map((c) => c.name| TO parts.
+    APPEND |).filter((n) => selected.has(n));\n    if (!confirm(`Create the SIDs and attribute rows of $\{names.join(', ')\} for $\{from\} to $\{to\}?\\n\\n`\n      + 'Every view on these tabl| TO parts.
+    APPEND |es then has the new periods as members.')) return;\n    setBusy('Filling{ cl_abap_conv_in_ce=>uccp( '2026' ) }');\n    setError('');\n    api('POST', 'time/fill', \{ from, to, char| TO parts.
+    APPEND |acteristics: names.join(',') \})\n      .then((data) => \{ setFilled(data.filled); show(data); \}, (e) => setError(e.message))\n      .finally(() => setBusy(''));\n  \};\n\n  const| TO parts.
+    APPEND | changed = state && (from !== state.from \|\| to !== state.to);\n  return html`\n    <div class="topbar"><h1>Time Master Data</h1><span class="muted">SIDs and attributes of BW's ca| TO parts.
+    APPEND |lendar characteristics</span>\n      <span class="spacer"></span><a href=$\{`./$\{location.search\}`\}>Schema Builder</a><a href=$\{`console.html$\{location.search\}`\}>MDX Console| TO parts.
+    APPEND |</a></div>\n    <div class="page"><div class="pane">\n      $\{error && html`<div class="notice err">$\{error\}</div>`\}\n      <section class="section">\n        <header><h2>Inter| TO parts.
+    APPEND |val</h2><span class="spacer"></span>\n          <span class="muted small">default: BW's interval of the virtual time hierarchies (RSRHIERARCHYVIRT)</span></header>\n        <div cl| TO parts.
+    APPEND |ass="body"><div class="row">\n          <label class="muted" for="from">From</label><input id="from" type="date" value=$\{from\} onInput=$\{(e) => setFrom(e.target.value)\} />\n   | TO parts.
+    APPEND |       <label class="muted" for="to">to</label><input id="to" type="date" value=$\{to\} onInput=$\{(e) => setTo(e.target.value)\} />\n          <button onClick=$\{() => load(\{ fro| TO parts.
+    APPEND |m, to \})\} disabled=$\{!!busy\}>$\{changed ? 'Show for this interval' : 'Refresh'\}</button>\n          $\{state && html`<span class="muted small">working days: factory calendar <| TO parts.
+    APPEND |span class="mono">$\{state.calendar\}</span></span>`\}\n        </div></div>\n      </section>\n      <section class="section">\n        <header><h2>Characteristics</h2><span class| TO parts.
+    APPEND |="spacer"></span>\n          $\{busy && html`<span class="status busy">$\{busy\}</span>`\}\n          <button class="primary" onClick=$\{fill\} disabled=$\{!!busy \|\| !state \|\| | TO parts.
+    APPEND |!selected.size \|\| changed\}\n            title=$\{changed ? 'Show the state for this interval first' : ''\}>Fill selected</button></header>\n        <div class="scroll-x">$\{!sta| TO parts.
+    APPEND |te ? html`<div class="body muted">$\{busy \|\| 'No data.'\}</div>` : html`\n          <table>\n            <thead><tr><th></th><th>Characteristic</th><th>Tables</th><th class="num"| TO parts.
+    APPEND |>With SID</th><th class="num">In interval</th>\n              <th class="num">Missing SIDs</th><th class="num">Attribute rows</th><th class="num">Missing rows</th><th>Values with S| TO parts.
+    APPEND |ID</th></tr></thead>\n            <tbody>$\{state.characteristics.map((c) => html`\n              <tr class="clickable" onClick=$\{() => toggle(c.name)\}>\n                <td><inp| TO parts.
+    APPEND |ut type="checkbox" checked=$\{selected.has(c.name)\} onClick=$\{(e) => e.stopPropagation()\} onChange=$\{() => toggle(c.name)\}\n                  aria-label=$\{`Select $\{c.name\}| TO parts.
+    APPEND |`\} /></td>\n                <td><strong class="mono">$\{c.name\}</strong>$\{complete(c) && html` <span class="status ok">complete</span>`\}</td>\n                <td class="mono s| TO parts.
+    APPEND |mall">$\{c.sidTable\}$\{c.attributeTable && html`<br />$\{c.attributeTable\}`\}</td>\n                <td class="num">$\{c.sids\}</td>\n                <td class="num">$\{c.expecte| TO parts.
+    APPEND |d\}</td>\n                <td class="num">$\{c.missingSids \|\| ''\}</td>\n                <td class="num">$\{c.attributeTable ? c.attributes : html`<span class="muted">none</span>| TO parts.
+    APPEND |`\}</td>\n                <td class="num">$\{c.missingAttributes \|\| ''\}</td>\n                <td class="mono small">$\{c.first && `$\{c.first\} | TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '2026' ) } $\{c.last\}`\}</td>\n              </tr>`)\}\n            </tbody>\n          </table>`\}\n        </div>\n      </section>\n      $\{filled | TO parts.
+    APPEND |&& html`<section class="section">\n        <header><h2>Last fill</h2></header>\n        <div class="body">$\{filled.map((f) => html`<div class=$\{`notice $\{f.error ? 'err' : 'ok'| TO parts.
+    APPEND |\}`\}>\n          <span class="mono">$\{f.name\}</span>: $\{f.error \|\| `$\{f.createdSids\} SIDs created, $\{f.attributeRows\} attribute rows written`\}</div>`)\}\n        </div>| TO parts.
+    APPEND |\n      </section>`\}\n      <p class="muted small">The fiscal characteristics (0FISC*, they depend on a fiscal year variant) and 0CALDAY are not filled here.\n        Values with | TO parts.
+    APPEND |a SID outside the interval get their attribute rows too.</p>\n    </div></div>`;\n\}\n\nconst root = document.getElementById('app');\nroot.textContent = '';\nrender(html`<$\{App\} | TO parts.
+    APPEND |/>`, root);\n| TO parts.
     result = concat_lines_of( parts ).
   ENDMETHOD.
 
