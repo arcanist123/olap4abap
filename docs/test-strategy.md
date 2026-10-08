@@ -50,6 +50,10 @@ container `emondrian-git` (port 8091, the same build with the FoodMart sample) a
 `emondrian-release` (port 8090, the released eMondrian) (Excel: Data > Get Data > From Analysis Services, that address
 as server). All four ports listen whether or not the server behind them runs; a server that is down answers 502 Bad
 Gateway until it is started.
+`--https` makes the same ports speak https (`https://localhost:8082/`, ...) for clients that want it: with `--cert` and
+`--key`, or a self-signed certificate for localhost and this machine's name that the proxy makes with openssl (Git for
+Windows has one) under `logs/xmla-proxy/tls/` and reuses. Excel only connects when Windows trusts it; import it once
+with `certutil -user -addstore Root logs/xmla-proxy/tls/cert.pem`. The backends keep their own scheme.
 Each exchange is printed as one line and saved in full under `logs/xmla-proxy/<start time>/` (git-ignored). A
 conversation Excel had with eMondrian can be replayed against SAP from those files to find the gaps before Excel is
 pointed at SAP. What Excel (MSOLAP 17) does: it offers binary XML and compression in

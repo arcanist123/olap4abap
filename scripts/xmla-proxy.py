@@ -20,6 +20,13 @@ A backend that is not running answers 502 Bad Gateway.
     python scripts/xmla-proxy.py --sap-url "https://localhost:50001/zzxxmla1?sap-client=001" --insecure
 
 In Excel: Data > Get Data > From Database > From Analysis Services, server http://localhost:8081/ (or 8082, ...).
+
+With --https the same ports speak https instead of http (https://localhost:8081/, ...). The certificate is --cert and
+--key, or else a self-signed one for localhost (and this machine's name and the --bind address) that the proxy makes
+with openssl under logs/xmla-proxy/tls/ on first use and reuses afterwards. Excel (MSOLAP) only connects when Windows
+trusts it; import it once into the current user's trusted root certificates:
+    python scripts/xmla-proxy.py --https
+    certutil -user -addstore Root logs/xmla-proxy/tls/cert.pem
 """
 import argparse
 import datetime
@@ -29,7 +36,10 @@ import http.server
 import itertools
 import pathlib
 import re
+import shutil
+import socket
 import ssl
+import subprocess
 import sys
 import threading
 import time
@@ -99,6 +109,35 @@ def save(directory, name, start_line, headers, body):
         f.write(body)
 
 
+def find_openssl():
+    found = shutil.which("openssl")
+    if found:
+        return found
+    # Git for Windows brings one that is not on the PATH of cmd or PowerShell
+    for candidate in (r"C:\Program Files\Git\mingw64\bin\openssl.exe", r"C:\Program Files\Git\usr\bin\openssl.exe"):
+        if pathlib.Path(candidate).exists():
+            return candidate
+    sys.exit("xmla-proxy: --https needs openssl (on the PATH or from Git for Windows), or --cert and --key")
+
+
+def self_signed_certificate(bind):
+    """A self-signed certificate for localhost, made once under logs/xmla-proxy/tls/ and reused."""
+    directory = ROOT / "logs" / "xmla-proxy" / "tls"
+    cert, key = directory / "cert.pem", directory / "key.pem"
+    if cert.exists() and key.exists():
+        return cert, key
+    directory.mkdir(parents=True, exist_ok=True)
+    names = ["DNS:localhost", "IP:127.0.0.1", "IP:::1", f"DNS:{socket.gethostname()}"]
+    if bind not in ("127.0.0.1", "0.0.0.0", "localhost"):
+        names.append(f"IP:{bind}" if re.fullmatch(r"[\d.]+|[\da-fA-F:]+", bind) else f"DNS:{bind}")
+    subprocess.run([find_openssl(), "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-sha256", "-days", "825",
+                    "-subj", "/CN=localhost", "-addext", "subjectAltName=" + ",".join(names),
+                    "-addext", "extendedKeyUsage=serverAuth", "-keyout", str(key), "-out", str(cert)],
+                   check=True, capture_output=True)
+    print(f"made a self-signed certificate {cert} for {', '.join(names)}")
+    return cert, key
+
+
 def make_handler(backend, target, log_dir, insecure=False):
     url = urllib.parse.urlsplit(target)
     path = url.path + ("?" + url.query if url.query else "")
@@ -114,6 +153,14 @@ def make_handler(backend, target, log_dir, insecure=False):
 
         def log_message(self, format, *args):
             pass
+
+        def handle(self):
+            try:
+                super().handle()
+            except ssl.SSLError as e:
+                # with --https: a client that speaks plain http or does not trust the certificate
+                with print_lock:
+                    print(f"{datetime.datetime.now():%H:%M:%S}       {backend:8} TLS failed: {e.reason or e}", flush=True)
 
         def read_body(self):
             if "chunked" in self.headers.get("Transfer-Encoding", "").lower():
@@ -186,7 +233,19 @@ def main():
                         help="one more backend, e.g. other=8085=http://localhost:8095/emondrian/xmla")
     parser.add_argument("--insecure", action="store_true",
                         help="do not check the certificates of https backends (self-signed development systems)")
+    parser.add_argument("--https", action="store_true",
+                        help="listen with https instead of http (a self-signed certificate unless --cert and --key)")
+    parser.add_argument("--cert", help="certificate (PEM) for --https")
+    parser.add_argument("--key", help="private key (PEM) of --cert")
     args = parser.parse_args()
+    tls = None
+    if args.https:
+        if bool(args.cert) != bool(args.key):
+            parser.error("--cert and --key go together")
+        cert, key = (args.cert, args.key) if args.cert else self_signed_certificate(args.bind)
+        tls = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        tls.load_cert_chain(cert, key)
+        print(f"https with certificate {cert}")
 
     log_dir = ROOT / "logs" / "xmla-proxy" / f"{datetime.datetime.now():%Y%m%d-%H%M%S}"
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -198,9 +257,12 @@ def main():
         backends.append((name, int(port), target))
     for backend, port, target in backends:
         server = http.server.ThreadingHTTPServer((args.bind, port), make_handler(backend, target, log_dir, args.insecure))
+        if tls:
+            # the handshake runs in the request's thread, so a client that stalls in it blocks no other client
+            server.socket = tls.wrap_socket(server.socket, server_side=True, do_handshake_on_connect=False)
         servers.append(server)
         threading.Thread(target=server.serve_forever, daemon=True).start()
-        print(f"{backend:8} http://{'localhost' if args.bind == '127.0.0.1' else args.bind}:{port}/ -> {target}")
+        print(f"{backend:8} {'https' if tls else 'http'}://{'localhost' if args.bind == '127.0.0.1' else args.bind}:{port}/ -> {target}")
     print(f"logging to {log_dir}", flush=True)
     try:
         threading.Event().wait()
