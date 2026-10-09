@@ -24,11 +24,34 @@ on a test system: the visits are thinned evenly over the days, so every day keep
   code; name in plain words, group, chapter), visit type `ZCLVTYPE` (care setting), date `ZCLDATE` (`YYYYMMDD`; the date
   text, day and month names, year, quarter, month, week counted from 1 January, day of month). The date is a plain
   characteristic, as FoodMart's `ZFMDATE`, so it can carry attributes.
+- The physician `ZCLDOC` is **authorization relevant** and has the hierarchy `ZCLDOC_ORG` (see below), for working
+  with BW's analysis authorizations. BW's own queries on `ZCLVISIT`/`ZCLVISITA` (RSRT, BEx, Analysis for Office) then
+  need an analysis authorization that covers `ZCLDOC`; olap4abap reads the tables and checks no authorizations.
 - Key figures: `ZCLVISNO` (1 per visit: the aDSO adds up visits with the same keys, so counting rows would not count
   visits), `ZCLDUR` duration, `ZCLWAIT` waiting time (minutes), `ZCLLABS` lab tests, `ZCLCHRG` charges.
 - The views of the characteristics (`ZZXXMLA1_CL_BW_VIEW_GEN`), the schema files `/WEB-INF/schema/ZCLVISIT.xml` and
   `/WEB-INF/schema/ZCLVISITA.xml` and a catalog for each in `/WEB-INF/datasources.xml` (added once; the setup writes the
   data sources file if there is none).
+
+## The hierarchy of the physicians
+
+`ZCLDOC` has hierarchies that are **version dependent** and where the **entire hierarchy is time dependent**
+(`RSDCHABAS`: `HIETABFL`, `HIEVERFL`, `HIENMTFL` set, `HIENDTFL` not; the same time dependency as the SAP demo's
+`0D_NW_PROD`): one hierarchy name, and per version a hierarchy per time slice, each a row of `RSHIEDIR` with its own
+`HIEID`, `DATEFROM` and `DATETO`. The generator loads `ZCLDOC_ORG` through BW's hierarchy interface
+(`RSNDI_SHIE_STRUCTURE_UPDATE4`, then `RSNDI_SHIE_ACTIVATE`; `UPDATE3` dumps on the 2025 system) with four slices:
+
+| Version | Valid | Structure |
+|---|---|---|
+| `001` Clinic Organization | 1000-01-01 to 2024-12-31 | Clinic > Primary Care (General Practice, Pediatrics), Specialist Care (Cardiology, Pulmonology, Orthopedics, Dermatology), Emergency Care (Emergency Medicine) > physicians |
+| `001` | 2025-01-01 to 9999-12-31 | reorganised: Specialist Care > Internal Medicine > Cardiology, Pulmonology; Dermatology under Primary Care; Dr. Hana Sato (`008`) moves to General Practice, Dr. Karim Aziz (`011`) to Emergency Medicine |
+| `002` Clinic Organization (Plan) | 1000-01-01 to 2024-12-31 | as version `001` |
+| `002` | 2025-01-01 to 9999-12-31 | the plan: Emergency Medicine under Primary Care, no Internal Medicine, nobody moves |
+
+The text nodes (`0HIER_NODE`) are named `CLINIC`, `PRIMARY`, `SPECIAL`, `INTMED`, `EMERGENCY` and per department `GP`,
+`PED`, `CARD`, `PULM`, `ORTH`, `DERM`, `EMER`; the leaves are the physicians' keys. The attribute Department stays as in
+the master data (it is not time dependent), so in 2025 it differs from the hierarchy for `008` and `011`. The run
+deletes the characteristic's hierarchies before the InfoObjects.
 
 ## The data
 

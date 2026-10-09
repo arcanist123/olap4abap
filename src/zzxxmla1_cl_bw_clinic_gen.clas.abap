@@ -12,6 +12,8 @@
 "! The clinic demo (docs/clinic-demo.md): visits of patients to a clinic in 2024 and 2025, made up by this class, so the
 "! demo carries no third-party data. It creates InfoArea ZCLINIC with
 "! - the InfoCube ZCLVISIT (characteristics patient, physician, diagnosis, visit type and date with flat attributes),
+"! - on the physician ZCLDOC, which is authorization relevant, the hierarchy ZCLDOC_ORG (clinic > division > department >
+"!   physician): version dependent, the entire hierarchy time dependent, two versions with two time slices each,
 "! - the cube-type aDSO ZCLVISITA with the same visits and BW's standard time characteristics in place of the date,
 "! loads both, generates the CDS views of the characteristics (ZZXXMLA1_CL_BW_VIEW_GEN), writes a schema per provider
 "! (/WEB-INF/schema/ZCLVISIT.xml, /WEB-INF/schema/ZCLVISITA.xml) and adds a catalog for each to
@@ -33,6 +35,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     CONSTANTS c_infoarea TYPE rsinfoarea VALUE 'ZCLINIC'.
     CONSTANTS c_cube     TYPE rsinfocube VALUE 'ZCLVISIT'.
     CONSTANTS c_adso     TYPE rsoadsonm VALUE 'ZCLVISITA'.
+    CONSTANTS c_hierarchy TYPE rshienm VALUE 'ZCLDOC_ORG'.
 
     "! Generates everything; the log of the run.
     "! @parameter max_visits | at most this many visits, spread evenly over the days; 0: all of them
@@ -57,6 +60,9 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
         datatp     TYPE datatype_d,
         leng       TYPE i,
         attributes TYPE ty_t_iobjnm,
+        "! with hierarchies: version dependent, the entire hierarchy time dependent
+        hierarchies   TYPE abap_bool,
+        auth_relevant TYPE abap_bool,
       END OF ty_cha,
       ty_t_cha TYPE STANDARD TABLE OF ty_cha WITH EMPTY KEY.
     TYPES:
@@ -118,6 +124,33 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
       END OF ty_physician,
       ty_t_physician TYPE STANDARD TABLE OF ty_physician WITH EMPTY KEY.
     TYPES:
+      "! a node of a hierarchy of the physicians: a text node (with a text) or a physician (its key, no text)
+      BEGIN OF ty_hie_node,
+        name   TYPE string,
+        parent TYPE string,
+        text   TYPE string,
+      END OF ty_hie_node,
+      ty_t_hie_node TYPE STANDARD TABLE OF ty_hie_node WITH EMPTY KEY.
+    TYPES:
+      "! a physician in another department than in the master data
+      BEGIN OF ty_move,
+        physician  TYPE i,
+        department TYPE string,
+      END OF ty_move,
+      ty_t_move TYPE STANDARD TABLE OF ty_move WITH EMPTY KEY.
+    TYPES:
+      "! a time slice of a version of the hierarchy ZCLDOC_ORG
+      BEGIN OF ty_hierarchy,
+        version  TYPE rsversion,
+        datefrom TYPE d,
+        dateto   TYPE d,
+        text     TYPE string,
+        nodes    TYPE ty_t_hie_node,
+      END OF ty_hierarchy,
+      ty_t_hierarchy TYPE STANDARD TABLE OF ty_hierarchy WITH EMPTY KEY.
+    TYPES ty_t_htab TYPE rsndi_t_htabstr.
+    TYPES ty_t_ndi_message TYPE rsndi_t_message.
+    TYPES:
       BEGIN OF ty_diagnosis,
         code    TYPE string,
         name    TYPE string,
@@ -171,6 +204,20 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     METHODS build_patients.
     METHODS build_physicians.
     METHODS build_diagnoses.
+    "! The time slices of the versions of ZCLDOC_ORG.
+    METHODS hierarchies RETURNING VALUE(result) TYPE ty_t_hierarchy.
+    "! The nodes of a time slice: the text nodes and below its department every physician, moved ones elsewhere.
+    METHODS organization
+      IMPORTING text_nodes    TYPE ty_t_hie_node
+                moves         TYPE ty_t_move OPTIONAL
+      RETURNING VALUE(result) TYPE ty_t_hie_node.
+    "! Appends a node and its subtree to the hierarchy table (NDI format: parent, first child and next sibling).
+    METHODS add_node
+      IMPORTING nodes    TYPE ty_t_hie_node
+                node     TYPE ty_hie_node
+                parentid TYPE rshienodid
+                tlevel   TYPE i
+      CHANGING  htab     TYPE ty_t_htab.
     "! The departments a patient of each age group is sent to, with their weights.
     METHODS department_weights RETURNING VALUE(result) TYPE ty_t_group_weight.
     "! The diagnoses each department sees, with their weights.
@@ -185,6 +232,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     METHODS delete_cube.
     METHODS delete_adso.
     METHODS delete_views.
+    METHODS delete_hierarchies.
     METHODS delete_infoobjects.
     METHODS ensure_infoarea.
     METHODS create_characteristic IMPORTING cha TYPE ty_cha.
@@ -193,6 +241,9 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     METHODS create_cube.
     METHODS activate_cube.
     METHODS load_master_data IMPORTING md TYPE ty_md.
+    "! Saves and activates a time slice of ZCLDOC_ORG (RSNDI_SHIE_STRUCTURE_UPDATE4, RSNDI_SHIE_ACTIVATE; UPDATE3
+    "! dumps on the 2025 system: CL_RSSH_HIERARCHY_FUNC=>NDI_UPDATE no longer takes its table of hierarchy texts).
+    METHODS load_hierarchy IMPORTING hierarchy TYPE ty_hierarchy.
     METHODS load_cube.
     "! Generates the views of the cube's characteristics and of the aDSO's time characteristics.
     METHODS generate_views RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_view_gen=>ty_t_view.
@@ -237,6 +288,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     METHODS write_return IMPORTING return TYPE bapiret2_t.
     METHODS write_exception IMPORTING error TYPE REF TO cx_root.
     METHODS write_messages IMPORTING messages TYPE rs_t_msg.
+    METHODS write_ndi_messages IMPORTING messages TYPE ty_t_ndi_message.
 ENDCLASS.
 
 
@@ -273,6 +325,9 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     activate_cube( ).
     LOOP AT master_data( ) INTO DATA(md).
       load_master_data( md ).
+    ENDLOOP.
+    LOOP AT hierarchies( ) INTO DATA(hierarchy).
+      load_hierarchy( hierarchy ).
     ENDLOOP.
     load_cube( ).
     verify( |/BIC/F{ c_cube }| ).
@@ -321,7 +376,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
         attributes = VALUE #( ( 'ZCLPNAME' ) ( 'ZCLSEX' ) ( 'ZCLBYEAR' ) ( 'ZCLAGEGR' ) ( 'ZCLBLOOD' ) ( 'ZCLINSUR' )
                               ( 'ZCLCITY' ) ( 'ZCLREGIO' ) ) )
       ( name = 'ZCLDOC'   text = 'Physician'  datatp = 'NUMC' leng = 3
-        attributes = VALUE #( ( 'ZCLDNAME' ) ( 'ZCLDEPT' ) ( 'ZCLEXPER' ) ) )
+        attributes = VALUE #( ( 'ZCLDNAME' ) ( 'ZCLDEPT' ) ( 'ZCLEXPER' ) )
+        hierarchies = abap_true auth_relevant = abap_true )
       ( name = 'ZCLDIAG'  text = 'Diagnosis'  leng = 5
         attributes = VALUE #( ( 'ZCLDTEXT' ) ( 'ZCLDGRP' ) ( 'ZCLDCHAP' ) ) )
       ( name = 'ZCLVTYPE' text = 'Visit Type' leng = 20
@@ -528,6 +584,101 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
         diagnosis_group = `Examinations` chapter = `Check-ups` )
       ( code = `Z09` name = `Follow-up examination`
         diagnosis_group = `Follow-up care` chapter = `Check-ups` ) ).
+  ENDMETHOD.
+
+  METHOD hierarchies.
+    " 2024: three divisions. On 1 January 2025 the actual organization (version 001) gets a division Internal Medicine
+    " for cardiology and pulmonology, dermatology moves to primary care and two physicians change their department (the
+    " attribute Department keeps the old one); the plan (version 002) kept the departments and put emergency medicine
+    " into primary care instead.
+    DATA(slice_2024) = organization( VALUE #(
+      ( name = `CLINIC` text = `Clinic` )
+      ( name = `PRIMARY`   parent = `CLINIC`    text = `Primary Care` )
+      ( name = `SPECIAL`   parent = `CLINIC`    text = `Specialist Care` )
+      ( name = `EMERGENCY` parent = `CLINIC`    text = `Emergency Care` )
+      ( name = `GP`        parent = `PRIMARY`   text = `General Practice` )
+      ( name = `PED`       parent = `PRIMARY`   text = `Pediatrics` )
+      ( name = `CARD`      parent = `SPECIAL`   text = `Cardiology` )
+      ( name = `PULM`      parent = `SPECIAL`   text = `Pulmonology` )
+      ( name = `ORTH`      parent = `SPECIAL`   text = `Orthopedics` )
+      ( name = `DERM`      parent = `SPECIAL`   text = `Dermatology` )
+      ( name = `EMER`      parent = `EMERGENCY` text = `Emergency Medicine` ) ) ).
+    DATA(actual_2025) = organization(
+      text_nodes = VALUE #(
+        ( name = `CLINIC` text = `Clinic` )
+        ( name = `PRIMARY`   parent = `CLINIC`    text = `Primary Care` )
+        ( name = `SPECIAL`   parent = `CLINIC`    text = `Specialist Care` )
+        ( name = `EMERGENCY` parent = `CLINIC`    text = `Emergency Care` )
+        ( name = `GP`        parent = `PRIMARY`   text = `General Practice` )
+        ( name = `PED`       parent = `PRIMARY`   text = `Pediatrics` )
+        ( name = `DERM`      parent = `PRIMARY`   text = `Dermatology` )
+        ( name = `INTMED`    parent = `SPECIAL`   text = `Internal Medicine` )
+        ( name = `CARD`      parent = `INTMED`    text = `Cardiology` )
+        ( name = `PULM`      parent = `INTMED`    text = `Pulmonology` )
+        ( name = `ORTH`      parent = `SPECIAL`   text = `Orthopedics` )
+        ( name = `EMER`      parent = `EMERGENCY` text = `Emergency Medicine` ) )
+      " Dr. Hana Sato to general practice, Dr. Karim Aziz to emergency medicine
+      moves = VALUE #( ( physician = 8 department = `GP` ) ( physician = 11 department = `EMER` ) ) ).
+    DATA(plan_2025) = organization( VALUE #(
+      ( name = `CLINIC` text = `Clinic` )
+      ( name = `PRIMARY`   parent = `CLINIC`  text = `Primary Care` )
+      ( name = `SPECIAL`   parent = `CLINIC`  text = `Specialist Care` )
+      ( name = `GP`        parent = `PRIMARY` text = `General Practice` )
+      ( name = `PED`       parent = `PRIMARY` text = `Pediatrics` )
+      ( name = `EMER`      parent = `PRIMARY` text = `Emergency Medicine` )
+      ( name = `CARD`      parent = `SPECIAL` text = `Cardiology` )
+      ( name = `PULM`      parent = `SPECIAL` text = `Pulmonology` )
+      ( name = `ORTH`      parent = `SPECIAL` text = `Orthopedics` )
+      ( name = `DERM`      parent = `SPECIAL` text = `Dermatology` ) ) ).
+    result = VALUE #(
+      ( version = '001' datefrom = '10000101' dateto = '20241231' text = `Clinic Organization` nodes = slice_2024 )
+      ( version = '001' datefrom = '20250101' dateto = '99991231' text = `Clinic Organization` nodes = actual_2025 )
+      ( version = '002' datefrom = '10000101' dateto = '20241231' text = `Clinic Organization (Plan)`
+        nodes = slice_2024 )
+      ( version = '002' datefrom = '20250101' dateto = '99991231' text = `Clinic Organization (Plan)`
+        nodes = plan_2025 ) ).
+  ENDMETHOD.
+
+  METHOD organization.
+    result = text_nodes.
+    LOOP AT physicians INTO DATA(physician).
+      DATA(department) = VALUE string( moves[ physician = physician-id ]-department OPTIONAL ).
+      IF department IS INITIAL.
+        department = SWITCH #( physician-department
+                               WHEN `General Practice` THEN `GP`
+                               WHEN `Pediatrics`       THEN `PED`
+                               WHEN `Cardiology`       THEN `CARD`
+                               WHEN `Pulmonology`      THEN `PULM`
+                               WHEN `Orthopedics`      THEN `ORTH`
+                               WHEN `Dermatology`      THEN `DERM`
+                               ELSE `EMER` ).
+      ENDIF.
+      APPEND VALUE #( name = |{ physician-id WIDTH = 3 ALIGN = RIGHT PAD = '0' }| parent = department ) TO result.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD add_node.
+    DATA previous TYPE rshienodid.
+    DATA(nodeid) = CONV rshienodid( lines( htab ) + 1 ).
+    APPEND VALUE #( nodeid   = nodeid
+                    iobjnm   = COND #( WHEN node-text IS INITIAL THEN 'ZCLDOC' ELSE '0HIER_NODE' )
+                    nodename = node-name
+                    tlevel   = tlevel
+                    parentid = parentid ) TO htab.
+    LOOP AT nodes INTO DATA(child) WHERE parent = node-name.
+      DATA(childid) = CONV rshienodid( lines( htab ) + 1 ).
+      IF previous IS INITIAL.
+        htab[ nodeid ]-childid = childid.
+      ELSE.
+        htab[ previous ]-nextid = childid.
+      ENDIF.
+      add_node( EXPORTING nodes    = nodes
+                          node     = child
+                          parentid = nodeid
+                          tlevel   = tlevel + 1
+                CHANGING  htab     = htab ).
+      previous = childid.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD department_weights.
@@ -755,6 +906,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     delete_adso( ).
     delete_cube( ).
     delete_views( ).
+    delete_hierarchies( ).
     delete_infoobjects( ).
   ENDMETHOD.
 
@@ -806,6 +958,34 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
         CATCH cx_dd_ddl_exception INTO DATA(error).
           write( |delete view of { iobjnm }: FAILED, { error->get_text( ) }| ).
       ENDTRY.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD delete_hierarchies.
+    DATA messages TYPE ty_t_ndi_message.
+    DATA subrc TYPE sy-subrc.
+    LOOP AT characteristics( ) INTO DATA(cha) WHERE hierarchies = abap_true.
+      SELECT DISTINCT hieid FROM rshiedir WHERE iobjnm = @cha-name INTO TABLE @DATA(hieids).
+      LOOP AT hieids INTO DATA(hieid).
+        CLEAR messages.
+        CALL FUNCTION 'RSNDI_SHIE_DELETE'
+          EXPORTING
+            i_s_hiekey   = VALUE rssh_s_hiekey( hieid = hieid-hieid )
+          IMPORTING
+            e_subrc      = subrc
+          TABLES
+            e_t_messages = messages.
+        IF subrc = 0.
+          COMMIT WORK AND WAIT.
+        ELSE.
+          ROLLBACK WORK.
+          write( |delete hierarchy { hieid-hieid } of { cha-name }: FAILED, subrc { subrc }| ).
+          write_ndi_messages( messages ).
+        ENDIF.
+      ENDLOOP.
+      IF hieids IS NOT INITIAL.
+        write( |delete hierarchies of { cha-name }: { lines( hieids ) } requested| ).
+      ENDIF.
     ENDLOOP.
   ENDMETHOD.
 
@@ -876,7 +1056,11 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       leng       = cha-leng
       outputlen  = cha-leng
       lowercase  = COND #( WHEN datatp = 'CHAR' THEN rs_c_true )
-      attribfl   = COND #( WHEN cha-attributes IS NOT INITIAL THEN rs_c_true ) ).
+      attribfl   = COND #( WHEN cha-attributes IS NOT INITIAL THEN rs_c_true )
+      hietabfl   = cha-hierarchies
+      hieverfl   = cha-hierarchies
+      hienmtfl   = cha-hierarchies
+      authrelfl  = cha-auth_relevant ).
     LOOP AT cha-attributes INTO DATA(attribute).
       APPEND VALUE #( chabasnm = cha-name
                       objvers  = rs_c_objvers-modified
@@ -1076,6 +1260,63 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     ENDIF.
     write( |load { md-iobjnm }: { lines( <table> ) } records, | &&
            |{ COND string( WHEN ok = abap_true THEN `done` ELSE |FAILED, subrc { subrc }| ) }| ).
+  ENDMETHOD.
+
+  METHOD load_hierarchy.
+    DATA htab TYPE ty_t_htab.
+    DATA texts TYPE rsndi_t_hiedirt.
+    DATA node_texts TYPE rsndi_t_thiernode.
+    DATA messages TYPE ty_t_ndi_message.
+    DATA subrc TYPE sy-subrc.
+    DATA hieid TYPE rshieid.
+    add_node( EXPORTING nodes    = hierarchy-nodes
+                        node     = hierarchy-nodes[ parent = `` ]
+                        parentid = 0
+                        tlevel   = 1
+              CHANGING  htab     = htab ).
+    texts = VALUE #( ( langu = 'E' txtsh = hierarchy-text txtmd = hierarchy-text txtlg = hierarchy-text ) ).
+    node_texts = VALUE #( FOR n IN hierarchy-nodes WHERE ( text IS NOT INITIAL )
+                          ( langu = 'E' nodename = n-name txtsh = n-text txtmd = n-text txtlg = n-text ) ).
+    DATA(header) = VALUE rsndi_s_hierupdate( hienm    = c_hierarchy
+                                             version  = hierarchy-version
+                                             iobjnm   = 'ZCLDOC'
+                                             datefrom = hierarchy-datefrom
+                                             dateto   = hierarchy-dateto ).
+    CALL FUNCTION 'RSNDI_SHIE_STRUCTURE_UPDATE4'
+      EXPORTING
+        i_s_hiehead   = header
+        i_t_hiedirt   = texts
+        i_t_hierstruc = htab
+        i_t_thiernode = node_texts
+        i_t_nodenames = VALUE rsndi_t_nodenmstr( )
+        i_t_hierintvl = VALUE rsndi_t_jtabstr( )
+        i_t_nodeattr  = VALUE rssh_t_nodeattr( )
+        i_t_level     = VALUE rsndi_t_hielvt( )
+      IMPORTING
+        e_subrc       = subrc
+        e_hieid       = hieid
+        e_t_messages  = messages.
+    IF subrc = 0.
+      COMMIT WORK AND WAIT.
+      CALL FUNCTION 'RSNDI_SHIE_ACTIVATE'
+        EXPORTING
+          i_hieid      = hieid
+        IMPORTING
+          e_subrc      = subrc
+        TABLES
+          e_t_messages = messages.
+    ENDIF.
+    IF subrc = 0.
+      COMMIT WORK AND WAIT.
+    ELSE.
+      ROLLBACK WORK.
+    ENDIF.
+    write( |hierarchy { c_hierarchy } version { hierarchy-version }, { hierarchy-datefrom DATE = ISO } to | &&
+           |{ hierarchy-dateto DATE = ISO }: { lines( htab ) } nodes, | &&
+           |{ COND string( WHEN subrc = 0 THEN `active` ELSE |FAILED, subrc { subrc }| ) }| ).
+    IF subrc <> 0.
+      write_ndi_messages( messages ).
+    ENDIF.
   ENDMETHOD.
 
   METHOD load_cube.
@@ -1546,6 +1787,14 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD write_messages.
+    LOOP AT messages INTO DATA(message).
+      MESSAGE ID message-msgid TYPE 'S' NUMBER message-msgno
+        WITH message-msgv1 message-msgv2 message-msgv3 message-msgv4 INTO DATA(text).
+      write( |  [{ message-msgty }] { text }| ).
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD write_ndi_messages.
     LOOP AT messages INTO DATA(message).
       MESSAGE ID message-msgid TYPE 'S' NUMBER message-msgno
         WITH message-msgv1 message-msgv2 message-msgv3 message-msgv4 INTO DATA(text).
