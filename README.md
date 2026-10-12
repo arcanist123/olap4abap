@@ -10,6 +10,19 @@ and evaluated as Mondrian does. The BW system's own MDX engine is not used.
 Status: under development. The MDX engine answers the statements of Mondrian's test suite that apply to a single cube
 the way the reference server does (see `docs/test-strategy.md`).
 
+## Motivation
+
+We want Excel's native pivot tables to connect to SAP directly. Excel speaks XMLA and MDX to an OLAP server out of the
+box (Data > Get Data > From Database > From Analysis Services, with the server's URL as the server name), so a pivot
+table, its filters, slicers and drill-through work against any server that answers XMLA the way Analysis Services does.
+olap4abap is that server, running inside the SAP system:
+
+- no add-in on the client and no middleware between Excel and SAP: the pivot table talks to an ICF service of the SAP
+  system;
+- no copy of the data: queries are evaluated on the BW tables where the data lives;
+- the MDX Excel generates is understood. SAP BW has an XMLA/MDX interface of its own, but it supports little of modern
+  MDX and cannot parse some of what Excel sends, which is why olap4abap has its own engine.
+
 ## What is in the repository
 
 - `src/` - the ABAP objects (abapGit file format), package `$ZZXXMLA1`, NetWeaver 7.50 syntax
