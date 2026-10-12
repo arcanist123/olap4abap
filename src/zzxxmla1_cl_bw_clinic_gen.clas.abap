@@ -17,7 +17,10 @@
 "!   hierarchy time dependent, each with two versions of two time slices,
 "! - on the diagnosis ZCLDIAG, also authorization relevant, the plain hierarchy ZCLDIAG_ICD (all diagnoses > chapter >
 "!   group > diagnosis), for authorizations that combine both characteristics,
+"! - the room ZCLROOM, compounded with the site ZCLSITE: the same rooms R01 to R04 at both sites, so a room is a member
+"!   only with its site (docs/bw-schema-design-guide.md, section 3.7),
 "! - the cube-type aDSO ZCLVISITA with the same visits and BW's standard time characteristics in place of the date,
+"!   read through its fact view (the SID of the room, ZZXXMLA1_CL_BW_VIEW_GEN),
 "! loads both, generates the CDS views of the characteristics (ZZXXMLA1_CL_BW_VIEW_GEN), writes a schema per provider
 "! (/WEB-INF/schema/ZCLVISIT.xml, /WEB-INF/schema/ZCLVISITA.xml) and adds a catalog for each to
 "! /WEB-INF/datasources.xml.
@@ -65,6 +68,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
         datatp     TYPE datatype_d,
         leng       TYPE i,
         attributes TYPE ty_t_iobjnm,
+        compounding TYPE ty_t_iobjnm,
         "! with hierarchies; version dependent; the entire hierarchy time dependent
         hierarchies   TYPE abap_bool,
         hie_versions  TYPE abap_bool,
@@ -88,10 +92,12 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
       ty_t_dime TYPE STANDARD TABLE OF ty_dime WITH EMPTY KEY.
     TYPES ty_t_row TYPE STANDARD TABLE OF string_table WITH EMPTY KEY.
     TYPES:
-      "! the master data of a characteristic: per row the key and the values of the attributes, in their order
+      "! the master data of a characteristic: per row the values of the compounding, the key and the values of the
+      "! attributes, in their order
       BEGIN OF ty_md,
-        iobjnm     TYPE rsiobjnm,
-        attributes TYPE ty_t_iobjnm,
+        iobjnm      TYPE rsiobjnm,
+        compounding TYPE ty_t_iobjnm,
+        attributes  TYPE ty_t_iobjnm,
         rows       TYPE ty_t_row,
       END OF ty_md,
       ty_t_md TYPE STANDARD TABLE OF ty_md WITH EMPTY KEY.
@@ -182,6 +188,12 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
       END OF ty_visit,
       ty_t_visit TYPE STANDARD TABLE OF ty_visit WITH EMPTY KEY.
     TYPES:
+      "! the site and the room of a visit; blank when no physician was assigned
+      BEGIN OF ty_room,
+        site TYPE string,
+        room TYPE string,
+      END OF ty_room.
+    TYPES:
       "! BW's time characteristics of a day
       BEGIN OF ty_calendar,
         calday     TYPE d,
@@ -248,6 +260,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     METHODS limit_visits IMPORTING max_visits TYPE i.
     METHODS master_data RETURNING VALUE(result) TYPE ty_t_md.
     METHODS calendar IMPORTING day TYPE d RETURNING VALUE(result) TYPE ty_calendar.
+    "! The site and room of a visit, from its physician and patient: no random number, so the visits stay as they were.
+    METHODS room IMPORTING visit TYPE ty_visit RETURNING VALUE(result) TYPE ty_room.
 
     METHODS delete_all.
     METHODS delete_cube.
@@ -301,11 +315,13 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
       IMPORTING catalog TYPE csequence
                 xml     TYPE string.
 
-    "! The field of an InfoObject in BW's generated tables (RSD_FIELDNM_GET_FROM_IOBJNM), checked against the structure.
+    "! The field of an InfoObject in BW's generated tables (RSD_FIELDNM_GET_FROM_IOBJNM), checked against the structure;
+    "! without namespace: as a fact view names it.
     METHODS iobj_field
-      IMPORTING struct        TYPE REF TO cl_abap_structdescr
-                iobjnm        TYPE rsiobjnm
-      RETURNING VALUE(result) TYPE string.
+      IMPORTING struct            TYPE REF TO cl_abap_structdescr
+                iobjnm            TYPE rsiobjnm
+                without_namespace TYPE abap_bool DEFAULT abap_false
+      RETURNING VALUE(result)     TYPE string.
     METHODS write_return IMPORTING return TYPE bapiret2_t.
     METHODS write_exception IMPORTING error TYPE REF TO cx_root.
     METHODS write_messages IMPORTING messages TYPE rs_t_msg.
@@ -392,6 +408,12 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       ( name = 'ZCLMONTH' text = 'Month of Year'     datatp = 'NUMC' leng = 2 )
       ( name = 'ZCLWEEK'  text = 'Week of Year'      datatp = 'NUMC' leng = 2 )
       ( name = 'ZCLDAYOM' text = 'Day of Month'      datatp = 'NUMC' leng = 2 )
+      ( name = 'ZCLRTYPE' text = 'Room Type'         leng = 20 )
+      " the site before the room compounded with it
+      ( name = 'ZCLSITE'  text = 'Site'       leng = 10
+        attributes = VALUE #( ( 'ZCLCITY' ) ) )
+      ( name = 'ZCLROOM'  text = 'Room'       leng = 4
+        compounding = VALUE #( ( 'ZCLSITE' ) ) attributes = VALUE #( ( 'ZCLRTYPE' ) ) )
       " the dimension characteristics
       ( name = 'ZCLPAT'   text = 'Patient'    datatp = 'NUMC' leng = 6
         attributes = VALUE #( ( 'ZCLPNAME' ) ( 'ZCLSEX' ) ( 'ZCLBYEAR' ) ( 'ZCLAGEGR' ) ( 'ZCLBLOOD' ) ( 'ZCLINSUR' )
@@ -428,7 +450,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       ( suffix = '2' text = 'Physician'  iobjtp = 'CHA' iobjnms = VALUE #( ( 'ZCLDOC' ) ) )
       ( suffix = '3' text = 'Diagnosis'  iobjtp = 'CHA' iobjnms = VALUE #( ( 'ZCLDIAG' ) ) )
       ( suffix = '4' text = 'Visit Type' iobjtp = 'CHA' iobjnms = VALUE #( ( 'ZCLVTYPE' ) ) )
-      ( suffix = '5' text = 'Time'       iobjtp = 'CHA' iobjnms = VALUE #( ( 'ZCLDATE' ) ) ) ).
+      ( suffix = '5' text = 'Time'       iobjtp = 'CHA' iobjnms = VALUE #( ( 'ZCLDATE' ) ) )
+      ( suffix = '6' text = 'Room'       iobjtp = 'CHA' iobjnms = VALUE #( ( 'ZCLSITE' ) ( 'ZCLROOM' ) ) ) ).
   ENDMETHOD.
 
   METHOD all_iobjnm.
@@ -437,7 +460,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD dimension_characteristics.
-    result = VALUE #( ( 'ZCLPAT' ) ( 'ZCLDOC' ) ( 'ZCLDIAG' ) ( 'ZCLVTYPE' ) ( 'ZCLDATE' ) ).
+    result = VALUE #( ( 'ZCLPAT' ) ( 'ZCLDOC' ) ( 'ZCLDIAG' ) ( 'ZCLVTYPE' ) ( 'ZCLDATE' ) ( 'ZCLSITE' ) ( 'ZCLROOM' ) ).
   ENDMETHOD.
 
   METHOD random.
@@ -982,7 +1005,32 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       ( iobjnm = 'ZCLVTYPE' attributes = VALUE #( ( 'ZCLSETNG' ) ) rows = type_rows )
       ( iobjnm = 'ZCLDATE' attributes = VALUE #( ( 'ZCLTHEDT' ) ( 'ZCLDAYNM' ) ( 'ZCLMONNM' ) ( 'ZCLYEAR' ) ( 'ZCLQTR' )
                                                  ( 'ZCLMONTH' ) ( 'ZCLWEEK' ) ( 'ZCLDAYOM' ) )
-        rows = date_rows ) ).
+        rows = date_rows )
+      ( iobjnm = 'ZCLSITE' attributes = VALUE #( ( 'ZCLCITY' ) )
+        rows = VALUE #( ( VALUE #( ( `NORTH` ) ( `Northfield` ) ) ) ( VALUE #( ( `SOUTH` ) ( `Southport` ) ) ) ) )
+      " R01 to R04 at both sites, R05 only in the north: a room is known only with its site. The south is loaded first
+      " (BW makes the SIDs of a load in key order), so the SIDs are not in the order of the names, which the members
+      " follow (OrderByColumn)
+      ( iobjnm = 'ZCLROOM' compounding = VALUE #( ( 'ZCLSITE' ) ) attributes = VALUE #( ( 'ZCLRTYPE' ) )
+        rows = VALUE #( ( VALUE #( ( `SOUTH` ) ( `R01` ) ( `Consultation` ) ) )
+                        ( VALUE #( ( `SOUTH` ) ( `R02` ) ( `Treatment` ) ) )
+                        ( VALUE #( ( `SOUTH` ) ( `R03` ) ( `Treatment` ) ) )
+                        ( VALUE #( ( `SOUTH` ) ( `R04` ) ( `Consultation` ) ) ) ) )
+      ( iobjnm = 'ZCLROOM' compounding = VALUE #( ( 'ZCLSITE' ) ) attributes = VALUE #( ( 'ZCLRTYPE' ) )
+        rows = VALUE #( ( VALUE #( ( `NORTH` ) ( `R01` ) ( `Consultation` ) ) )
+                        ( VALUE #( ( `NORTH` ) ( `R02` ) ( `Consultation` ) ) )
+                        ( VALUE #( ( `NORTH` ) ( `R03` ) ( `Treatment` ) ) )
+                        ( VALUE #( ( `NORTH` ) ( `R04` ) ( `Treatment` ) ) )
+                        ( VALUE #( ( `NORTH` ) ( `R05` ) ( `Imaging` ) ) ) ) ) ).
+  ENDMETHOD.
+
+  METHOD room.
+    IF visit-physician = 0.
+      RETURN.
+    ENDIF.
+    result-site = COND #( WHEN visit-physician MOD 2 = 0 THEN `NORTH` ELSE `SOUTH` ).
+    DATA(rooms) = COND i( WHEN result-site = `NORTH` THEN 5 ELSE 4 ).
+    result-room = |R0{ visit-patient MOD rooms + 1 }|.
   ENDMETHOD.
 
   METHOD calendar.
@@ -1005,7 +1053,14 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD delete_all.
-    " the providers and the views use the characteristics, so they go first
+    " the providers and the views use the characteristics, so they go first; the fact view selects from the aDSO
+    TRY.
+        IF NEW zzxxmla1_cl_bw_view_gen( )->delete_fact_view( c_adso ) = abap_true.
+          write( |delete fact view of { c_adso }: done| ).
+        ENDIF.
+      CATCH cx_dd_ddl_exception INTO DATA(error).
+        write( |delete fact view of { c_adso }: FAILED, { error->get_text( ) }| ).
+    ENDTRY.
     delete_adso( ).
     delete_cube( ).
     delete_views( ).
@@ -1145,6 +1200,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     DATA return_line TYPE bapiret2.
     DATA iobj TYPE bapi6108-infoobject.
     DATA attributes TYPE STANDARD TABLE OF bapi6108at WITH DEFAULT KEY.
+    DATA compounds TYPE STANDARD TABLE OF bapi6108cm WITH DEFAULT KEY.
     DATA(datatp) = COND datatype_d( WHEN cha-datatp IS INITIAL THEN 'CHAR' ELSE cha-datatp ).
     DATA(details) = VALUE bapi6108(
       infoobject = cha-name
@@ -1173,6 +1229,12 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
                       f4order  = sy-tabix
                       atrtimfl = '0' ) TO attributes.
     ENDLOOP.
+    LOOP AT cha-compounding INTO DATA(compounding).
+      APPEND VALUE #( infoobject = cha-name
+                      objvers    = rs_c_objvers-modified
+                      posit      = sy-tabix
+                      iobjcmp    = compounding ) TO compounds.
+    ENDLOOP.
     CALL FUNCTION 'BAPI_IOBJ_CREATE'
       EXPORTING
         details     = details
@@ -1180,6 +1242,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
         infoobject  = iobj
         return      = return_line
       TABLES
+        compounds   = compounds
         attributes  = attributes
         returntable = return.
     IF iobj IS INITIAL.
@@ -1328,15 +1391,20 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     DATA(table_type) = cl_abap_tabledescr=>create( line ).
     CREATE DATA data TYPE HANDLE table_type.
     ASSIGN data->* TO <table>.
+    DATA(keys) = lines( md-compounding ) + 1.
     LOOP AT md-rows INTO DATA(fields).
       APPEND INITIAL LINE TO <table> ASSIGNING <row>.
+      LOOP AT md-compounding INTO DATA(compounding).
+        ASSIGN COMPONENT |/BIC/{ compounding }| OF STRUCTURE <row> TO <value>.
+        <value> = fields[ sy-tabix ].
+      ENDLOOP.
       ASSIGN COMPONENT |/BIC/{ md-iobjnm }| OF STRUCTURE <row> TO <value>.
-      <value> = fields[ 1 ].
+      <value> = fields[ keys ].
       ASSIGN COMPONENT 'OBJVERS' OF STRUCTURE <row> TO <value>.
       <value> = rs_c_objvers-active.
       LOOP AT md-attributes INTO DATA(attribute).
         ASSIGN COMPONENT |/BIC/{ attribute }| OF STRUCTURE <row> TO <value>.
-        <value> = fields[ sy-tabix + 1 ].
+        <value> = fields[ sy-tabix + keys ].
       ENDLOOP.
     ENDLOOP.
     attributes = VALUE #( FOR a IN md-attributes ( iobjnm = a ) ).
@@ -1448,6 +1516,11 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       <value> = visit-visit_type.
       ASSIGN COMPONENT 'ZCLDATE' OF STRUCTURE <row> TO <value>.
       <value> = visit-day.
+      DATA(room) = room( visit ).
+      ASSIGN COMPONENT 'ZCLSITE' OF STRUCTURE <row> TO <value>.
+      <value> = room-site.
+      ASSIGN COMPONENT 'ZCLROOM' OF STRUCTURE <row> TO <value>.
+      <value> = room-room.
       ASSIGN COMPONENT 'ZCLVISNO' OF STRUCTURE <row> TO <value>.
       <value> = 1.
       ASSIGN COMPONENT 'ZCLDUR' OF STRUCTURE <row> TO <value>.
@@ -1508,6 +1581,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
         LOOP AT VALUE ty_t_iobjnm( ( '0CALWEEK' ) ( '0CALMONTH' ) ( '0CALQUARTER' ) ( '0CALYEAR' ) ) INTO DATA(iobjnm).
           APPEND generator->generate( iobjnm ) TO result.
         ENDLOOP.
+        " the aDSO's facts with the SID of the room (characteristic of the view: the aDSO)
+        APPEND generator->generate_fact_view( c_adso ) TO result.
       CATCH cx_dd_ddl_exception INTO DATA(error).
         write( |views: FAILED, { error->get_text( ) }| ).
     ENDTRY.
@@ -1521,8 +1596,9 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     DATA messages TYPE rs_t_msg.
     DATA error TYPE REF TO cx_root.
     " the characteristics of the cube with BW's calendar in place of the date; 0CALDAY has no SID table, so no view
-    objects = VALUE #( FOR c IN VALUE ty_t_iobjnm( ( 'ZCLPAT' ) ( 'ZCLDOC' ) ( 'ZCLDIAG' ) ( 'ZCLVTYPE' ) ( '0CALDAY' )
-                                                   ( '0CALWEEK' ) ( '0CALMONTH' ) ( '0CALQUARTER' ) ( '0CALYEAR' ) )
+    objects = VALUE #( FOR c IN VALUE ty_t_iobjnm( ( 'ZCLPAT' ) ( 'ZCLDOC' ) ( 'ZCLDIAG' ) ( 'ZCLVTYPE' ) ( 'ZCLSITE' )
+                                                   ( 'ZCLROOM' ) ( '0CALDAY' ) ( '0CALWEEK' ) ( '0CALMONTH' )
+                                                   ( '0CALQUARTER' ) ( '0CALYEAR' ) )
                        ( iobjnm = c sid_determination_mode = 'S' ) ).
     LOOP AT key_figures( ) INTO DATA(kyf).
       APPEND VALUE #( iobjnm = kyf-name aggregation = 'SUM' ) TO objects.
@@ -1582,6 +1658,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     DATA(physician) = iobj_field( struct = line iobjnm = 'ZCLDOC' ).
     DATA(diagnosis) = iobj_field( struct = line iobjnm = 'ZCLDIAG' ).
     DATA(visit_type) = iobj_field( struct = line iobjnm = 'ZCLVTYPE' ).
+    DATA(site) = iobj_field( struct = line iobjnm = 'ZCLSITE' ).
+    DATA(room_field) = iobj_field( struct = line iobjnm = 'ZCLROOM' ).
     DATA(visit_number) = iobj_field( struct = line iobjnm = 'ZCLVISNO' ).
     DATA(duration) = iobj_field( struct = line iobjnm = 'ZCLDUR' ).
     DATA(wait) = iobj_field( struct = line iobjnm = 'ZCLWAIT' ).
@@ -1602,6 +1680,11 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       <value> = visit-diagnosis.
       ASSIGN COMPONENT visit_type OF STRUCTURE <row> TO <value>.
       <value> = visit-visit_type.
+      DATA(room) = room( visit ).
+      ASSIGN COMPONENT site OF STRUCTURE <row> TO <value>.
+      <value> = room-site.
+      ASSIGN COMPONENT room_field OF STRUCTURE <row> TO <value>.
+      <value> = room-room.
       ASSIGN COMPONENT visit_number OF STRUCTURE <row> TO <value>.
       <value> = 1.
       ASSIGN COMPONENT duration OF STRUCTURE <row> TO <value>.
@@ -1674,7 +1757,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
 
   METHOD schema_xml.
     DATA(name) = COND string( WHEN adso = abap_true THEN c_adso ELSE c_cube ).
-    DATA(fact_table) = COND string( WHEN adso = abap_true THEN adso_table( cl_rsdso_constants=>n_c_viewtype_reporting )
+    " the aDSO's facts from its fact view, which has the SID of the room and its fields without namespace
+    DATA(fact_table) = COND string( WHEN adso = abap_true THEN view_of( views = views iobjnm = c_adso )
                                     ELSE |/BIC/F{ c_cube }| ).
     IF fact_table IS INITIAL.
       RETURN.
@@ -1744,6 +1828,30 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       |      <Level name="Care Setting" uniqueMembers="true" sourceAttribute="Care Setting"/>\n| &&
       |      <Level name="Visit Type" uniqueMembers="true" sourceAttribute="Type"/>\n| &&
       |    </Hierarchy>\n| &&
+      |  </Dimension>\n| &&
+      |  <Dimension name="Site" table="{ view_of( views = views iobjnm = 'ZCLSITE' ) }">\n| &&
+      |    <DimensionAttribute name="Site Id" usage="Key">| &&
+      key_columns( adso = adso column = `ZCLSITE` data_type = `String` ) && |</DimensionAttribute>\n| &&
+      attribute_xml( name = `City` column = `ZCLCITY` ) &&
+      |    <Hierarchy hasAll="true" allMemberName="All Sites">\n| &&
+      |      <Level name="Site" uniqueMembers="true" sourceAttribute="Site Id">\n| &&
+      |        <Property name="City" sourceAttribute="City"/>\n| &&
+      |      </Level>\n| &&
+      |    </Hierarchy>\n| &&
+      |  </Dimension>\n| &&
+      " compounded with the site: keyed by the SID on both providers, named and ordered by site and room (NORTH/R01)
+      |  <Dimension name="Room" table="{ view_of( views = views iobjnm = 'ZCLROOM' ) }">\n| &&
+      |    <DimensionAttribute name="Room Id" usage="Key"><KeyColumn dataType="Integer" columnName="SID"/>| &&
+      |<OrderByColumn dataType="String" columnName="{ zzxxmla1_cl_bw_view_gen=>c_compound_key }"/>| &&
+      |<NameColumn dataType="String" columnName="{ zzxxmla1_cl_bw_view_gen=>c_compound_key }"/></DimensionAttribute>\n| &&
+      attribute_xml( name = `Room Key` column = `ZCLROOM` ) &&
+      attribute_xml( name = `Room Type` column = `ZCLRTYPE` ) &&
+      |    <Hierarchy hasAll="true" allMemberName="All Rooms">\n| &&
+      |      <Level name="Room" uniqueMembers="true" sourceAttribute="Room Id">\n| &&
+      |        <Property name="Room Key" sourceAttribute="Room Key"/>\n| &&
+      |        <Property name="Room Type" sourceAttribute="Room Type"/>\n| &&
+      |      </Level>\n| &&
+      |    </Hierarchy>\n| &&
       |  </Dimension>\n|.
 
     DATA(usages) = VALUE string_table( ).
@@ -1776,7 +1884,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
         |    </Hierarchy>\n| &&
         |  </Dimension>\n|.
       usages = VALUE #( ( |Patient:SID_ZCLPAT| ) ( |Physician:SID_ZCLDOC| ) ( |Diagnosis:SID_ZCLDIAG| )
-                        ( |Visit Type:SID_ZCLVTYPE| ) ( |Time:SID_ZCLDATE| ) ).
+                        ( |Visit Type:SID_ZCLVTYPE| ) ( |Time:SID_ZCLDATE| ) ( |Site:SID_ZCLSITE| )
+                        ( |Room:SID_ZCLROOM| ) ).
     ELSE.
       " BW's time characteristics have no attributes: one dimension each, keyed by the value as the fact column
       DATA(calendar) = VALUE ty_t_group_weight( ( scope = `Year` key = `0CALYEAR` )
@@ -1784,7 +1893,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
                                                 ( scope = `Month` key = `0CALMONTH` )
                                                 ( scope = `Week` key = `0CALWEEK` ) ).
       LOOP AT calendar INTO DATA(period).
-        DATA(column) = zzxxmla1_cl_bw_view_gen=>view_column( iobj_field( struct = fact iobjnm = CONV #( period-key ) ) ).
+        DATA(column) = iobj_field( struct = fact iobjnm = CONV #( period-key ) without_namespace = abap_true ).
         result = result &&
           |  <Dimension name="{ period-scope }" table="{ view_of( views = views iobjnm = CONV #( period-key ) ) }">\n| &&
           |    <DimensionAttribute name="{ period-scope }" usage="Key">| &&
@@ -1793,9 +1902,12 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       ENDLOOP.
       LOOP AT VALUE ty_t_group_weight( ( scope = `Patient` key = `ZCLPAT` ) ( scope = `Physician` key = `ZCLDOC` )
                                        ( scope = `Diagnosis` key = `ZCLDIAG` ) ( scope = `Visit Type` key = `ZCLVTYPE` )
-                                       ( LINES OF calendar ) ) INTO period.
-        APPEND |{ period-scope }:{ iobj_field( struct = fact iobjnm = CONV #( period-key ) ) }| TO usages.
+                                       ( scope = `Site` key = `ZCLSITE` ) ( LINES OF calendar ) ) INTO period.
+        APPEND |{ period-scope }:{ iobj_field( struct = fact iobjnm = CONV #( period-key ) without_namespace = adso ) }|
+          TO usages.
       ENDLOOP.
+      " the room by its SID, which the fact view has
+      APPEND |Room:SID_{ iobj_field( struct = fact iobjnm = 'ZCLROOM' without_namespace = adso ) }| TO usages.
     ENDIF.
 
     result = result &&
@@ -1806,16 +1918,20 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       SPLIT usage AT `:` INTO DATA(dimension) DATA(foreign_key).
       result = result && |    <DimensionUsage name="{ dimension }" source="{ dimension }" foreignKey="{ foreign_key }"/>\n|.
     ENDLOOP.
-    DATA(duration) = iobj_field( struct = fact iobjnm = 'ZCLDUR' ).
+    DATA(duration) = iobj_field( struct = fact iobjnm = 'ZCLDUR' without_namespace = adso ).
+    DATA(visit_number) = iobj_field( struct = fact iobjnm = 'ZCLVISNO' without_namespace = adso ).
+    DATA(wait) = iobj_field( struct = fact iobjnm = 'ZCLWAIT' without_namespace = adso ).
+    DATA(labs) = iobj_field( struct = fact iobjnm = 'ZCLLABS' without_namespace = adso ).
+    DATA(charges) = iobj_field( struct = fact iobjnm = 'ZCLCHRG' without_namespace = adso ).
     result = result &&
-      |    <Measure name="Visits" column="{ iobj_field( struct = fact iobjnm = 'ZCLVISNO' ) }" aggregator="sum" | &&
+      |    <Measure name="Visits" column="{ visit_number }" aggregator="sum" | &&
       |formatString="#,##0"/>\n| &&
       |    <Measure name="Duration Min" column="{ duration }" aggregator="sum" formatString="#,##0"/>\n| &&
-      |    <Measure name="Waiting Min" column="{ iobj_field( struct = fact iobjnm = 'ZCLWAIT' ) }" aggregator="sum" | &&
+      |    <Measure name="Waiting Min" column="{ wait }" aggregator="sum" | &&
       |formatString="#,##0"/>\n| &&
-      |    <Measure name="Lab Tests" column="{ iobj_field( struct = fact iobjnm = 'ZCLLABS' ) }" aggregator="sum" | &&
+      |    <Measure name="Lab Tests" column="{ labs }" aggregator="sum" | &&
       |formatString="#,##0"/>\n| &&
-      |    <Measure name="Charges" column="{ iobj_field( struct = fact iobjnm = 'ZCLCHRG' ) }" aggregator="sum" | &&
+      |    <Measure name="Charges" column="{ charges }" aggregator="sum" | &&
       |formatString="#,##0.00"/>\n| &&
       |  </Cube>\n| &&
       |</Schema>\n|.
@@ -1862,7 +1978,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
         name_error = 1
         OTHERS     = 2.
     DATA(subrc) = sy-subrc.
-    result = field.
+    result = COND #( WHEN without_namespace = abap_true THEN zzxxmla1_cl_bw_view_gen=>view_column( field ) ELSE field ).
     DATA(components) = struct->get_components( ).
     IF subrc <> 0 OR NOT line_exists( components[ name = result ] ).
       write( |{ iobjnm }: no field { result } in { struct->get_relative_name( ) }| ).

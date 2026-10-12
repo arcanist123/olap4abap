@@ -32,6 +32,18 @@ CLASS ltc_bw_view_gen DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION 
     METHODS texts_left_out FOR TESTING.
     "! compounding: the key fields of the SID table are in the view, and the joins use them all
     METHODS compounded FOR TESTING.
+    "! the name of a value compounded once: # for an initial value, NUMC initial is all zeros
+    METHODS compound_key_two FOR TESTING.
+    "! compounded twice: a branch per set of initial values, the larger sets first, literals joined
+    METHODS compound_key_three FOR TESTING.
+    "! a room compounded with its site, in the clinic aDSO
+    METHODS fact_metadata_of_room
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_view_gen=>ty_fact_metadata.
+    "! the fact view of an aDSO with a compounded characteristic: every field without namespace, and its SID from
+    "! its SID table joined on all key fields
+    METHODS fact_view FOR TESTING.
+    "! no compounded characteristic, or none whose compounding the aDSO has: no fact view
+    METHODS fact_view_not_needed FOR TESTING.
     "! a characteristic without attribute table: the SID table alone
     METHODS without_attributes FOR TESTING.
     "! no SID table, no view
@@ -216,7 +228,98 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
                 conditions = VALUE #( ( `t.d_nw_cntry = s.d_nw_cntry` ) ( `t.d_nw_regio = s.d_nw_regio` ) ) ) ) ).
     cl_abap_unit_assert=>assert_equals(
       act = VALUE string_table( FOR c IN layout-columns ( |{ c-name } { c-iobjnm }| ) )
-      exp = VALUE string_table( ( `SID ` ) ( `D_NW_CNTRY ` ) ( `D_NW_REGIO 0D_NW_REGIO` ) ( `TXTMD 0D_NW_REGIO` ) ) ).
+      exp = VALUE string_table( ( `SID ` ) ( `D_NW_CNTRY ` ) ( `D_NW_REGIO 0D_NW_REGIO` ) ( `COMPOUND_KEY ` )
+                                ( `TXTMD 0D_NW_REGIO` ) ) ).
+    DATA(compound_key) = layout-columns[ name = zzxxmla1_cl_bw_view_gen=>c_compound_key ].
+    cl_abap_unit_assert=>assert_equals( act = compound_key-datatype exp = `CHAR` ).
+    cl_abap_unit_assert=>assert_equals( act = compound_key-length exp = 7 ).
+  ENDMETHOD.
+
+  METHOD compound_key_two.
+    DATA(nl) = cl_abap_char_utilities=>newline.
+    cl_abap_unit_assert=>assert_equals(
+      act = zzxxmla1_cl_bw_view_gen=>compound_key_expression( VALUE #(
+              ( field = 'FISCVARNT' datatype = 'CHAR' length = 2 key = abap_true )
+              ( field = 'FISCPER'   datatype = 'NUMC' length = 7 key = abap_true ) ) )
+      exp = |case{ nl }| &&
+            |             when s.fiscvarnt = ' ' and s.fiscper = '0000000' then '#/#'{ nl }| &&
+            |             when s.fiscvarnt = ' ' then concat( '#/', s.fiscper ){ nl }| &&
+            |             when s.fiscper = '0000000' then concat( s.fiscvarnt, '/#' ){ nl }| &&
+            |             else concat( concat( s.fiscvarnt, '/' ), s.fiscper ) end| ).
+  ENDMETHOD.
+
+  METHOD compound_key_three.
+    DATA(act) = zzxxmla1_cl_bw_view_gen=>compound_key_expression( VALUE #(
+                  ( field = 'A' datatype = 'CHAR' length = 1 key = abap_true )
+                  ( field = 'B' datatype = 'CHAR' length = 1 key = abap_true )
+                  ( field = 'C' datatype = 'CHAR' length = 1 key = abap_true ) ) ).
+    SPLIT act AT cl_abap_char_utilities=>newline INTO TABLE DATA(branches).
+    cl_abap_unit_assert=>assert_equals(
+      act = VALUE string_table( FOR b IN branches ( condense( b ) ) )
+      exp = VALUE string_table(
+              ( `case` )
+              ( `when s.a = ' ' and s.b = ' ' and s.c = ' ' then '#/#/#'` )
+              ( `when s.a = ' ' and s.b = ' ' then concat( '#/#/', s.c )` )
+              ( `when s.a = ' ' and s.c = ' ' then concat( concat( '#/', s.b ), '/#' )` )
+              ( `when s.b = ' ' and s.c = ' ' then concat( s.a, '/#/#' )` )
+              ( `when s.a = ' ' then concat( concat( concat( '#/', s.b ), '/' ), s.c )` )
+              ( `when s.b = ' ' then concat( concat( s.a, '/#/' ), s.c )` )
+              ( `when s.c = ' ' then concat( concat( concat( s.a, '/' ), s.b ), '/#' )` )
+              ( `else concat( concat( concat( concat( s.a, '/' ), s.b ), '/' ), s.c ) end` ) ) ).
+  ENDMETHOD.
+
+  METHOD fact_metadata_of_room.
+    result = VALUE #(
+      adso           = 'ZCLVISITA'
+      reporting_view = '/BIC/AZCLVISITA7'
+      fields         = VALUE #( ( field = 'REQTSN'        datatype = 'NUMC' length = 23 )
+                                ( field = '/BIC/ZCLSITE'  datatype = 'CHAR' length = 10 iobjnm = 'ZCLSITE' )
+                                ( field = '/BIC/ZCLROOM'  datatype = 'CHAR' length = 4  iobjnm = 'ZCLROOM' )
+                                ( field = '/BIC/ZCLVISNO' datatype = 'DEC'  length = 17 iobjnm = 'ZCLVISNO' ) )
+      compounded     = VALUE #( ( iobjnm = 'ZCLROOM' sids = '/BIC/SZCLROOM' key_field = '/BIC/ZCLROOM'
+                                  compounding = VALUE #( ( iobjnm = 'ZCLSITE' field = '/BIC/ZCLSITE' ) ) ) ) ).
+  ENDMETHOD.
+
+  METHOD fact_view.
+    DATA(nl) = cl_abap_char_utilities=>newline.
+    DATA(layout) = zzxxmla1_cl_bw_view_gen=>build_fact_layout( fact_metadata_of_room( ) ).
+    cl_abap_unit_assert=>assert_initial( layout-notes ).
+    cl_abap_unit_assert=>assert_equals(
+      act = VALUE string_table( FOR c IN layout-columns ( |{ c-name } { c-iobjnm } { c-sid }| ) )
+      exp = VALUE string_table( ( `REQTSN  ` ) ( `ZCLSITE ZCLSITE ` ) ( `ZCLROOM ZCLROOM ` ) ( `ZCLVISNO ZCLVISNO ` )
+                                ( `SID_ZCLROOM ZCLROOM X` ) ) ).
+    cl_abap_unit_assert=>assert_equals(
+      act = zzxxmla1_cl_bw_view_gen=>fact_ddl_source( adso = 'ZCLVISITA' view_name = 'ZZXXMLA1V0000090' layout = layout )
+      exp = |@AbapCatalog.sqlViewName: 'ZZXXMLA1V0000090'{ nl }| &&
+            |@AbapCatalog.compiler.compareFilter: true{ nl }| &&
+            |@AccessControl.authorizationCheck: #NOT_REQUIRED{ nl }| &&
+            |@EndUserText.label: 'BW aDSO ZCLVISITA: facts with SIDs of compounding'{ nl }| &&
+            |define view ZZXXMLA1_C0000090{ nl }| &&
+            |  as select from /bic/azclvisita7 as a{ nl }| &&
+            |    left outer join /bic/szclroom as s1 on  s1./bic/zclsite = a./bic/zclsite{ nl }| &&
+            |                                        and s1./bic/zclroom = a./bic/zclroom{ nl }| &&
+            |\{{ nl }| &&
+            |  a.reqtsn as REQTSN,{ nl }| &&
+            |  a./bic/zclsite as ZCLSITE,{ nl }| &&
+            |  a./bic/zclroom as ZCLROOM,{ nl }| &&
+            |  a./bic/zclvisno as ZCLVISNO,{ nl }| &&
+            |  s1.sid as SID_ZCLROOM{ nl }| &&
+            |\}{ nl }| ).
+  ENDMETHOD.
+
+  METHOD fact_view_not_needed.
+    DATA(metadata) = fact_metadata_of_room( ).
+    CLEAR metadata-compounded.
+    cl_abap_unit_assert=>assert_initial( zzxxmla1_cl_bw_view_gen=>build_fact_layout( metadata )-columns ).
+    " compounded with a characteristic the aDSO lacks: a note, and without another SID column no view
+    metadata = fact_metadata_of_room( ).
+    DELETE metadata-fields WHERE iobjnm = 'ZCLSITE'.
+    DATA(layout) = zzxxmla1_cl_bw_view_gen=>build_fact_layout( metadata ).
+    cl_abap_unit_assert=>assert_initial( layout-columns ).
+    cl_abap_unit_assert=>assert_equals(
+      act = layout-notes
+      exp = VALUE zzxxmla1_cl_bw_view_gen=>ty_t_note(
+              ( iobjnm = `ZCLROOM` reason = `compounded with ZCLSITE, which is not a field of the aDSO` ) ) ).
   ENDMETHOD.
 
   METHOD without_attributes.
@@ -269,6 +372,11 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
                                         exp = `/1BW/D01` ).
     cl_abap_unit_assert=>assert_initial( zzxxmla1_cl_bw_view_gen=>characteristic_of_placeholder( `ZZXXMLA1V0000011` ) ).
     cl_abap_unit_assert=>assert_initial( zzxxmla1_cl_bw_view_gen=>characteristic_of_placeholder( `ZZXXMLA1_C0000011` ) ).
+    DATA(fact) = zzxxmla1_cl_bw_view_gen=>fact_placeholder( 'ZCLVISITA' ).
+    cl_abap_unit_assert=>assert_equals( act = fact exp = `ZZXXMLA1_F_ZCLVISITA` ).
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_bw_view_gen=>adso_of_fact_placeholder( fact ) exp = `ZCLVISITA` ).
+    cl_abap_unit_assert=>assert_initial( zzxxmla1_cl_bw_view_gen=>characteristic_of_placeholder( fact ) ).
+    cl_abap_unit_assert=>assert_initial( zzxxmla1_cl_bw_view_gen=>adso_of_fact_placeholder( placeholder ) ).
   ENDMETHOD.
 
   METHOD tables_of_zfmstore.

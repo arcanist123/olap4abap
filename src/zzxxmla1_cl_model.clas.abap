@@ -126,7 +126,8 @@ CLASS zzxxmla1_cl_model DEFINITION
                 paths         TYPE string_table
       RETURNING VALUE(result) TYPE string.
     "! The condition that the keys of the levels 1 to level_no come before (&lt;, &lt;=) or after (&gt;, &gt;=) a path in
-    "! the database's order (an ORDER BY of the key columns, NULL first): the keys compared from the first level.
+    "! the database's order (an ORDER BY of the key columns, NULL first): the keys compared from the first level; a level
+    "! with an ordinal column by its ordinal first.
     CLASS-METHODS order_condition
       IMPORTING hierarchy     TYPE ty_hierarchy
                 level_no      TYPE i
@@ -265,6 +266,14 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
     CLEAR: columns, order_by.
     LOOP AT hierarchy-levels INTO DATA(level).
       APPEND zzxxmla1_cl_sql=>quote( level-key_column ) TO columns.
+      " an ordinal column orders the members, the key the ones of the same ordinal (SqlMemberSource); it is read
+      " once, also when it is the name column
+      IF level-ordinal_column IS NOT INITIAL.
+        IF level-ordinal_column <> level-name_column.
+          APPEND zzxxmla1_cl_sql=>quote( level-ordinal_column ) TO columns.
+        ENDIF.
+        APPEND zzxxmla1_cl_sql=>quote( level-ordinal_column ) TO order_by.
+      ENDIF.
       APPEND zzxxmla1_cl_sql=>quote( level-key_column ) TO order_by.
       IF level-name_column <> level-key_column.
         APPEND zzxxmla1_cl_sql=>quote( level-name_column ) TO columns.
@@ -351,7 +360,19 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
       DATA(key) = VALUE string( keys[ sy-tabix ] OPTIONAL ).
       DATA(column) = zzxxmla1_cl_sql=>quote( level-key_column ).
       DATA(conjuncts) = equal.
-      APPEND key_order_condition( column = column key = key operator = strict ) TO conjuncts.
+      IF level-ordinal_column IS INITIAL.
+        APPEND key_order_condition( column = column key = key operator = strict ) TO conjuncts.
+      ELSE.
+        " ordered by the ordinal, then by the key: the path's ordinal from the table (one per key)
+        DATA(ordinal) = zzxxmla1_cl_sql=>quote( level-ordinal_column ).
+        DATA(of_path) = |( SELECT MAX( { ordinal } ) FROM { zzxxmla1_cl_sql=>quote( hierarchy-dim_table ) } WHERE | &&
+                        |{ concat_lines_of( table = VALUE string_table( ( LINES OF equal )
+                                                                         ( zzxxmla1_cl_sql=>key_condition( column = column
+                                                                                                          key    = key ) ) )
+                                            sep   = ` AND ` ) } )|.
+        APPEND |( { ordinal } { strict } { of_path } OR ( { ordinal } = { of_path } AND | &&
+               |{ key_order_condition( column = column key = key operator = strict ) } ) )| TO conjuncts.
+      ENDIF.
       APPEND |( { concat_lines_of( table = conjuncts sep = ` AND ` ) } )| TO disjuncts.
       APPEND zzxxmla1_cl_sql=>key_condition( column = column key = key ) TO equal.
     ENDLOOP.
@@ -455,13 +476,28 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
         DATA(level_no) = sy-tabix.
         column = column + 1.
         DATA(key) = row[ column ].
-        order = order && c_separator && `0`
-                && order_key( key = key numeric = is_numeric_level( hierarchy = hierarchy level_no = level_no ) ).
+        DATA(ordinal) = VALUE string( ).
+        IF level-ordinal_column IS NOT INITIAL AND level-ordinal_column <> level-name_column.
+          column = column + 1.
+          ordinal = row[ column ].
+        ENDIF.
         DATA(name) = member_name( value = key data_type = level-data_type ).
         IF level-name_column <> level-key_column.
           column = column + 1.
           name = row[ column ].
         ENDIF.
+        " the order key of a level with an ordinal column: the ordinal's, then the key's (RolapMemberBase.compareTo)
+        IF level-ordinal_column IS NOT INITIAL.
+          IF level-ordinal_column = level-name_column.
+            ordinal = name.
+          ENDIF.
+          order = order && c_separator && `0`
+                  && order_key( key     = ordinal
+                                numeric = is_numeric_column( hierarchy = hierarchy column = level-ordinal_column
+                                                             data_type = `String` ) ).
+        ENDIF.
+        order = order && c_separator && `0`
+                && order_key( key = key numeric = is_numeric_level( hierarchy = hierarchy level_no = level_no ) ).
         DATA(properties) = VALUE string_table( ).
         DO lines( level-properties ) TIMES.
           column = column + 1.

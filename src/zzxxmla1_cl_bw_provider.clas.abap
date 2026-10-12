@@ -20,6 +20,9 @@
 "! RSDDIMEIOBJ, an aDSO switches on the navigation attributes of a characteristic together (navigational_attr_on).
 "! What a schema cannot use is a note with the reason: units and currencies, fields without InfoObject, texts a view
 "! cannot join. Nothing is changed.
+"! A compounded characteristic has a name column, its compounding and its value (docs/bw-schema-design-guide.md,
+"! section 3.7). An aDSO with one is read from its fact view (ZZXXMLA1_CL_BW_VIEW_GEN, a placeholder if it is not
+"! generated yet): its fields without namespace, and the compounded characteristic's SID as its fact column.
 CLASS zzxxmla1_cl_bw_provider DEFINITION
   PUBLIC
   FINAL
@@ -78,6 +81,10 @@ CLASS zzxxmla1_cl_bw_provider DEFINITION
         view        TYPE string,     " the database view of the basic characteristic's DDL source, initial if it is
                                      " not generated yet or lacks a column it is generated with now
         key_column  TYPE ty_column,  " the characteristic's value as a column of the view
+        "! compounded: the view's column of the compounding and the value (K4/2024001), initial for any other
+        name_column TYPE ty_column,
+        "! the fact column is the SID: always on an InfoCube, on an aDSO for a compounded characteristic (its fact view's)
+        fact_sid    TYPE abap_bool,
         text_column TYPE string,     " the column of its text, initial if it has none
         attributes  TYPE ty_t_attribute,
       END OF ty_characteristic,
@@ -258,9 +265,11 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
             fail( |InfoCube { cube }: { fact_table } has no column { sid_column }; only HANA-optimised InfoCubes | &&
                   |are supported| ).
           ENDIF.
-          APPEND characteristic( iobjnm      = characteristic-iobjnm
-                                 iobjtp      = characteristic-iobjtp
-                                 fact_column = column ) TO provider-characteristics.
+          DATA(with_sid) = characteristic( iobjnm      = characteristic-iobjnm
+                                           iobjtp      = characteristic-iobjtp
+                                           fact_column = column ).
+          with_sid-fact_sid = abap_true.
+          APPEND with_sid TO provider-characteristics.
         WHEN 'UNI'.
           APPEND VALUE #( iobjnm = characteristic-iobjnm reason = `unit or currency` ) TO provider-notes.
       ENDCASE.
@@ -342,6 +351,42 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
           APPEND VALUE #( iobjnm = object-iobjnm reason = `unit or currency` ) TO provider-notes.
       ENDCASE.
     ENDLOOP.
+
+    " compounded characteristics: the facts are read from the fact view, which has the SID of each, every field named
+    " without namespace (docs/bw-schema-design-guide.md, section 3.7)
+    DATA(fact) = views->fact_layout( adso ).
+    LOOP AT fact-notes INTO DATA(note).
+      APPEND VALUE #( iobjnm = note-iobjnm reason = note-reason ) TO provider-notes.
+    ENDLOOP.
+    IF fact-columns IS INITIAL.
+      RETURN.
+    ENDIF.
+    " the view as it is, if it has every column it is generated with now; else a placeholder, generated on accept
+    provider-fact_table = views->existing_fact_view( adso ).
+    IF provider-fact_table IS NOT INITIAL.
+      DATA(view_columns) = columns_of( provider-fact_table ).
+      LOOP AT fact-columns INTO DATA(fact_column).
+        IF NOT line_exists( view_columns[ name = fact_column-name ] ).
+          CLEAR provider-fact_table.
+          EXIT.
+        ENDIF.
+      ENDLOOP.
+    ENDIF.
+    IF provider-fact_table IS INITIAL.
+      provider-fact_table = zzxxmla1_cl_bw_view_gen=>fact_placeholder( adso ).
+    ENDIF.
+    LOOP AT provider-characteristics ASSIGNING FIELD-SYMBOL(<characteristic>).
+      READ TABLE fact-columns INTO fact_column WITH KEY iobjnm = <characteristic>-iobjnm sid = abap_true.
+      IF sy-subrc = 0.
+        <characteristic>-fact_column = VALUE #( name = fact_column-name datatype = `INT4` length = 10 ).
+        <characteristic>-fact_sid = abap_true.
+      ELSE.
+        <characteristic>-fact_column-name = zzxxmla1_cl_bw_view_gen=>view_column( <characteristic>-fact_column-name ).
+      ENDIF.
+    ENDLOOP.
+    LOOP AT provider-key_figures ASSIGNING FIELD-SYMBOL(<key_figure>).
+      <key_figure>-fact_column-name = zzxxmla1_cl_bw_view_gen=>view_column( <key_figure>-fact_column-name ).
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD characteristic.
@@ -357,6 +402,11 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
       APPEND VALUE #( iobjnm = note-iobjnm reason = |{ note-reason } (of { iobjnm })| ) TO notes.
     ENDLOOP.
     result-key_column = VALUE #( name = key-name datatype = key-datatype length = key-length ).
+    READ TABLE layout-columns INTO DATA(compound_key) WITH KEY name = zzxxmla1_cl_bw_view_gen=>c_compound_key.
+    IF sy-subrc = 0.
+      result-name_column = VALUE #( name = compound_key-name datatype = compound_key-datatype
+                                    length = compound_key-length ).
+    ENDIF.
     result-text_column = VALUE #( layout-columns[ iobjnm = result-basic text = abap_true ]-name OPTIONAL ).
 
     " the attributes of its basic characteristic, in BW's order

@@ -22,6 +22,7 @@ CLASS ltc_facts DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
     METHODS max_constraints FOR TESTING RAISING zzxxmla1_cx_xmla.
     METHODS without_batching FOR TESTING RAISING zzxxmla1_cx_xmla.
     METHODS top_count FOR TESTING RAISING zzxxmla1_cx_xmla.
+    METHODS ordered_paths FOR TESTING RAISING zzxxmla1_cx_xmla.
     "! the filter of a product family
     METHODS family
       IMPORTING name          TYPE string
@@ -133,6 +134,30 @@ CLASS ltc_facts IMPLEMENTATION.
       act = lines( facts->top_count( operands = operands filters = VALUE #( ) measure = unit_sales count = 4
                                      top = abap_true with_empty = abap_false ) )
       exp = 3 ).
+  ENDMETHOD.
+
+  METHOD ordered_paths.
+    DATA(level) = reader->get_level( reader->lookup_compound( VALUE #( ( name = `Product` quoting = `QUOTED` )
+                                                                      ( name = `Product Family` quoting = `QUOTED` ) ) )-id ).
+    DATA(operands) = VALUE zzxxmla1_cl_mdx_facts=>ty_t_top_operand( ( hierarchy = level-hierarchy
+                                                                      level     = level-key_level ) ).
+    DATA(filters) = family( `Drink` ).
+    DATA(drink) = filters[ 1 ]-path.
+    filters = family( `Food` ).
+    DATA(food) = filters[ 1 ]-path.
+    filters = family( `Non-Consumable` ).
+    DATA(non_consumable) = filters[ 1 ]-path.
+    " by the key descending, ignoring case: the unassigned family (empty key) last
+    cl_abap_unit_assert=>assert_equals(
+      act = facts->ordered_paths( operands = operands filters = VALUE #( ) with_empty = abap_true
+                                  items = VALUE #( ( operand = 1 level = level-key_level descending = abap_true ) ) )
+      exp = VALUE zzxxmla1_cl_mdx_facts=>ty_t_paths( ( VALUE #( ( non_consumable ) ) ) ( VALUE #( ( food ) ) )
+                                                     ( VALUE #( ( drink ) ) ) ( VALUE #( ( `` ) ) ) ) ).
+    " by unit sales ascending, only the families with facts, the first two
+    cl_abap_unit_assert=>assert_equals(
+      act = facts->ordered_paths( operands = operands filters = VALUE #( ) with_empty = abap_false limit = 2
+                                  items = VALUE #( ( measure = unit_sales ) ) )
+      exp = VALUE zzxxmla1_cl_mdx_facts=>ty_t_paths( ( VALUE #( ( drink ) ) ) ( VALUE #( ( non_consumable ) ) ) ) ).
   ENDMETHOD.
 
   METHOD non_empty_paths.

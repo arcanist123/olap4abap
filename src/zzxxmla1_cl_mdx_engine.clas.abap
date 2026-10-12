@@ -640,8 +640,58 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
                 node          TYPE ty_node
       RETURNING VALUE(result) TYPE ty_t_tuple
       RAISING   zzxxmla1_cx_xmla.
-    "! A stable merge sort of the tuples by the keys.
+    "! The keys of Order (buildKeySpecList): each key a value, then the symbol of its direction (ASC if there is none).
+    METHODS order_keys
+      IMPORTING node          TYPE ty_node
+      RETURNING VALUE(result) TYPE ty_t_sort_key
+      RAISING   zzxxmla1_cx_xmla.
+    "! Order in the database (our extension: the reference sorts in memory, Sorter): BASC / BDESC keys, each the
+    "! OrderKey of the current member of a hierarchy of the set or of its ancestor at a level, or a stored measure (also
+    "! through calculated measures that are only that measure: a format string, a solve order), of a set that the native
+    "! crossjoin reads (NonEmptyCrossJoin, CrossJoin while the evaluator is non-empty; also through named sets, which
+    "! are evaluated in the slicer's context, and Generate(set, {(the current members of its hierarchies)}), which gives
+    "! the set as it is). One query (ZZXXMLA1_CL_MDX_FACTS=>ordered_paths): the native crossjoin's tuples ordered by the
+    "! keys, then in the set's order (hierarchy order), the first limit ones. With calculated members in the context
+    "! or any other key or set not native.
+    "! @parameter limit | Head(Order(...), limit): the first ones only; 0: all
+    METHODS native_order
+      IMPORTING evaluator     TYPE ty_evaluator
+                node          TYPE ty_node
+                keys          TYPE ty_t_sort_key
+                limit         TYPE i DEFAULT 0
+      EXPORTING native        TYPE abap_bool
+      RETURNING VALUE(result) TYPE ty_t_tuple
+      RAISING   zzxxmla1_cx_xmla.
+    "! The ORDER BY item of a key of native_order: a stored measure, or the level of an argument's level or of an
+    "! ancestor of it whose key the OrderKey compares; constant: the OrderKey of the All member, which orders nothing.
+    METHODS native_order_item
+      IMPORTING node     TYPE ty_node
+                args     TYPE ty_t_cj_arg
+      EXPORTING item     TYPE zzxxmla1_cl_mdx_facts=>ty_order_item
+                found    TYPE abap_bool
+                constant TYPE abap_bool.
+    "! The hierarchy of a hierarchy's CurrentMember; -1 for any other expression.
+    METHODS current_member_hierarchy
+      IMPORTING node          TYPE ty_node
+      RETURNING VALUE(result) TYPE i.
+    "! The tuples of the rows of ZZXXMLA1_CL_MDX_FACTS=>ordered_paths: the members of each argument's paths, read per
+    "! argument in one query. A path whose member is not found (not expected): none, and not native.
+    METHODS tuples_of_paths
+      IMPORTING args          TYPE ty_t_cj_arg
+                !rows         TYPE zzxxmla1_cl_mdx_facts=>ty_t_paths
+      EXPORTING native        TYPE abap_bool
+      RETURNING VALUE(result) TYPE ty_t_tuple.
+    "! A stable merge sort of the tuples by the keys. With break keys only, the value of each key for each tuple is
+    "! evaluated once into a table, and the tuples' indexes are sorted by these values.
     METHODS sort_tuples
+      IMPORTING evaluator TYPE ty_evaluator
+                keys      TYPE ty_t_sort_key
+                run       TYPE i
+      CHANGING  tuples    TYPE ty_t_tuple
+      RAISING   zzxxmla1_cx_xmla.
+    "! The stable merge sort of sort_tuples with a hierarchical key: each comparison evaluates in the context of the
+    "! tuples (compare_by_keys).
+    METHODS merge_sort_tuples
       IMPORTING evaluator TYPE ty_evaluator
                 keys      TYPE ty_t_sort_key
                 run       TYPE i
@@ -3894,7 +3944,12 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
                                          top           = top
                                          with_empty    = with_empty
                                          tuple_filters = tuple_filters ).
-    " the members of the paths, read per operand in one query
+    result = tuples_of_paths( EXPORTING args = args rows = rows IMPORTING native = native ).
+  ENDMETHOD.
+
+  METHOD tuples_of_paths.
+    CLEAR native.
+    " the members of the paths, read per argument in one query
     TYPES:
       BEGIN OF ty_found,
         operand TYPE i,
@@ -3902,7 +3957,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         member  TYPE ty_member,
       END OF ty_found.
     DATA found_members TYPE HASHED TABLE OF ty_found WITH UNIQUE KEY operand path.
-    LOOP AT args INTO arg.
+    LOOP AT args INTO DATA(arg).
       DATA(position) = sy-tabix.
       LOOP AT schema_reader->get_members_by_paths( level = arg-level
                                                    paths = VALUE #( FOR r IN rows ( r[ position ] ) ) )
@@ -3916,7 +3971,6 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         position = sy-tabix.
         READ TABLE found_members INTO DATA(found_member) WITH TABLE KEY operand = position path = path.
         IF sy-subrc <> 0.
-          " a path the member read does not find (not expected): not native
           CLEAR result.
           RETURN.
         ENDIF.
@@ -3925,6 +3979,239 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       APPEND tuple TO result.
     ENDLOOP.
     native = abap_true.
+  ENDMETHOD.
+
+  METHOD native_order.
+    CLEAR native.
+    IF keys IS INITIAL OR line_exists( keys[ brk = abap_false ] ).
+      RETURN.
+    ENDIF.
+    " the set: through named sets (evaluated in the slicer's context, not non-empty), parentheses and
+    " Generate(set, {(the current members of the set's hierarchies)}), which gives each tuple of the set once, in its
+    " order
+    DATA(set) = node->args[ 1 ].
+    DATA(in_named_set) = abap_false.
+    DATA(generated) = VALUE int4_table( ).
+    DO 20 TIMES.
+      IF set->kind = zzxxmla1_cl_mdx_node=>c_kind-named_set.
+        IF set->set_expression IS NOT BOUND.
+          RETURN.
+        ENDIF.
+        set = set->set_expression.
+        in_named_set = abap_true.
+      ELSEIF set->kind <> zzxxmla1_cl_mdx_node=>c_kind-resolved_call.
+        RETURN.
+      ELSEIF set->fun_def-implementation = `ParenthesesFunDef`.
+        set = set->args[ 1 ].
+      ELSEIF ( key_of( set ) = `GENERATE|Function|8,8` OR key_of( set ) = `GENERATE|Function|8,8,11` )
+          AND generated IS INITIAL.
+        " the tuple of current members, in braces
+        DATA(generator) = set->args[ 2 ].
+        WHILE generator->kind = zzxxmla1_cl_mdx_node=>c_kind-resolved_call AND lines( generator->args ) = 1
+            AND ( generator->fun_def-implementation = `SetFunDef`
+                  OR generator->fun_def-implementation = `ParenthesesFunDef` ).
+          generator = generator->args[ 1 ].
+        ENDWHILE.
+        DATA(current_members) = COND zzxxmla1_cl_mdx_node=>ty_t_node(
+          WHEN generator->kind = zzxxmla1_cl_mdx_node=>c_kind-resolved_call
+               AND generator->fun_def-implementation = `TupleFunDef` THEN generator->args
+          ELSE VALUE #( ( generator ) ) ).
+        LOOP AT current_members INTO DATA(current_member).
+          DATA(generated_hierarchy) = current_member_hierarchy( current_member ).
+          IF generated_hierarchy < 0.
+            RETURN.
+          ENDIF.
+          APPEND generated_hierarchy TO generated.
+        ENDLOOP.
+        set = set->args[ 1 ].
+      ELSE.
+        EXIT.
+      ENDIF.
+    ENDDO.
+    IF set->kind <> zzxxmla1_cl_mdx_node=>c_kind-resolved_call OR lines( set->args ) <> 2.
+      RETURN.
+    ENDIF.
+    DATA(name) = to_upper( set->fun_def-name ).
+    IF name <> `NONEMPTYCROSSJOIN` AND ( name <> `CROSSJOIN` OR in_named_set = abap_true
+                                         OR evaluator->is_non_empty( ) = abap_false ).
+      RETURN.
+    ENDIF.
+
+    " the operands: a level's members, below a member if there is one (native_top_count)
+    DATA operands TYPE zzxxmla1_cl_mdx_node=>ty_t_node.
+    crossjoin_operands( EXPORTING node = set CHANGING operands = operands ).
+    DATA args TYPE ty_t_cj_arg.
+    DATA top_operands TYPE zzxxmla1_cl_mdx_facts=>ty_t_top_operand.
+    LOOP AT operands INTO DATA(operand).
+      direct_cj_arg( EXPORTING node = operand IMPORTING arg = DATA(arg) found = DATA(found) ).
+      IF found = abap_false OR arg-member_list = abap_true
+          OR arg-hierarchy = zzxxmla1_cl_mdx_schema_reader=>c_measures
+          OR line_exists( args[ hierarchy = arg-hierarchy ] ).
+        RETURN.
+      ENDIF.
+      DATA(key_level) = schema_reader->get_level( arg-level )-key_level.
+      IF key_level = 0 OR arg-ancestor-key_level > key_level.
+        RETURN.
+      ENDIF.
+      APPEND arg TO args.
+      APPEND VALUE #( hierarchy = arg-hierarchy level = key_level
+                      ancestor_level = arg-ancestor-key_level ancestor_path = arg-ancestor-path ) TO top_operands.
+    ENDLOOP.
+    IF generated IS NOT INITIAL AND generated <> VALUE int4_table( FOR a IN args ( a-hierarchy ) ).
+      RETURN.
+    ENDIF.
+
+    " the keys: per key an item of the ORDER BY
+    DATA items TYPE zzxxmla1_cl_mdx_facts=>ty_t_order_item.
+    DATA(with_measure) = abap_false.
+    LOOP AT keys INTO DATA(key).
+      IF key-expression IS NOT BOUND.
+        RETURN.
+      ENDIF.
+      native_order_item( EXPORTING node = key-expression args = args
+                         IMPORTING item = DATA(item) found = found constant = DATA(constant) ).
+      IF found = abap_false.
+        RETURN.
+      ENDIF.
+      IF constant = abap_false.
+        item-descending = key-descending.
+        APPEND item TO items.
+        IF item-operand = 0.
+          with_measure = abap_true.
+        ENDIF.
+      ENDIF.
+    ENDLOOP.
+
+    " the values' context: the cell's filters, the stored non-All members of the other hierarchies (native_top_count)
+    DATA filters TYPE zzxxmla1_cl_mdx_facts=>ty_t_filter.
+    LOOP AT evaluator->get_members( ) INTO DATA(context) WHERE hier_id <> zzxxmla1_cl_mdx_schema_reader=>c_measures.
+      IF line_exists( args[ hierarchy = context-hier_id ] ).
+        CONTINUE.
+      ENDIF.
+      IF with_measure = abap_true
+          AND ( context-calculated = abap_true OR context-calc_name IS NOT INITIAL OR context-is_null = abap_true ).
+        RETURN.
+      ENDIF.
+      IF context-key_level > 0 AND context-calculated = abap_false AND context-is_null = abap_false.
+        APPEND VALUE #( hierarchy = context-hier_id level = context-key_level path = context-path ) TO filters.
+      ENDIF.
+    ENDLOOP.
+
+    " the set's context (the slicer's for a named set): the native crossjoin's conditions, and its tuples have facts
+    " with the context without the calculated and default members (read_native_tuples)
+    DATA tuple_filters TYPE zzxxmla1_cl_mdx_facts=>ty_t_filter.
+    DATA(savepoint) = evaluator->savepoint( ).
+    IF in_named_set = abap_true.
+      evaluator->set_context_members( slicer_evaluator_context ).
+    ENDIF.
+    DATA(valid) = valid_cj_args( evaluator = evaluator args = args ).
+    LOOP AT evaluator->get_members( ) INTO context WHERE hier_id <> zzxxmla1_cl_mdx_schema_reader=>c_measures.
+      IF line_exists( args[ hierarchy = context-hier_id ] ) OR context-calculated = abap_true
+          OR context-unique_name = schema_reader->get_default_member( context-hier_id )-unique_name.
+        CONTINUE.
+      ENDIF.
+      IF context-is_null = abap_true.
+        valid = abap_false.
+      ELSEIF context-key_level > 0.
+        APPEND VALUE #( hierarchy = context-hier_id level = context-key_level path = context-path ) TO tuple_filters.
+      ENDIF.
+    ENDLOOP.
+    evaluator->restore( savepoint ).
+    IF valid = abap_false.
+      RETURN.
+    ENDIF.
+
+    DATA(rows) = fact_reader->ordered_paths( operands      = top_operands
+                                             filters       = filters
+                                             items         = items
+                                             limit         = limit
+                                             with_empty    = abap_false
+                                             tuple_filters = tuple_filters ).
+    result = tuples_of_paths( EXPORTING args = args rows = rows IMPORTING native = native ).
+  ENDMETHOD.
+
+  METHOD native_order_item.
+    CLEAR: item, found, constant.
+    " through parentheses and calculated measures that are only another measure
+    DATA(expression) = node.
+    DO 20 TIMES.
+      IF expression->kind = zzxxmla1_cl_mdx_node=>c_kind-resolved_call AND lines( expression->args ) = 1
+          AND ( expression->fun_def-implementation = `ParenthesesFunDef`
+                OR expression->fun_def-implementation = `TupleFunDef` ).
+        expression = expression->args[ 1 ].
+      ELSEIF expression->kind = zzxxmla1_cl_mdx_node=>c_kind-member
+          AND expression->element-member-hier_id = zzxxmla1_cl_mdx_schema_reader=>c_measures
+          AND expression->element-member-calculated = abap_true.
+        expression = schema_reader->get_calculated_member( expression->element-member-unique_name )-expression.
+        IF expression IS NOT BOUND.
+          RETURN.
+        ENDIF.
+      ELSE.
+        EXIT.
+      ENDIF.
+    ENDDO.
+    IF expression->kind = zzxxmla1_cl_mdx_node=>c_kind-member.
+      DATA(measure) = expression->element-member.
+      IF measure-hier_id = zzxxmla1_cl_mdx_schema_reader=>c_measures AND measure-calculated = abap_false
+          AND measure-measure_index > 0.
+        item = VALUE #( measure = measure-measure_index ).
+        found = abap_true.
+      ENDIF.
+      RETURN.
+    ENDIF.
+
+    " the OrderKey of the current member of an argument's hierarchy, or of its ancestor at a level: its key
+    " (compare_order_keys)
+    IF expression->kind <> zzxxmla1_cl_mdx_node=>c_kind-resolved_call OR key_of( expression ) <> `ORDERKEY|Property|6`.
+      RETURN.
+    ENDIF.
+    DATA(target) = expression->args[ 1 ].
+    DATA(ancestor_level) = VALUE zzxxmla1_cl_mdx_schema_reader=>ty_level( ).
+    IF target->kind = zzxxmla1_cl_mdx_node=>c_kind-resolved_call AND key_of( target ) = `ANCESTOR|Function|6,4`.
+      IF target->args[ 2 ]->kind <> zzxxmla1_cl_mdx_node=>c_kind-level.
+        RETURN.
+      ENDIF.
+      ancestor_level = schema_reader->get_level( target->args[ 2 ]->element-id ).
+      target = target->args[ 1 ].
+    ENDIF.
+    DATA(hierarchy) = current_member_hierarchy( target ).
+    READ TABLE args INTO DATA(arg) WITH KEY hierarchy = hierarchy.
+    IF sy-subrc <> 0.
+      RETURN.
+    ENDIF.
+    DATA(operand) = sy-tabix.
+    DATA(level) = schema_reader->get_level( arg-level )-key_level.
+    IF ancestor_level IS NOT INITIAL.
+      " a level of another hierarchy or below the member's: not native
+      IF ancestor_level-hierarchy <> hierarchy OR ancestor_level-key_level > level.
+        RETURN.
+      ENDIF.
+      IF ancestor_level-key_level = 0.
+        " the All member's OrderKey: the same for every tuple
+        found = abap_true.
+        constant = abap_true.
+        RETURN.
+      ENDIF.
+      level = ancestor_level-key_level.
+    ENDIF.
+    item = VALUE #( operand = operand level = level ).
+    found = abap_true.
+  ENDMETHOD.
+
+  METHOD current_member_hierarchy.
+    result = -1.
+    IF node->kind <> zzxxmla1_cl_mdx_node=>c_kind-resolved_call OR key_of( node ) <> `CURRENTMEMBER|Property|3`.
+      RETURN.
+    ENDIF.
+    DATA(arg) = node->args[ 1 ].
+    CASE arg->kind.
+      WHEN zzxxmla1_cl_mdx_node=>c_kind-hierarchy.
+        result = arg->element-id.
+      WHEN zzxxmla1_cl_mdx_node=>c_kind-dimension.
+        " Dimension.getHierarchy: the first one
+        DATA(dimension) = schema_reader->get_dimension( arg->element-id ).
+        result = dimension-hierarchies[ 1 ].
+    ENDCASE.
   ENDMETHOD.
 
   METHOD range.
@@ -4133,9 +4420,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     result = schema_reader->get_level( member-level )-depth.
   ENDMETHOD.
 
-  METHOD order.
-    " buildKeySpecList: each key a value, then the symbol of its direction (ASC if there is none)
-    DATA keys TYPE ty_t_sort_key.
+  METHOD order_keys.
     DATA(j) = 2.
     WHILE j <= lines( node->args ).
       DATA(key) = VALUE ty_sort_key( expression = node->args[ j ] ).
@@ -4151,8 +4436,17 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         key-brk = xsdbool( flag = `BASC` OR flag = `BDESC` ).
         j = j + 1.
       ENDIF.
-      APPEND key TO keys.
+      APPEND key TO result.
     ENDWHILE.
+  ENDMETHOD.
+
+  METHOD order.
+    DATA(keys) = order_keys( node ).
+    DATA native TYPE abap_bool.
+    result = native_order( EXPORTING evaluator = evaluator node = node keys = keys IMPORTING native = native ).
+    IF native = abap_true.
+      RETURN.
+    ENDIF.
 
     result = evaluate_set( evaluator = evaluator node = node->args[ 1 ] ).
     IF lines( result ) <= 1.
@@ -4194,7 +4488,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
             OR ( set->kind = zzxxmla1_cl_mdx_node=>c_kind-resolved_call AND set->fun_def-implementation = `AsFunDef` ).
           LOOP AT result INTO DATA(preloaded).
             set_position( node = set index = sy-tabix ).
-            LOOP AT keys INTO key.
+            LOOP AT keys INTO DATA(key).
               DATA(preload_index) = sy-tabix.
               sort_value( evaluator = evaluator key = key key_index = preload_index run = run
                           members = COND #( WHEN lines( preloaded ) = 1 THEN preloaded
@@ -4212,28 +4506,143 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD sort_tuples.
-    " the values of break keys first, once per tuple (the comparisons find them in sort_values; an error is left to
-    " the comparison that meets it): if a cell is missed, this pass is evaluated again once it is read, so the tuples
-    " are not sorted in this one (the reference sorts them, by the value 0 of the missed cells)
-    IF lines( tuples ) > 1 AND NOT line_exists( keys[ brk = abap_false ] ).
-      DATA(savepoint) = evaluator->savepoint( ).
-      LOOP AT tuples INTO DATA(tuple).
-        LOOP AT keys INTO DATA(key).
-          DATA(key_index) = sy-tabix.
-          TRY.
-              sort_value( evaluator = evaluator key = key key_index = key_index run = run
-                          members   = COND #( WHEN lines( tuple ) = 1 THEN tuple
-                                              ELSE dependent_members( key = key tuple = tuple ) ) ).
-            CATCH zzxxmla1_cx_xmla.
-              evaluator->restore( savepoint ).
-          ENDTRY.
-        ENDLOOP.
-      ENDLOOP.
-      IF fact_reader->is_dirty( ) = abap_true.
-        RETURN.
-      ENDIF.
+    IF lines( tuples ) <= 1.
+      RETURN.
+    ENDIF.
+    DATA(count) = lines( tuples ).
+    IF line_exists( keys[ brk = abap_false ] ).
+      " a hierarchical key: the comparator chain, each comparison evaluating in the context of the tuples
+      merge_sort_tuples( EXPORTING evaluator = evaluator keys = keys run = run CHANGING tuples = tuples ).
+      RETURN.
     ENDIF.
 
+    " break keys only (BreakMemberComparator, BreakTupleComparator): the value of each key for each tuple first, once,
+    " in the order of the set (an error is kept for the comparison that meets it). If a cell is missed, this pass is
+    " evaluated again once it is read, so the tuples are not sorted in this one (the reference sorts them, by the
+    " value 0 of the missed cells).
+    TYPES:
+      BEGIN OF ty_entry,
+        value TYPE zzxxmla1_cl_mdx_evaluator=>ty_value,
+        error TYPE REF TO zzxxmla1_cx_xmla,
+        " the key's dependent members of a tuple (TupleExpMemoComparator): equal ones compare as 0 before the values
+        id    TYPE i,
+      END OF ty_entry.
+    TYPES:
+      BEGIN OF ty_name,
+        key  TYPE i,
+        name TYPE string,
+        id   TYPE i,
+      END OF ty_name.
+    DATA entries TYPE STANDARD TABLE OF ty_entry WITH EMPTY KEY.
+    DATA names TYPE HASHED TABLE OF ty_name WITH UNIQUE KEY key name.
+    DATA positions TYPE STANDARD TABLE OF int4_table WITH EMPTY KEY.
+    DATA(key_count) = lines( keys ).
+    " per key the positions of the members it depends on (the tuples of a set have the same hierarchies); a member
+    " is a whole tuple (Sorter.sortMembers)
+    DATA(first) = tuples[ 1 ].
+    LOOP AT keys INTO DATA(key).
+      DATA(key_positions) = VALUE int4_table( ).
+      DATA(position) = 0.
+      LOOP AT first INTO DATA(member).
+        position = position + 1.
+        IF lines( first ) = 1 OR key-expression IS NOT BOUND
+            OR depends_on( node = key-expression hierarchy = member-hier_id as_value = abap_true ) = abap_true.
+          APPEND position TO key_positions.
+        ENDIF.
+      ENDLOOP.
+      APPEND key_positions TO positions.
+    ENDLOOP.
+    DATA(savepoint) = evaluator->savepoint( ).
+    LOOP AT tuples INTO DATA(tuple).
+      DATA(key_index) = 0.
+      LOOP AT keys INTO key.
+        key_index = key_index + 1.
+        DATA(members) = VALUE ty_tuple( FOR p IN positions[ key_index ] ( tuple[ p ] ) ).
+        DATA(entry) = VALUE ty_entry( ).
+        IF lines( tuple ) > 1.
+          DATA(name) = concat_lines_of( table = VALUE string_table( FOR m IN members ( m-unique_name ) ) sep = `,` ).
+          READ TABLE names INTO DATA(known) WITH TABLE KEY key = key_index name = name.
+          IF sy-subrc <> 0.
+            known = VALUE #( key = key_index name = name id = lines( names ) + 1 ).
+            INSERT known INTO TABLE names.
+          ENDIF.
+          entry-id = known-id.
+        ENDIF.
+        TRY.
+            entry-value = sort_value( evaluator = evaluator key = key key_index = key_index run = run
+                                      members = members ).
+          CATCH zzxxmla1_cx_xmla INTO DATA(error).
+            evaluator->restore( savepoint ).
+            entry-error = error.
+        ENDTRY.
+        APPEND entry TO entries.
+      ENDLOOP.
+    ENDLOOP.
+    IF fact_reader->is_dirty( ) = abap_true.
+      RETURN.
+    ENDIF.
+
+    " bottom-up merge sort of the tuples' indexes: stable, as Java sorts lists and arrays of objects
+    DATA source TYPE int4_table.
+    DATA(indexes) = VALUE int4_table( FOR i = 1 THEN i + 1 UNTIL i > count ( i ) ).
+    DATA(width) = 1.
+    WHILE width < count.
+      source = indexes.
+      CLEAR indexes.
+      DATA(left) = 1.
+      WHILE left <= count.
+        DATA(middle) = nmin( val1 = left + width val2 = count + 1 ).
+        DATA(right) = nmin( val1 = left + 2 * width val2 = count + 1 ).
+        DATA(i1) = left.
+        DATA(i2) = middle.
+        WHILE i1 < middle OR i2 < right.
+          DATA(take_left) = abap_false.
+          IF i2 >= right.
+            take_left = abap_true.
+          ELSEIF i1 < middle.
+            " the comparator chain: the first key whose comparison is not 0 decides
+            DATA(base1) = ( source[ i1 ] - 1 ) * key_count.
+            DATA(base2) = ( source[ i2 ] - 1 ) * key_count.
+            DATA(compared) = 0.
+            key_index = 0.
+            WHILE key_index < key_count AND compared = 0.
+              key_index = key_index + 1.
+              ASSIGN entries[ base1 + key_index ] TO FIELD-SYMBOL(<entry1>).
+              ASSIGN entries[ base2 + key_index ] TO FIELD-SYMBOL(<entry2>).
+              IF <entry1>-id <> 0 AND <entry1>-id = <entry2>-id.
+                CONTINUE.
+              ENDIF.
+              IF <entry1>-error IS BOUND.
+                error = <entry1>-error.
+                RAISE EXCEPTION error.
+              ELSEIF <entry2>-error IS BOUND.
+                error = <entry2>-error.
+                RAISE EXCEPTION error.
+              ENDIF.
+              compared = compare_values( value1 = <entry1>-value value2 = <entry2>-value ).
+              IF keys[ key_index ]-descending = abap_true.
+                compared = - compared.
+              ENDIF.
+            ENDWHILE.
+            take_left = xsdbool( compared <= 0 ).
+          ENDIF.
+          IF take_left = abap_true.
+            APPEND source[ i1 ] TO indexes.
+            i1 = i1 + 1.
+          ELSE.
+            APPEND source[ i2 ] TO indexes.
+            i2 = i2 + 1.
+          ENDIF.
+        ENDWHILE.
+        left = right.
+      ENDWHILE.
+      width = width * 2.
+    ENDWHILE.
+    DATA(unsorted) = tuples.
+    tuples = VALUE #( FOR row IN indexes ( unsorted[ row ] ) ).
+  ENDMETHOD.
+
+  METHOD merge_sort_tuples.
     " bottom-up merge sort: stable, as Java sorts lists and arrays of objects
     DATA source TYPE ty_t_tuple.
     DATA(count) = lines( tuples ).
@@ -4785,6 +5194,33 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     DATA(savepoint) = evaluator->savepoint( ).
     evaluator->set_non_empty( abap_false ).
     TRY.
+        " Head(Order(...), count), also of a named set not evaluated yet: natively the first count tuples only
+        DATA(ordered) = node->args[ 1 ].
+        IF ordered->kind = zzxxmla1_cl_mdx_node=>c_kind-named_set AND ordered->set_expression IS BOUND
+            AND NOT line_exists( named_set_values[ key = ordered->set_key ] ).
+          ordered = ordered->set_expression.
+          DATA(in_named_set) = abap_true.
+        ENDIF.
+        IF head = abap_true AND lines( node->args ) > 1
+            AND ordered->kind = zzxxmla1_cl_mdx_node=>c_kind-resolved_call
+            AND ordered->fun_def-implementation = `OrderFunDef`.
+          DATA(limit) = CONV i( trunc( evaluate_number( evaluator = evaluator node = node->args[ 2 ] ) ) ).
+          IF limit > 0.
+            IF in_named_set = abap_true.
+              evaluator->set_context_members( slicer_evaluator_context ).
+            ENDIF.
+            DATA native TYPE abap_bool.
+            result = native_order( EXPORTING evaluator = evaluator node = ordered keys = order_keys( ordered )
+                                             limit = limit
+                                   IMPORTING native = native ).
+            IF native = abap_true.
+              evaluator->restore( savepoint ).
+              RETURN.
+            ENDIF.
+            evaluator->restore( savepoint ).
+            evaluator->set_non_empty( abap_false ).
+          ENDIF.
+        ENDIF.
         result = evaluate_set( evaluator = evaluator node = node->args[ 1 ] ).
         " compileInteger: a number truncated, null is 0; no count is 1
         DATA(count) = COND i( WHEN lines( node->args ) > 1

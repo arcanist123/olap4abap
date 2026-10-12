@@ -12,8 +12,8 @@ period functions: all 244 `reference/` cases pass, and of the 395 statements of 
 
 No statement stops at a function the engine does not evaluate any more; #64 differs in the last digits of a sum
 eMondrian's database adds in another order (`docs/test-strategy.md`). The run (three statements at once) takes about
-four minutes; the slowest on SAP is #85 (105 s, `Order` in ABAP, step 8 below); #46 takes 2.3 s with the native
-`TopCount` (step 9); everything else is below 10 s.
+two minutes; #85 takes 1 s with the native `Order` (step 8, 105 s before), #46 2.3 s with the native `TopCount` (step
+9); everything else is below 10 s.
 
 ## Now: members pushed down to HANA
 
@@ -53,9 +53,33 @@ cases and the applicable statements passing:
    way. Applicable statements: same answers, the whole run 191 s instead of about 240 s; #46 and #85 (Order/TopCount
    over 100,000+ tuples) take about 105 s instead of about 80 s, the second pass evaluating every value again.
 8. Open: an unqualified member name (`[USA]`) is looked for by name in every hierarchy, one query each (100 on
-   `ZXMLWIDE`). `Order`/`TopCount` over large sets is slow in ABAP (#85: `Head(Order(...), 5)` over about 85,000
-   tuples, 105 s; #46 took as long before step 9): the merge sort calls a method per comparison and finds each value
-   by a string key; evaluating each sort value once into a table and sorting that with `SORT ... STABLE` would help.
+   `ZXMLWIDE`).
+   Done (2026-10-12): `Order` over large sets. #85 (`Head(Order(...), 5)` over the 85,000 tuples of a
+   `NonEmptyCrossJoin` of customers and products, the query a pivot client generates) took 105 s: the merge sort made
+   1.4 million comparisons, each finding the key's dependent members again (`depends_on` over the key's tree) and its
+   value by a string key. Two changes:
+   - Native `Order` (our extension; the reference has no `RolapNativeOrder` and sorts in memory, `Sorter`):
+     `ZZXXMLA1_CL_MDX_ENGINE=>native_order`, `ZZXXMLA1_CL_MDX_FACTS=>ordered_paths` (`top_count` is now one of its
+     callers). Keys `BASC`/`BDESC`, each the `OrderKey` of an operand's current member or of its `Ancestor` at a level
+     (its level's key column: a number as a number, a string `LOWER`, then as it is, `Util.caseSensitiveCompareName`;
+     the All level orders nothing), or a stored measure, also through calculated measures that are only that measure
+     (`[*SORTED_MEASURE]` -> `[*FORMATTED_MEASURE_1]` -> `[Store Sales]`). The set: what the native crossjoin reads
+     (`NonEmptyCrossJoin`, `CrossJoin` under a non-empty evaluator), also through named sets (their context is the
+     slicer's) and `Generate(set, {(the current members of its hierarchies)})`, which gives the set as it is. One
+     query as native `TopCount`'s: the native crossjoin's tuples (inner join to the facts of the set's context), the
+     measures' values left-joined (no facts: NULL, first ascending, last descending), `ORDER BY` the keys, then the
+     members' keys (the set's order), and `Head(Order(...), n)` (also of a named set not evaluated yet) is `LIMIT n`.
+     Not native: `ASC`/`DESC` (hierarchical), any other key or set, calculated members in the context of a measure key.
+   - The interpreted sort (`sort_tuples`, also `TopCount`/`BottomCount` that are not native): with break keys only,
+     the positions of the members each key depends on are found once, every key's value is evaluated once per tuple
+     into a table (an error kept for the comparison that meets it; equal dependent members compare as 0 by an id),
+     and the tuples' indexes are merge-sorted by these values. A hierarchical key keeps the old comparator
+     (`merge_sort_tuples`).
+   #85: 1 s (eMondrian 3.6 s). All 90 applicable statements with `Order`, `Head`, `TopCount` or `BottomCount` and 16
+   edge cases (`BDESC`, ties, string keys, an ancestor key, the All level, slicer, subselect, a chain of calculated
+   measures, empty values in another context, named sets with `Generate`, the fallbacks, evaluation errors) give
+   eMondrian's answers; the whole run takes 104 s. Still open: a second pass of a phase evaluates the sort values of
+   an interpreted `Order` again (`sort_values` are kept per run).
 9. Done (2026-10-12): native `TopCount`/`BottomCount` (`RolapNativeTopCount`, `ZZXXMLA1_CL_MDX_ENGINE=>native_top_count`,
    `ZZXXMLA1_CL_MDX_FACTS=>top_count`): by a stored measure, of a crossjoin (`CrossJoin` or `*`, our extension: the
    reference's `CrossJoinArgFactory` knows only the function names, so it sorts #46 in memory) of level members,
@@ -94,6 +118,41 @@ Design in `schema-generator.md`. Order:
    throwaway catalog). One cube per catalog for the MVP (`mvp-scope.md`, Catalog decision).
    Open: an accept through the UI checked by hand (the API's accept was); calculated members of the schema (the
    reader ignores them) and aggregators other than `sum`/`count` (the engine sums them) are not offered.
+
+## Done: compounded characteristics
+
+Built 2026-10-12; the model is in `bw-schema-design-guide.md`, section 3.7. A compounded characteristic (`0FISCPER`
+with `0FISCVARNT`, a cost centre with its controlling area) is unique only by all its key fields: `2024001` exists
+under K4 and under V3. On an InfoCube the members' unique names collided; on an aDSO, keyed and joined by the value, a
+fact was counted once per compounding value, in cells and in the native crossjoin, `TopCount` and `Order`.
+
+1. Done: test data. The clinic demo (`docs/clinic-demo.md`) has the room `ZCLROOM`, compounded with the site
+   `ZCLSITE`: R01 to R04 at both sites, R05 only in the north, in `ZCLVISIT` and `ZCLVISITA`. Joined by the value, the
+   aDSO's visits were 64,516 instead of 33,956.
+2. Done: the HANA plan on `ZCLVISITA`. A query without the room has no join to its SID table (pruned); one with it
+   joins the facts to the SID table's index on both key fields. A compounded characteristic costs nothing where it is
+   not used.
+3. Done: the fact view. `ZZXXMLA1_CL_BW_VIEW_GEN` (`fact_layout`, `generate_fact_view`) reads an aDSO's compounded
+   characteristics (`RSDIOBJCMP` of the basic characteristic) and writes a CDS view on `/BIC/A<adso>7`: every field
+   without namespace and `SID_<field>` per compounded characteristic. `ZZXXMLA1_CL_BW_PROVIDER` reads the aDSO from it
+   (a placeholder `ZZXXMLA1_F_<aDSO>` until it exists, generated on accept by `ZZXXMLA1_CL_SCHEMA_API`); the proposal
+   keys the compounded dimensions by `SID`. No engine change for the joins.
+4. Done: names. The characteristic's view has `COMPOUND_KEY` (`NORTH/R01`, `#/#`), the key attribute's `NameColumn`;
+   the own key is the member property `Key`. Not the caption: `captionColumn` is not supported.
+5. Done: order. `ZZXXMLA1_CL_SCHEMA` reads an attribute's `OrderByColumn` (and `orderBy`) and a level's
+   `ordinalColumn` as the reference does (`RolapLevel`, `RolapDimension.resolveOrdinalColumn`); members are read
+   ordered by it, then by the key, their order key is the ordinal's, then the key's, `order_condition` (`Lag`, `Lead`,
+   ranges) compares the ordinal first, and the native `Order`/`TopCount` (`ordered_paths`) order by it. The clinic's
+   south rooms get the lower SIDs and still come after the north ones.
+6. Open: the fiscal time characteristics in the time master data (`0FISCPER`, `0FISCYEAR`; not filled today,
+   `time-master-data.md`): an aDSO's fact whose value has no SID has no `SID_<field>` and drops out of the engine's
+   inner join.
+
+Not done, decided: no hierarchy with the compounding as a level above (`[0FISCPER.Fiscal].[K4].[2024001]`), the
+schemas are flat; no join on two generated string columns (HANA cannot use the columns, and the NUMC values are
+numbers in the views but text in the facts); no SID columns for the characteristics without compounding (a join each,
+up to 100 on the wide demo, and SID order); no keys of several columns in the engine (not in the reference's schema,
+which then could not serve these schemas).
 
 ## Done: Time is a TimeDimension
 
@@ -226,7 +285,7 @@ lowest of a user hierarchy. The other label filters, value filters and Top 10 st
 deviation: a constant true condition (`1 = 1`) makes eMondrian fail with a NullPointerException
 (`LiteralStarPredicate` has no column); olap4abap does not restrict the subcube.
 
-Suggested next: the performance of #85 and #46 (one minute each); the functions Mondrian's tests do not reach
+Suggested next: the functions Mondrian's tests do not reach
 (`StrToSet`, `StrToTuple`, `Extract`, `Cache`, ...); `checkDimensionFilter` (a native `Filter` operand). Re-running
 `scripts/extract-mdx-tests.py` after the level properties found 13 more statements that run on eMondrian (appended as
 #382-#394, the earlier indexes kept); all give eMondrian's answer now. For them: `OpeningPeriod`/`ClosingPeriod`

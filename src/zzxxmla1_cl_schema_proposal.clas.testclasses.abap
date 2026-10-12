@@ -22,6 +22,10 @@ CLASS ltc_proposal DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHO
     METHODS dimension_of_adso FOR TESTING RAISING cx_static_check.
     METHODS hierarchies FOR TESTING RAISING cx_static_check.
     METHODS key_by_sid_on_infocube FOR TESTING RAISING cx_static_check.
+    "! a compounded characteristic of an aDSO, keyed by the SID of its fact view and named by its compounding and key
+    METHODS compounded FOR TESTING RAISING cx_static_check.
+    "! compounded, but its facts have no SID: not proposed, it would count facts more than once
+    METHODS compounded_without_sid FOR TESTING RAISING cx_static_check.
     METHODS reference_characteristic FOR TESTING RAISING cx_static_check.
     METHODS time_characteristics FOR TESTING RAISING cx_static_check.
     METHODS measures_and_notes FOR TESTING RAISING cx_static_check.
@@ -166,6 +170,54 @@ CLASS ltc_proposal IMPLEMENTATION.
                                         exp = `ZFMSTORE SID` ).
     DATA(usage) = CAST zzxxmla1_cl_schema_def=>ty_dimension_usage( schema-cubes[ 1 ]-dimensions[ 1 ]-def ).
     cl_abap_unit_assert=>assert_equals( act = usage->foreign_key exp = `SID_ZFMSTORE` ).
+  ENDMETHOD.
+
+  METHOD compounded.
+    DATA(provider) = adso( ).
+    provider-fact_table = `ZZXXMLA1_F_ZFMSALESA`.
+    provider-characteristics = VALUE #(
+      ( iobjnm = `0FISCPER` text = `Fiscal Year/Period` iobjtp = `TIM` basic = `0FISCPER` has_sids = abap_true
+        fact_sid = abap_true view = `ZZXXMLA1V0000090` text_column = `TXTLG`
+        fact_column = VALUE #( name = `SID_FISCPER` datatype = `INT4` length = 10 )
+        key_column = VALUE #( name = `FISCPER` datatype = `NUMC` length = 7 )
+        name_column = VALUE #( name = `COMPOUND_KEY` datatype = `CHAR` length = 10 ) ) ).
+    DATA(schema) = NEW zzxxmla1_cl_schema_proposal( )->propose( provider )-schema.
+    DATA(period) = schema-dimensions[ 1 ].
+    cl_abap_unit_assert=>assert_equals(
+      act = VALUE string_table( FOR a IN period-attributes
+                                ( |{ a-name }: { a-key_column->column_name }| &&
+                                  |{ COND string( WHEN a-name_column IS BOUND THEN |/{ a-name_column->column_name }| ) }| ) )
+      exp = VALUE string_table( ( `0FISCPER SID: SID/COMPOUND_KEY` ) ( `0FISCPER Key: FISCPER` )
+                                ( `0FISCPER Text: TXTLG` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = period-attributes[ 1 ]-name_column->data_type exp = `String` ).
+    " in the order of the names, not of the SIDs
+    cl_abap_unit_assert=>assert_equals( act = period-attributes[ 1 ]-order_by_column->column_name exp = `COMPOUND_KEY` ).
+    cl_abap_unit_assert=>assert_not_bound( period-attributes[ 2 ]-order_by_column ).
+    DATA(level) = period-hierarchies[ 1 ]-levels[ 1 ].
+    cl_abap_unit_assert=>assert_equals( act = level-source_attribute exp = `0FISCPER SID` ).
+    cl_abap_unit_assert=>assert_equals(
+      act = VALUE string_table( FOR p IN level-properties ( |{ p-name }/{ p-caption }/{ p-source_attribute }| ) )
+      exp = VALUE string_table( ( `Text/Fiscal Year/Period (Text)/0FISCPER Text` )
+                                ( `Key/Fiscal Year/Period (Key)/0FISCPER Key` ) ) ).
+    DATA(cube) = schema-cubes[ 1 ].
+    DATA(fact) = CAST zzxxmla1_cl_schema_def=>ty_table( cube-fact-def ).
+    cl_abap_unit_assert=>assert_equals( act = fact->name
+                                        exp = `ZZXXMLA1_F_ZFMSALESA` ).
+    DATA(usage) = CAST zzxxmla1_cl_schema_def=>ty_dimension_usage( cube-dimensions[ 1 ]-def ).
+    cl_abap_unit_assert=>assert_equals( act = usage->foreign_key exp = `SID_FISCPER` ).
+  ENDMETHOD.
+
+  METHOD compounded_without_sid.
+    DATA(provider) = adso( ).
+    provider-characteristics = VALUE #(
+      ( iobjnm = `0FISCPER` text = `Fiscal Year/Period` iobjtp = `TIM` basic = `0FISCPER` has_sids = abap_true
+        fact_column = VALUE #( name = `/BIC/FISCPER` datatype = `NUMC` length = 7 )
+        key_column = VALUE #( name = `FISCPER` datatype = `NUMC` length = 7 )
+        name_column = VALUE #( name = `COMPOUND_KEY` datatype = `CHAR` length = 10 ) ) ).
+    DATA(proposal) = NEW zzxxmla1_cl_schema_proposal( )->propose( provider ).
+    cl_abap_unit_assert=>assert_initial( proposal-schema-dimensions ).
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( proposal-notes[
+      iobjnm = `0FISCPER` reason = `compounded, and the facts have no SID of it` ] ) ) ).
   ENDMETHOD.
 
   METHOD reference_characteristic.

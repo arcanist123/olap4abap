@@ -21,10 +21,11 @@
 "! - POST check?catalog=X: the body is the edited schema XML. The checks of accept, nothing is changed: the schema
 "!   parses, and the server's catalogs with this one load in ZZXXMLA1_CL_SCHEMA as the XMLA endpoint will load them.
 "!   The schema file of an existing catalog is its Definition (it is replaced), of a new one
-"!   /WEB-INF/schema/<catalog>.xml. Answers the file, whether the catalog is new and the characteristics whose views
-"!   accept generates;
+"!   /WEB-INF/schema/<catalog>.xml. Answers the file, whether the catalog is new and the characteristics (and aDSOs,
+"!   for their fact views) whose views accept generates;
 "! - POST accept?catalog=X: the checks of check, then the views of the tables named by a placeholder
-"!   (ZZXXMLA1_C_<characteristic>) are generated (ZZXXMLA1_CL_BW_VIEW_GEN) and replaced by their database views,
+"!   (ZZXXMLA1_C_<characteristic>, ZZXXMLA1_F_<aDSO> for the fact view of an aDSO with a compounded characteristic)
+"!   are generated (ZZXXMLA1_CL_BW_VIEW_GEN) and replaced by their database views,
 "!   the schema file is written, a new catalog added to the first data source of /WEB-INF/datasources.xml, and the
 "!   work is committed. Without catalog the schema's name is the catalog;
 "! - POST remove?catalog=X: the catalog is removed from every data source of /WEB-INF/datasources.xml and its schema
@@ -200,8 +201,9 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
                 catalog     TYPE string
                 schema_xml  TYPE string
       RAISING   zzxxmla1_cx_api_refused.
-    "! The table names of the schema's dimensions (shared and private, and the Table of their hierarchies), each
-    "! once in the order of the schema; a placeholder of a view not generated yet is replaced by its database view.
+    "! The table names of the schema's dimensions (shared and private, and the Table of their hierarchies) and of its
+    "! cubes' fact tables, each once in the order of the schema; a placeholder of a view not generated yet is replaced
+    "! by its database view.
     METHODS map_tables
       IMPORTING views         TYPE zzxxmla1_cl_bw_view_gen=>ty_t_view OPTIONAL
       CHANGING  !schema       TYPE zzxxmla1_cl_schema_def=>ty_schema
@@ -214,7 +216,8 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
       IMPORTING views TYPE zzxxmla1_cl_bw_view_gen=>ty_t_view
       CHANGING  table TYPE string
                 names TYPE string_table.
-    "! The characteristic whose view the table name is a placeholder of, initial for any other name.
+    "! The characteristic whose view the table name is a placeholder of, or the aDSO whose fact view it is a
+    "! placeholder of (the views list it as characteristic); initial for any other name.
     METHODS characteristic_of
       IMPORTING table         TYPE string
       RETURNING VALUE(result) TYPE string.
@@ -425,7 +428,17 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
       DATA(characteristic) = characteristic_of( table ).
       IF characteristic IS NOT INITIAL.
         TRY.
-            APPEND generator->generate( CONV #( characteristic ) ) TO views.
+            IF zzxxmla1_cl_bw_view_gen=>adso_of_fact_placeholder( table ) IS NOT INITIAL.
+              DATA(fact_view) = generator->generate_fact_view( CONV #( characteristic ) ).
+              IF fact_view IS INITIAL.
+                RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400
+                  message = |aDSO { characteristic } has no compounded characteristic, so no fact view: | &&
+                            |propose its schema again|.
+              ENDIF.
+              APPEND fact_view TO views.
+            ELSE.
+              APPEND generator->generate( CONV #( characteristic ) ) TO views.
+            ENDIF.
           CATCH cx_dd_ddl_exception INTO DATA(ddl_error).
             RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 500
               message = |View of { characteristic } not generated: { ddl_error->get_text( ) }|.
@@ -750,6 +763,11 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
       map_dimension( EXPORTING views = views CHANGING dimension = <dimension> names = result ).
     ENDLOOP.
     LOOP AT schema-cubes INTO DATA(cube).
+      IF cube-fact-name = `Table`.
+        " the node refers to the table, so it changes in the schema
+        DATA(fact) = CAST zzxxmla1_cl_schema_def=>ty_table( cube-fact-def ).
+        map_table( EXPORTING views = views CHANGING table = fact->name names = result ).
+      ENDIF.
       LOOP AT cube-dimensions INTO DATA(node) WHERE name = `Dimension`.
         " the node refers to the dimension, so it changes in the schema
         DATA(own) = CAST zzxxmla1_cl_schema_def=>ty_dimension( node-def ).
@@ -785,6 +803,9 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
 
   METHOD characteristic_of.
     result = zzxxmla1_cl_bw_view_gen=>characteristic_of_placeholder( table ).
+    IF result IS INITIAL.
+      result = zzxxmla1_cl_bw_view_gen=>adso_of_fact_placeholder( table ).
+    ENDIF.
   ENDMETHOD.
 
   METHOD outline.

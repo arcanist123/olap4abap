@@ -172,6 +172,31 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
                 with_empty    TYPE abap_bool
                 tuple_filters TYPE ty_t_filter OPTIONAL
       RETURNING VALUE(result) TYPE ty_t_paths.
+    TYPES:
+      "! An item of the ORDER BY of ordered_paths: the key column of a level of an operand (its position and the
+      "! level, from 1), or a stored measure (its position in the measures; operand 0). A key compares as the reference
+      "! compares a member's key (RolapMemberBase.compareTo): a number as a number, a string ignoring case first
+      "! (Util.caseSensitiveCompareName). NULL (a tuple without facts) first ascending, last descending.
+      BEGIN OF ty_order_item,
+        operand    TYPE i,
+        level      TYPE i,
+        measure    TYPE i,
+        descending TYPE abap_bool,
+      END OF ty_order_item,
+      ty_t_order_item TYPE STANDARD TABLE OF ty_order_item WITH EMPTY KEY.
+    "! The crossjoin of the operands ordered in the database (top_count, and Order natively): the members' crossjoin
+    "! joined to the facts as top_count joins them, the values of the measures of the items with the filters, ordered
+    "! by the items, then by the members in the order of the crossjoin (the stable sort keeps the set's order); the
+    "! paths of each row's members, the first limit rows. Each statement is answered once per request.
+    "! @parameter limit | the most rows; 0: all
+    METHODS ordered_paths
+      IMPORTING operands      TYPE ty_t_top_operand
+                filters       TYPE ty_t_filter
+                items         TYPE ty_t_order_item
+                limit         TYPE i DEFAULT 0
+                with_empty    TYPE abap_bool
+                tuple_filters TYPE ty_t_filter OPTIONAL
+      RETURNING VALUE(result) TYPE ty_t_paths.
     "! The subcube of the query (a subselect): only the facts it admits are read, by value and non_empty_paths alike,
     "! as the reference server adds it to every cell request and native set (RolapEvaluator.getSubcubePredicate).
     METHODS set_subcube
@@ -296,11 +321,12 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
     "! the answers of top_count by their statement
     DATA top_answers TYPE HASHED TABLE OF ty_top_answer WITH UNIQUE KEY sql.
     "! The facts grouped by the key columns of the operands' levels ("G1_1", "G1_2", ..., "G2_1", ...), with the
-    "! filters and the subcube, and the value of the measure ("V").
+    "! filters and the subcube, and the values of the measures ("V1", "V2", ...).
+    "! @parameter values | the measures, their positions in the measures; none: only the groups
     METHODS top_facts_sql
       IMPORTING operands      TYPE ty_t_top_operand
                 filters       TYPE ty_t_filter
-                measure       TYPE i
+                !values       TYPE ty_t_index
       RETURNING VALUE(result) TYPE string.
     "! The members of an operand: the distinct key columns of its levels in its dimension table ("C1", "C2", ...),
     "! those below its ancestor.
@@ -716,6 +742,10 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
     DATA(columns) = VALUE string_table( ).
     LOOP AT hierarchy-levels INTO DATA(level) TO operand-level.
       APPEND |{ zzxxmla1_cl_sql=>quote( level-key_column ) } AS "C{ sy-tabix }"| TO columns.
+      " the order of a level with an ordinal column (one per key, so DISTINCT keeps the members)
+      IF level-ordinal_column IS NOT INITIAL.
+        APPEND |{ zzxxmla1_cl_sql=>quote( level-ordinal_column ) } AS "O{ sy-tabix }"| TO columns.
+      ENDIF.
     ENDLOOP.
     result = |SELECT DISTINCT { concat_lines_of( table = columns sep = `, ` ) } | &&
              |FROM { zzxxmla1_cl_sql=>quote( hierarchy-dim_table ) }| &&
@@ -766,10 +796,12 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
         APPEND |{ column } AS "G{ index }_{ level_no }"| TO select_list.
       ENDLOOP.
     ENDLOOP.
-    " the value as load reads it: the sum of the fact column (NULL is 0), or the fact count
-    APPEND COND string( WHEN measures[ measure ]-aggregator = `count` THEN `COUNT( * ) AS "V"`
-                        ELSE |COALESCE( SUM( f.{ zzxxmla1_cl_sql=>quote( measures[ measure ]-fact_column ) } ), 0 )| &&
-                             ` AS "V"` ) TO select_list.
+    " the values as load reads them: the sum of the fact column (NULL is 0), or the fact count
+    LOOP AT values INTO DATA(measure).
+      APPEND COND string( WHEN measures[ measure ]-aggregator = `count` THEN |COUNT( * ) AS "V{ sy-tabix }"|
+                          ELSE |COALESCE( SUM( f.{ zzxxmla1_cl_sql=>quote( measures[ measure ]-fact_column ) } ), 0 )| &&
+                               | AS "V{ sy-tabix }"| ) TO select_list.
+    ENDLOOP.
     DATA(conditions) = VALUE string_table( ).
     LOOP AT filters INTO filter WHERE level > 0.
       DATA(keys) = path_keys( path = filter-path level = filter-level ).
@@ -797,8 +829,17 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD top_count.
+    result = ordered_paths( operands      = operands
+                            filters       = filters
+                            items         = VALUE #( ( measure = measure descending = top ) )
+                            limit         = count
+                            with_empty    = with_empty
+                            tuple_filters = tuple_filters ).
+  ENDMETHOD.
+
+  METHOD ordered_paths.
     " the members' crossjoin: per operand its key columns, joined to a grouped fact query on all of them
-    DATA(order_by) = VALUE string_table( ).
+    DATA(hierarchy_order) = VALUE string_table( ).
     DATA(outer_columns) = VALUE string_table( ).
     DATA(value_join) = VALUE string_table( ).
     DATA(tuple_join) = VALUE string_table( ).
@@ -811,28 +852,61 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
         " the keys of BW's tables are never NULL; a member with a NULL key would have no facts here
         APPEND |{ column } = g."G{ index }_{ sy-index }"| TO value_join.
         APPEND |{ column } = t."G{ index }_{ sy-index }"| TO tuple_join.
-        " hierarchy order: the keys from the first level, NULL first (read_members)
-        APPEND |{ column } ASC NULLS FIRST| TO order_by.
+        " hierarchy order: the keys from the first level, NULL first (read_members), a level's ordinal before its key
+        IF hierarchies[ operand-hierarchy ]-levels[ sy-index ]-ordinal_column IS NOT INITIAL.
+          APPEND |m{ index }."O{ sy-index }" ASC NULLS FIRST| TO hierarchy_order.
+        ENDIF.
+        APPEND |{ column } ASC NULLS FIRST| TO hierarchy_order.
       ENDDO.
       from = from && COND string( WHEN index > 1 THEN ` CROSS JOIN ` ) && |( { operand_sql( operand ) } ) m{ index }|.
     ENDLOOP.
-    " the value of each tuple from the facts (none: empty, the smallest value); without the empty tuples only those
-    " with facts with the tuple filters, which may differ from the value's
-    DATA(value_facts) = top_facts_sql( operands = operands filters = filters measure = measure ).
+    " the measures of the items, each once
+    DATA(values) = VALUE ty_t_index( ).
+    LOOP AT items INTO DATA(item) WHERE operand = 0.
+      IF NOT line_exists( values[ table_line = item-measure ] ).
+        APPEND item-measure TO values.
+      ENDIF.
+    ENDLOOP.
+    " the values of each tuple from the facts (none: empty, the smallest value); without the empty tuples only those
+    " with facts with the tuple filters, which may differ from the values'
     DATA(value_condition) = concat_lines_of( table = value_join sep = ` AND ` ).
-    IF with_empty = abap_true.
-      from = |{ from } LEFT JOIN ( { value_facts } ) g ON { value_condition }|.
-    ELSEIF tuple_filters = filters.
-      from = |{ from } INNER JOIN ( { value_facts } ) g ON { value_condition }|.
+    IF with_empty = abap_false AND tuple_filters = filters AND values IS NOT INITIAL.
+      from = |{ from } INNER JOIN ( { top_facts_sql( operands = operands filters = filters values = values ) } ) g| &&
+             | ON { value_condition }|.
     ELSE.
-      DATA(tuple_facts) = top_facts_sql( operands = operands filters = tuple_filters measure = measure ).
-      from = |{ from } INNER JOIN ( { tuple_facts } ) t ON { concat_lines_of( table = tuple_join sep = ` AND ` ) }| &&
-             | LEFT JOIN ( { value_facts } ) g ON { value_condition }|.
+      IF with_empty = abap_false.
+        from = |{ from } INNER JOIN ( { top_facts_sql( operands = operands filters = tuple_filters values = VALUE #( ) ) } )| &&
+               | t ON { concat_lines_of( table = tuple_join sep = ` AND ` ) }|.
+      ENDIF.
+      IF values IS NOT INITIAL.
+        from = |{ from } LEFT JOIN ( { top_facts_sql( operands = operands filters = filters values = values ) } ) g| &&
+               | ON { value_condition }|.
+      ENDIF.
     ENDIF.
-    INSERT |g."V" { COND string( WHEN top = abap_true THEN `DESC NULLS LAST` ELSE `ASC NULLS FIRST` ) }|
-           INTO order_by INDEX 1.
+    DATA(order_by) = VALUE string_table( ).
+    LOOP AT items INTO item.
+      DATA(direction) = COND string( WHEN item-descending = abap_true THEN `DESC NULLS LAST` ELSE `ASC NULLS FIRST` ).
+      IF item-operand = 0.
+        APPEND |g."V{ line_index( values[ table_line = item-measure ] ) }" { direction }| TO order_by.
+        CONTINUE.
+      ENDIF.
+      DATA(key_column) = |m{ item-operand }."C{ item-level }"|.
+      " OrderKey of a level with an ordinal column: the ordinal (RolapMemberBase.getOrderKey), then the key
+      DATA(ordered_level) = hierarchies[ operands[ item-operand ]-hierarchy ]-levels[ item-level ].
+      IF ordered_level-ordinal_column IS NOT INITIAL.
+        APPEND |m{ item-operand }."O{ item-level }" { direction }| TO order_by.
+      ENDIF.
+      IF zzxxmla1_cl_model=>is_numeric_level( hierarchy = hierarchies[ operands[ item-operand ]-hierarchy ]
+                                              level_no  = item-level ) = abap_false.
+        " Util.caseSensitiveCompareName: ignoring case, then with case
+        APPEND |LOWER( { key_column } ) { direction }| TO order_by.
+      ENDIF.
+      APPEND |{ key_column } { direction }| TO order_by.
+    ENDLOOP.
+    APPEND LINES OF hierarchy_order TO order_by.
     DATA(sql) = |SELECT { concat_lines_of( table = outer_columns sep = `, ` ) } FROM { from }| &&
-                | ORDER BY { concat_lines_of( table = order_by sep = `, ` ) } LIMIT { count }|.
+                | ORDER BY { concat_lines_of( table = order_by sep = `, ` ) }| &&
+                COND string( WHEN limit > 0 THEN | LIMIT { limit }| ).
     READ TABLE top_answers INTO DATA(answer) WITH TABLE KEY sql = sql.
     IF sy-subrc = 0.
       result = answer-paths.

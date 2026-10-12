@@ -21,6 +21,9 @@ CLASS ltc_model DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
     METHODS properties FOR TESTING.
     "! order keys compare as the database orders the keys: numbers by value, the empty key first
     METHODS order_key FOR TESTING.
+    "! a level with an ordinal column (a room by its compound key, keyed by the SID): its order key has the
+    "! ordinal's, then the key's; the conditions of Lag/Lead and ranges compare the ordinal first
+    METHODS ordinal_column FOR TESTING.
     METHODS hierarchy
       IMPORTING name_column   TYPE string OPTIONAL
       RETURNING VALUE(result) TYPE zzxxmla1_cl_model=>ty_hierarchy.
@@ -75,6 +78,34 @@ CLASS ltc_model IMPLEMENTATION.
       ( level_no = 3 key = `16` name = `16` path = |USA{ tab }Seattle{ tab }16|
         unique_name = `[Store].[USA].[Seattle].[16]` parent = `[Store].[USA].[Seattle]`
         order_key = |{ seattle }{ tab }0P0216| ) ) ).
+  ENDMETHOD.
+
+  METHOD ordinal_column.
+    DATA(rooms) = VALUE zzxxmla1_cl_model=>ty_hierarchy(
+      dim_name = `Room` hier_name = `Room` unique_name = `[Room]` has_all = abap_true dim_table = `V_ROOM`
+      levels   = VALUE #( ( level_no = 1 level_name = `Room` key_column = `SID` name_column = `COMPOUND_KEY`
+                            ordinal_column = `COMPOUND_KEY` data_type = `Numeric` unique_members = abap_true ) ) ).
+    " the key and the name, which is the ordinal too (read once): SID 7 is NORTH/R05, loaded after SOUTH/R01 (SID 3)
+    DATA(members) = zzxxmla1_cl_model=>members_of_rows(
+      hierarchy = rooms
+      rows      = VALUE #( ( VALUE #( ( `7` ) ( `NORTH/R05` ) ) )
+                           ( VALUE #( ( `3` ) ( `SOUTH/R01` ) ) ) ) ).
+    DATA(tab) = zzxxmla1_cl_model=>c_separator.
+    cl_abap_unit_assert=>assert_equals(
+      act = VALUE string_table( FOR m IN members ( |{ m-key } { m-name } { m-order_key }| ) )
+      exp = VALUE string_table( ( |7 NORTH/R05 { tab }0NORTH/R05{ tab }0P017| )
+                                ( |3 SOUTH/R01 { tab }0SOUTH/R01{ tab }0P013| ) ) ).
+    " an ordinal column of its own: read after the key, before the name
+    rooms-levels[ 1 ]-name_column = `ZCLROOM`.
+    members = zzxxmla1_cl_model=>members_of_rows( hierarchy = rooms
+                                                  rows      = VALUE #( ( VALUE #( ( `7` ) ( `NORTH/R05` ) ( `R05` ) ) ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = |{ members[ 1 ]-name } { members[ 1 ]-order_key }|
+                                        exp = |R05 { tab }0NORTH/R05{ tab }0P017| ).
+    rooms-levels[ 1 ]-name_column = `COMPOUND_KEY`.
+    cl_abap_unit_assert=>assert_equals(
+      act = zzxxmla1_cl_model=>order_condition( hierarchy = rooms level_no = 1 path = `7` operator = `>` )
+      exp = `( ( ( "COMPOUND_KEY" > ( SELECT MAX( "COMPOUND_KEY" ) FROM "V_ROOM" WHERE "SID" = '7' ) OR ` &&
+            `( "COMPOUND_KEY" = ( SELECT MAX( "COMPOUND_KEY" ) FROM "V_ROOM" WHERE "SID" = '7' ) AND "SID" > '7' ) ) ) )` ).
   ENDMETHOD.
 
   METHOD name_column.

@@ -29,6 +29,7 @@ CLASS ltc_api DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
     METHODS catalog_already_there FOR TESTING RAISING cx_static_check.
     METHODS catalog_of_another_file FOR TESTING.
     METHODS catalog_names FOR TESTING.
+    METHODS fact_view_mapped FOR TESTING RAISING cx_static_check.
     METHODS tables_mapped FOR TESTING RAISING cx_static_check.
     METHODS outline FOR TESTING RAISING cx_static_check.
     METHODS accept_unreadable_schema FOR TESTING.
@@ -154,9 +155,11 @@ CLASS ltc_api IMPLEMENTATION.
   METHOD tables_mapped.
     DATA(schema) = zzxxmla1_cl_schema_def=>parse( schema_xml( ) ).
     DATA(names) = api->map_tables( CHANGING schema = schema ).
-    cl_abap_unit_assert=>assert_equals( act = names exp = VALUE string_table( ( `ZZXXMLA1_C_ZFMSTORE` ) ( `ZZXXMLA1V0000004` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = names exp = VALUE string_table( ( `ZZXXMLA1_C_ZFMSTORE` ) ( `/BIC/FZFMSALES` )
+                                                                              ( `ZZXXMLA1V0000004` ) ) ).
     cl_abap_unit_assert=>assert_equals( act = api->characteristic_of( names[ 1 ] ) exp = `ZFMSTORE` ).
     cl_abap_unit_assert=>assert_initial( api->characteristic_of( names[ 2 ] ) ).
+    cl_abap_unit_assert=>assert_initial( api->characteristic_of( names[ 3 ] ) ).
 
     api->map_tables( EXPORTING views  = VALUE #( ( characteristic = 'ZFMSTORE' ddl_name = 'ZZXXMLA1_C_ZFMSTORE'
                                                    view_name = 'ZZXXMLA1V0000003' ) )
@@ -164,6 +167,21 @@ CLASS ltc_api IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = schema-dimensions[ 1 ]-table exp = `ZZXXMLA1V0000003` ).
     DATA(xml) = zzxxmla1_cl_schema_def=>to_xml( schema ).
     cl_abap_unit_assert=>assert_char_cp( act = xml exp = `*table="ZZXXMLA1V0000003"*table="ZZXXMLA1V0000004"*` ).
+  ENDMETHOD.
+
+  METHOD fact_view_mapped.
+    " an aDSO with a compounded characteristic: its fact view is generated on accept, as the views are
+    DATA(schema) = zzxxmla1_cl_schema_def=>parse( replace( val = schema_xml( ) sub = `/BIC/FZFMSALES`
+                                                           with = `ZZXXMLA1_F_ZFMSALESA` ) ).
+    DATA(names) = api->map_tables( CHANGING schema = schema ).
+    cl_abap_unit_assert=>assert_equals( act = names[ 2 ] exp = `ZZXXMLA1_F_ZFMSALESA` ).
+    cl_abap_unit_assert=>assert_equals( act = api->characteristic_of( names[ 2 ] ) exp = `ZFMSALESA` ).
+    api->map_tables( EXPORTING views  = VALUE #( ( characteristic = 'ZFMSALESA' ddl_name = 'ZZXXMLA1_C0000099'
+                                                   view_name = 'ZZXXMLA1V0000099' ) )
+                     CHANGING  schema = schema ).
+    DATA(fact) = CAST zzxxmla1_cl_schema_def=>ty_table( schema-cubes[ 1 ]-fact-def ).
+    cl_abap_unit_assert=>assert_equals( act = fact->name
+                                        exp = `ZZXXMLA1V0000099` ).
   ENDMETHOD.
 
   METHOD outline.

@@ -26,6 +26,9 @@ CLASS ltc_schema DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT
     METHODS properties FOR TESTING RAISING cx_static_check.
     "! an attribute keyed by the SID and named by the value (NameColumn): its hierarchy and a level over it
     METHODS name_column FOR TESTING RAISING cx_static_check.
+    "! the members' order: an attribute's OrderByColumn (on its hierarchy and on a level over it), a level's
+    "! ordinalColumn, orderBy="Name"; none where it is the key
+    METHODS ordinal_column FOR TESTING RAISING cx_static_check.
     METHODS read
       IMPORTING xml           TYPE string
       RETURNING VALUE(result) TYPE REF TO zzxxmla1_cl_schema
@@ -61,6 +64,35 @@ CLASS ltc_schema IMPLEMENTATION.
     DATA(attribute) = schema->levels( cube = `Sales` dim = `Store` hier = `Store` ).
     cl_abap_unit_assert=>assert_equals( act = lines( attribute ) exp = 1 ).
     cl_abap_unit_assert=>assert_equals( act = attribute[ 1 ]-name_column exp = `STORE` ).
+  ENDMETHOD.
+
+  METHOD ordinal_column.
+    DATA(schema) = read(
+      `<Schema name="S">` &&
+      `  <Dimension name="Room" table="V_ROOM">` &&
+      `    <DimensionAttribute name="Room" usage="Key"><KeyColumn dataType="Integer" columnName="SID"/>` &&
+      `      <OrderByColumn dataType="String" columnName="COMPOUND_KEY"/>` &&
+      `      <NameColumn dataType="String" columnName="COMPOUND_KEY"/></DimensionAttribute>` &&
+      `    <DimensionAttribute name="Site" orderBy="Name"><KeyColumn dataType="String" columnName="SITE"/>` &&
+      `      <NameColumn dataType="String" columnName="SITE_TXT"/></DimensionAttribute>` &&
+      `    <DimensionAttribute name="Type" orderBy="Key"><KeyColumn dataType="String" columnName="RTYPE"/>` &&
+      `      </DimensionAttribute>` &&
+      `    <Hierarchy name="Rooms" hasAll="true"><Level name="Site" column="SITE" ordinalColumn="SITE_TXT"/>` &&
+      `      <Level name="Room" sourceAttribute="Room"/></Hierarchy>` &&
+      `  </Dimension>` &&
+      `  <Cube name="Visits"><Table name="F"/>` &&
+      `    <DimensionUsage name="Room" source="Room" foreignKey="SID_ROOM"/>` &&
+      `    <Measure name="Visits" column="VISITS" aggregator="sum"/></Cube>` &&
+      `</Schema>` ).
+    DATA(levels) = schema->levels( cube = `Visits` dim = `Room` hier = `Rooms` ).
+    cl_abap_unit_assert=>assert_equals( act = levels[ 1 ]-ordinal_column exp = `SITE_TXT` ).
+    cl_abap_unit_assert=>assert_equals( act = levels[ 2 ]-ordinal_column exp = `COMPOUND_KEY` ).
+    DATA(room) = schema->levels( cube = `Visits` dim = `Room` hier = `Room` ).
+    cl_abap_unit_assert=>assert_equals( act = room[ 1 ]-ordinal_column exp = `COMPOUND_KEY` ).
+    DATA(site) = schema->levels( cube = `Visits` dim = `Room` hier = `Site` ).
+    cl_abap_unit_assert=>assert_equals( act = site[ 1 ]-ordinal_column exp = `SITE_TXT` ).
+    DATA(type) = schema->levels( cube = `Visits` dim = `Room` hier = `Type` ).
+    cl_abap_unit_assert=>assert_initial( type[ 1 ]-ordinal_column ).
   ENDMETHOD.
 
   METHOD attribute_model.
@@ -205,7 +237,8 @@ CLASS ltc_schema IMPLEMENTATION.
       CATCH zzxxmla1_cx_xmla INTO DATA(fault).
         cl_abap_unit_assert=>assert_equals( act = fault->description
                                             exp = |olap4abap Error:Hierarchy 'D' of dimension 'D', level 'L': only a key | &&
-                                                  |column and a name column of the dimension's table are supported| ).
+                                                  |column, a name column and an ordinal column of the dimension's table | &&
+                                                  |are supported| ).
     ENDTRY.
     TRY.
         read( |<Schema name="S">{ dimension }<Hierarchy hasAll="true"><Level name="L" sourceAttribute="X"/>| &&

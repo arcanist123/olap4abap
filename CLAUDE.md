@@ -93,7 +93,12 @@ Read before designing anything:
   hierarchy `<char>__<attribute>` per navigation attribute the provider switches on; no attribute hierarchies, no
   user hierarchies (the user makes them in the UI); a default drill-through action with each characteristic's value
   and text, which the UI's "Double-click columns" adjusts. The views (`ZZXXMLA1_CL_BW_VIEW_GEN`, one per basic
-  characteristic) carry the EN texts and the time-dependent attributes at 9999-12-31. The UI (`web/schema/`, Preact with htm, no build step) is served from
+  characteristic) carry the EN texts and the time-dependent attributes at 9999-12-31. A compounded characteristic
+  (`0FISCPER` with `0FISCVARNT`) is named and ordered by `COMPOUND_KEY` of its view (`K4/2024001`, `#/#`; the key
+  attribute's `NameColumn` and `OrderByColumn`), and an aDSO with one is read from its fact view
+  (`ZZXXMLA1_CL_BW_VIEW_GEN=>generate_fact_view`: the reporting view with `SID_<field>` per compounded characteristic,
+  placeholder `ZZXXMLA1_F_<aDSO>` until accept), so it is keyed by the SID as on an InfoCube
+  (`docs/bw-schema-design-guide.md`, section 3.7). The UI (`web/schema/`, Preact with htm, no build step) is served from
   the code below `/schema/` by `ZZXXMLA1_CL_WEB_APP`: the generated class `ZZXXMLA1_CL_WEB_APP_FILES` has a method per
   file returning its text (`scripts/generate-web-app-abap.py`, run after every change of `web/schema/`, then
   `sap-write.py` the class; nothing is uploaded or written by the setup); it
@@ -175,7 +180,11 @@ Read before designing anything:
   too (the reference reads all children there). `TopCount`/`BottomCount` by a stored measure of a crossjoin (`CrossJoin`
   or `*`) of level members, `Children` or `Descendants` is native (`RolapNativeTopCount`, `native_top_count`,
   `ZZXXMLA1_CL_MDX_FACTS=>top_count`): the members' crossjoin left-joined to the grouped facts, ordered by the value
-  and limited in HANA (`docs/next-steps.md`, step 9). Execute
+  and limited in HANA (`docs/next-steps.md`, step 9). `Order` with `BASC`/`BDESC` keys that are the `OrderKey` of a
+  current member (or of its `Ancestor` at a level) or a stored measure (also through calculated measures that only
+  name it) of a set the native crossjoin reads (also through named sets and an identity `Generate`) is native too, our
+  extension (`native_order`, `ZZXXMLA1_CL_MDX_FACTS=>ordered_paths`), and `Head` of it is its `LIMIT`; any other
+  `Order` sorts in ABAP, break keys evaluated once per tuple into a table and the indexes merge-sorted (step 8). Execute
   answers carry the query's `DIMENSION PROPERTIES` (olap4j's standard member properties) and `CELL PROPERTIES`.
   Subselects (`FROM (SELECT ... FROM ...)`, Excel's pivot filters) are eMondrian's subcube: the axes of every inner
   SELECT become a predicate that every fact read adds (`Query.getSubcubePredicates`, `ZZXXMLA1_CL_MDX_FACTS=>set_subcube`),
@@ -211,7 +220,8 @@ Read before designing anything:
   the schema builder's old copies below `/schema/` and, if there is none, writes a
   `/WEB-INF/datasources.xml` without catalogs; with its checkbox also the clinic demo (`docs/clinic-demo.md`): InfoCube
   `ZCLVISIT` and aDSO `ZCLVISITA` with made-up visits of patients to a clinic, their schemas and catalogs
-  (`ZZXXMLA1_CL_BW_CLINIC_GEN`). The clinic demo is the project's own demo data; FoodMart stays the test source.
+  (`ZZXXMLA1_CL_BW_CLINIC_GEN`); its room `ZCLROOM` is compounded with the site `ZCLSITE`. The clinic demo is the
+  project's own demo data; FoodMart stays the test source.
   For looking into BW's analysis authorizations its physician `ZCLDOC` is authorization relevant and has two
   hierarchies, `ZCLDOC_ORG` and `ZCLDOC_SITE` (two names are needed for authorization tests): version dependent,
   entire hierarchy time dependent, two versions of two time slices each; the diagnosis `ZCLDIAG` is authorization

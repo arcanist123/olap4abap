@@ -54,6 +54,8 @@ CLASS ltc_bw_provider IMPLEMENTATION.
                                                                                         datatype = `NUMC`
                                                                                         length   = 10 ) ).
     cl_abap_unit_assert=>assert_equals( act = store-has_sids exp = abap_true ).
+    cl_abap_unit_assert=>assert_false( store-fact_sid ).
+    cl_abap_unit_assert=>assert_initial( store-name_column ).
     cl_abap_unit_assert=>assert_equals( act = store-basic exp = `ZFMSTORE` ).
     cl_abap_unit_assert=>assert_equals( act = store-view exp = `ZZXXMLA1V0000003` ).
     cl_abap_unit_assert=>assert_equals( act = store-key_column-name exp = `ZFMSTORE` ).
@@ -110,6 +112,14 @@ CLASS ltc_bw_provider IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = VALUE string_table( FOR a IN product-attributes ( |{ a-iobjnm } { a-navigation }| ) )
                                         exp = VALUE string_table( ( `0D_NW_PRDCT X` ) ( `0D_NW_PRDGP X` ) ) ).
     cl_abap_unit_assert=>assert_false( xsdbool( line_exists( provider-notes[ iobjnm = `0D_NW_PRDGP` ] ) ) ).
+    " the region is compounded with the country: named by both
+    DATA(region) = provider-characteristics[ iobjnm = `0D_NW_REGIO` ].
+    cl_abap_unit_assert=>assert_equals( act = region-name_column
+                                        exp = VALUE zzxxmla1_cl_bw_provider=>ty_column( name     = `COMPOUND_KEY`
+                                                                                        datatype = `CHAR`
+                                                                                        length   = 7 ) ).
+    cl_abap_unit_assert=>assert_true( region-fact_sid ).
+    cl_abap_unit_assert=>assert_initial( code-name_column ).
   ENDMETHOD.
 
   METHOD unknown_provider.

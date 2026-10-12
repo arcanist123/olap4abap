@@ -24,6 +24,11 @@ on a test system: the visits are thinned evenly over the days, so every day keep
   code; name in plain words, group, chapter), visit type `ZCLVTYPE` (care setting), date `ZCLDATE` (`YYYYMMDD`; the date
   text, day and month names, year, quarter, month, week counted from 1 January, day of month). The date is a plain
   characteristic, as FoodMart's `ZFMDATE`, so it can carry attributes.
+- The site `ZCLSITE` (`NORTH`, `SOUTH`; city) and the room `ZCLROOM` (room type), **compounded** with the site: R01 to
+  R04 are at both sites, R05 only in the north, so a room is a member only with its site, `[Room].[NORTH/R01]`
+  (`docs/bw-schema-design-guide.md`, section 3.7). The south rooms are loaded first, so their SIDs come before the
+  north ones and the members' order (by name, `OrderByColumn`) differs from the SIDs'. The aDSO is read through its
+  fact view (the SID of the room, `ZZXXMLA1_CL_BW_VIEW_GEN=>generate_fact_view`), which a run deletes before the aDSO.
 - The physician `ZCLDOC` is **authorization relevant** and has two hierarchies, `ZCLDOC_ORG` and `ZCLDOC_SITE`, and
   the diagnosis `ZCLDIAG` is authorization relevant too, with the hierarchy `ZCLDIAG_ICD` (see below), for working
   with BW's analysis authorizations, also in combination. BW's own queries on `ZCLVISIT`/`ZCLVISITA` (RSRT, BEx,
@@ -114,6 +119,9 @@ BW's blank member (the initial key, SID 0) is in every hierarchy, and a few visi
 recorded yet, some emergency visits have no physician (triage) or an unidentified patient, 0.5% no visit type. Time has
 no blank visits.
 
+The site and the room come from the physician (even: north, odd: south) and the patient (the room), so they draw no
+random number and the visits stay as they were; a visit without physician has neither (`#/#`).
+
 ## The schemas
 
 The generator writes the schemas itself, by the rules of the proposal (`docs/schema-generator.md`): on the cube a
@@ -125,6 +133,8 @@ dimension is keyed by the SID of its view and named by the value, on the aDSO ke
 | Physician | Department > Physician (property Years in Practice) | |
 | Diagnosis | Chapter > Group > Diagnosis | the group Influenza has one diagnosis |
 | Visit Type | Care Setting > Visit Type | |
+| Site | none (property City) | |
+| Room | none (properties Room Key, Room Type) | keyed by the SID on both providers (the aDSO's fact view), named and ordered by `COMPOUND_KEY` (`NORTH/R01`) |
 | Time (cube) | Year > Quarter > Month (named by the month) > Day, without All member, default `[Time].[2025]`; `Weekly`: Year > Week > Day | `TimeDimension` |
 | Year, Quarter, Month, Week (aDSO) | none | one dimension per time characteristic, which have no attributes |
 

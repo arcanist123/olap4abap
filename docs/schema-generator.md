@@ -130,7 +130,9 @@ BW has; no dimension is built on the fact table's own columns, and the proposal 
 
 Also: `ZZXXMLA1_CL_SCHEMA` gives an attribute hierarchy the attribute's name as `hier_name`, so an attribute named like
 its dimension and an unnamed `Hierarchy` of that dimension share it; the UI warns about it (and about a second unnamed
-hierarchy). Compounded characteristics are named by their own key only (the key alone is not unique).
+hierarchy). Compounded characteristics are named by their compounding and their key (`COMPOUND_KEY` of the view,
+`K4/2024001`), ordered by these names (`OrderByColumn`), and an aDSO with one is read from its fact view, keyed by the
+SID (`bw-schema-design-guide.md`, section 3.7).
 
 ## The API (step 4)
 

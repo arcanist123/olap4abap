@@ -18,7 +18,9 @@
 "!   attribute CHARACTERISTIC SID (an InfoCube's, keyed by the view's SID, the fact table's SID column being the
 "!   foreign key) or CHARACTERISTIC Key (an aDSO's, keyed by the value, the fact column), both named by the internal
 "!   BW key; on an InfoCube the value as attribute CHARACTERISTIC Key too; the text CHARACTERISTIC Text; each
-"!   attribute and its text.
+"!   attribute and its text. A compounded characteristic is keyed by the SID on an aDSO too (its fact view's,
+"!   ZZXXMLA1_CL_BW_PROVIDER) and named by its compounding and key (K4/2024001) and ordered by these names, its key a member property Key
+"!   (docs/bw-schema-design-guide.md, section 3.7);
 "! - its first Hierarchy, unnamed so that it is the dimension's default, is flat: All and one level of the
 "!   characteristic, with the text as member property Text and every display attribute (and navigation attribute
 "!   the provider does not switch on) as member properties, key and text;
@@ -136,10 +138,11 @@ CLASS zzxxmla1_cl_schema_proposal DEFINITION
     METHODS write_drill_through.
     "! Writes a DimensionAttribute of one column, not an attribute hierarchy.
     METHODS write_attribute
-      IMPORTING name        TYPE string
-                key_column  TYPE zzxxmla1_cl_bw_provider=>ty_column
-                name_column TYPE zzxxmla1_cl_bw_provider=>ty_column OPTIONAL
-                usage       TYPE string OPTIONAL.
+      IMPORTING name            TYPE string
+                key_column      TYPE zzxxmla1_cl_bw_provider=>ty_column
+                name_column     TYPE zzxxmla1_cl_bw_provider=>ty_column OPTIONAL
+                order_by_column TYPE zzxxmla1_cl_bw_provider=>ty_column OPTIONAL
+                usage           TYPE string OPTIONAL.
     "! Writes a flat Hierarchy: All and one level, the level's text as property Text.
     METHODS open_hierarchy
       IMPORTING name           TYPE string OPTIONAL
@@ -235,6 +238,13 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
       note( iobjnm = characteristic-iobjnm reason = `no SID table, so no view` ).
       RETURN.
     ENDIF.
+    " a compounded characteristic joined by its value would count a fact once per compounding value
+    DATA(compounded) = xsdbool( characteristic-name_column IS NOT INITIAL ).
+    DATA(by_sid) = xsdbool( kind = zzxxmla1_cl_bw_provider=>c_kind-cube OR characteristic-fact_sid = abap_true ).
+    IF compounded = abap_true AND by_sid = abap_false.
+      note( iobjnm = characteristic-iobjnm reason = `compounded, and the facts have no SID of it` ).
+      RETURN.
+    ENDIF.
     result = characteristic-iobjnm.
     DATA(table) = COND string( WHEN characteristic-view IS NOT INITIAL THEN characteristic-view
                                ELSE zzxxmla1_cl_bw_view_gen=>placeholder( characteristic-basic ) ).
@@ -242,16 +252,19 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
                                                    ( name = `caption` value = characteristic-text )
                                                    ( name = `table` value = table ) ) ).
 
-    " the key attribute: keyed by the SID on an InfoCube, by the value on an aDSO, named by the internal BW key
-    DATA(key) = COND string( WHEN kind = zzxxmla1_cl_bw_provider=>c_kind-cube THEN |{ result } SID|
-                             ELSE |{ result } Key| ).
-    " the value as an attribute of its own on an InfoCube too: the drill-through reads a column by its attribute
+    " the key attribute: keyed by the SID where the facts have it (an InfoCube's, an aDSO's compounded characteristic),
+    " else by the value; named by the internal BW key, a compounded one by its compounding and its key
+    DATA(key) = COND string( WHEN by_sid = abap_true THEN |{ result } SID| ELSE |{ result } Key| ).
+    " the value as an attribute of its own when keyed by the SID: the drill-through reads a column by its attribute
     DATA(value) = |{ result } Key|.
-    IF kind = zzxxmla1_cl_bw_provider=>c_kind-cube.
+    IF by_sid = abap_true.
       write_attribute( name        = key
                        usage       = `Key`
                        key_column  = VALUE #( name = `SID` datatype = `INT4` length = 10 )
-                       name_column = characteristic-key_column ).
+                       name_column = COND #( WHEN compounded = abap_true THEN characteristic-name_column
+                                             ELSE characteristic-key_column )
+                       " a compounded one in the order of its names: the SIDs are in the order BW made them
+                       order_by_column = COND #( WHEN compounded = abap_true THEN characteristic-name_column ) ).
       write_attribute( name = value key_column = characteristic-key_column ).
     ELSE.
       write_attribute( name = key usage = `Key` key_column = characteristic-key_column ).
@@ -276,6 +289,9 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
 
     " the characteristic: flat, the other attributes as properties
     open_hierarchy( caption = characteristic-text level = result attribute = key text_attribute = text ).
+    IF compounded = abap_true.
+      property( name = `Key` caption = |{ characteristic-text } (Key)| attribute = value ).
+    ENDIF.
     LOOP AT characteristic-attributes INTO attribute WHERE navigation = abap_false.
       property( name = attribute-iobjnm caption = attribute-text attribute = attribute-iobjnm ).
       IF attribute-text_column IS NOT INITIAL.
@@ -304,6 +320,10 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
                                                             ( name = `attributeHierarchyEnabled` value = `false` ) ) ).
     leaf( name = `KeyColumn` attributes = VALUE #( ( name = `dataType` value = data_type( key_column ) )
                                                    ( name = `columnName` value = key_column-name ) ) ).
+    IF order_by_column IS NOT INITIAL.
+      leaf( name = `OrderByColumn` attributes = VALUE #( ( name = `dataType` value = data_type( order_by_column ) )
+                                                         ( name = `columnName` value = order_by_column-name ) ) ).
+    ENDIF.
     IF name_column IS NOT INITIAL.
       leaf( name = `NameColumn` attributes = VALUE #( ( name = `dataType` value = data_type( name_column ) )
                                                       ( name = `columnName` value = name_column-name ) ) ).

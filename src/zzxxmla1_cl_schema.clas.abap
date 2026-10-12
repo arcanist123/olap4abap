@@ -90,6 +90,7 @@ CLASS zzxxmla1_cl_schema DEFINITION
         caption        TYPE string,
         key_column     TYPE string,
         name_column    TYPE string,   " the member names; the key column if the level has no name column
+        "! the members' order (a level's ordinalColumn, an attribute's OrderByColumn); initial: the key's
         ordinal_column TYPE string,
         data_type      TYPE string,   " Numeric or String
         unique_members TYPE abap_bool,
@@ -260,6 +261,11 @@ CLASS zzxxmla1_cl_schema DEFINITION
       RAISING   zzxxmla1_cx_xmla.
     "! The column that names an attribute's members: its NameColumn, else its KeyColumn.
     CLASS-METHODS attribute_name_column
+      IMPORTING attribute     TYPE zzxxmla1_cl_schema_def=>ty_dimension_attribute
+      RETURNING VALUE(result) TYPE string.
+    "! The column an attribute's members are ordered by (RolapDimension.resolveOrdinalColumn): its OrderByColumn, else
+    "! the column orderBy names (Key, Name); initial if that is the key column or there is none.
+    CLASS-METHODS attribute_ordinal_column
       IMPORTING attribute     TYPE zzxxmla1_cl_schema_def=>ty_dimension_attribute
       RETURNING VALUE(result) TYPE string.
     "! A column type as the type of a level: Numeric or String.
@@ -497,6 +503,7 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
                       caption        = hier_name
                       key_column     = attribute-key_column->column_name
                       name_column    = attribute_name_column( attribute )
+                      ordinal_column = attribute_ordinal_column( attribute )
                       data_type      = data_type( attribute-key_column->data_type )
                       unique_members = abap_true
                       level_type     = level_type( attribute-level_type ) ) TO all_levels.
@@ -533,14 +540,15 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
       IF level-parent_column IS NOT INITIAL OR level-parent_exp IS BOUND OR level-closure IS BOUND
           OR level-key_exp IS BOUND OR level-name_exp IS BOUND
           OR level-caption_exp IS BOUND OR level-ordinal_exp IS BOUND OR level-caption_column IS NOT INITIAL
-          OR level-ordinal_column IS NOT INITIAL OR level-member_formatter IS BOUND OR level-formatter IS NOT INITIAL
+          OR level-member_formatter IS BOUND OR level-formatter IS NOT INITIAL
           OR ( level-hide_member_if IS NOT INITIAL AND level-hide_member_if <> `Never` )
           OR ( level-table IS NOT INITIAL AND level-table <> dimension-table ).
-        fail( |{ where }, level '{ level-name }': only a key column and a name column of the dimension's table | &&
-              |are supported| ).
+        fail( |{ where }, level '{ level-name }': only a key column, a name column and an ordinal column of the | &&
+              |dimension's table are supported| ).
       ENDIF.
       DATA(key_column) = level-column.
       DATA(name_column) = level-name_column.
+      DATA(ordinal_column) = level-ordinal_column.
       DATA(type) = level-type.
       IF level-source_attribute IS NOT INITIAL.
         " RolapLevel.createFromXml: the attribute gives the key column and its type
@@ -552,6 +560,10 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
         type = attribute-key_column->data_type.
         IF name_column IS INITIAL AND attribute-name_column IS BOUND.
           name_column = attribute-name_column->column_name.
+        ENDIF.
+        " RolapLevel: the attribute's OrderByColumn is the level's ordinal
+        IF attribute-order_by_column IS BOUND.
+          ordinal_column = attribute-order_by_column->column_name.
         ENDIF.
       ENDIF.
       IF key_column IS INITIAL.
@@ -565,6 +577,7 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
                       caption        = COND #( WHEN level-caption IS NOT INITIAL THEN level-caption ELSE level-name )
                       key_column     = key_column
                       name_column    = COND #( WHEN name_column IS NOT INITIAL THEN name_column ELSE key_column )
+                      ordinal_column = COND #( WHEN ordinal_column <> key_column THEN ordinal_column )
                       data_type      = data_type( type )
                       unique_members = level-unique_members
                       level_type     = level_type( level-level_type )
@@ -661,6 +674,17 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
   METHOD attribute_name_column.
     result = COND #( WHEN attribute-name_column IS BOUND THEN attribute-name_column->column_name
                      ELSE attribute-key_column->column_name ).
+  ENDMETHOD.
+
+  METHOD attribute_ordinal_column.
+    IF attribute-order_by_column IS BOUND.
+      result = attribute-order_by_column->column_name.
+    ELSEIF attribute-order_by = `Name`.
+      result = attribute_name_column( attribute ).
+    ENDIF.
+    IF attribute-key_column IS BOUND AND result = attribute-key_column->column_name.
+      CLEAR result.
+    ENDIF.
   ENDMETHOD.
 
   METHOD data_type.

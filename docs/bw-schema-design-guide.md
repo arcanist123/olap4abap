@@ -176,6 +176,55 @@ only declared properties: the member key is not offered, which is why the text a
 - **BW's "not assigned" value (SID 0)** is a member with an empty key; it appears without `NON EMPTY`.
 - **Hierarchy unique names** of non-default hierarchies are `[Dimension.Hierarchy]`, not `[Dimension].[Hierarchy]`.
 
+### 3.7 Compounded characteristics
+
+Built 2026-10-12 (`next-steps.md`, compounded characteristics). A compounded characteristic (`0FISCPER` with
+`0FISCVARNT`, `0D_NW_REGIO` with `0D_NW_CNTRY`, a cost centre with its controlling area) is unique only by all its key
+fields: period `2024001` exists under fiscal year variant K4 and under V3. The SID is unique; its own key is not.
+
+- **InfoCube:** the facts hold the SID and the dimension is keyed and joined by it, so cells are right. Named by its
+  own key only, the members' unique names would collide (`[0FISCPER].[2024001]` twice).
+- **aDSO:** the facts hold the value. Keyed and joined by the own key, a fact would match the view's row of every
+  compounding value and be counted once per variant, in cells and in the native crossjoin, `TopCount` and `Order`
+  (the clinic aDSO's rooms: 64,516 visits instead of 33,956).
+
+The model, for both kinds of provider:
+
+| | Compounded characteristic | Every other characteristic |
+|---|---|---|
+| Key (join) | `SID` | InfoCube `SID`, aDSO the value |
+| aDSO fact table | the aDSO's fact view: `/BIC/A<adso>7` with `SID_<field>` from a left outer join to the SID table on all key fields | the reporting view's field (in the fact view if the aDSO has one) |
+| Name | `COMPOUND_KEY` of the characteristic's view: the compounding keys and the own key, separated by `/` (`K4/2024001`); BW's initial value is `#`, so `#/#` | the own key |
+| Order | `COMPOUND_KEY` as `OrderByColumn` of the key attribute: SIDs are in the order BW made them | the key |
+| Member properties | `Key` (the own key), `Text` | `Text` |
+
+```sql
+-- the aDSO's fact view (ZZXXMLA1_CL_BW_VIEW_GEN), only if the aDSO has a compounded characteristic
+SELECT a.reqtsn AS REQTSN, ..., a./bic/zclroom AS ZCLROOM, ..., s1.sid AS SID_ZCLROOM
+FROM /bic/azclvisita7 AS a
+LEFT OUTER JOIN /bic/szclroom AS s1 ON s1./bic/zclsite = a./bic/zclsite AND s1./bic/zclroom = a./bic/zclroom
+```
+
+- The join is a compound join on BW's own key fields, inside the fact view; the engine joins on the integer SID as on
+  an InfoCube, and the schema format is the reference's. Only compounded characteristics get a SID column: the
+  others are unique by their value already. HANA's plans on `ZCLVISITA` (2026-10-12): a query without the room has
+  no join to its SID table (pruned); one with it joins the facts to the SID table's index on both key fields.
+- The fact view names every field without namespace (`/BIC/ZCLPAT` is `ZCLPAT`), as the characteristics' views do.
+  It is numbered like them (`ZZXXMLA1V...`), found by its description ("BW aDSO ZCLVISITA: ..."); a proposal names
+  `ZZXXMLA1_F_<aDSO>` until it is generated, which accept does. BW cannot delete an aDSO a view selects from: delete
+  the fact view first (`ZZXXMLA1_CL_BW_VIEW_GEN=>delete_fact_view`).
+- `COMPOUND_KEY` is one CASE with a branch per set of initial values (CDS allows no CASE inside `concat`): two key
+  fields give four branches, three give eight.
+- The compounding characteristic is in the provider anyway (BW requires it) and stays a dimension of its own; slicing
+  by it does not make the names unique.
+- A reference characteristic is compounded if its basic characteristic is. If the aDSO lacks a field of the
+  compounding, the characteristic is not proposed (a note): it would count facts more than once.
+- An aDSO's fact whose value has no SID drops out (the engine inner-joins), as a value missing in the view does.
+
+Not used: a hierarchy with the compounding as a level above (the schemas are flat); a join on generated string
+columns (HANA cannot use them, and NUMC values are numbers in the views but text in the facts); keys of several
+columns (not in the reference's schema format).
+
 ## 4. Views
 
 The generated views (`ZZXXMLA1_CL_BW_VIEW_GEN`, one per basic characteristic) follow these rules: SID, the key with
@@ -262,9 +311,8 @@ country ([NWCOMPANY.xml](examples/bw-schema/NWCOMPANY.xml)). Answers on the syst
 | `[0D_NW_SHIP]` with properties | 0000001000 · Adecom SA · GB · 1111: 102,625,813.00 · ... (19 parties) |
 | `[0D_NW_CODE.0D_NW_CODE__0D_NW_CNTRY]` × `[0D_NW_CODE]` | DE / 1111 · FR / 3333 · GB / 2222 · US / 4444, totals 4,674,811,295.00 |
 
-Compounding: `0D_NW_REGIO` is compounded with `0D_NW_CNTRY`, so its key alone is not unique. The SID is unique; name
-the member by both keys, concatenated in the view (`concat_with_space( d_nw_cntry, d_nw_regio, 1 )`), so that unique
-names are unique too. Not tried on the system yet.
+Compounding: `0D_NW_REGIO` is compounded with `0D_NW_CNTRY`, so its key alone is not unique. This is an InfoCube, so
+the SID keeps the cells right; the members are named `DE/11`, `US/CA`, `AR/#`, ... (section 3.7).
 
 ## 6. Measures
 
@@ -320,13 +368,15 @@ Current limits of olap4abap:
     them become hierarchies; an InfoCube switches each on (`RSDDIMEIOBJ`).
   - Captions are built, not BW's: `All <text>` for the All member, `<text> (Text)` for a text property, the
     attribute's text for a navigation attribute's hierarchy ("Country", not "Country of Company").
-  - Compounded characteristics are named by their own key only (section 5); their texts are joined on all key fields.
+  - Compounded characteristics are named by their compounding and their key, keyed by the SID on an aDSO too
+    (its fact view) and ordered by their names (section 3.7). Their texts are joined on all key fields.
 - **Aggregation:** fact queries sum every measure; only `sum` (and the built-in `Fact Count`) are correct. A measure
   with `aggregator="min"` or `"max"` is read as a sum by `ZZXXMLA1_CL_MDX_FACTS` today. Exception aggregation and
   non-cumulative key figures are not supported.
 - **Schema calculated members** (`CalculatedMember` in a cube) are not read; schema `NamedSet`s, virtual cubes, roles
   and parameters are refused.
-- **Not supported in levels:** `captionColumn`, `ordinalColumn` (members are ordered by key), expressions,
-  `parentColumn`, `hideMemberIf`; property formatters.
+- **Not supported in levels:** `captionColumn`, expressions, `parentColumn`, `hideMemberIf`; property formatters.
+  `ordinalColumn` (and an attribute's `OrderByColumn` or `orderBy`) orders the members, the key those of the same
+  ordinal.
 - **`0CALDAY`** has no SID table and is not proposed.
 - One cube per catalog.
