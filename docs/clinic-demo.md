@@ -24,22 +24,28 @@ on a test system: the visits are thinned evenly over the days, so every day keep
   code; name in plain words, group, chapter), visit type `ZCLVTYPE` (care setting), date `ZCLDATE` (`YYYYMMDD`; the date
   text, day and month names, year, quarter, month, week counted from 1 January, day of month). The date is a plain
   characteristic, as FoodMart's `ZFMDATE`, so it can carry attributes.
-- The physician `ZCLDOC` is **authorization relevant** and has the hierarchy `ZCLDOC_ORG` (see below), for working
-  with BW's analysis authorizations. BW's own queries on `ZCLVISIT`/`ZCLVISITA` (RSRT, BEx, Analysis for Office) then
-  need an analysis authorization that covers `ZCLDOC`; olap4abap reads the tables and checks no authorizations.
+- The physician `ZCLDOC` is **authorization relevant** and has two hierarchies, `ZCLDOC_ORG` and `ZCLDOC_SITE`, and
+  the diagnosis `ZCLDIAG` is authorization relevant too, with the hierarchy `ZCLDIAG_ICD` (see below), for working
+  with BW's analysis authorizations, also in combination. BW's own queries on `ZCLVISIT`/`ZCLVISITA` (RSRT, BEx,
+  Analysis for Office) then need an analysis authorization that covers `ZCLDOC` and `ZCLDIAG`; olap4abap reads the
+  tables and checks no authorizations.
 - Key figures: `ZCLVISNO` (1 per visit: the aDSO adds up visits with the same keys, so counting rows would not count
   visits), `ZCLDUR` duration, `ZCLWAIT` waiting time (minutes), `ZCLLABS` lab tests, `ZCLCHRG` charges.
 - The views of the characteristics (`ZZXXMLA1_CL_BW_VIEW_GEN`), the schema files `/WEB-INF/schema/ZCLVISIT.xml` and
   `/WEB-INF/schema/ZCLVISITA.xml` and a catalog for each in `/WEB-INF/datasources.xml` (added once; the setup writes the
   data sources file if there is none).
 
-## The hierarchy of the physicians
+## The hierarchies of the physicians
 
 `ZCLDOC` has hierarchies that are **version dependent** and where the **entire hierarchy is time dependent**
 (`RSDCHABAS`: `HIETABFL`, `HIEVERFL`, `HIENMTFL` set, `HIENDTFL` not; the same time dependency as the SAP demo's
-`0D_NW_PROD`): one hierarchy name, and per version a hierarchy per time slice, each a row of `RSHIEDIR` with its own
-`HIEID`, `DATEFROM` and `DATETO`. The generator loads `ZCLDOC_ORG` through BW's hierarchy interface
-(`RSNDI_SHIE_STRUCTURE_UPDATE4`, then `RSNDI_SHIE_ACTIVATE`; `UPDATE3` dumps on the 2025 system) with four slices:
+`0D_NW_PROD`): per hierarchy name and version a hierarchy per time slice, each a row of `RSHIEDIR` with its own
+`HIEID`, `DATEFROM` and `DATETO`. There are two hierarchy names, for authorization tests that restrict on nodes of
+different hierarchies. A physician's department and site are
+independent, so the nodes of the two cut across each other. The generator loads them through BW's hierarchy interface
+(`RSNDI_SHIE_STRUCTURE_UPDATE4`, then `RSNDI_SHIE_ACTIVATE`; `UPDATE3` dumps on the 2025 system), four slices each.
+
+`ZCLDOC_ORG`, the organization:
 
 | Version | Valid | Structure |
 |---|---|---|
@@ -50,8 +56,51 @@ on a test system: the visits are thinned evenly over the days, so every day keep
 
 The text nodes (`0HIER_NODE`) are named `CLINIC`, `PRIMARY`, `SPECIAL`, `INTMED`, `EMERGENCY` and per department `GP`,
 `PED`, `CARD`, `PULM`, `ORTH`, `DERM`, `EMER`; the leaves are the physicians' keys. The attribute Department stays as in
-the master data (it is not time dependent), so in 2025 it differs from the hierarchy for `008` and `011`. The run
-deletes the characteristic's hierarchies before the InfoObjects.
+the master data (it is not time dependent), so in 2025 it differs from the hierarchy for `008` and `011`.
+
+`ZCLDOC_SITE`, the sites (All Sites `SITES` > City Center `CITY`, Suburbs `SUBURBS` > site > physicians):
+
+| Version | Valid | Main Campus `MAIN` (City Center) | Riverside Branch `RIVER` (Suburbs) | Northgate Branch `NORTH` |
+|---|---|---|---|---|
+| `001` Clinic Sites | 1000-01-01 to 2024-12-31 | the other 13 | `004`, `005`, `008`, `011`, `013`, `016`, `018` | - |
+| `001` | 2025-01-01 to 9999-12-31 | the other 12 | `004`, `011`, `013`, `018` | Suburbs: `002`, `005`, `008`, `016` |
+| `002` Clinic Sites (Plan) | 1000-01-01 to 2024-12-31 | as version `001` | as version `001` | - |
+| `002` | 2025-01-01 to 9999-12-31 | the other 12 | `005`, `008`, `011`, `016` | City Center: `003`, `004`, `013`, `018` |
+
+### Probing BW's authorizations on them
+
+Program `ZZXXMLA1_BW_AUTH_PROBE` (`ZZXXMLA1_CL_BW_AUTH_PROBE`) runs queries through BW's own MDX engine
+(`BAPI_MDDATASET_*`) on `$ZCLVISITA` as the current user and lists per query OK, EMPTY, NO AUTH or ERROR with BW's
+answer (with the cell status where BW gives one) or message; above the list the analysis authorizations that restrict
+`ZCLDOC` or `ZCLDIAG`, with all their lines, and whether the user has them. BW's MDX shows per hierarchy name and
+version only the slice valid at the key date (unique name `[ZCLDOC<pad 30>ZCLDOC_ORG<pad 30>001]`, no date in it;
+`[ZCLDIAG<pad 30>ZCLDIAG_ICD]` without version), so the probe sets the key date (`RRT_SET_KEY_DATE`) and runs everything
+once per key date (default 2024-06-15 and 2025-06-15):
+
+- the total, which aggregates both characteristics (it needs the aggregation authorization `:` on each);
+- per characteristic, flat: `[ZCLDOC].Members` and each value as slicer (the values from the SID table);
+- per hierarchy its members, and per node (text node `[<hierarchy>].[<name pad 32>0HIER_NODE]`, leaf
+  `[<hierarchy>].[008]`) the node as slicer, on the rows, its children and its parent;
+- combined: the members of one characteristic (flat and per hierarchy) with each value and each text node of the
+  other as slicer (its leaves too with "combine with leaves").
+
+With `0BI_ALL` all 2,244 queries answer (about 90 seconds). The statement goes to BW in lines of 75 characters that BW
+joins respecting blanks.
+
+## The hierarchy of the diagnoses
+
+For authorizations that combine two characteristics, the diagnosis `ZCLDIAG` has the hierarchy `ZCLDIAG_ICD`, Diagnoses
+by ICD-10 Chapter: All Diagnoses `DIAGNOSES` > chapter > group > diagnosis (69 nodes: 9 chapters, 23 groups, the 36
+diagnoses' codes as leaves). Unlike the physician's, it is plain: neither version nor time dependent (`HIETABFL` only;
+version blank, valid to 9999-12-31), so in a combination only the physician's side depends on the key date and the
+version. The text nodes are named by their text in upper case with `_` for blanks and hyphens, cut at 32 characters:
+`RESPIRATORY`, `UPPER_RESPIRATORY_INFECTIONS`, `CHRONIC_LOWER_RESPIRATORY_DISEAS`, `CHECK_UPS`, ... A department
+treats some chapters more than others (respiratory diagnoses mostly in pulmonology, general practice and pediatrics),
+so a node of each hierarchy restricts the visits differently from their intersection.
+
+The run deletes the characteristics' hierarchies before the InfoObjects. An analysis authorization on a hierarchy node
+also stores the hierarchy's `HIEID` (`RSECHIE`), and every run creates new ones: check the hierarchy authorizations
+after a run (not tried yet).
 
 ## The data
 
