@@ -5,6 +5,9 @@
 #   scripts/sap-sync.sh pull    SAP -> repo: export the package into src/ (abapGit file format) - overwrites src/
 #   scripts/sap-sync.sh push    repo -> SAP: create the package if missing, import src/ and activate - overwrites objects
 #
+# sapcli has no DDIC tables: their files (*.tabl.xml, for abapGit) are kept by pull and left out by push, so a table
+# is changed in SAP by hand (SE11) and in its file.
+#
 # Git is the only thing that writes to the remote: after `pull`, review `git diff` and commit from here.
 # Connection settings come from .env.sap (git-ignored, see .env.sap.example) or the environment.
 # Needs: bash (Git Bash on Windows), sapcli on PATH.
@@ -80,6 +83,12 @@ cmd_pull() {
     # (tr, not grep: Git Bash's grep drops the CRs)
     if [ "$(tr -cd '\r' <"$source" | head -c1 | wc -c)" -gt 0 ]; then printf '\r\n' >>"$source"; else printf '\n' >>"$source"; fi
   done
+  # sapcli exports no tables: their files stay as they are
+  local table
+  for table in "$ROOT/$SRC_DIR"/*.tabl.xml; do
+    [ -e "$table" ] || continue
+    cp "$table" "$tmp/pkg/$SRC_DIR/"
+  done
   rm -rf "$ROOT/$SRC_DIR"
   cp "$tmp/pkg/.abapgit.xml" "$ROOT/.abapgit.xml"
   cp -r "$tmp/pkg/$SRC_DIR" "$ROOT/$SRC_DIR"
@@ -99,8 +108,15 @@ cmd_push() {
   # create the package when missing (idempotent); local package, no transport layer
   "${SAPCLI[@]}" package create "$PACKAGE" "olap4abap: XMLA server with an MDX engine" \
     --software-component "$SOFTWARE_COMPONENT" --record-changes --no-error-existing
-  # import src/ (reads the current directory) and activate; a transport request can be passed as $1 for non-local packages
-  "${SAPCLI[@]}" checkin package "$PACKAGE" ${1:+"$1"} --software-component "$SOFTWARE_COMPONENT" --starting-folder "$SRC_DIR"
+  # import src/ without the tables, which sapcli does not know, and activate: checkin reads the current directory, so a
+  # copy is imported; a transport request can be passed as $1 for non-local packages
+  local tmp
+  tmp="$(mktemp -d)"
+  trap 'rm -rf "$tmp"' RETURN
+  cp "$ROOT/.abapgit.xml" "$tmp/"
+  cp -r "$ROOT/$SRC_DIR" "$tmp/$SRC_DIR"
+  rm -f "$tmp/$SRC_DIR"/*.tabl.xml
+  (cd "$tmp" && "${SAPCLI[@]}" checkin package "$PACKAGE" ${1:+"$1"} --software-component "$SOFTWARE_COMPONENT"     --starting-folder "$SRC_DIR")
   echo "imported $SRC_DIR/ into $PACKAGE"
 }
 

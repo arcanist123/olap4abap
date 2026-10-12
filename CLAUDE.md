@@ -189,12 +189,13 @@ Read before designing anything:
   `ZZXXMLA1_CL_SCHEMA_DEF` reads any Mondrian schema as `MondrianDef` does and writes it back as `toXML` does,
   generated from Mondrian's `MondrianDef.java` (`docs/environment.md`, Mondrian's schema definition). The reference
   schema `reference/schema/FoodmartBW.xml` has no SQL: the fact table is the BW table, the dimension tables are the
-  CDS views `ZZXXMLA1_CL_BW_VIEW_GEN` generates per characteristic (`docs/bw-to-schema-mapping.md`); the eMondrian
+  CDS views `ZZXXMLA1_CL_BW_VIEW_GEN` generates per characteristic (`docs/bw-to-schema-mapping.md`), in `$TMP` unless
+  its caller names a package, so that they are not objects of the installed package; the eMondrian
   reference database holds copies of the BW tables and the same views (`docs/environment.md`, the reference database
   holds the BW tables).
-- Setup: program `ZZXXMLA1_SETUP` (`ZZXXMLA1_CL_SETUP`) makes a system ready after the package is imported: the table
-  `ZZXXMLA1_FILE` (`ZZXXMLA1_CL_CREATE_TABLES`; it deletes the schema builder's old copies below `/schema/`) and, if
-  there is none, a
+- Setup: program `ZZXXMLA1_SETUP` (`ZZXXMLA1_CL_SETUP`) makes a system ready after the package is imported (the table
+  `ZZXXMLA1_FILE` comes with it, `src/zzxxmla1_file.tabl.xml`, which sapcli neither exports nor imports): it deletes
+  the schema builder's old copies below `/schema/` and, if there is none, writes a
   `/WEB-INF/datasources.xml` without catalogs; with its checkbox also the clinic demo (`docs/clinic-demo.md`): InfoCube
   `ZCLVISIT` and aDSO `ZCLVISITA` with made-up visits of patients to a clinic, their schemas and catalogs
   (`ZZXXMLA1_CL_BW_CLINIC_GEN`). The clinic demo is the project's own demo data; FoodMart stays the test source.

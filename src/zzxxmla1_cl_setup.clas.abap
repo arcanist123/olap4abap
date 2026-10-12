@@ -10,7 +10,6 @@
 * Copyright (C) 2005-2021 Hitachi Vantara and others, Copyright (C) 2021-2025 Sergei Semenkov. See the NOTICE file.
 *----------------------------------------------------------------------------------------------------------------------*
 "! Sets up the server after the package is imported (program ZZXXMLA1_SETUP, or sapcli class execute):
-"! - the tables (ZZXXMLA1_CL_CREATE_TABLES);
 "! - the files below /schema/ deleted: earlier setups wrote the schema builder there, it is now served from the code
 "!   (ZZXXMLA1_CL_WEB_APP_FILES);
 "! - /WEB-INF/datasources.xml with one data source and no catalog, only if there is none: it holds the catalogs;
@@ -53,7 +52,6 @@ CLASS zzxxmla1_cl_setup IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD run.
-    APPEND LINES OF NEW zzxxmla1_cl_create_tables( )->run( ) TO result.
     APPEND LINES OF delete_app_files( ) TO result.
     APPEND LINES OF write_datasources( ) TO result.
     COMMIT WORK.

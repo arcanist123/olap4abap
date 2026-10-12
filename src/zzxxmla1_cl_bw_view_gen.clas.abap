@@ -40,7 +40,9 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
   PUBLIC SECTION.
     INTERFACES if_oo_adt_classrun.
 
-    CONSTANTS c_package TYPE devclass VALUE '$ZZXXMLA1'.
+    "! The package of the generated views unless the caller names another: local, so that they are not objects of
+    "! the package the code is installed in (an abapGit repository would offer to delete them).
+    CONSTANTS c_default_package TYPE devclass VALUE '$TMP'.
     TYPES:
       BEGIN OF ty_view,
         characteristic TYPE rsiobjnm,
@@ -135,6 +137,10 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
         notes   TYPE ty_t_note,
       END OF ty_layout.
 
+    "! package: the package new views are created in.
+    METHODS constructor
+      IMPORTING package TYPE devclass DEFAULT c_default_package.
+
     "! Creates or updates the views of all characteristics of a cube, in the order of the cube.
     METHODS generate_cube
       IMPORTING cube          TYPE rsinfocube
@@ -207,6 +213,7 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
         alias TYPE string,
       END OF ty_source,
       ty_t_source TYPE STANDARD TABLE OF ty_source WITH EMPTY KEY.
+    DATA package TYPE devclass.
     DATA handler TYPE REF TO if_dd_ddl_handler.
     "! the numbers handed out in this run, not yet in the DDIC
     DATA used_numbers TYPE STANDARD TABLE OF i WITH EMPTY KEY.
@@ -281,6 +288,10 @@ ENDCLASS.
 
 CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
 
+  METHOD constructor.
+    me->package = package.
+  ENDMETHOD.
+
   METHOD if_oo_adt_classrun~main.
     TRY.
         LOOP AT generate_cube( 'ZFMSALES' ) INTO DATA(view).
@@ -324,7 +335,7 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
                                                   ddtext     = text
                                                   source     = source ) ).
     cl_dd_ddl_handler=>if_dd_ddl_handler~write_tadir( objectname = result-ddl_name
-                                                      devclass   = c_package
+                                                      devclass   = package
                                                       prid       = -1 ).
     ddl_handler( )->activate( result-ddl_name ).
   ENDMETHOD.
