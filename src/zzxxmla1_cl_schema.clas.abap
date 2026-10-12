@@ -109,6 +109,20 @@ CLASS zzxxmla1_cl_schema DEFINITION
         visible       TYPE abap_bool,
       END OF ty_measure,
       ty_t_measure TYPE STANDARD TABLE OF ty_measure WITH EMPTY KEY.
+    TYPES:
+      "! A column of a cube's drill-through action (RolapDrillThroughColumn): its name and what it reads, a level (the
+      "! first level of the hierarchy, of the dimension's first hierarchy, if none is named), a column of the dimension's
+      "! table (a DrillThroughAttribute with a sourceAttribute: the attribute's key column) or a measure.
+      BEGIN OF ty_drill_column,
+        cube_name  TYPE string,
+        name       TYPE string,
+        dim_name   TYPE string,
+        hier_name  TYPE string,   " empty: the dimension's first hierarchy
+        level_name TYPE string,   " empty: the first level of the hierarchy
+        column     TYPE string,   " a column of the dimension's table; then no hierarchy and level
+        meas_name  TYPE string,   " a measure; then no dimension
+      END OF ty_drill_column,
+      ty_t_drill_column TYPE STANDARD TABLE OF ty_drill_column WITH EMPTY KEY.
 
     "! The schemas of all catalogs of the server, read once per session.
     CLASS-METHODS get
@@ -145,6 +159,11 @@ CLASS zzxxmla1_cl_schema DEFINITION
     METHODS measures
       IMPORTING cube          TYPE csequence
       RETURNING VALUE(result) TYPE ty_t_measure.
+    "! The columns of the cube's default drill-through action (RolapCube.getDefaultDrillThroughAction: the first
+    "! DrillThroughAction with default="true"), in the order of the schema; empty: the cube has none.
+    METHODS drill_through_columns
+      IMPORTING cube          TYPE csequence
+      RETURNING VALUE(result) TYPE ty_t_drill_column.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -155,6 +174,14 @@ CLASS zzxxmla1_cl_schema DEFINITION
     DATA all_hiers     TYPE ty_t_hier.
     DATA all_levels    TYPE ty_t_level.
     DATA all_measures  TYPE ty_t_measure.
+    DATA all_drill_columns TYPE ty_t_drill_column.
+    TYPES:
+      "! a dimension of a cube: its name in the cube and its definition
+      BEGIN OF ty_cube_dimension,
+        name TYPE string,
+        def  TYPE zzxxmla1_cl_schema_def=>ty_dimension,
+      END OF ty_cube_dimension,
+      ty_t_cube_dimension TYPE STANDARD TABLE OF ty_cube_dimension WITH EMPTY KEY.
 
     "! The catalogs of the server: those of every data source of the repository, with their schema files. A catalog
     "! name is one catalog of the server: data sources may list it again with the same Definition.
@@ -180,6 +207,13 @@ CLASS zzxxmla1_cl_schema DEFINITION
                 caption     TYPE string
                 foreign_key TYPE string
                 dimension   TYPE zzxxmla1_cl_schema_def=>ty_dimension
+      RAISING   zzxxmla1_cx_xmla.
+    "! The drill-through actions of a cube (RolapCube.addActions), each column resolved as the reference resolves it
+    "! when it loads the schema; the columns of the first default one are kept.
+    METHODS add_actions
+      IMPORTING cube       TYPE string
+                actions    TYPE zzxxmla1_cl_schema_def=>ty_t_node
+                dimensions TYPE ty_t_cube_dimension
       RAISING   zzxxmla1_cx_xmla.
     "! A Hierarchy element of a dimension (RolapHierarchy, RolapLevel.createFromXml).
     METHODS add_hierarchy
@@ -313,6 +347,7 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
                     fact_table   = fact->name
                     generated_at = updated ) TO all_cubes.
 
+    DATA dimensions TYPE ty_t_cube_dimension.
     LOOP AT cube-dimensions INTO DATA(node).
       CASE node-name.
         WHEN `DimensionUsage`.
@@ -328,6 +363,7 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
                                                ELSE usage->name )
                          foreign_key = usage->foreign_key
                          dimension   = shared ).
+          APPEND VALUE #( name = usage->name def = shared ) TO dimensions.
         WHEN `Dimension`.
           DATA(private) = CAST zzxxmla1_cl_schema_def=>ty_dimension( node-def ).
           add_dimension( cube        = cube-name
@@ -336,6 +372,7 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
                                                ELSE private->name )
                          foreign_key = private->foreign_key
                          dimension   = private->* ).
+          APPEND VALUE #( name = private->name def = private->* ) TO dimensions.
         WHEN OTHERS.
           fail( |Cube '{ cube-name }': { node-name } is not supported| ).
       ENDCASE.
@@ -353,6 +390,63 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
                       aggregator    = measure-aggregator
                       format_string = measure-format_string
                       visible       = xsdbool( measure-visible <> abap_false ) ) TO all_measures.
+    ENDLOOP.
+    add_actions( cube = cube-name actions = cube-actions dimensions = dimensions ).
+  ENDMETHOD.
+
+  METHOD add_actions.
+    DATA(kept) = abap_false.
+    LOOP AT actions INTO DATA(node) WHERE name = `DrillThroughAction`.
+      DATA(action) = CAST zzxxmla1_cl_schema_def=>ty_drill_through_action( node-def ).
+      DATA(columns) = VALUE ty_t_drill_column( ).
+      LOOP AT action->columns INTO DATA(column_node).
+        DATA(column) = VALUE ty_drill_column( cube_name = cube ).
+        IF column_node-name = `DrillThroughMeasure`.
+          DATA(measure) = CAST zzxxmla1_cl_schema_def=>ty_drill_through_measure( column_node-def ).
+          IF NOT line_exists( all_measures[ cube_name = cube meas_name = measure->measure ] ).
+            fail( |Error while creating DrillThrough  action. Measure '{ measure->name }' not found| ).
+          ENDIF.
+          column-name = measure->name.
+          column-meas_name = measure->measure.
+          APPEND column TO columns.
+          CONTINUE.
+        ENDIF.
+        DATA(attribute) = CAST zzxxmla1_cl_schema_def=>ty_drill_through_attribute( column_node-def ).
+        column-name = attribute->name.
+        column-dim_name = attribute->dimension.
+        READ TABLE dimensions INTO DATA(dimension) WITH KEY name = attribute->dimension.
+        IF sy-subrc <> 0.
+          fail( |Error while creating DrillThrough  action. Dimension '{ attribute->dimension }' not found| ).
+        ENDIF.
+        IF attribute->source_attribute IS NOT INITIAL.
+          " resolveDrillThroughAttributeColumn: the key column of the dimension's attribute, whatever hierarchy it has
+          READ TABLE dimension-def-attributes INTO DATA(source) WITH KEY name = attribute->source_attribute.
+          IF sy-subrc <> 0 OR source-key_column IS NOT BOUND.
+            fail( |Error while creating DrillThrough  action. Attribute '{ attribute->source_attribute }' | &&
+                  |not found on dimension '{ attribute->dimension }'| ).
+          ENDIF.
+          column-column = source-key_column->column_name.
+        ELSEIF attribute->hierarchy IS NOT INITIAL.
+          " a level is looked for only in a named hierarchy
+          IF NOT line_exists( all_hiers[ cube_name = cube dim_name = attribute->dimension
+                                         hier_name = attribute->hierarchy ] ).
+            fail( |Error while creating DrillThrough  action. Hierarchy '{ attribute->hierarchy }' not found| ).
+          ENDIF.
+          column-hier_name = attribute->hierarchy.
+          IF attribute->level IS NOT INITIAL.
+            IF NOT line_exists( all_levels[ cube_name = cube dim_name = attribute->dimension
+                                            hier_name = attribute->hierarchy level_name = attribute->level ] ).
+              fail( |Error while creating DrillThrough  action. Level '{ attribute->level }' not found| ).
+            ENDIF.
+            column-level_name = attribute->level.
+          ENDIF.
+        ENDIF.
+        APPEND column TO columns.
+      ENDLOOP.
+      IF action->_default = abap_true AND kept = abap_false.
+        APPEND LINES OF columns TO all_drill_columns.
+        kept = abap_true.
+      ENDIF.
     ENDLOOP.
   ENDMETHOD.
 
@@ -591,6 +685,10 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
 
   METHOD levels.
     result = VALUE #( FOR l IN all_levels WHERE ( cube_name = cube AND dim_name = dim AND hier_name = hier ) ( l ) ).
+  ENDMETHOD.
+
+  METHOD drill_through_columns.
+    result = VALUE #( FOR c IN all_drill_columns WHERE ( cube_name = cube ) ( c ) ).
   ENDMETHOD.
 
   METHOD measures.

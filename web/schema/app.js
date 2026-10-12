@@ -160,9 +160,14 @@ function renameDimension(doc, dim, name) {
     for (const cube of cubesOf(doc)) {
       for (const usage of kids(cube, 'DimensionUsage').filter((u) => attr(u, 'source') === old)) {
         usage.setAttribute('source', name);
-        if (attr(usage, 'name') === old) usage.setAttribute('name', name);
+        if (attr(usage, 'name') === old) {
+          usage.setAttribute('name', name);
+          renameActionDimension(cube, old, name);
+        }
       }
     }
+  } else {
+    renameActionDimension(dim.parentNode, old, name);
   }
   for (const h of hierarchiesOf(dim)) {
     const member = attr(h, 'defaultMember');
@@ -170,9 +175,13 @@ function renameDimension(doc, dim, name) {
   }
 }
 
-function renameAttribute(dim, attribute, name) {
+function renameAttribute(doc, dim, attribute, name) {
   const old = attr(attribute, 'name');
   attribute.setAttribute('name', name);
+  for (const { cube, name: dimName } of placesOf(doc, dim)) {
+    columnsOfDimension(cube, dimName).filter((c) => attr(c, 'sourceAttribute') === old)
+      .forEach((c) => c.setAttribute('sourceAttribute', name));
+  }
   for (const h of hierarchiesOf(dim)) {
     for (const level of kids(h, 'Level')) {
       if (attr(level, 'sourceAttribute') === old) level.setAttribute('sourceAttribute', name);
@@ -197,6 +206,29 @@ function setAttributeLevelType(dim, attribute, levelType) {
 // an attribute is an attribute hierarchy unless attributeHierarchyEnabled is false; the proposal makes only the key one
 const hasHierarchy = (attribute) => isTrue(attribute, 'attributeHierarchyEnabled', true);
 const setAttributeHierarchy = (attribute, on) => setAttr(attribute, 'attributeHierarchyEnabled', on ? '' : 'false');
+
+// The drill-through action: the columns of the fact rows a double click on a cell shows (the cell's measure is added
+// unless the action names measures). Without a default action every level column of every dimension is shown.
+const defaultAction = (cube) => kids(cube, 'DrillThroughAction').find((a) => attr(a, 'default') === 'true');
+const actionColumns = (cube, tag) => kids(cube, 'DrillThroughAction').flatMap((a) => kids(a, tag));
+// the cubes a dimension is in, with its name there: a shared one's usages, a private one's cube
+const placesOf = (doc, dim) => (isShared(dim)
+  ? usagesOf(doc, dim).map(({ cube, usage }) => ({ cube, name: attr(usage, 'name') }))
+  : [{ cube: dim.parentNode, name: attr(dim, 'name') }]);
+const columnsOfDimension = (cube, name) =>
+  actionColumns(cube, 'DrillThroughAttribute').filter((c) => attr(c, 'dimension') === name);
+function renameActionDimension(cube, old, name) {
+  columnsOfDimension(cube, old).forEach((c) => c.setAttribute('dimension', name));
+}
+function renameActionMeasure(cube, old, name) {
+  actionColumns(cube, 'DrillThroughMeasure').filter((c) => attr(c, 'measure') === old).forEach((c) => c.setAttribute('measure', name));
+}
+// the name a new column gets: the dimension's caption for its value, "(Text)" after it for its text
+function columnName(dimCaption, attribute) {
+  if (attribute.endsWith(' Key')) return dimCaption;
+  if (attribute.endsWith(' Text')) return `${dimCaption} (Text)`;
+  return attribute;
+}
 
 const required = (what) => (value) => (value.trim() ? '' : `${what} needs a name`);
 const unique = (what, others) => (value) =>
@@ -407,7 +439,7 @@ function CubePane({ doc, edit, cube, select }) {
   const measures = kids(cube, 'Measure');
   const usages = kids(cube, 'DimensionUsage');
   const privates = kids(cube, 'Dimension');
-  const known = ['Table', 'DimensionUsage', 'Dimension', 'Measure', 'Annotations'];
+  const known = ['Table', 'DimensionUsage', 'Dimension', 'Measure', 'Annotations', 'DrillThroughAction'];
   const others = [...cube.children].filter((c) => !known.includes(c.tagName)).map((c) => c.tagName);
   const measureNames = measures.map((m) => attr(m, 'name'));
   const dimNames = [...usages, ...privates].map((u) => attr(u, 'name'));
@@ -415,6 +447,7 @@ function CubePane({ doc, edit, cube, select }) {
 
   const removeMeasure = (m) => edit(() => {
     const name = attr(m, 'name');
+    actionColumns(cube, 'DrillThroughMeasure').filter((c) => attr(c, 'measure') === name).forEach((c) => c.remove());
     m.remove();
     if (defaultMeasure === name) setAttr(cube, 'defaultMeasure', attr(kids(cube, 'Measure')[0], 'name'));
   });
@@ -438,7 +471,11 @@ function CubePane({ doc, edit, cube, select }) {
         <thead><tr><th>Name</th><th>Column</th><th>Aggregator</th><th>Format string</th><th>Visible</th><th></th></tr></thead>
         <tbody>${measures.map((m, i) => html`<tr key=${i}>
           <td><${TextField} value=${attr(m, 'name')} validate=${unique('A measure', measureNames.filter((n) => n !== attr(m, 'name')))}
-            onCommit=${(v) => edit(() => { if (defaultMeasure === attr(m, 'name')) cube.setAttribute('defaultMeasure', v); m.setAttribute('name', v); })} /></td>
+            onCommit=${(v) => edit(() => {
+              if (defaultMeasure === attr(m, 'name')) cube.setAttribute('defaultMeasure', v);
+              renameActionMeasure(cube, attr(m, 'name'), v);
+              m.setAttribute('name', v);
+            })} /></td>
           <td class="mono small">${attr(m, 'column')}</td>
           <td><${Select} value=${attr(m, 'aggregator')} options=${AGGREGATORS} onChange=${(v) => edit(() => m.setAttribute('aggregator', v))}
             title="The engine evaluates sum and count" /></td>
@@ -464,12 +501,15 @@ function CubePane({ doc, edit, cube, select }) {
             const di = sharedDims(doc).findIndex((d) => attr(d, 'name') === attr(u, 'source'));
             return html`<tr key=${'u' + i}>
               <td><${TextField} value=${attr(u, 'name')} validate=${unique('A dimension', dimNames.filter((n) => n !== attr(u, 'name')))}
-                onCommit=${(v) => edit(() => u.setAttribute('name', v))} /></td>
+                onCommit=${(v) => edit(() => { renameActionDimension(cube, attr(u, 'name'), v); u.setAttribute('name', v); })} /></td>
               <td>${di >= 0 ? html`<button class="link" onClick=${() => select({ kind: 'dim', ci: null, di })}>${attr(u, 'source')}</button>`
                 : html`<span class="field-error">${attr(u, 'source')} (missing)</span>`}</td>
               <td class="mono small">${attr(u, 'foreignKey')}</td>
               <td class="actions"><button class="icon danger" title="Remove from the cube (the dimension stays)"
-                onClick=${() => confirm(`Remove '${attr(u, 'name')}' from cube '${attr(cube, 'name')}'?`) && edit(() => u.remove())}>✕</button></td>
+                onClick=${() => confirm(`Remove '${attr(u, 'name')}' from cube '${attr(cube, 'name')}'?`) && edit(() => {
+                  columnsOfDimension(cube, attr(u, 'name')).forEach((c) => c.remove());
+                  u.remove();
+                })}>✕</button></td>
             </tr>`;
           })}
           ${privates.map((d, i) => html`<tr key=${'p' + i}>
@@ -480,8 +520,87 @@ function CubePane({ doc, edit, cube, select }) {
         </tbody>
       </table></div>
     </section>
+    <${DrillThroughSection} doc=${doc} edit=${edit} cube=${cube} />
     ${others.length > 0 && html`<div class="notice warn">The cube also has ${[...new Set(others)].join(', ')}; edit them on the XML tab.</div>`}
   </div>`;
+}
+
+// The cube's default drill-through action: what a double click on a cell (Excel's "Show Details") shows.
+function DrillThroughSection({ doc, edit, cube }) {
+  const action = defaultAction(cube);
+  // the cube's dimensions with their definitions and captions
+  const dims = [
+    ...kids(cube, 'DimensionUsage').map((u) => {
+      const def = sharedDims(doc).find((d) => attr(d, 'name') === attr(u, 'source'));
+      return { name: attr(u, 'name'), caption: attr(u, 'caption') || attr(def, 'caption') || attr(u, 'name'), def };
+    }),
+    ...kids(cube, 'Dimension').map((d) => ({ name: attr(d, 'name'), caption: attr(d, 'caption') || attr(d, 'name'), def: d })),
+  ];
+  const measureNames = kids(cube, 'Measure').map((m) => attr(m, 'name'));
+  const columns = action ? [...action.children].filter((c) => c.tagName.startsWith('DrillThrough')) : [];
+  const names = columns.map((c) => attr(c, 'name'));
+  const reads = (c) => {
+    if (c.tagName === 'DrillThroughMeasure') return html`measure <span class="mono">${attr(c, 'measure')}</span>`;
+    const target = attr(c, 'sourceAttribute') || [attr(c, 'hierarchy'), attr(c, 'level')].filter(Boolean).join(' › ') || 'first level';
+    const dim = dims.find((d) => d.name === attr(c, 'dimension'));
+    const attribute = dim && attributesOf(dim.def).find((a) => attr(a, 'name') === attr(c, 'sourceAttribute'));
+    return html`${attr(c, 'dimension')} · ${target}${attribute && html` <span class="mono small muted">${keyColumn(attribute)}</span>`}`;
+  };
+  const add = (value) => edit(() => {
+    const [kind, target, source] = value.split('|');
+    const base = kind === 'm' ? target : columnName(dims.find((d) => d.name === target).caption, source);
+    let name = base;
+    for (let n = 2; names.includes(name); n++) name = `${base} ${n}`;
+    action.appendChild(kind === 'm'
+      ? create(doc, 'DrillThroughMeasure', { name, measure: target })
+      : create(doc, 'DrillThroughAttribute', { name, dimension: target, sourceAttribute: source }));
+  });
+  const create_ = () => edit(() => insertAfterLast(cube, create(doc, 'DrillThroughAction', { name: 'Details', default: 'true' }),
+    ['Measure', 'CalculatedMember', 'NamedSet']));
+
+  return html`<section class="section">
+    <header><h3>Double-click columns</h3><span class="spacer"></span>
+      <span class="muted small">the columns of the fact rows a double click on a cell shows, with the cell's measure</span></header>
+    <div class="body">
+      ${!action ? html`<div class="row">
+          <span class="muted">No default drill-through action: a double click shows every level column of every dimension,
+            one join per dimension.</span>
+          <button onClick=${create_}>Choose the columns</button>
+        </div>` : html`
+        ${columns.length > 0 && html`<div class="scroll-x"><table>
+          <thead><tr><th>Column</th><th>Reads</th><th></th></tr></thead>
+          <tbody>${columns.map((c, i) => html`<tr key=${i}>
+            <td><${TextField} value=${attr(c, 'name')} validate=${unique('A column', names.filter((n) => n !== attr(c, 'name')))}
+              onCommit=${(v) => edit(() => c.setAttribute('name', v))} /></td>
+            <td>${reads(c)}</td>
+            <td class="actions">
+              <button class="icon" title="Up" disabled=${i === 0} onClick=${() => edit(() => action.insertBefore(c, columns[i - 1]))}>↑</button>
+              <button class="icon" title="Down" disabled=${i === columns.length - 1} onClick=${() => edit(() => action.insertBefore(columns[i + 1], c))}>↓</button>
+              <button class="icon danger" title="Remove the column" onClick=${() => edit(() => c.remove())}>✕</button>
+            </td>
+          </tr>`)}</tbody>
+        </table></div>`}
+        ${!columns.length && html`<div class="muted">No columns: a double click shows the cell's measure only.</div>`}
+        <div class="row">
+          <select value="" aria-label="Add a column" onChange=${(e) => {
+            const value = e.target.value;
+            e.target.value = '';
+            if (value) add(value);
+          }}>
+            <option value="">Add a column…</option>
+            ${dims.filter((d) => d.def).map((d) => html`<optgroup label=${d.caption === d.name ? d.name : `${d.caption} (${d.name})`}>
+              ${attributesOf(d.def).map((a) => html`<option value=${`a|${d.name}|${attr(a, 'name')}`}>${attr(a, 'name')}</option>`)}
+            </optgroup>`)}
+            <optgroup label="Measures (shown in every row instead of the cell's)">
+              ${measureNames.map((m) => html`<option value=${`m|${m}`}>${m}</option>`)}
+            </optgroup>
+          </select>
+          <span class="spacer"></span>
+          <button class="danger" title="Without the action a double click shows every level column of every dimension"
+            onClick=${() => confirm('Remove the drill-through action?') && edit(() => action.remove())}>Remove action</button>
+        </div>`}
+    </div>
+  </section>`;
 }
 
 function DimensionPane({ doc, edit, dim, sel, select, suggestions }) {
@@ -499,6 +618,7 @@ function DimensionPane({ doc, edit, dim, sel, select, suggestions }) {
     const what = usages.length ? ` and its ${usages.length} cube usage(s)` : '';
     if (!confirm(`Remove dimension '${attr(dim, 'name')}'${what}?`)) return;
     edit(() => {
+      placesOf(doc, dim).forEach(({ cube, name }) => columnsOfDimension(cube, name).forEach((c) => c.remove()));
       usages.forEach(({ usage }) => usage.remove());
       dim.remove();
     });
@@ -541,7 +661,7 @@ function DimensionPane({ doc, edit, dim, sel, select, suggestions }) {
           const isKey = attr(a, 'usage') === 'Key';
           return html`<tr key=${i}>
             <td><${TextField} value=${attr(a, 'name')} validate=${unique('An attribute', attrNames.filter((n) => n !== attr(a, 'name')))}
-              onCommit=${(v) => edit(() => renameAttribute(dim, a, v))} /></td>
+              onCommit=${(v) => edit(() => renameAttribute(doc, dim, a, v))} /></td>
             <td class="mono small">${keyColumn(a)} ${isKey && html`<span class="kind">key</span>`}</td>
             <td class="mono small">${attr(kids(a, 'NameColumn')[0], 'columnName')}</td>
             <td><${Check} checked=${hasHierarchy(a)} disabled=${hasHierarchy(a) && hierarchyCount === 1}
@@ -554,7 +674,12 @@ function DimensionPane({ doc, edit, dim, sel, select, suggestions }) {
             </div></td>`}
             <td class="actions"><button class="icon danger" disabled=${isKey || used.has(attr(a, 'name'))}
               title=${isKey ? 'The key attribute stays' : used.has(attr(a, 'name')) ? 'A hierarchy uses it' : 'Remove the attribute'}
-              onClick=${() => edit(() => a.remove())}>✕</button></td>
+              onClick=${() => edit(() => {
+                for (const { cube, name } of placesOf(doc, dim)) {
+                  columnsOfDimension(cube, name).filter((c) => attr(c, 'sourceAttribute') === attr(a, 'name')).forEach((c) => c.remove());
+                }
+                a.remove();
+              })}>✕</button></td>
           </tr>`;
         })}</tbody>
       </table></div>

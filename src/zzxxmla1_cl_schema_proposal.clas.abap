@@ -17,7 +17,8 @@
 "!   references. Its DimensionAttributes describe the view's columns, none is an attribute hierarchy: the key
 "!   attribute CHARACTERISTIC SID (an InfoCube's, keyed by the view's SID, the fact table's SID column being the
 "!   foreign key) or CHARACTERISTIC Key (an aDSO's, keyed by the value, the fact column), both named by the internal
-"!   BW key; the text CHARACTERISTIC Text; each attribute and its text.
+"!   BW key; on an InfoCube the value as attribute CHARACTERISTIC Key too; the text CHARACTERISTIC Text; each
+"!   attribute and its text.
 "! - its first Hierarchy, unnamed so that it is the dimension's default, is flat: All and one level of the
 "!   characteristic, with the text as member property Text and every display attribute (and navigation attribute
 "!   the provider does not switch on) as member properties, key and text;
@@ -28,7 +29,9 @@
 "!   level types). A characteristic without SID table (0CALDAY) has no view and is not proposed;
 "! - one Measure per key figure that sums, takes the minimum or the maximum, without exception aggregation and not
 "!   non-cumulative, named by the key figure, captioned by its text, formatted by the decimals of its column; the
-"!   first one is the default measure.
+"!   first one is the default measure;
+"! - a default DrillThroughAction, the columns of the rows a double click on a cell shows (with the cell's measure):
+"!   per characteristic its value and its text, if it has one, named by the characteristic's text.
 "! Identifiers are BW's technical names, so they are unique and never change; captions are texts. Whatever is not
 "! proposed is a note with its reason; a level type the user may want when marking a dimension as time is a
 "! suggestion. The proposal is written as schema XML and read as the reference reads it (ZZXXMLA1_CL_SCHEMA_DEF), so the
@@ -103,8 +106,17 @@ CLASS zzxxmla1_cl_schema_proposal DEFINITION
         format_string TYPE string,
       END OF ty_measure,
       ty_t_measure TYPE STANDARD TABLE OF ty_measure WITH EMPTY KEY.
+    TYPES:
+      "! a column of the default drill-through action: a column of a dimension's view, by its attribute
+      BEGIN OF ty_drill_column,
+        name      TYPE string,
+        dimension TYPE string,
+        attribute TYPE string,
+      END OF ty_drill_column,
+      ty_t_drill_column TYPE STANDARD TABLE OF ty_drill_column WITH EMPTY KEY.
 
     DATA xml TYPE string.
+    DATA drill_columns TYPE ty_t_drill_column.
     DATA depth TYPE i.
     DATA notes TYPE zzxxmla1_cl_bw_provider=>ty_t_note.
     DATA suggestions TYPE ty_t_suggestion.
@@ -114,6 +126,14 @@ CLASS zzxxmla1_cl_schema_proposal DEFINITION
       IMPORTING kind           TYPE string
                 characteristic TYPE zzxxmla1_cl_bw_provider=>ty_characteristic
       RETURNING VALUE(result)  TYPE string.
+    "! Adds the key and the text of a characteristic to the default drill-through action, named by the
+    "! characteristic's text (by the InfoObject if it has none or another characteristic has the same).
+    METHODS add_drill_columns
+      IMPORTING characteristic TYPE zzxxmla1_cl_bw_provider=>ty_characteristic
+                key            TYPE string
+                text           TYPE string.
+    "! Writes the default drill-through action: the columns double-clicking a cell shows, with the cell's measure.
+    METHODS write_drill_through.
     "! Writes a DimensionAttribute of one column, not an attribute hierarchy.
     METHODS write_attribute
       IMPORTING name        TYPE string
@@ -188,7 +208,7 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD propose.
-    CLEAR: xml, depth, notes, suggestions.
+    CLEAR: xml, depth, notes, suggestions, drill_columns.
     notes = provider-notes.
     DATA usages TYPE ty_t_usage.
 
@@ -225,11 +245,14 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
     " the key attribute: keyed by the SID on an InfoCube, by the value on an aDSO, named by the internal BW key
     DATA(key) = COND string( WHEN kind = zzxxmla1_cl_bw_provider=>c_kind-cube THEN |{ result } SID|
                              ELSE |{ result } Key| ).
+    " the value as an attribute of its own on an InfoCube too: the drill-through reads a column by its attribute
+    DATA(value) = |{ result } Key|.
     IF kind = zzxxmla1_cl_bw_provider=>c_kind-cube.
       write_attribute( name        = key
                        usage       = `Key`
                        key_column  = VALUE #( name = `SID` datatype = `INT4` length = 10 )
                        name_column = characteristic-key_column ).
+      write_attribute( name = value key_column = characteristic-key_column ).
     ELSE.
       write_attribute( name = key usage = `Key` key_column = characteristic-key_column ).
     ENDIF.
@@ -238,6 +261,7 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
     IF text IS NOT INITIAL.
       write_attribute( name = text key_column = VALUE #( name = characteristic-text_column datatype = `CHAR` ) ).
     ENDIF.
+    add_drill_columns( characteristic = characteristic key = value text = text ).
     " a navigation attribute switched on is named as BW names it, <characteristic>__<attribute>; the others by the
     " attribute
     LOOP AT characteristic-attributes INTO DATA(attribute).
@@ -341,7 +365,34 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
                                                    ( name = `aggregator` value = measure-aggregator )
                                                    ( name = `formatString` value = measure-format_string ) ) ).
     ENDLOOP.
+    write_drill_through( ).
     close( `Cube` ).
+  ENDMETHOD.
+
+  METHOD add_drill_columns.
+    DATA(name) = COND string( WHEN characteristic-text IS NOT INITIAL THEN characteristic-text
+                              ELSE characteristic-iobjnm ).
+    IF line_exists( drill_columns[ name = name ] ).
+      name = characteristic-iobjnm.
+    ENDIF.
+    APPEND VALUE #( name = name dimension = characteristic-iobjnm attribute = key ) TO drill_columns.
+    IF text IS NOT INITIAL.
+      APPEND VALUE #( name = |{ name } (Text)| dimension = characteristic-iobjnm attribute = text ) TO drill_columns.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD write_drill_through.
+    IF drill_columns IS INITIAL.
+      RETURN.
+    ENDIF.
+    open( name = `DrillThroughAction` attributes = VALUE #( ( name = `name` value = `Details` )
+                                                            ( name = `default` value = `true` ) ) ).
+    LOOP AT drill_columns INTO DATA(column).
+      leaf( name = `DrillThroughAttribute` attributes = VALUE #( ( name = `name` value = column-name )
+                                                                 ( name = `dimension` value = column-dimension )
+                                                                 ( name = `sourceAttribute` value = column-attribute ) ) ).
+    ENDLOOP.
+    close( `DrillThroughAction` ).
   ENDMETHOD.
 
   METHOD measures.

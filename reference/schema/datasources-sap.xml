@@ -23,6 +23,9 @@
         <Catalog name="ZFOODMART">
             <Definition>/WEB-INF/schema/FoodmartBW.xml</Definition>
         </Catalog>
+        <Catalog name="ZFMDRILL">
+            <Definition>/WEB-INF/schema/FoodmartBWDrill.xml</Definition>
+        </Catalog>
     </Catalogs>
   </DataSource>
 </DataSources>

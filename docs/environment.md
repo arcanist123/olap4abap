@@ -89,7 +89,9 @@ eMondrian and our engine. Its database (the HSQLDB jar) therefore holds copies o
 and the generated characteristic views (`ZZXXMLA1V...`) with the SQL HANA has for them. The same for the wide demo
 (`docs/wide-demo.md`): its schema `reference/schema/ZXMLWIDE.xml` (made with the schema builder on SAP, catalog
 `ZXMLWIDE` in both servers), the 201 tables of `ZXMLWIDE` (`/BIC/FZXMLWIDE`, `/BIC/S|PZXMLAD00` ... `99`) and its 100
-views (`ZZXXMLA1V0000033` ... `132`). Only views over copied tables are taken; SAP has views of other providers too:
+views (`ZZXXMLA1V0000033` ... `132`). The catalog `ZFMDRILL` (`reference/schema/FoodmartBWDrill.xml`, drill-through
+actions) needs no tables of its own: its cube is on ZFMSALES's. On SAP it is a catalog of `/WEB-INF/datasources.xml` next
+to the ones the schema builder added there. Only views over copied tables are taken; SAP has views of other providers too:
 
     python scripts/add-empty-members.py           # FoodMart data with the empty members (once, from the original jar)
     sapcli class execute ZZXXMLA1_CL_BW_VIEW_GEN  # the CDS views of the characteristics (logon as in sap-sync.sh)

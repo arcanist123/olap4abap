@@ -124,6 +124,35 @@ def main():
         check("time dimension loads", "Loads" in status(page))
         check("with the suggested level type", page.locator("tr:has(.kind) select").input_value() == "TimeMonths")
         shot(page, "4-adso-time")
+
+        # the double-click columns: the proposal's default drill-through action (each characteristic's value, its
+        # text where it has one); a measure added; a renamed dimension's columns follow
+        page.click(".tree .item:has-text('ZFMSALESA') >> nth=1")
+        drill = page.locator("section:has(h3:text('Double-click columns'))")
+        names = [drill.locator("tbody tr").nth(i).locator("input[type=text]").input_value()
+                 for i in range(drill.locator("tbody tr").count())]
+        check("the proposal's double-click columns", names[:4] == ["Product", "Customer", "Store", "Promotion"]
+              and "Calendar Year/Month (Text)" in names and len(names) == 10, names)
+        drill.locator("select[aria-label='Add a column']").select_option("m|ZFMUNITS")
+        page.wait_for_selector(".status.busy", timeout=5000)
+        check("a measure column loads", "Loads" in status(page)
+              and drill.locator("tbody tr").last.locator("input[type=text]").input_value() == "ZFMUNITS")
+        shot(page, "5-drill-through")
+        page.click(".tree .item:has-text('ZFMSTORE')")
+        page.wait_for_selector(".form label:text('Dimension name')")
+        dim = page.locator(".form input[type=text]").first
+        dim.fill("ZFMSTORE_UI")
+        dim.press("Enter")
+        try:
+            page.wait_for_selector(".status.busy", timeout=5000)
+        except Exception:
+            pass  # the check may be over already
+        loads = "Loads" in status(page)
+        page.click("role=tab[name='XML']")
+        xml = page.input_value("textarea.xml")
+        check("a renamed dimension's column follows", loads and
+              '<DrillThroughAttribute name="Store" dimension="ZFMSTORE_UI" sourceAttribute="ZFMSTORE Key"/>' in xml,
+              [loads] + [line.strip() for line in xml.splitlines() if "DrillThroughAttribute name=\"Store\"" in line])
         browser.close()
 
     check("no script errors", not errors, errors)

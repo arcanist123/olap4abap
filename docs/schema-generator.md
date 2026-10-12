@@ -55,7 +55,8 @@ catalogs `NWCOMPANY` and `NWPRODUCT` (`examples/bw-schema/`):
   acceptance replaces (and so generates the view again, under its number);
 - its `DimensionAttribute`s describe the view's columns, none is an attribute hierarchy
   (`attributeHierarchyEnabled="false"`): the key attribute `<char> SID` on an InfoCube (keyed by the view's `SID`,
-  named by the key with `NameColumn`) or `<char> Key` on an aDSO (keyed by the value); the text `<char> Text`; each
+  named by the key with `NameColumn`, and next to it the value as attribute `<char> Key`, so that the drill-through
+  can name it) or `<char> Key` on an aDSO (keyed by the value); the text `<char> Text`; each
   attribute (named by its InfoObject, or `<char>__<attribute>` for a navigation attribute the provider switches on)
   followed by its text `... Text`. The key attribute is never named like its dimension, so it cannot clash with the
   unnamed hierarchy;
@@ -69,7 +70,16 @@ catalogs `NWCOMPANY` and `NWPRODUCT` (`examples/bw-schema/`):
 - key figures with aggregation SUM, MIN or MAX become measures with that aggregator, named by the key figure,
   captioned by its text, with a format string by the decimals of the fact column (`#,##0`, `#,##0.00`, at most 3
   decimals). Exception aggregation and non-cumulative key figures are listed as not proposed rather than mapped
-  wrongly. The first measure is the default.
+  wrongly. The first measure is the default;
+- a default `DrillThroughAction` `Details`: the columns of the fact rows a double click on a cell shows (Excel's
+  "Show Details"), per characteristic its value (`<char> Key`, named by the characteristic's text) and, if it has one,
+  its text (`<char> Text`, "... (Text)"); a characteristic without text gives its value only. It names no measure, so
+  a row shows the measure of the clicked cell (the statement's coordinates carry it). Without the action a double
+  click would show every level column of every dimension. The value of an aDSO is read from the fact table, a text or
+  an InfoCube's value from the view (one join per characteristic). In the UI the cube's section "Double-click
+  columns" renames, orders, removes and adds columns (any attribute of the cube's dimensions, or measures, which are
+  then shown in every row instead of the cell's) or removes the action; renaming or removing a dimension, an
+  attribute or a measure updates the columns that name it.
 
 ### Time
 

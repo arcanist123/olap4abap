@@ -91,7 +91,8 @@ Read before designing anything:
   (BW's model): technical names as identifiers, texts as captions; per characteristic a flat unnamed hierarchy
   (members keyed by SID, named by the key, the EN text and the display attributes as member properties) and a flat
   hierarchy `<char>__<attribute>` per navigation attribute the provider switches on; no attribute hierarchies, no
-  user hierarchies (the user makes them in the UI). The views (`ZZXXMLA1_CL_BW_VIEW_GEN`, one per basic
+  user hierarchies (the user makes them in the UI); a default drill-through action with each characteristic's value
+  and text, which the UI's "Double-click columns" adjusts. The views (`ZZXXMLA1_CL_BW_VIEW_GEN`, one per basic
   characteristic) carry the EN texts and the time-dependent attributes at 9999-12-31. The UI (`web/schema/`, Preact with htm, no build step) is served from
   the code below `/schema/` by `ZZXXMLA1_CL_WEB_APP`: the generated class `ZZXXMLA1_CL_WEB_APP_FILES` has a method per
   file returning its text (`scripts/generate-web-app-abap.py`, run after every change of `web/schema/`, then
@@ -174,6 +175,12 @@ Read before designing anything:
   `ZZXXMLA1_CL_MDX_FACTS=>drill_through`, `DrillThroughQuerySpec`; `ZZXXMLA1_CL_XMLA_TABULAR`, `TabularRowSet`): every
   level column of the cube's star (named by the first level that uses it, in hierarchy order) and the measure, the
   levels of the cell's members constrained, the subcube and a compound slicer applied, column types from HANA's catalog.
+  Without `RETURN` the cube's default `DrillThroughAction` (`ZZXXMLA1_CL_SCHEMA=>drill_through_columns`,
+  `RolapCube.getDefaultDrillThroughAction`) gives the columns and their names: levels, measures and columns of a
+  dimension's table (`sourceAttribute`); test catalog `ZFMDRILL` (`reference/schema/FoodmartBWDrill.xml`). A
+  dimension's table is joined only for a column other than the one its foreign key refers to; that one (the SID of an
+  InfoCube, the value of an aDSO, cast to the view's type) is read from the fact table: BW has master data for every
+  value of a fact, so the join removes no row.
   MDX data definition the grammar does not know (`CREATE SESSION CUBE`, which Excel sends to group members of a
   PivotTable, `CREATE SUBCUBE`, `ALTER CUBE`, `DROP CUBE`) is answered with a fault "... statements are not supported"
   before parsing (`ZZXXMLA1_CL_XMLA_HANDLER=>unsupported_statement`); the reference gives a syntax error there.

@@ -5,7 +5,7 @@ A catalog or a schema is added by writing files, without any new ABAP object.
 
     python scripts/sap-files.py put reference/schema/FoodmartBW.xml /WEB-INF/schema/FoodmartBW.xml
     python scripts/sap-files.py put reference/schema/datasources-sap.xml /WEB-INF/datasources.xml
-    python scripts/sap-files.py deploy               # both of the above: the server's files as this repository has them
+    python scripts/sap-files.py deploy               # the above and FoodmartBWDrill.xml: the server's files as this repository has them
     python scripts/sap-files.py list
     python scripts/sap-files.py get /WEB-INF/datasources.xml
     python scripts/sap-files.py delete /WEB-INF/schema/Old.xml
@@ -27,6 +27,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 # the files `deploy` writes: local file -> path on the server
 DEPLOY = [
     ("reference/schema/FoodmartBW.xml", "/WEB-INF/schema/FoodmartBW.xml"),
+    ("reference/schema/FoodmartBWDrill.xml", "/WEB-INF/schema/FoodmartBWDrill.xml"),
     ("reference/schema/datasources-sap.xml", "/WEB-INF/datasources.xml"),
 ]
 CHUNK = 120  # characters of base64 per source line

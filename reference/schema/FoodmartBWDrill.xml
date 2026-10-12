@@ -1,0 +1,93 @@
+<?xml version="1.0"?>
+<!--
+  Catalog ZFMDRILL: a cube on the facts of ZFMSALES (reference/schema/FoodmartBW.xml) with drill-through actions, for
+  the drill-through without RETURN clause that reads the cube's default action (execute_drillthrough_action_*). Its
+  dimensions are copies of FoodmartBW.xml's; Media Type has no attribute hierarchy, so the action's column of it is a
+  column of the star of its own; the keys of customer and day make the order of the rows unique. The first action is
+  not the default one and must be ignored.
+-->
+<Schema name="ZFMDRILL">
+  <Dimension name="Product" table="ZZXXMLA1V0000001">
+    <DimensionAttribute name="Product Id" usage="Key">
+      <KeyColumn dataType="Integer" columnName="SID"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="Product Name"><KeyColumn dataType="String" columnName="ZFMPNAME"/></DimensionAttribute>
+    <DimensionAttribute name="Brand Name"><KeyColumn dataType="String" columnName="ZFMBRAND"/></DimensionAttribute>
+    <DimensionAttribute name="Department"><KeyColumn dataType="String" columnName="ZFMDEPT"/></DimensionAttribute>
+    <DimensionAttribute name="Product Family"><KeyColumn dataType="String" columnName="ZFMFAMILY"/></DimensionAttribute>
+    <Hierarchy hasAll="true">
+      <Level name="Product Family" uniqueMembers="true" sourceAttribute="Product Family"/>
+      <Level name="Product Department" uniqueMembers="false" sourceAttribute="Department"/>
+      <Level name="Brand Name" uniqueMembers="false" sourceAttribute="Brand Name"/>
+      <Level name="Product Name" uniqueMembers="true" sourceAttribute="Product Name"/>
+    </Hierarchy>
+  </Dimension>
+
+  <Dimension name="Store" table="ZZXXMLA1V0000003">
+    <DimensionAttribute name="Store Id" usage="Key">
+      <KeyColumn dataType="Integer" columnName="SID"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="Store Name"><KeyColumn dataType="String" columnName="ZFMSNAME"/></DimensionAttribute>
+    <DimensionAttribute name="Country"><KeyColumn dataType="String" columnName="ZFMCNTRY"/></DimensionAttribute>
+    <DimensionAttribute name="State Province"><KeyColumn dataType="String" columnName="ZFMSTATE"/></DimensionAttribute>
+    <DimensionAttribute name="City"><KeyColumn dataType="String" columnName="ZFMCITY"/></DimensionAttribute>
+    <Hierarchy hasAll="true">
+      <Level name="Store Country" uniqueMembers="true" sourceAttribute="Country"/>
+      <Level name="Store State" uniqueMembers="true" sourceAttribute="State Province"/>
+      <Level name="Store City" uniqueMembers="false" sourceAttribute="City"/>
+      <Level name="Store Name" uniqueMembers="true" sourceAttribute="Store Name"/>
+    </Hierarchy>
+  </Dimension>
+
+  <Dimension name="Promotions" table="ZZXXMLA1V0000004">
+    <DimensionAttribute name="Promotion Id" usage="Key">
+      <KeyColumn dataType="Integer" columnName="SID"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="Promotion Name"><KeyColumn dataType="String" columnName="ZFMPRNAM"/></DimensionAttribute>
+    <DimensionAttribute name="Media Type" attributeHierarchyEnabled="false">
+      <KeyColumn dataType="String" columnName="ZFMMEDIA"/>
+    </DimensionAttribute>
+    <Hierarchy hasAll="true" allMemberName="All Promotions">
+      <Level name="Promotion Name" uniqueMembers="true" sourceAttribute="Promotion Name"/>
+    </Hierarchy>
+  </Dimension>
+
+  <Dimension name="Customers" table="ZZXXMLA1V0000002">
+    <DimensionAttribute name="Customer Id" usage="Key" attributeHierarchyEnabled="false">
+      <KeyColumn dataType="Integer" columnName="SID"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="City"><KeyColumn dataType="String" columnName="ZFMCITY"/></DimensionAttribute>
+  </Dimension>
+
+  <Dimension name="Day" table="ZZXXMLA1V0000005">
+    <DimensionAttribute name="Time Id" usage="Key" attributeHierarchyEnabled="false">
+      <KeyColumn dataType="Integer" columnName="SID"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="The Date"><KeyColumn dataType="String" columnName="ZFMTHEDT"/></DimensionAttribute>
+  </Dimension>
+
+  <Cube name="ZFMSALESDT" caption="FoodMart Sales with drill-through actions" defaultMeasure="Unit Sales">
+    <Table name="/BIC/FZFMSALES"/>
+    <DimensionUsage name="Product" source="Product" foreignKey="SID_ZFMPROD"/>
+    <DimensionUsage name="Store" source="Store" foreignKey="SID_ZFMSTORE"/>
+    <DimensionUsage name="Promotions" source="Promotions" foreignKey="SID_ZFMPROMO"/>
+    <DimensionUsage name="Customers" source="Customers" foreignKey="SID_ZFMCUST"/>
+    <DimensionUsage name="Day" source="Day" foreignKey="SID_ZFMDATE"/>
+    <Measure name="Unit Sales" column="/BIC/ZFMUNITS" aggregator="sum"/>
+    <Measure name="Store Cost" column="/BIC/ZFMSCOST" aggregator="sum"/>
+    <Measure name="Store Sales" column="/BIC/ZFMSSALES" aggregator="sum"/>
+    <DrillThroughAction name="Costs">
+      <DrillThroughAttribute name="Store" dimension="Store"/>
+      <DrillThroughMeasure name="Cost" measure="Store Cost"/>
+    </DrillThroughAction>
+    <DrillThroughAction name="Details" default="true">
+      <DrillThroughAttribute name="City" dimension="Store" hierarchy="Store" level="Store City"/>
+      <DrillThroughAttribute name="Family" dimension="Product"/>
+      <DrillThroughAttribute name="Product" dimension="Product" sourceAttribute="Product Id"/>
+      <DrillThroughAttribute name="Media" dimension="Promotions" sourceAttribute="Media Type"/>
+      <DrillThroughAttribute name="Customer" dimension="Customers" sourceAttribute="Customer Id"/>
+      <DrillThroughAttribute name="Day" dimension="Day" sourceAttribute="Time Id"/>
+      <DrillThroughMeasure name="Sales" measure="Store Sales"/>
+    </DrillThroughAction>
+  </Cube>
+</Schema>

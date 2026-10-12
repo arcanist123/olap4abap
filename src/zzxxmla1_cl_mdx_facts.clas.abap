@@ -69,12 +69,15 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
         false  TYPE string VALUE `FALSE`,
       END OF c_predicate.
     TYPES:
-      "! An item of the RETURN clause of a drill-through: a level of a hierarchy, or a measure (its position in the
-      "! measures; 0 for a level).
+      "! An item of the RETURN clause of a drill-through: a level of a hierarchy, a column of the table of a hierarchy's
+      "! dimension (a DrillThroughAttribute with a sourceAttribute; level 0), or a measure (its position in the
+      "! measures; 0 for a level or a column).
       BEGIN OF ty_drill_item,
         hierarchy TYPE i,
         level     TYPE i,
         measure   TYPE i,
+        column    TYPE string,
+        name      TYPE string,   " of the column: the name of its star column if it has none yet
       END OF ty_drill_item,
       ty_t_drill_item TYPE STANDARD TABLE OF ty_drill_item WITH EMPTY KEY.
     TYPES:
@@ -124,8 +127,8 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
     "! @parameter measure | the stored measure of the cell, its position in the measures
     "! @parameter slicer | the positions of a compound slicer (an OR of ANDs of members), restricting the facts as the
     "!   subcube does; empty: none (RolapCell.buildDrillthroughSlicerPredicate)
-    "! @parameter items | the RETURN clause: only these columns and measures, in this order; empty: all columns and
-    "!   the measure
+    "! @parameter items | the RETURN clause or the cube's default drill-through action: only these columns and
+    "!   measures, in this order; empty: all columns and the measure
     "! @parameter max_rows | MAXROWS, the SQL row limit; 0: none
     "! @parameter first_row | FIRSTROWSET: the number of rows skipped
     METHODS drill_through
@@ -179,6 +182,7 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
         column    TYPE string,
         data_type TYPE string,
         scale     TYPE string,
+        length    TYPE string,
       END OF ty_column_type,
       ty_t_column_type TYPE HASHED TABLE OF ty_column_type WITH UNIQUE KEY table column.
 
@@ -234,6 +238,16 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
     CLASS-METHODS column_types
       IMPORTING tables        TYPE string_table
       RETURNING VALUE(result) TYPE ty_t_column_type.
+    "! The fact table's foreign key of a hierarchy's dimension as the value of the column it refers to: cast to that
+    "! column's type if the two differ (an aDSO's fact column holds a NUMC value as text, the view the number).
+    METHODS fact_key
+      IMPORTING hierarchy     TYPE i
+                types         TYPE ty_t_column_type
+      RETURNING VALUE(result) TYPE string.
+    "! A database type as the type of a CAST: with its length (and the scale of a decimal) where it has one.
+    CLASS-METHODS cast_type
+      IMPORTING type          TYPE ty_column_type
+      RETURNING VALUE(result) TYPE string.
     "! XmlaHandler.sqlToXsdType: integers and decimals of scale 0 xsd:integer, other decimals xsd:decimal, floating
     "! point numbers xsd:double, anything else xsd:string.
     CLASS-METHODS xsd_type
@@ -476,6 +490,13 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
         APPEND VALUE #( measure = item-measure ) TO drill_items.
         CONTINUE.
       ENDIF.
+      IF item-column IS NOT INITIAL.
+        " a column of the dimension's table (RolapDrillThroughAttributeColumn), registered after the levels'
+        DATA(attribute_column) = star_column( hierarchy = item-hierarchy column = item-column name = item-name ).
+        constrain( EXPORTING column = attribute_column CHANGING request = request ).
+        APPEND VALUE #( column = attribute_column ) TO drill_items.
+        CONTINUE.
+      ENDIF.
       DATA(level_column) = level_columns[ hierarchy = item-hierarchy level = item-level ].
       constrain( EXPORTING column = level_column-key CHANGING request = request ).
       APPEND VALUE #( column = level_column-key ) TO drill_items.
@@ -547,19 +568,26 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
     ENDLOOP.
     APPEND LINES OF rest TO ordered.
 
+    " the types of the columns as the database reports them: of the fact table and of the tables of the request
+    DATA tables TYPE string_table.
+    APPEND cube-fact_table TO tables.
+    LOOP AT request INTO request_column.
+      DATA(dim_table) = hierarchies[ star_columns[ request_column-column ]-hierarchy ]-dim_table.
+      IF NOT line_exists( tables[ table_line = dim_table ] ).
+        APPEND dim_table TO tables.
+      ENDIF.
+    ENDLOOP.
+    DATA(types) = column_types( tables ).
+
     " the statement: a column of the star is selected (and ordered by) if it is part of the select, a constrained
-    " one restricts the rows; every table of a column of the request is joined
+    " one restricts the rows. The table of a column is joined only if the column is selected or restricts the rows,
+    " and the column the dimension's foreign key refers to is read from the fact table: BW has a SID (and on an aDSO a
+    " master data value) for every value of a fact, so the join would not remove a row.
     DATA select_list TYPE string_table.
     DATA order_by TYPE string_table.
     DATA conditions TYPE string_table.
     DATA joins TYPE ty_t_index.
     DATA sources TYPE STANDARD TABLE OF ty_column_type WITH EMPTY KEY.   " table and column of each select item
-    LOOP AT request INTO request_column.
-      DATA(star) = star_columns[ request_column-column ].
-      IF NOT line_exists( joins[ table_line = star-hierarchy ] ).
-        APPEND star-hierarchy TO joins.
-      ENDIF.
-    ENDLOOP.
     LOOP AT ordered INTO DATA(select_item).
       IF select_item-measure > 0.
         IF drill_measures IS NOT INITIAL AND NOT line_exists( drill_measures[ measure = select_item-measure ] ).
@@ -592,14 +620,22 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
         APPEND VALUE #( table = cube-fact_table column = fact_column ) TO sources.
         CONTINUE.
       ENDIF.
-      star = star_columns[ select_item-column ].
-      DATA(expression) = |d{ star-hierarchy }.{ zzxxmla1_cl_sql=>quote( star-column ) }|.
+      DATA(star) = star_columns[ select_item-column ].
+      DATA(on_fact) = xsdbool( star-column = hierarchies[ star-hierarchy ]-key_column ).
+      DATA(expression) = COND string(
+        WHEN on_fact = abap_true THEN fact_key( hierarchy = star-hierarchy types = types )
+        ELSE |d{ star-hierarchy }.{ zzxxmla1_cl_sql=>quote( star-column ) }| ).
       READ TABLE request INTO request_column WITH TABLE KEY column = select_item-column.
       DATA(position) = sy-tabix.
+      DATA(selected) = xsdbool( drill_items IS INITIAL OR line_exists( drill_items[ column = select_item-column ] ) ).
+      IF on_fact = abap_false AND ( selected = abap_true OR request_column-has_value = abap_true )
+          AND NOT line_exists( joins[ table_line = star-hierarchy ] ).
+        APPEND star-hierarchy TO joins.
+      ENDIF.
       IF request_column-has_value = abap_true.
         APPEND zzxxmla1_cl_sql=>key_condition( column = expression key = request_column-value ) TO conditions.
       ENDIF.
-      IF drill_items IS NOT INITIAL AND NOT line_exists( drill_items[ column = select_item-column ] ).
+      IF selected = abap_false.
         CONTINUE.
       ENDIF.
       APPEND expression TO select_list.
@@ -642,16 +678,9 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
                              THEN | ORDER BY { concat_lines_of( table = order_by sep = `, ` ) }| ) &&
                 COND string( WHEN max_rows > 0 THEN | LIMIT { max_rows }| ).
 
-    " the types of the columns as the database reports them
-    DATA tables TYPE string_table.
-    LOOP AT sources INTO DATA(table_column).
-      IF NOT line_exists( tables[ table_line = table_column-table ] ).
-        APPEND table_column-table TO tables.
-      ENDIF.
-    ENDLOOP.
-    DATA(types) = column_types( tables ).
+    " the XML schema types of the columns: of a key read from the fact table the type of the dimension's column
     LOOP AT result-columns ASSIGNING FIELD-SYMBOL(<column>).
-      table_column = sources[ sy-tabix ].
+      DATA(table_column) = sources[ sy-tabix ].
       READ TABLE types INTO DATA(type) WITH TABLE KEY table = table_column-table column = table_column-column.
       <column>-xsd_type = COND #( WHEN sy-subrc = 0 THEN xsd_type( type )
                                   WHEN table_column-column IS INITIAL THEN `xsd:integer`
@@ -732,13 +761,42 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
   METHOD column_types.
     DATA(names) = concat_lines_of( table = VALUE string_table( FOR t IN tables ( zzxxmla1_cl_sql=>literal( t ) ) )
                                    sep   = `, ` ).
-    DATA(sql) = |SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE_NAME, TO_NVARCHAR( SCALE ) FROM SYS.TABLE_COLUMNS | &&
+    DATA(sql) = |SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE_NAME, TO_NVARCHAR( SCALE ), TO_NVARCHAR( LENGTH ) | &&
+                |FROM SYS.TABLE_COLUMNS | &&
                 |WHERE SCHEMA_NAME = CURRENT_SCHEMA AND TABLE_NAME IN ( { names } ) UNION ALL | &&
-                |SELECT VIEW_NAME, COLUMN_NAME, DATA_TYPE_NAME, TO_NVARCHAR( SCALE ) FROM SYS.VIEW_COLUMNS | &&
+                |SELECT VIEW_NAME, COLUMN_NAME, DATA_TYPE_NAME, TO_NVARCHAR( SCALE ), TO_NVARCHAR( LENGTH ) | &&
+                |FROM SYS.VIEW_COLUMNS | &&
                 |WHERE SCHEMA_NAME = CURRENT_SCHEMA AND VIEW_NAME IN ( { names } )|.
-    LOOP AT zzxxmla1_cl_sql=>query( sql = sql columns = 4 ) INTO DATA(row).
-      INSERT VALUE #( table = row[ 1 ] column = row[ 2 ] data_type = row[ 3 ] scale = row[ 4 ] ) INTO TABLE result.
+    LOOP AT zzxxmla1_cl_sql=>query( sql = sql columns = 5 ) INTO DATA(row).
+      INSERT VALUE #( table = row[ 1 ] column = row[ 2 ] data_type = row[ 3 ] scale = row[ 4 ] length = row[ 5 ] )
+             INTO TABLE result.
     ENDLOOP.
+  ENDMETHOD.
+
+  METHOD fact_key.
+    DATA(dimension) = hierarchies[ hierarchy ].
+    result = |f.{ zzxxmla1_cl_sql=>quote( dimension-fk_column ) }|.
+    READ TABLE types INTO DATA(key_type) WITH TABLE KEY table = dimension-dim_table column = dimension-key_column.
+    IF sy-subrc <> 0.
+      RETURN.
+    ENDIF.
+    READ TABLE types INTO DATA(fk_type) WITH TABLE KEY table = cube-fact_table column = dimension-fk_column.
+    IF sy-subrc = 0 AND fk_type-data_type = key_type-data_type.
+      RETURN.
+    ENDIF.
+    result = |CAST( { result } AS { cast_type( key_type ) } )|.
+  ENDMETHOD.
+
+  METHOD cast_type.
+    result = type-data_type.
+    CASE type-data_type.
+      WHEN `DECIMAL`.
+        IF type-scale IS NOT INITIAL.
+          result = |DECIMAL( { type-length }, { type-scale } )|.
+        ENDIF.
+      WHEN `NVARCHAR` OR `VARCHAR` OR `NCHAR` OR `CHAR` OR `ALPHANUM` OR `VARBINARY`.
+        result = |{ type-data_type }( { type-length } )|.
+    ENDCASE.
   ENDMETHOD.
 
   METHOD xsd_type.

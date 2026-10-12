@@ -25,6 +25,7 @@ CLASS ltc_proposal DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHO
     METHODS reference_characteristic FOR TESTING RAISING cx_static_check.
     METHODS time_characteristics FOR TESTING RAISING cx_static_check.
     METHODS measures_and_notes FOR TESTING RAISING cx_static_check.
+    METHODS drill_through_action FOR TESTING RAISING cx_static_check.
     METHODS view_not_generated_yet FOR TESTING RAISING cx_static_check.
     METHODS suggestions FOR TESTING RAISING cx_static_check.
     METHODS data_types FOR TESTING.
@@ -238,6 +239,39 @@ CLASS ltc_proposal IMPLEMENTATION.
                                                      ( iobjnm = `0CALDAY` reason = `no SID table, so no view` )
                                                      ( iobjnm = `ZFMAVG` reason = `exception aggregation AVG` )
                                                      ( iobjnm = `ZFMSTOCK` reason = `non-cumulative key figure` ) ) ).
+  ENDMETHOD.
+
+  METHOD drill_through_action.
+    " the default action: per characteristic its value and, if it has one, its text; no measure, so a row shows the
+    " clicked cell's; on an InfoCube the value is an attribute next to the SID key
+    DATA(adso) = adso( ).
+    DATA(cube) = adso.
+    cube-kind = zzxxmla1_cl_bw_provider=>c_kind-cube.
+    DATA schemas TYPE STANDARD TABLE OF zzxxmla1_cl_schema_def=>ty_schema WITH EMPTY KEY.
+    APPEND NEW zzxxmla1_cl_schema_proposal( )->propose( adso )-schema TO schemas.
+    APPEND NEW zzxxmla1_cl_schema_proposal( )->propose( cube )-schema TO schemas.
+    LOOP AT schemas INTO DATA(schema).
+      DATA(actions) = schema-cubes[ 1 ]-actions.
+      cl_abap_unit_assert=>assert_equals( act = lines( actions ) exp = 1 ).
+      cl_abap_unit_assert=>assert_equals( act = actions[ 1 ]-name exp = `DrillThroughAction` ).
+      DATA(action) = CAST zzxxmla1_cl_schema_def=>ty_drill_through_action( actions[ 1 ]-def ).
+      cl_abap_unit_assert=>assert_equals( act = action->_default exp = abap_true ).
+      DATA(columns) = VALUE string_table( ).
+      LOOP AT action->columns INTO DATA(node).
+        DATA(column) = CAST zzxxmla1_cl_schema_def=>ty_drill_through_attribute( node-def ).
+        APPEND |{ column->name }: { column->dimension }.{ column->source_attribute }| TO columns.
+      ENDLOOP.
+      cl_abap_unit_assert=>assert_equals(
+        act = columns
+        exp = VALUE string_table( ( `Store: ZFMSTORE.ZFMSTORE Key` ) ( `Store (Text): ZFMSTORE.ZFMSTORE Text` )
+                                  ( `Calendar Year/Week: 0CALWEEK.0CALWEEK Key` )
+                                  ( `Calendar Year/Month: 0CALMONTH.0CALMONTH Key` )
+                                  ( `Calendar Year/Month (Text): 0CALMONTH.0CALMONTH Text` )
+                                  ( `Calendar Year: 0CALYEAR.0CALYEAR Key` ) ) ).
+    ENDLOOP.
+    DATA(store) = schemas[ 2 ]-dimensions[ 1 ].
+    cl_abap_unit_assert=>assert_equals( act = store-attributes[ 2 ]-name exp = `ZFMSTORE Key` ).
+    cl_abap_unit_assert=>assert_equals( act = store-attributes[ 2 ]-key_column->column_name exp = `ZFMSTORE` ).
   ENDMETHOD.
 
   METHOD view_not_generated_yet.

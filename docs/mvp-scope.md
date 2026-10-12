@@ -113,7 +113,7 @@ Decisions taken by the project owner on 2026-10-02, with reasons.
   currency/unit handling (the demo cube has a single currency and unit); the package dimension and other technical
   characteristics; Composite/MultiProviders; non-HANA cubes (F+E table union); aggregate tables, roles, virtual
   cubes, ragged hierarchies. (Drillthrough was out of scope too, but Excel offers it on every cell, so it is done:
-  `DRILLTHROUGH` without the schema's `DrillThroughAction`s.)
+  `DRILLTHROUGH`, with the cube's default `DrillThroughAction` when there is no `RETURN`.)
 
 ## Open points
 

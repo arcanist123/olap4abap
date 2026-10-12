@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<ExecuteResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:sql="urn:schemas-microsoft-com:xml-sql" elementFormDefault="qualified">
+        <xsd:element name="root">
+          <xsd:complexType>
+            <xsd:sequence>
+              <xsd:element maxOccurs="unbounded" minOccurs="0" name="row" type="row"/>
+            </xsd:sequence>
+          </xsd:complexType>
+        </xsd:element>
+        <xsd:simpleType name="uuid">
+          <xsd:restriction base="xsd:string">
+            <xsd:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+          </xsd:restriction>
+        </xsd:simpleType>
+        <xsd:complexType name="row">
+          <xsd:sequence>
+            <xsd:element minOccurs="0" name="City" sql:field="City" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Family" sql:field="Family" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Product" sql:field="Product" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Media" sql:field="Media" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Customer" sql:field="Customer" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Day" sql:field="Day" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Sales" sql:field="Sales" type="xsd:decimal"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:schema>
+      <row>
+        <City xsi:type="xsd:string">Bellingham</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">5</Product>
+        <Media xsi:type="xsd:string">Daily Paper, Radio</Media>
+        <Customer xsi:type="xsd:integer">7192</Customer>
+        <Day xsi:type="xsd:integer">454</Day>
+        <Sales xsi:type="xsd:decimal">4.38</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Bellingham</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">368</Product>
+        <Media xsi:type="xsd:string">Daily Paper, Radio</Media>
+        <Customer xsi:type="xsd:integer">5188</Customer>
+        <Day xsi:type="xsd:integer">454</Day>
+        <Sales xsi:type="xsd:decimal">3.42</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Salem</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">5</Product>
+        <Media xsi:type="xsd:string">Product Attachment</Media>
+        <Customer xsi:type="xsd:integer">4499</Customer>
+        <Day xsi:type="xsd:integer">610</Day>
+        <Sales xsi:type="xsd:decimal">4.38</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Salem</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">8</Product>
+        <Media xsi:type="xsd:string">Product Attachment</Media>
+        <Customer xsi:type="xsd:integer">3647</Customer>
+        <Day xsi:type="xsd:integer">610</Day>
+        <Sales xsi:type="xsd:decimal">10.36</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Salem</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">289</Product>
+        <Media xsi:type="xsd:string">Product Attachment</Media>
+        <Customer xsi:type="xsd:integer">941</Customer>
+        <Day xsi:type="xsd:integer">610</Day>
+        <Sales xsi:type="xsd:decimal">4.11</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Salem</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">315</Product>
+        <Media xsi:type="xsd:string">Product Attachment</Media>
+        <Customer xsi:type="xsd:integer">1154</Customer>
+        <Day xsi:type="xsd:integer">610</Day>
+        <Sales xsi:type="xsd:decimal">4.8</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Salem</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">369</Product>
+        <Media xsi:type="xsd:string">Product Attachment</Media>
+        <Customer xsi:type="xsd:integer">7569</Customer>
+        <Day xsi:type="xsd:integer">610</Day>
+        <Sales xsi:type="xsd:decimal">9.2</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Salem</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">577</Product>
+        <Media xsi:type="xsd:string">Product Attachment</Media>
+        <Customer xsi:type="xsd:integer">9256</Customer>
+        <Day xsi:type="xsd:integer">610</Day>
+        <Sales xsi:type="xsd:decimal">7.86</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Salem</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">578</Product>
+        <Media xsi:type="xsd:string">Product Attachment</Media>
+        <Customer xsi:type="xsd:integer">8844</Customer>
+        <Day xsi:type="xsd:integer">610</Day>
+        <Sales xsi:type="xsd:decimal">4.58</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Salem</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">596</Product>
+        <Media xsi:type="xsd:string">Product Attachment</Media>
+        <Customer xsi:type="xsd:integer">465</Customer>
+        <Day xsi:type="xsd:integer">610</Day>
+        <Sales xsi:type="xsd:decimal">2.56</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Salem</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">600</Product>
+        <Media xsi:type="xsd:string">Product Attachment</Media>
+        <Customer xsi:type="xsd:integer">5257</Customer>
+        <Day xsi:type="xsd:integer">610</Day>
+        <Sales xsi:type="xsd:decimal">4.62</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Salem</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">624</Product>
+        <Media xsi:type="xsd:string">Product Attachment</Media>
+        <Customer xsi:type="xsd:integer">3647</Customer>
+        <Day xsi:type="xsd:integer">610</Day>
+        <Sales xsi:type="xsd:decimal">4.92</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Salem</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">626</Product>
+        <Media xsi:type="xsd:string">Product Attachment</Media>
+        <Customer xsi:type="xsd:integer">6733</Customer>
+        <Day xsi:type="xsd:integer">610</Day>
+        <Sales xsi:type="xsd:decimal">3.87</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Salem</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">631</Product>
+        <Media xsi:type="xsd:string">Product Attachment</Media>
+        <Customer xsi:type="xsd:integer">3153</Customer>
+        <Day xsi:type="xsd:integer">610</Day>
+        <Sales xsi:type="xsd:decimal">2.34</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Salem</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">899</Product>
+        <Media xsi:type="xsd:string">Product Attachment</Media>
+        <Customer xsi:type="xsd:integer">6932</Customer>
+        <Day xsi:type="xsd:integer">610</Day>
+        <Sales xsi:type="xsd:decimal">5.76</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Salem</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">939</Product>
+        <Media xsi:type="xsd:string">Product Attachment</Media>
+        <Customer xsi:type="xsd:integer">465</Customer>
+        <Day xsi:type="xsd:integer">610</Day>
+        <Sales xsi:type="xsd:decimal">3.5</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Salem</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">948</Product>
+        <Media xsi:type="xsd:string">Product Attachment</Media>
+        <Customer xsi:type="xsd:integer">6021</Customer>
+        <Day xsi:type="xsd:integer">610</Day>
+        <Sales xsi:type="xsd:decimal">8.88</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Salem</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">995</Product>
+        <Media xsi:type="xsd:string">Product Attachment</Media>
+        <Customer xsi:type="xsd:integer">4589</Customer>
+        <Day xsi:type="xsd:integer">610</Day>
+        <Sales xsi:type="xsd:decimal">3.45</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Salem</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">996</Product>
+        <Media xsi:type="xsd:string">Product Attachment</Media>
+        <Customer xsi:type="xsd:integer">5230</Customer>
+        <Day xsi:type="xsd:integer">610</Day>
+        <Sales xsi:type="xsd:decimal">2.55</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Salem</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">1206</Product>
+        <Media xsi:type="xsd:string">Product Attachment</Media>
+        <Customer xsi:type="xsd:integer">5257</Customer>
+        <Day xsi:type="xsd:integer">610</Day>
+        <Sales xsi:type="xsd:decimal">17.15</Sales>
+      </row>
+    </root>
+  </return>
+</ExecuteResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

@@ -415,8 +415,18 @@ named by the first level that uses its column (`Product Id`, but `Name (Key)` fo
 `_0`, `_1`; the rows are ordered by all columns but the measure; no total-count row (`EnableTotalCount` is off). A
 non-trivial calculated member fails in eMondrian with a Java NullPointerException text
 (`execute_drillthrough_calc_member`, faultstring and description ignored); ours says
-`Cannot do DrillThrough operation on the cell` with the same fault code. Not ported: the schema's `DrillThroughAction`s
-(FoodmartBW.xml has none), virtual cubes, `Format` property values other than the exact `Tabular`.
+`Cannot do DrillThrough operation on the cell` with the same fault code. Not ported: virtual cubes, `Format` property
+values other than the exact `Tabular`.
+
+Drill-through actions (`execute_drillthrough_action*`, catalog `ZFMDRILL`, `reference/schema/FoodmartBWDrill.xml`: a
+cube on ZFMSALES's facts with a non-default action and a default one): without `RETURN` the default action's columns
+are the return list, a level, a dimension (its first level), a `sourceAttribute` column (Media Type without attribute
+hierarchy; the customer and day keys, which also make the order of the rows unique) and a measure, and its names
+replace the first column names by position (`XmlaHandler.executeDrillThroughQuery`); All members add no columns; with
+`RETURN` the action is ignored. Both sides keep a query ordered only by columns that are unique per row: the rows of a
+tie come back in another order from HSQLDB and HANA. Reading a dimension's key from the fact table instead of joining
+its table gives the same rows on FoodMart (the cases above); on an aDSO it was checked by hand on `ZCLVISITA`
+(`NUMC` values cast to the view's number type).
 
 ## Error cases (faults)
 

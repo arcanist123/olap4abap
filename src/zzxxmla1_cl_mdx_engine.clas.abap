@@ -115,7 +115,8 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
     "! Executes a DRILLTHROUGH statement (MondrianOlap4jStatement.executeQuery2): its query, then the fact rows of the
     "! first cell (RolapCell.drillThroughInternal with an extended context): every level column of the cube's
     "! hierarchies and the cell's measure, the columns constrained to the cell's members, at most MAXROWS rows after
-    "! the first FIRSTROWSET; with a RETURN clause only its levels and measures.
+    "! the first FIRSTROWSET; with a RETURN clause only its levels and measures, without one those of the cube's
+    "! default drill-through action, named as the action names them.
     METHODS drill_through
       IMPORTING statement     TYPE zzxxmla1_cl_mdx_parser=>ty_statement
       RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_facts=>ty_drill_through
@@ -135,6 +136,12 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       IMPORTING return_list   TYPE zzxxmla1_cl_mdx_node=>ty_t_node
       RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_facts=>ty_t_drill_item
       RAISING   zzxxmla1_cx_xmla.
+    "! The columns of a drill-through action as drill-through items (RolapDrillThroughColumn.getOlapElement, then
+    "! addNonConstrainingColumns): a level, the first level of a hierarchy or of a dimension's first hierarchy, a
+    "! column of a dimension's table or a measure.
+    METHODS action_items
+      IMPORTING action        TYPE zzxxmla1_cl_schema=>ty_t_drill_column
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_facts=>ty_t_drill_item.
     "! The fault of a failed drill-through (XmlaHandler.executeDrillThroughQuery: HSB_DRILL_THROUGH_SQL).
     CLASS-METHODS drill_through_error
       IMPORTING message TYPE string
@@ -1528,6 +1535,13 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
   METHOD drill_through.
     DATA(executed) = execute( statement-query ).
     DATA(items) = drill_through_items( statement-return_list ).
+    " without a RETURN clause the cube's default drill-through action gives the items and the names of the first
+    " columns (MondrianOlap4jStatement.executeQuery2, XmlaHandler.executeDrillThroughQuery)
+    DATA action TYPE zzxxmla1_cl_schema=>ty_t_drill_column.
+    IF statement-return_list IS INITIAL.
+      action = zzxxmla1_cl_schema=>get( )->drill_through_columns( schema_reader->cube-cube_name ).
+      items = action_items( action ).
+    ENDIF.
 
     " the cell of the coordinates 0 (CellSet.getCell): the first tuple of every axis in the context of the slicer, as
     " execute_stripe sets it; an empty axis has no cell
@@ -1602,6 +1616,43 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       items     = items
       max_rows  = statement-max_rows
       first_row = statement-first_rowset ).
+    " TabularRowSet.setColumnName: the action's names, by position (a level with a name column gives two columns)
+    LOOP AT action INTO DATA(column).
+      IF sy-tabix > lines( result-columns ).
+        EXIT.
+      ENDIF.
+      result-columns[ sy-tabix ]-name = column-name.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD action_items.
+    DATA(hierarchies) = schema_reader->get_model_hierarchies( ).
+    LOOP AT action INTO DATA(column).
+      IF column-meas_name IS NOT INITIAL.
+        READ TABLE schema_reader->measures TRANSPORTING NO FIELDS WITH KEY name = column-meas_name.
+        APPEND VALUE #( measure = sy-tabix ) TO result.
+        CONTINUE.
+      ENDIF.
+      " a column, a dimension: the dimension's first hierarchy (Dimension.getHierarchy)
+      DATA(hier_name) = column-hier_name.
+      IF hier_name IS INITIAL.
+        READ TABLE hierarchies INTO DATA(first) WITH KEY dim_name = column-dim_name.
+        hier_name = first-hier_name.
+      ENDIF.
+      READ TABLE hierarchies INTO DATA(hierarchy) WITH KEY dim_name = column-dim_name hier_name = hier_name.
+      DATA(position) = sy-tabix.
+      IF column-column IS NOT INITIAL.
+        APPEND VALUE #( hierarchy = position column = column-column name = column-name ) TO result.
+        CONTINUE.
+      ENDIF.
+      " a level, else the first level of the hierarchy
+      DATA(level) = 1.
+      IF column-level_name IS NOT INITIAL.
+        READ TABLE hierarchy-levels TRANSPORTING NO FIELDS WITH KEY level_name = column-level_name.
+        level = sy-tabix.
+      ENDIF.
+      APPEND VALUE #( hierarchy = position level = level ) TO result.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD trivial_member.
