@@ -17,6 +17,12 @@ By default:
     http://localhost:8083/  git       container emondrian-git (8091): the same build, catalog FoodMart (the sample)
     http://localhost:8084/  release   container emondrian-release (8090): the released eMondrian
 A backend that is not running answers 502 Bad Gateway.
+
+--auth-probe PORT adds a port that forwards nothing: it answers every request with 401 and the --challenge headers
+and prints how the client authenticated (no header, Basic and the user, Negotiate/NTLM, or a Bearer token and its
+claims). It shows whether Excel can be sent to Entra ID by a custom XMLA endpoint:
+    python scripts/xmla-proxy.py --https --auth-probe 8085                       # a Bearer challenge only
+    python scripts/xmla-proxy.py --https --auth-probe 8085 --challenge "Bearer authorization_uri=..." --challenge Basic
     python scripts/xmla-proxy.py --sap-url "https://localhost:50001/zzxxmla1?sap-client=001" --insecure
 
 In Excel: Data > Get Data > From Database > From Analysis Services, server http://localhost:8081/ (or 8082, ...).
@@ -29,11 +35,13 @@ trusts it; import it once into the current user's trusted root certificates:
     certutil -user -addstore Root logs/xmla-proxy/tls/cert.pem
 """
 import argparse
+import base64
 import datetime
 import functools
 import http.client
 import http.server
 import itertools
+import json
 import pathlib
 import re
 import shutil
@@ -48,6 +56,9 @@ import urllib.parse
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 HOP_BY_HOP = {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer",
               "transfer-encoding", "upgrade", "host", "content-length", "accept-encoding"}
+# the challenge Entra-protected APIs answer with: the authority to get a token from and the resource it is for
+DEFAULT_CHALLENGE = ('Bearer authorization_uri="https://login.microsoftonline.com/common/oauth2/authorize", '
+                     'resource_id="api://olap4abap"')
 counter = itertools.count(1)
 print_lock = threading.Lock()
 
@@ -218,6 +229,63 @@ def make_handler(backend, target, log_dir, insecure=False):
     return Handler
 
 
+def jwt_claims(token):
+    """The claims of a JWT that tell who issued it for whom (no signature check: only to see what a client sends)."""
+    try:
+        payload = token.split(".")[1]
+        claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
+    except (IndexError, ValueError):
+        return "not a JWT"
+    keys = ("aud", "iss", "appid", "azp", "app_displayname", "scp", "roles", "upn", "unique_name", "tid")
+    return ", ".join(f"{k}={claims[k]}" for k in keys if k in claims)
+
+
+def make_auth_probe(challenges, log_dir):
+    """Forwards nothing: answers every request with 401 and the challenges, and shows how the client authenticates."""
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def log_message(self, format, *args):
+            pass
+
+        def probe(self):
+            n = next(counter)
+            body = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+            authorization = self.headers.get("Authorization") or ""
+            scheme, _, credentials = authorization.partition(" ")
+            if not authorization:
+                seen = "no Authorization header"
+            elif scheme.lower() == "bearer":
+                seen = f"Bearer token: {jwt_claims(credentials)}"
+            elif scheme.lower() == "basic":
+                user = text_of(base64.b64decode(credentials + "==")).partition(":")[0]
+                seen = f"Basic, user {user}"
+            else:
+                seen = f"{scheme} ({len(credentials)} characters)"
+            # the credentials themselves are not saved
+            headers = [(k, scheme + " <redacted>" if k.lower() == "authorization" else v) for k, v in self.headers.items()]
+            save(log_dir, f"{n:04d}-auth-probe.request.txt", f"{self.command} {self.path}", headers, body)
+            response_body = f"xmla-proxy auth probe: {seen}\n".encode("utf-8")
+            self.send_response(401, "Unauthorized")
+            for challenge in challenges:
+                self.send_header("WWW-Authenticate", challenge)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(response_body)))
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(response_body)
+            action = (self.headers.get("SOAPAction") or "").strip('"').rsplit(":", 1)[-1]
+            with print_lock:
+                print(f"{datetime.datetime.now():%H:%M:%S} #{n:04d} probe    {self.command} {action:8} "
+                      f"{describe_request(body)}\n{'':23}-> 401  {seen}  "
+                      f"(User-Agent: {self.headers.get('User-Agent', '-')})", flush=True)
+
+        do_GET = do_POST = do_PUT = do_DELETE = do_HEAD = do_OPTIONS = probe
+
+    return Handler
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--mondrian-port", type=int, default=8081)
@@ -237,6 +305,11 @@ def main():
                         help="listen with https instead of http (a self-signed certificate unless --cert and --key)")
     parser.add_argument("--cert", help="certificate (PEM) for --https")
     parser.add_argument("--key", help="private key (PEM) of --cert")
+    parser.add_argument("--auth-probe", type=int, metavar="PORT",
+                        help="also listen on PORT, answer everything with 401 and the --challenge headers, and show "
+                             "how the client authenticates (forwards nothing)")
+    parser.add_argument("--challenge", action="append", metavar="HEADER",
+                        help="a WWW-Authenticate header of --auth-probe (repeatable); default: " + DEFAULT_CHALLENGE)
     args = parser.parse_args()
     tls = None
     if args.https:
@@ -255,8 +328,13 @@ def main():
     for extra in args.backend:
         name, port, target = extra.split("=", 2)
         backends.append((name, int(port), target))
-    for backend, port, target in backends:
-        server = http.server.ThreadingHTTPServer((args.bind, port), make_handler(backend, target, log_dir, args.insecure))
+    handlers = [(backend, port, target, make_handler(backend, target, log_dir, args.insecure))
+                for backend, port, target in backends]
+    if args.auth_probe:
+        challenges = args.challenge or [DEFAULT_CHALLENGE]
+        handlers.append(("probe", args.auth_probe, "401 " + " | ".join(challenges), make_auth_probe(challenges, log_dir)))
+    for backend, port, target, handler in handlers:
+        server = http.server.ThreadingHTTPServer((args.bind, port), handler)
         if tls:
             # the handshake runs in the request's thread, so a client that stalls in it blocks no other client
             server.socket = tls.wrap_socket(server.socket, server_side=True, do_handshake_on_connect=False)

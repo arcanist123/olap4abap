@@ -60,6 +60,11 @@ pointed at SAP. What Excel (MSOLAP 17) does: it offers binary XML and compressio
 `X-Transport-Caps-Negotiation-Flags` and takes plain XML when the server ignores that; it opens a session with an
 Execute without statement and `BeginSession`, sends `Session SessionId=...` with every request and ends with
 `EndSession`; it sends no `Content`, so every Discover answer needs the rowset's `xsd:schema` (Content SchemaData).
+`--auth-probe 8085` adds a port that forwards nothing. It answers every request with 401 and the `--challenge` headers
+(by default a `Bearer authorization_uri=` challenge pointing to Entra ID) and prints how the client authenticated: with
+no header, with Basic (and the user name), with Negotiate/NTLM, or with a Bearer token (and its claims `aud`, `iss`,
+`appid`, `upn`). The credentials themselves are not saved. The probe shows whether a custom XMLA endpoint can send
+Excel to Entra ID.
 
 Keep Only Selected Items (right-click a pivot item, Filter): Excel first sends its item path query (`with member
 measures.__XlItemPath as Generate(Ascendants(...))`, `__XlSiblingCount`, `__XlChildCount`) and only then the filtered
