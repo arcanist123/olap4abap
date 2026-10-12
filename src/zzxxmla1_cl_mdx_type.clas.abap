@@ -160,12 +160,35 @@ CLASS zzxxmla1_cl_mdx_type DEFINITION
     METHODS is_union_compatible
       IMPORTING other         TYPE REF TO zzxxmla1_cl_mdx_type
       RETURNING VALUE(result) TYPE abap_bool.
+    "! Type.computeCommonType: the most general type of this and the other one, none if they have none.
+    "! @parameter conversions | TypeUtil.computeCommonType's allowConversions: a dimension and a hierarchy of it have
+    "! the dimension's type
+    METHODS compute_common_type
+      IMPORTING other         TYPE REF TO zzxxmla1_cl_mdx_type
+                conversions   TYPE abap_bool DEFAULT abap_true
+      RETURNING VALUE(result) TYPE REF TO zzxxmla1_cl_mdx_type.
     "! The type as toString writes it, with ids instead of names (for tests).
     METHODS describe RETURNING VALUE(result) TYPE string.
 
   PRIVATE SECTION.
     CLASS-METHODS create
       IMPORTING kind          TYPE string
+      RETURNING VALUE(result) TYPE REF TO zzxxmla1_cl_mdx_type.
+    "! instanceof ScalarType: the scalar types and their subclasses.
+    METHODS is_scalar RETURNING VALUE(result) TYPE abap_bool.
+    "! equals of the scalar types: a ScalarType or SymbolType equals only a ScalarType, a DecimalType one of its scale.
+    METHODS scalar_equals
+      IMPORTING other         TYPE REF TO zzxxmla1_cl_mdx_type
+      RETURNING VALUE(result) TYPE abap_bool.
+    "! ScalarType.computeCommonType.
+    METHODS common_scalar_type
+      IMPORTING other         TYPE REF TO zzxxmla1_cl_mdx_type
+                conversions   TYPE abap_bool
+      RETURNING VALUE(result) TYPE REF TO zzxxmla1_cl_mdx_type.
+    "! TupleType.commonTupleType and createCommonTupleType.
+    METHODS common_tuple_type
+      IMPORTING other         TYPE REF TO zzxxmla1_cl_mdx_type
+                conversions   TYPE abap_bool
       RETURNING VALUE(result) TYPE REF TO zzxxmla1_cl_mdx_type.
 ENDCLASS.
 
@@ -415,7 +438,9 @@ CLASS zzxxmla1_cl_mdx_type IMPLEMENTATION.
     DATA(member1) = to_member_type( ).
     DATA(member2) = other->to_member_type( ).
     IF member1 IS BOUND AND member2 IS BOUND.
-      result = xsdbool( member1->hierarchy = member2->hierarchy ).
+      " TypeUtil.equal: an unknown hierarchy goes with any
+      result = xsdbool( member1->hierarchy = c_none OR member2->hierarchy = c_none
+                        OR member1->hierarchy = member2->hierarchy ).
       RETURN.
     ENDIF.
     IF kind = c_kind-tuple AND other->kind = c_kind-tuple AND lines( element_types ) = lines( other->element_types ).
@@ -426,6 +451,147 @@ CLASS zzxxmla1_cl_mdx_type IMPLEMENTATION.
       ENDLOOP.
       result = abap_true.
     ENDIF.
+  ENDMETHOD.
+
+  METHOD compute_common_type.
+    " MemberType.getValueType and TupleType.getValueType are a ScalarType (the value type of a measure is one too)
+    IF other IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    CASE kind.
+      WHEN c_kind-set.
+        IF other->kind <> c_kind-set.
+          RETURN.
+        ENDIF.
+        DATA(element) = COND #( WHEN element_type IS BOUND THEN element_type ELSE member_type( ) ).
+        DATA(common_element) = element->compute_common_type(
+                                 other       = COND #( WHEN other->element_type IS BOUND THEN other->element_type
+                                                       ELSE member_type( ) )
+                                 conversions = conversions ).
+        IF common_element IS BOUND.
+          result = set_type( common_element ).
+        ENDIF.
+      WHEN c_kind-member.
+        IF other->is_scalar( ) = abap_true.
+          result = scalar( )->compute_common_type( other = other conversions = conversions ).
+        ELSEIF other->kind = c_kind-tuple.
+          result = other->compute_common_type( other = me conversions = conversions ).
+        ELSEIF other->kind <> c_kind-member.
+          RETURN.
+        ELSEIF member IS NOT INITIAL AND member = other->member.
+          result = me.
+        ELSEIF level > 0 AND level = other->level.
+          result = member_type( dimension = dimension hierarchy = hierarchy level = level ).
+        ELSEIF hierarchy <> c_none AND hierarchy = other->hierarchy.
+          result = member_type( dimension = dimension hierarchy = hierarchy ).
+        ELSEIF dimension <> c_none AND dimension = other->dimension.
+          result = member_type( dimension = dimension ).
+        ELSE.
+          result = member_type( ).
+        ENDIF.
+      WHEN c_kind-tuple.
+        IF other->is_scalar( ) = abap_true.
+          result = scalar( )->compute_common_type( other = other conversions = conversions ).
+        ELSEIF other->kind = c_kind-member.
+          result = common_tuple_type( other = tuple_type( VALUE #( ( other ) ) ) conversions = conversions ).
+        ELSEIF other->kind = c_kind-tuple.
+          result = common_tuple_type( other = other conversions = conversions ).
+        ENDIF.
+      WHEN c_kind-level.
+        IF other->kind <> c_kind-level.
+          RETURN.
+        ELSEIF level > 0 AND level = other->level.
+          result = me.
+        ELSEIF hierarchy <> c_none AND hierarchy = other->hierarchy.
+          result = level_type( dimension = dimension hierarchy = hierarchy level = 0 ).
+        ELSEIF dimension <> c_none AND dimension = other->dimension.
+          result = level_type( dimension = dimension hierarchy = c_none level = 0 ).
+        ELSE.
+          result = level_type( dimension = c_none hierarchy = c_none level = 0 ).
+        ENDIF.
+      WHEN c_kind-hierarchy.
+        IF other->kind <> c_kind-hierarchy.
+          RETURN.
+        ELSEIF hierarchy <> c_none AND hierarchy = other->hierarchy.
+          result = me.
+        ELSEIF dimension <> c_none AND dimension = other->dimension.
+          result = hierarchy_type( dimension = dimension hierarchy = c_none ).
+        ELSE.
+          result = hierarchy_type( dimension = c_none hierarchy = c_none ).
+        ENDIF.
+      WHEN c_kind-dimension.
+        IF conversions = abap_true AND other->kind = c_kind-hierarchy.
+          IF other->dimension = dimension.
+            result = me.
+          ENDIF.
+        ELSEIF other->kind <> c_kind-dimension.
+          RETURN.
+        ELSEIF dimension <> c_none AND dimension = other->dimension.
+          result = dimension_type( dimension = dimension hierarchy = hierarchy ).
+        ELSE.
+          result = dimension_type( dimension = c_none ).
+        ENDIF.
+      WHEN c_kind-cube.
+        IF other->kind = c_kind-cube.
+          result = me.
+        ENDIF.
+      WHEN OTHERS.
+        result = common_scalar_type( other = other conversions = conversions ).
+    ENDCASE.
+  ENDMETHOD.
+
+  METHOD is_scalar.
+    result = xsdbool( kind = c_kind-boolean OR kind = c_kind-numeric OR kind = c_kind-decimal OR kind = c_kind-string
+                      OR kind = c_kind-datetime OR kind = c_kind-symbol OR kind = c_kind-null OR kind = c_kind-empty
+                      OR kind = c_kind-scalar ).
+  ENDMETHOD.
+
+  METHOD scalar_equals.
+    CASE kind.
+      WHEN c_kind-scalar OR c_kind-symbol.
+        result = xsdbool( other->kind = c_kind-scalar ).
+      WHEN c_kind-decimal.
+        result = xsdbool( other->kind = c_kind-decimal AND other->scale = scale ).
+      WHEN OTHERS.
+        result = xsdbool( other->kind = kind ).
+    ENDCASE.
+  ENDMETHOD.
+
+  METHOD common_scalar_type.
+    IF scalar_equals( other ) = abap_true.
+      result = me.
+    ELSEIF other->kind = c_kind-null.
+      result = me.
+    ELSEIF kind = c_kind-null AND other->is_scalar( ) = abap_true.
+      result = other.
+    ELSEIF kind = c_kind-scalar AND other->is_scalar( ) = abap_true.
+      result = me.
+    ELSEIF other->kind = c_kind-scalar.
+      result = other.
+    ELSEIF other->is_scalar( ) = abap_true.
+      result = scalar( ).
+    ELSEIF other->kind = c_kind-member OR other->kind = c_kind-tuple.
+      result = compute_common_type( other = scalar( ) conversions = conversions ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD common_tuple_type.
+    " the shorter tuple's elements with the longer one's, the rest of the longer one ScalarType
+    DATA(shorter) = COND #( WHEN lines( element_types ) < lines( other->element_types ) THEN me ELSE other ).
+    DATA(longer) = COND #( WHEN lines( element_types ) < lines( other->element_types ) THEN other ELSE me ).
+    DATA(common_elements) = VALUE ty_t_type( ).
+    LOOP AT shorter->element_types INTO DATA(element).
+      DATA(common_element) = element->compute_common_type( other       = longer->element_types[ sy-tabix ]
+                                                           conversions = conversions ).
+      IF common_element IS NOT BOUND.
+        RETURN.
+      ENDIF.
+      APPEND common_element TO common_elements.
+    ENDLOOP.
+    WHILE lines( common_elements ) < lines( longer->element_types ).
+      APPEND scalar( ) TO common_elements.
+    ENDWHILE.
+    result = tuple_type( common_elements ).
   ENDMETHOD.
 
   METHOD describe.

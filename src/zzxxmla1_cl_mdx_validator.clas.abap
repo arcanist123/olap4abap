@@ -1424,6 +1424,23 @@ CLASS zzxxmla1_cl_mdx_validator IMPLEMENTATION.
                && |{ schema_reader->get_hierarchy( level_hierarchy )-unique_name }| ).
           ENDIF.
         ENDIF.
+        IF to_upper( fun_def-name ) = `IIF` AND lines( args ) = 3.
+          " IifFunDef.getResultType: a scalar of the return category, else the common type of the two branches
+          CASE fun_def-return_category.
+            WHEN c_category-numeric.
+              result = zzxxmla1_cl_mdx_type=>numeric( ).
+            WHEN c_category-string.
+              result = zzxxmla1_cl_mdx_type=>string( ).
+            WHEN c_category-logical.
+              result = zzxxmla1_cl_mdx_type=>boolean( ).
+            WHEN OTHERS.
+              result = args[ 2 ]->get_type( )->compute_common_type( args[ 3 ]->get_type( ) ).
+          ENDCASE.
+          IF result IS NOT BOUND.
+            fail( |Cannot deduce type of call to function '{ fun_def-name }'| ).
+          ENDIF.
+          RETURN.
+        ENDIF.
         IF to_upper( fun_def-name ) = `GENERATE` AND lines( args ) > 1.
           " GenerateFunDef.getResultType: a string, or a set of the second argument's members or tuples
           DATA(second) = args[ 2 ]->get_type( ).

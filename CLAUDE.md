@@ -129,10 +129,11 @@ Read before designing anything:
   validator, evaluated by the evaluator's calculations (scoped solve order) through `ZZXXMLA1_IF_MDX_CALC` (Mondrian's
   `Calc`, implemented by the engine; calculations see the evaluator as `ZZXXMLA1_IF_MDX_EVALUATOR`, `Evaluator`, and
   its schema reader as `ZZXXMLA1_IF_MDX_SCHEMA_READER`, `SchemaReader`; the compiled calculations of members made while
-  the query runs are kept by the root evaluator, `RolapEvaluatorRoot`), with arithmetic, comparisons, logic, `IIf` and string functions. Format strings
+  the query runs are kept by the root evaluator, `RolapEvaluatorRoot`), with arithmetic, comparisons, logic, `IIf` (also of sets, members, tuples, levels and dimensions: typed by the
+  common type of its branches, `TypeUtil.computeCommonType`, as Excel's filter lists need) and string functions. Format strings
   are a port of `mondrian.util.Format` (`ZZXXMLA1_CL_MDX_FORMAT`). `Order` (Mondrian's `Sorter`
   comparators), `Filter`, `TopCount`/`BottomCount`, `:`, `Descendants`, `IsEmpty`, `Cast`, `Aggregate`, the set algebra (`Union`, `Except`,
-  `Intersect`, `Head`/`Tail`, `Distinct`, `Item`, `SetToStr`) and the aggregates (`Count`, `Sum`, `Avg`, `Min`, `Max`,
+  `Intersect`, `Head`/`Tail`, `Distinct`, `Item`, `SetToStr`, `NonEmpty`) and the aggregates (`Count`, `Sum`, `Avg`, `Min`, `Max`,
   `Rank`), named sets (`WITH SET`, aliases `AS`, `Current`, `CurrentOrdinal`), `Generate` and the member
   functions (`Parent`, `Lag`, `Ancestor`, `ParallelPeriod`, `PeriodsToDate`, `UniqueName`, `OrderKey`, ..., with the
   null member `[Hierarchy].[#null]`), the operators `IN`, `MATCHES` (Mondrian's UDFs, in the funtable from

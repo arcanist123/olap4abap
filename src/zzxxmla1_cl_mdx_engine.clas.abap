@@ -263,6 +263,14 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
                 tuples        TYPE ty_t_tuple
       RETURNING VALUE(result) TYPE ty_t_tuple
       RAISING   zzxxmla1_cx_xmla.
+    "! NonEmpty(set [, set]) (NonEmptyFunDef.NonEmptyListCalcImpl): the tuples of the first set, evaluated non-empty,
+    "! whose cell is not empty with one of the tuples of the second set (evaluated not non-empty), or in the context
+    "! without a second set.
+    METHODS non_empty_set
+      IMPORTING evaluator     TYPE ty_evaluator
+                node          TYPE ty_node
+      RETURNING VALUE(result) TYPE ty_t_tuple
+      RAISING   zzxxmla1_cx_xmla.
     "! FunUtil.getNonEmptyLevelMembers (RolapSchemaReader.getLevelMembers with the evaluator): under a non-empty
     "! evaluator the members of a level of more than LevelPreCacheThreshold members are read with a
     "! SqlContextConstraint (context_members); otherwise all of them. The reference constrains them by the other axes
@@ -413,6 +421,12 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
                 call          TYPE ty_node
                 index         TYPE i
       RETURNING VALUE(result) TYPE ty_t_tuple
+      RAISING   zzxxmla1_cx_xmla.
+    "! IifFunDef.compileCall: the index of the argument the condition chooses, 2 if it is true, else 3.
+    METHODS iif_branch
+      IMPORTING evaluator     TYPE ty_evaluator
+                node          TYPE ty_node
+      RETURNING VALUE(result) TYPE i
       RAISING   zzxxmla1_cx_xmla.
     "! The key of a function definition: name, syntax and the categories of the matching signature, e.g.
     "! MEMBERS|Property|3.
@@ -1893,6 +1907,38 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     evaluator->restore( savepoint ).
   ENDMETHOD.
 
+  METHOD non_empty_set.
+    " the context is not restored between the tuples, only at the end
+    DATA(savepoint) = evaluator->savepoint( ).
+    TRY.
+        evaluator->set_non_empty( abap_false ).
+        DATA(right_tuples) = COND ty_t_tuple( WHEN lines( node->args ) > 1
+                                              THEN evaluate_arg_as_set( evaluator = evaluator call = node index = 2 ) ).
+        evaluator->set_non_empty( abap_true ).
+        DATA(left_tuples) = evaluate_arg_as_set( evaluator = evaluator call = node index = 1 ).
+        LOOP AT left_tuples INTO DATA(left_tuple).
+          IF lines( node->args ) = 1.
+            evaluator->set_context_members( left_tuple ).
+            IF evaluator->evaluate_current( )-empty = abap_false.
+              APPEND left_tuple TO result.
+            ENDIF.
+            CONTINUE.
+          ENDIF.
+          LOOP AT right_tuples INTO DATA(right_tuple).
+            evaluator->set_context_members( left_tuple ).
+            evaluator->set_context_members( right_tuple ).
+            IF evaluator->evaluate_current( )-empty = abap_false.
+              APPEND left_tuple TO result.
+              EXIT.
+            ENDIF.
+          ENDLOOP.
+        ENDLOOP.
+      CLEANUP.
+        evaluator->restore( savepoint ).
+    ENDTRY.
+    evaluator->restore( savepoint ).
+  ENDMETHOD.
+
   METHOD non_empty_level_members.
     result = schema_reader->get_level_members( level ).
     IF evaluator->is_non_empty( ) = abap_true AND lines( result ) > c_level_pre_cache_threshold.
@@ -2355,6 +2401,11 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         result = drilldown_member( evaluator = evaluator node = node ).
       WHEN `EXISTS|Function|8,8`.
         result = exists( evaluator = evaluator node = node ).
+      WHEN `NONEMPTY|Function|8` OR `NONEMPTY|Function|8,8`.
+        result = non_empty_set( evaluator = evaluator node = node ).
+      WHEN `IIF|Function|5,8,8`.
+        result = evaluate_arg_as_set( evaluator = evaluator call = node
+                                      index     = iif_branch( evaluator = evaluator node = node ) ).
       WHEN OTHERS.
         not_implemented( node ).
     ENDCASE.
@@ -2368,6 +2419,10 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       " * and () take members and tuples too
       result = VALUE #( ( evaluate_tuple( evaluator = evaluator node = arg ) ) ).
     ENDIF.
+  ENDMETHOD.
+
+  METHOD iif_branch.
+    result = COND #( WHEN evaluate_boolean( evaluator = evaluator node = node->args[ 1 ] ) = abap_true THEN 2 ELSE 3 ).
   ENDMETHOD.
 
   METHOD evaluate_tuple.
@@ -2384,6 +2439,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     ELSEIF node->kind = zzxxmla1_cl_mdx_node=>c_kind-resolved_call
         AND to_upper( node->fun_def-name ) = `CURRENT` AND node->fun_def-syntax = zzxxmla1_cl_mdx_node=>c_syntax-property.
       result = named_set_current( evaluator = evaluator node = node ).
+    ELSEIF node->kind = zzxxmla1_cl_mdx_node=>c_kind-resolved_call AND key_of( node ) = `IIF|Function|5,10,10`.
+      result = evaluate_tuple( evaluator = evaluator node = node->args[ iif_branch( evaluator = evaluator node = node ) ] ).
     ELSE.
       result = VALUE #( ( evaluate_member( evaluator = evaluator node = node ) ) ).
     ENDIF.
@@ -2442,6 +2499,9 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
             result = current_date_member( evaluator = evaluator node = node ).
           WHEN `LASTNONEMPTY|Function|8,6`.
             result = last_non_empty( evaluator = evaluator node = node ).
+          WHEN `IIF|Function|5,6,6`.
+            result = evaluate_member( evaluator = evaluator
+                                      node      = node->args[ iif_branch( evaluator = evaluator node = node ) ] ).
           WHEN `COUSIN|Function|6,6`.
             result = cousin( member = evaluate_member( evaluator = evaluator node = node->args[ 1 ] )
                              ancestor = evaluate_member( evaluator = evaluator node = node->args[ 2 ] ) ).
@@ -2483,6 +2543,10 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
             WHEN `HIERARCHY|Property|4`.
               result = schema_reader->get_level( evaluate_level( evaluator = evaluator node = node->args[ 1 ] ) )-hierarchy.
               RETURN.
+            WHEN `IIF|Function|5,3,3` OR `IIF|Function|5,2,2`.
+              result = evaluate_hierarchy( evaluator = evaluator
+                                           node      = node->args[ iif_branch( evaluator = evaluator node = node ) ] ).
+              RETURN.
           ENDCASE.
         ENDIF.
         result = evaluate_member( evaluator = evaluator node = node )-hier_id.
@@ -2498,6 +2562,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       not_implemented( node ).
     ENDIF.
     CASE key_of( node ).
+      WHEN `IIF|Function|5,4,4`.
+        result = evaluate_level( evaluator = evaluator node = node->args[ iif_branch( evaluator = evaluator node = node ) ] ).
       WHEN `LEVEL|Property|6`.
         result = evaluate_member( evaluator = evaluator node = node->args[ 1 ] )-level.
       WHEN `LEVELS|Method|3,7`.
@@ -4717,6 +4783,10 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
           RETURN.
         WHEN `DIMENSION|Property|2`.
           result = evaluate_dimension( evaluator = evaluator node = node->args[ 1 ] ).
+          RETURN.
+        WHEN `IIF|Function|5,2,2`.
+          result = evaluate_dimension( evaluator = evaluator
+                                       node      = node->args[ iif_branch( evaluator = evaluator node = node ) ] ).
           RETURN.
       ENDCASE.
     ENDIF.

@@ -49,6 +49,8 @@ CLASS ltc_engine DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT
     METHODS ancestors_and_periods FOR TESTING RAISING zzxxmla1_cx_xmla.
     METHODS names_and_order_keys FOR TESTING RAISING zzxxmla1_cx_xmla.
     METHODS in_is_matches FOR TESTING RAISING zzxxmla1_cx_xmla.
+    METHODS iif_of_sets_members_levels FOR TESTING RAISING zzxxmla1_cx_xmla.
+    METHODS non_empty_function FOR TESTING RAISING zzxxmla1_cx_xmla.
     METHODS existing_and_exists FOR TESTING RAISING zzxxmla1_cx_xmla.
     METHODS scalar_functions FOR TESTING RAISING zzxxmla1_cx_xmla.
     METHODS set_functions_of_the_model FOR TESTING RAISING zzxxmla1_cx_xmla.
@@ -632,6 +634,53 @@ CLASS ltc_engine IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = values( result )
                                         exp = VALUE string_table( ( `0` ) ( `0` ) ( `1` ) ( `0` ) ( `1` ) ( `1` )
                                                                   ( `1` ) ( `0` ) ( `1` ) ) ).
+  ENDMETHOD.
+
+  METHOD iif_of_sets_members_levels.
+    " IifFunDef: the condition chooses the branch, for sets, members, tuples, levels and dimensions as for scalars;
+    " answers of the reference server (reference/execute_iif_*)
+    DATA(result) = execute( `select IIf([Measures].[Unit Sales] > 0, {}, [Product].[Product Family].Members) on 0, `
+                         && `IIf([Measures].[Unit Sales] > 0, [Product].[Product Family].Members, {}) on 1 `
+                         && `from [ZFMSALES]` ).
+    cl_abap_unit_assert=>assert_initial( result-axes[ 1 ]-tuples ).
+    cl_abap_unit_assert=>assert_equals( act = lines( result-axes[ 2 ]-tuples ) exp = 4 ).
+    " the members of {} are of no hierarchy, so they can be united with any (TypeUtil.isUnionCompatible)
+    result = execute( `select Union(IIf(1 = 1, {}, [Store].[Store Country].Members), `
+                   && `[Product].[Product Family].Members) on 0 from [ZFMSALES]` ).
+    cl_abap_unit_assert=>assert_equals( act = lines( result-axes[ 1 ]-tuples ) exp = 4 ).
+    result = execute( `with member [Measures].[m] as 'IIf(1 = 0, [Measures].[Unit Sales], [Measures].[Store Sales])' `
+                   && `select {[Measures].[m], [Measures].[Store Sales]} on 0, `
+                   && `{IIf(1 = 1, ([Product].[Food], [Store].[USA]), ([Product].[Drink], [Store].[Canada])), `
+                   && `(IIf(1 = 0, [Product].[Food], [Product].[Drink]), [Store].[USA])} on 1 from [ZFMSALES]` ).
+    cl_abap_unit_assert=>assert_equals( act = VALUE string_table( FOR tuple IN result-axes[ 2 ]-tuples
+                                                                  ( concat_lines_of( table = VALUE string_table(
+                                                                      FOR member IN tuple ( member-unique_name ) )
+                                                                                      sep   = `,` ) ) )
+                                        exp = VALUE string_table( ( `[Product].[Food],[Store].[USA]` )
+                                                                  ( `[Product].[Drink],[Store].[USA]` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = values( result )
+                                        exp = VALUE string_table( ( `409035.59` ) ( `409035.59` )
+                                                                  ( `48836.21` ) ( `48836.21` ) ) ).
+    result = execute( `select IIf(1 = 0, [Product].[Product Family], [Product].[Product Department]).Members on 0, `
+                   && `{IIf(1 = 0, [Product], [Store]).DefaultMember} on 1 from [ZFMSALES]` ).
+    cl_abap_unit_assert=>assert_equals( act = lines( result-axes[ 1 ]-tuples ) exp = 24 ).
+    cl_abap_unit_assert=>assert_equals( act = result-axes[ 2 ]-tuples[ 1 ][ 1 ]-unique_name exp = `[Store].[All Stores]` ).
+  ENDMETHOD.
+
+  METHOD non_empty_function.
+    " NonEmptyFunDef: the tuples of the first set with a value with one of the second set's, or in the context; Canada
+    " and Mexico have no sales in 1997 and the initial member of Product none at all (reference/execute_nonempty)
+    DATA(result) = execute( `select NonEmpty([Product].[Product Family].Members, {[Store].[All Stores]}) on 0, `
+                         && `NonEmpty([Store].[Store Country].Members) on 1 from [ZFMSALES] where [Time].[1997].[Q1]` ).
+    cl_abap_unit_assert=>assert_equals( act = tuples( result )
+                                        exp = VALUE string_table( ( `[Product].[Drink]` ) ( `[Product].[Food]` )
+                                                                  ( `[Product].[Non-Consumable]` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = lines( result-axes[ 2 ]-tuples ) exp = 1 ).
+    cl_abap_unit_assert=>assert_equals( act = values( result )
+                                        exp = VALUE string_table( ( `5976` ) ( `47809` ) ( `12506` ) ) ).
+    " with an empty second set nothing has a value
+    result = execute( `select NonEmpty([Product].[Product Family].Members, {}) on 0 from [ZFMSALES]` ).
+    cl_abap_unit_assert=>assert_initial( result-axes[ 1 ]-tuples ).
   ENDMETHOD.
 
   METHOD existing_and_exists.

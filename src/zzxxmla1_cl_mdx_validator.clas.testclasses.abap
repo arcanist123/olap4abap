@@ -47,6 +47,7 @@ CLASS ltc_validator DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SH
     METHODS tuple_of_one_member FOR TESTING RAISING zzxxmla1_cx_xmla.
     METHODS order_keys FOR TESTING RAISING zzxxmla1_cx_xmla.
     METHODS named_sets FOR TESTING RAISING zzxxmla1_cx_xmla.
+    METHODS iif_types FOR TESTING RAISING zzxxmla1_cx_xmla.
 ENDCLASS.
 
 CLASS ltc_validator IMPLEMENTATION.
@@ -139,6 +140,48 @@ CLASS ltc_validator IMPLEMENTATION.
   METHOD not_implemented.
     assert_axis_fails( expr     = `StrToSet("{[Product].[Food]}")`
                        expected = `The function StrToSet(<String Expression>) is not implemented yet` ).
+  ENDMETHOD.
+
+  METHOD iif_types.
+    " IifFunDef.getResultType: the common type of the two branches (TypeUtil.computeCommonType), not the type of the
+    " condition; Excel's filter lists choose between {} and a set
+    DATA(hierarchies) = reader->get_hierarchies( ).
+    DATA(product) = hierarchies[ unique_name = `[Product]` ]-id.
+    DATA(set) = axis( `IIf(1 = 1, {}, [Product].[Product Family].Members)` ).
+    cl_abap_unit_assert=>assert_equals( act = set->fun_def-signature
+                                        exp = `<Set> IIf(<Logical Expression>, <Set>, <Set>)` ).
+    cl_abap_unit_assert=>assert_equals( act = set->get_type( )->describe( ) exp = `SetType<MemberType<>>` ).
+    " members of two levels of a hierarchy: a member of the hierarchy
+    set = axis( `IIf(1 = 1, [Product].[Product Family].Members, [Product].[Product Department].Members)` ).
+    cl_abap_unit_assert=>assert_equals( act = set->get_type( )->describe( ) exp = |SetType<MemberType<hierarchy={ product }>>| ).
+    " two members of a level: a member of the level
+    DATA(family) = axis( `[Product].[Product Family].Members` )->get_type( )->element_type->describe( ).
+    set = axis( `{IIf(1 = 1, [Product].[Food], [Product].[Drink])}` ).
+    cl_abap_unit_assert=>assert_equals( act = set->args[ 1 ]->get_type( )->describe( ) exp = family ).
+    set = axis( `{IIf(1 = 1, [Product].[Food], [Store].[USA])}` ).
+    cl_abap_unit_assert=>assert_equals( act = set->args[ 1 ]->get_type( )->describe( ) exp = `MemberType<>` ).
+    " tuples element by element
+    set = axis( `{IIf(1 = 1, ([Product].[Food], [Store].[USA]), ([Product].[Drink], [Store].[Canada]))}` ).
+    cl_abap_unit_assert=>assert_equals( act = set->args[ 1 ]->fun_def-signature
+                                        exp = `<Tuple> IIf(<Logical Expression>, <Tuple>, <Tuple>)` ).
+    DATA(tuple) = set->args[ 1 ]->get_type( ).
+    cl_abap_unit_assert=>assert_equals( act = tuple->get_arity( ) exp = 2 ).
+    cl_abap_unit_assert=>assert_equals( act = tuple->element_types[ 1 ]->describe( ) exp = family ).
+    " two levels of a hierarchy: a level of the hierarchy
+    DATA(members) = axis( `IIf(1 = 1, [Product].[Product Family], [Product].[Product Department]).Members` ).
+    DATA(level) = members->args[ 1 ]->get_type( ).
+    cl_abap_unit_assert=>assert_equals( act = level->kind exp = zzxxmla1_cl_mdx_type=>c_kind-level ).
+    cl_abap_unit_assert=>assert_equals( act = level->get_level( ) exp = 0 ).
+    cl_abap_unit_assert=>assert_equals( act = level->get_hierarchy( ) exp = product ).
+    " two dimensions: DimensionType.Unknown
+    set = axis( `{IIf(1 = 1, [Product], [Store]).DefaultMember}` ).
+    cl_abap_unit_assert=>assert_equals( act = set->args[ 1 ]->args[ 1 ]->get_type( )->describe( )
+                                        exp = `DimensionType<dimension=-1>` ).
+    " the scalar variants keep the type of their return category
+    DATA(query) = resolve( `with member [Measures].[x] as 'IIf(1 = 1, 1, 2)' `
+                        && `member [Measures].[y] as 'IIf(1 = 1, "a", "b")' select from [ZFMSALES]` ).
+    cl_abap_unit_assert=>assert_equals( act = query-formulas[ 1 ]-expression->get_type( )->describe( ) exp = `NumericType` ).
+    cl_abap_unit_assert=>assert_equals( act = query-formulas[ 2 ]-expression->get_type( )->describe( ) exp = `StringType` ).
   ENDMETHOD.
 
   METHOD named_sets.

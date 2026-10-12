@@ -1,0 +1,6 @@
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<SOAP-ENV:Body>
+<Execute xmlns="urn:schemas-microsoft-com:xml-analysis" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<Command><Statement>with member [Measures].[m] as 'IIf(1 = 0, [Measures].[Unit Sales], [Measures].[Store Sales])' select {[Measures].[m], [Measures].[Store Sales]} on 0, {IIf(1 = 1, ([Product].[Food], [Store].[USA]), ([Product].[Drink], [Store].[Canada])), (IIf(1 = 0, [Product].[Food], [Product].[Drink]), [Store].[USA])} on 1 from [ZFMSALES]</Statement></Command>
+<Properties><PropertyList><DataSourceInfo>ABAP BW</DataSourceInfo><Catalog>ZFOODMART</Catalog><Format>Multidimensional</Format><AxisFormat>TupleFormat</AxisFormat><Content>SchemaData</Content></PropertyList></Properties>
+</Execute></SOAP-ENV:Body></SOAP-ENV:Envelope>
