@@ -165,8 +165,10 @@ Read before designing anything:
   answers carry the query's `DIMENSION PROPERTIES` (olap4j's standard member properties) and `CELL PROPERTIES`.
   Subselects (`FROM (SELECT ... FROM ...)`, Excel's pivot filters) are eMondrian's subcube: the axes of every inner
   SELECT become a predicate that every fact read adds (`Query.getSubcubePredicates`, `ZZXXMLA1_CL_MDX_FACTS=>set_subcube`),
-  so totals cover only the subcube; member sets, `-`, `Head`, `CrossJoin`, `Union` and `Members` are understood, `Filter`
-  not yet, any other function fails the query as in eMondrian.
+  so totals cover only the subcube; member sets, `-`, `Head`, `CrossJoin`, `Union`, `Members` and `Filter` on the
+  name, caption or key of the current member (`addFilterToSubcubePredicates`; also `member_caption`, Excel's "equals"
+  label filter, our fix of eMondrian, `scripts/patches/subcube-filter-member-caption.patch`) are understood, any other
+  function or condition fails the query as in eMondrian.
   `DRILLTHROUGH` (Excel's double click on a cell, `MAXROWS`, `FIRSTROWSET`, `RETURN`) gives the fact rows of the
   query's first cell as a tabular rowset (`ZZXXMLA1_CL_MDX_ENGINE=>drill_through`, `RolapCell.drillThroughInternal`;
   `ZZXXMLA1_CL_MDX_FACTS=>drill_through`, `DrillThroughQuerySpec`; `ZZXXMLA1_CL_XMLA_TABULAR`, `TabularRowSet`): every

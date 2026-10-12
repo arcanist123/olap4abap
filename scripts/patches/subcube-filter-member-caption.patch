@@ -1,0 +1,29 @@
+diff --git a/mondrian/src/main/java/mondrian/olap/Query.java b/mondrian/src/main/java/mondrian/olap/Query.java
+index a8795ab7d..11fe68e38 100644
+--- a/mondrian/src/main/java/mondrian/olap/Query.java
++++ b/mondrian/src/main/java/mondrian/olap/Query.java
+@@ -2941,7 +2941,9 @@ public class Query extends QueryPart {
+         }
+         FunCall propertyFunCall = (FunCall) exp;
+         if ((!propertyFunCall.getFunName().equalsIgnoreCase("Name")
+-            && !propertyFunCall.getFunName().equalsIgnoreCase("Caption"))
++            && !propertyFunCall.getFunName().equalsIgnoreCase("Caption")
++            && !propertyFunCall.getFunName().equalsIgnoreCase(Property.MEMBER_NAME.getName())
++            && !propertyFunCall.getFunName().equalsIgnoreCase(Property.MEMBER_CAPTION.getName()))
+             || propertyFunCall.getArgCount() != 1)
+         {
+             return false;
+@@ -3051,6 +3053,13 @@ public class Query extends QueryPart {
+             return new CurrentMemberPropertyReference(keyColumn, false);
+         }
+ 
++        // the intrinsic properties MEMBER_CAPTION and MEMBER_NAME (Excel's label filters) are Caption and Name
++        if (propertyName.equalsIgnoreCase(Property.MEMBER_CAPTION.getName())) {
++            propertyName = "Caption";
++        } else if (propertyName.equalsIgnoreCase(Property.MEMBER_NAME.getName())) {
++            propertyName = "Name";
++        }
++
+         if (!propertyName.equalsIgnoreCase("Name")
+             && !propertyName.equalsIgnoreCase("Caption"))
+         {

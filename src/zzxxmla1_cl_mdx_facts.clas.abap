@@ -38,13 +38,23 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
     TYPES ty_t_paths TYPE STANDARD TABLE OF string_table WITH EMPTY KEY.
     "! A node of the subcube predicate (the reference server's StarPredicate of Query.getSubcubePredicates): AND, OR or NOT of its
     "! children (indexes in the predicate table), MEMBER (the facts of a member: the key columns of its levels equal
-    "! its path; the All member any fact) or FALSE.
+    "! its path; the All member any fact), VALUE (a column of a hierarchy's table equal to a value, as text if quoted, or NULL,
+    "! ValueColumnPredicate), TRUE or FALSE.
     TYPES ty_t_index TYPE STANDARD TABLE OF i WITH EMPTY KEY.
+    TYPES:
+      BEGIN OF ty_value_column,
+        hierarchy TYPE i,
+        column    TYPE string,
+        value     TYPE string,
+        is_null   TYPE abap_bool,   " the column IS NULL
+        quoted    TYPE abap_bool,   " the value is compared as a string literal, else as a number
+      END OF ty_value_column.
     TYPES:
       BEGIN OF ty_predicate,
         kind     TYPE string,
         children TYPE ty_t_index,
         member   TYPE ty_filter,
+        column   TYPE ty_value_column,
       END OF ty_predicate,
       "! the nodes of a predicate, the root first; empty: no restriction
       ty_t_predicate TYPE STANDARD TABLE OF ty_predicate WITH EMPTY KEY.
@@ -54,6 +64,8 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
         or     TYPE string VALUE `OR`,
         not    TYPE string VALUE `NOT`,
         member TYPE string VALUE `MEMBER`,
+        value  TYPE string VALUE `VALUE`,
+        true   TYPE string VALUE `TRUE`,
         false  TYPE string VALUE `FALSE`,
       END OF c_predicate.
     TYPES:
@@ -324,8 +336,24 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
           result = |( { concat_lines_of( table = parts sep = | { node-kind } | ) } )|.
         ENDIF.
       WHEN c_predicate-not.
-        result = |NOT { predicate_sql( EXPORTING predicate = predicate index = node-children[ 1 ]
-                                       CHANGING  joined    = joined ) }|.
+        result = |NOT ( { predicate_sql( EXPORTING predicate = predicate index = node-children[ 1 ]
+                                         CHANGING  joined    = joined ) } )|.
+      WHEN c_predicate-value.
+        id = node-column-hierarchy.
+        IF NOT line_exists( joined[ table_line = id ] ).
+          APPEND id TO joined.
+        ENDIF.
+        DATA(column) = |s{ id }.{ zzxxmla1_cl_sql=>quote( node-column-column ) }|.
+        IF node-column-is_null = abap_true.
+          result = |{ column } IS NULL|.
+        ELSEIF node-column-quoted = abap_true.
+          " a string comparison: the column may be a number, so its text is compared
+          result = |TO_NVARCHAR( { column } ) = { zzxxmla1_cl_sql=>literal( node-column-value ) }|.
+        ELSE.
+          result = |{ column } = { node-column-value }|.
+        ENDIF.
+      WHEN c_predicate-true.
+        result = `1 = 1`.
       WHEN OTHERS.
         result = `1 = 0`.
     ENDCASE.

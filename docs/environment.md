@@ -55,7 +55,10 @@ operand that was not evaluated); `ZZXXMLA1_CL_MDX_ENGINE=>IN_OPERAND_ORDER` does
 ("Empty Set in Slicer", 2022) returns empty axes whenever the context holds a null member, but Mondrian's placeholder
 of a compound slicer (`RolapResult.CompoundSlicerRolapMember`) delegates to the null member, so every query with a
 slicer of several tuples had empty axes and no cells (Mondrian's own tests expect values, e.g. `AccessControlTest`:
-4,163). The patch exempts the placeholder. To put a patched jar into the running container without a full rebuild:
+4,163). The patch exempts the placeholder. `subcube-filter-member-caption.patch` (2026-10-12):
+`Query.addFilterToSubcubePredicates` accepts `.Name`, `.Caption` and `.Key` of the current member but not
+`.member_caption`, which Excel's label filters send, so every label filter failed; the patch reads `MEMBER_CAPTION` and
+`MEMBER_NAME` as `Caption` and `Name`. To put a patched jar into the running container without a full rebuild:
 
     git -C mondrian apply ../scripts/patches/compound-slicer.patch
     (cd mondrian/mondrian && mvn -B -o install -DskipTests)     # about 30 s

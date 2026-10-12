@@ -159,7 +159,15 @@ Excel's label and value filters (recorded on eMondrian through `scripts/xmla-pro
 `Generate(... AS [XL_Filter_Set_0], TopCount(Filter(Except(DrilldownLevel(...)))))`. eMondrian refuses every one of
 them: `addFilterToSubcubePredicates` accepts only `[Level].CurrentMember.Name/Caption/Key` compared by `=` or `<>`
 (Excel writes the hierarchy and `member_caption`), and the Top 10 form fails with "MDX object '[XL_Filter_Set_0]' not
-found". Supporting them goes beyond the reference; decided separately.
+found". Ported 2026-10-12: `Filter` in a subselect is `addFilterToSubcubePredicates` (`ZZXXMLA1_CL_MDX_ENGINE=>
+add_subcube_filter`: `=`, `<>`, `NOT`, `AND`, `OR`, `IsEmpty` of the current member's `Name`, `Caption`, `Key` or
+`Properties(...)` against a literal, as a `VALUE` predicate on the level's column), and `MEMBER_CAPTION`/`MEMBER_NAME`
+count as `Caption`/`Name` in olap4abap and in the reference (`scripts/patches/subcube-filter-member-caption.patch`), so
+Excel's "equals"/"does not equal" label filters work. The current member of a hierarchy compares its lowest level
+(`getCurrentMemberComparisonLevel`), so they work on flat hierarchies (the schema builder's), not on a level above the
+lowest of a user hierarchy. The other label filters, value filters and Top 10 still fail as in the reference. One
+deviation: a constant true condition (`1 = 1`) makes eMondrian fail with a NullPointerException
+(`LiteralStarPredicate` has no column); olap4abap does not restrict the subcube.
 
 Suggested next: the performance of #85 and #46 (one minute each); the functions Mondrian's tests do not reach
 (`StrToSet`, `StrToTuple`, `Extract`, `Cache`, ...); `checkDimensionFilter` (a native `Filter` operand). Re-running

@@ -141,6 +141,16 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       RAISING   zzxxmla1_cx_xmla.
     TYPES ty_node TYPE REF TO zzxxmla1_cl_mdx_node.
     TYPES ty_evaluator TYPE REF TO zzxxmla1_if_mdx_evaluator.
+    TYPES:
+      "! Query.CurrentMemberPropertyReference: a level of a hierarchy, the column of its table a property reads and
+      "! whether a value is compared to it as a string.
+      BEGIN OF ty_property_reference,
+        found        TYPE abap_bool,
+        hierarchy    TYPE i,
+        level        TYPE i,          " the level in the model, from 1
+        column       TYPE string,
+        force_string TYPE abap_bool,
+      END OF ty_property_reference.
     CONSTANTS:
       BEGIN OF c_category,
         dimension TYPE i VALUE 2,
@@ -1126,8 +1136,9 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       RAISING   zzxxmla1_cx_xmla.
     "! The reference server's Query.getSubcubePredicates: the subcube of the subselects as a predicate on the facts, the predicates
     "! of the axes of every subselect ANDed; none without subselect. Only the form of an axis counts: member sets ({},
-    "! in parentheses), - (all but), Head of a member set, CrossJoin (AND), Union (OR), and Members, AllMembers,
-    "! Children and Descendants (no restriction); any other function fails the query.
+    "! in parentheses), - (all but), Head of a member set, CrossJoin (AND), Union (OR), Filter on the name, caption or
+    "! key of the current member, and Members, AllMembers, Children and Descendants (no restriction); any other
+    "! function fails the query.
     METHODS subcube_predicate
       IMPORTING query         TYPE zzxxmla1_cl_mdx_parser=>ty_query
       RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_facts=>ty_t_predicate
@@ -1148,6 +1159,68 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       CHANGING  sets      TYPE zzxxmla1_cl_mdx_facts=>ty_t_index
                 predicate TYPE zzxxmla1_cl_mdx_facts=>ty_t_predicate
       RAISING   zzxxmla1_cx_xmla.
+    "! addFilterToSubcubePredicates: Filter(set, condition) as the predicates of the set and the predicate of the
+    "! condition (negated NOT); a condition that is no predicate fails the query.
+    METHODS add_subcube_filter
+      IMPORTING node      TYPE ty_node
+                negated   TYPE abap_bool
+      CHANGING  sets      TYPE zzxxmla1_cl_mdx_facts=>ty_t_index
+                predicate TYPE zzxxmla1_cl_mdx_facts=>ty_t_predicate
+      RAISING   zzxxmla1_cx_xmla.
+    "! isSupportedNonEmptyFilterCondition: whether a Filter condition of a subselect is accepted (a predicate, IsEmpty,
+    "! NOT, AND, OR, parentheses, = and <> of accepted operands).
+    METHODS is_subcube_condition
+      IMPORTING node          TYPE ty_node
+      RETURNING VALUE(result) TYPE abap_bool.
+    "! isSupportedFilterConditionOperand: a property of the current member, a string or numeric literal, the name or
+    "! caption of the current member, or an accepted condition.
+    METHODS is_subcube_operand
+      IMPORTING node          TYPE ty_node
+      RETURNING VALUE(result) TYPE abap_bool.
+    "! createConditionSubcubePredicate: the predicate of a Filter condition, added to predicate; its index, 0 if the
+    "! condition is none.
+    METHODS condition_predicate
+      IMPORTING node          TYPE ty_node
+      CHANGING  predicate     TYPE zzxxmla1_cl_mdx_facts=>ty_t_predicate
+      RETURNING VALUE(result) TYPE i.
+    "! createComparisonSubcubePredicate: a property of the current member equal to a literal (on either side).
+    METHODS comparison_predicate
+      IMPORTING left          TYPE ty_node
+                right         TYPE ty_node
+      CHANGING  predicate     TYPE zzxxmla1_cl_mdx_facts=>ty_t_predicate
+      RETURNING VALUE(result) TYPE i.
+    "! createBooleanComparisonSubcubePredicate: = or <> of constant truth values, or of a condition and one.
+    METHODS boolean_comparison_predicate
+      IMPORTING left          TYPE ty_node
+                right         TYPE ty_node
+                not_equals    TYPE abap_bool
+      CHANGING  predicate     TYPE zzxxmla1_cl_mdx_facts=>ty_t_predicate
+      RETURNING VALUE(result) TYPE i.
+    "! evalConstantBoolean: the truth value of a numeric literal (not 0) or of = and <> of two literals; unknown: is_known
+    "! is false.
+    CLASS-METHODS constant_boolean
+      IMPORTING node     TYPE ty_node
+      EXPORTING is_known TYPE abap_bool
+                value    TYPE abap_bool.
+    "! createCurrentMemberPropertyValuePredicate: the column of a property of the current member equal to a value, or
+    "! NULL; 0 if the expression is no such property.
+    METHODS property_value_predicate
+      IMPORTING node          TYPE ty_node
+                value         TYPE ty_node OPTIONAL
+      CHANGING  predicate     TYPE zzxxmla1_cl_mdx_facts=>ty_t_predicate
+      RETURNING VALUE(result) TYPE i.
+    "! getCurrentMemberPropertyReference: the column of the level of the current member that a property
+    "! (Key, MEMBER_KEY, Name, Caption, MEMBER_NAME, MEMBER_CAPTION, also as Properties("...")) of
+    "! &lt;Hierarchy&gt;.CurrentMember reads; found is false for any other expression. Name and caption are compared as
+    "! strings. Our fix of the reference: MEMBER_NAME and MEMBER_CAPTION (Excel's label filters) are Name and Caption.
+    METHODS property_reference
+      IMPORTING node          TYPE ty_node
+      RETURNING VALUE(result) TYPE ty_property_reference.
+    "! getCurrentMemberComparisonLevel: the level whose members &lt;Level, Hierarchy or Dimension&gt;.CurrentMember
+    "! compares, the lowest one of a hierarchy; found is false for any other expression and for the (All) level.
+    METHODS comparison_level
+      IMPORTING node          TYPE ty_node
+      RETURNING VALUE(result) TYPE ty_property_reference.
     "! A subselect the reference server cannot turn into a predicate (UnsupportedOperationException): the query fails.
     CLASS-METHODS unsupported_subcube
       IMPORTING message TYPE string
@@ -1686,8 +1759,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
           ENDIF.
         ENDIF.
       WHEN `FILTER`.
-        " The reference server turns some conditions on member keys into predicates; not ported yet
-        unsupported_subcube( |Filter in a subselect is not implemented yet: { node->unparse( ) }| ).
+        add_subcube_filter( EXPORTING node = node negated = negated CHANGING sets = sets predicate = predicate ).
       WHEN `ALLMEMBERS` OR `MEMBERS` OR `CHILDREN` OR `DESCENDANTS`.
         " all or descendants of members of a hierarchy: no restriction
       WHEN OTHERS.
@@ -1727,6 +1799,295 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
              TO predicate.
     ENDIF.
     APPEND lines( predicate ) TO sets.
+  ENDMETHOD.
+
+  METHOD add_subcube_filter.
+    IF lines( node->args ) <> 2.
+      unsupported_subcube( |Filter in subcube must have 2 args: { node->unparse( ) }| ).
+    ENDIF.
+    " only conditions that are predicates, no Filter that would have to be evaluated
+    DATA(condition) = node->args[ 2 ].
+    IF is_subcube_condition( condition ) = abap_false.
+      unsupported_subcube( |Unsupported Filter condition in subcube axis: { condition->unparse( ) }| ).
+    ENDIF.
+    add_subcube_set( EXPORTING node = node->args[ 1 ] negated = negated CHANGING sets = sets predicate = predicate ).
+    DATA(index) = condition_predicate( EXPORTING node = condition CHANGING predicate = predicate ).
+    IF index = 0.
+      RETURN.
+    ENDIF.
+    IF negated = abap_true.
+      APPEND VALUE #( kind = zzxxmla1_cl_mdx_facts=>c_predicate-not children = VALUE #( ( index ) ) ) TO predicate.
+      index = lines( predicate ).
+    ENDIF.
+    APPEND index TO sets.
+  ENDMETHOD.
+
+  METHOD is_subcube_condition.
+    DATA scratch TYPE zzxxmla1_cl_mdx_facts=>ty_t_predicate.
+    IF condition_predicate( EXPORTING node = node CHANGING predicate = scratch ) > 0.
+      result = abap_true.
+      RETURN.
+    ENDIF.
+    " a literal would have to be a logical one, which MDX has none of
+    IF node->kind <> zzxxmla1_cl_mdx_node=>c_kind-resolved_call.
+      RETURN.
+    ENDIF.
+    DATA(count) = lines( node->args ).
+    CASE to_upper( node->fun_def-name ).
+      WHEN `ISEMPTY`.
+        result = xsdbool( count = 1 ).
+      WHEN `NOT` OR `()`.
+        IF count = 1.
+          result = is_subcube_condition( node->args[ 1 ] ).
+        ENDIF.
+      WHEN `OR` OR `AND`.
+        IF count = 2 AND is_subcube_condition( node->args[ 1 ] ) = abap_true.
+          result = is_subcube_condition( node->args[ 2 ] ).
+        ENDIF.
+      WHEN `=` OR `<>`.
+        IF count = 2 AND is_subcube_operand( node->args[ 1 ] ) = abap_true.
+          result = is_subcube_operand( node->args[ 2 ] ).
+        ENDIF.
+    ENDCASE.
+  ENDMETHOD.
+
+  METHOD is_subcube_operand.
+    IF property_reference( node )-found = abap_true.
+      result = abap_true.
+      RETURN.
+    ENDIF.
+    IF node->kind = zzxxmla1_cl_mdx_node=>c_kind-literal.
+      result = xsdbool( node->category = zzxxmla1_cl_mdx_node=>c_category-string
+                        OR node->category = zzxxmla1_cl_mdx_node=>c_category-numeric ).
+      RETURN.
+    ENDIF.
+    IF node->kind <> zzxxmla1_cl_mdx_node=>c_kind-resolved_call.
+      RETURN.
+    ENDIF.
+    " isCurrentMemberStringPropertyExpression: the name or caption of the current member
+    CASE to_upper( node->fun_def-name ).
+      WHEN `NAME` OR `CAPTION` OR `MEMBER_NAME` OR `MEMBER_CAPTION`.
+        IF lines( node->args ) = 1 AND comparison_level( node->args[ 1 ] )-found = abap_true.
+          result = abap_true.
+          RETURN.
+        ENDIF.
+    ENDCASE.
+    result = is_subcube_condition( node ).
+  ENDMETHOD.
+
+  METHOD condition_predicate.
+    IF node->kind <> zzxxmla1_cl_mdx_node=>c_kind-resolved_call.
+      RETURN.
+    ENDIF.
+    DATA(name) = to_upper( node->fun_def-name ).
+    DATA(count) = lines( node->args ).
+    CASE name.
+      WHEN `()`.
+        IF count = 1.
+          result = condition_predicate( EXPORTING node = node->args[ 1 ] CHANGING predicate = predicate ).
+        ENDIF.
+      WHEN `NOT`.
+        IF count = 1.
+          DATA(inner) = condition_predicate( EXPORTING node = node->args[ 1 ] CHANGING predicate = predicate ).
+          IF inner > 0.
+            APPEND VALUE #( kind = zzxxmla1_cl_mdx_facts=>c_predicate-not children = VALUE #( ( inner ) ) ) TO predicate.
+            result = lines( predicate ).
+          ENDIF.
+        ENDIF.
+      WHEN `AND` OR `OR`.
+        IF count = 2.
+          DATA(left) = condition_predicate( EXPORTING node = node->args[ 1 ] CHANGING predicate = predicate ).
+          DATA(right) = condition_predicate( EXPORTING node = node->args[ 2 ] CHANGING predicate = predicate ).
+          IF left > 0 AND right > 0.
+            APPEND VALUE #( kind     = COND #( WHEN name = `AND` THEN zzxxmla1_cl_mdx_facts=>c_predicate-and
+                                               ELSE zzxxmla1_cl_mdx_facts=>c_predicate-or )
+                            children = VALUE #( ( left ) ( right ) ) ) TO predicate.
+            result = lines( predicate ).
+          ENDIF.
+        ENDIF.
+      WHEN `ISEMPTY`.
+        IF count = 1.
+          result = property_value_predicate( EXPORTING node = node->args[ 1 ] CHANGING predicate = predicate ).
+        ENDIF.
+      WHEN `=` OR `<>`.
+        IF count = 2.
+          result = comparison_predicate( EXPORTING left = node->args[ 1 ] right = node->args[ 2 ]
+                                         CHANGING  predicate = predicate ).
+          IF result = 0.
+            result = boolean_comparison_predicate( EXPORTING left       = node->args[ 1 ]
+                                                             right      = node->args[ 2 ]
+                                                             not_equals = xsdbool( name = `<>` )
+                                                   CHANGING  predicate  = predicate ).
+          ELSEIF name = `<>`.
+            APPEND VALUE #( kind = zzxxmla1_cl_mdx_facts=>c_predicate-not children = VALUE #( ( result ) ) ) TO predicate.
+            result = lines( predicate ).
+          ENDIF.
+        ENDIF.
+    ENDCASE.
+  ENDMETHOD.
+
+  METHOD comparison_predicate.
+    " getLiteralComparisonValue: a string or numeric literal (MDX has no logical ones)
+    IF right->kind = zzxxmla1_cl_mdx_node=>c_kind-literal
+        AND ( right->category = zzxxmla1_cl_mdx_node=>c_category-string
+              OR right->category = zzxxmla1_cl_mdx_node=>c_category-numeric ).
+      result = property_value_predicate( EXPORTING node = left value = right CHANGING predicate = predicate ).
+      IF result > 0.
+        RETURN.
+      ENDIF.
+    ENDIF.
+    IF left->kind = zzxxmla1_cl_mdx_node=>c_kind-literal
+        AND ( left->category = zzxxmla1_cl_mdx_node=>c_category-string
+              OR left->category = zzxxmla1_cl_mdx_node=>c_category-numeric ).
+      result = property_value_predicate( EXPORTING node = right value = left CHANGING predicate = predicate ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD boolean_comparison_predicate.
+    constant_boolean( EXPORTING node = left IMPORTING is_known = DATA(left_known) value = DATA(left_value) ).
+    constant_boolean( EXPORTING node = right IMPORTING is_known = DATA(right_known) value = DATA(right_value) ).
+    IF left_known = abap_true AND right_known = abap_true.
+      DATA(holds) = xsdbool( xsdbool( left_value = right_value ) <> not_equals ).
+      APPEND VALUE #( kind = COND #( WHEN holds = abap_true THEN zzxxmla1_cl_mdx_facts=>c_predicate-true
+                                     ELSE zzxxmla1_cl_mdx_facts=>c_predicate-false ) ) TO predicate.
+      result = lines( predicate ).
+      RETURN.
+    ENDIF.
+    " a condition compared to a truth value: the condition, or its negation
+    DO 2 TIMES.
+      DATA(condition) = COND #( WHEN sy-index = 1 THEN left ELSE right ).
+      DATA(known) = COND #( WHEN sy-index = 1 THEN right_known ELSE left_known ).
+      DATA(value) = COND #( WHEN sy-index = 1 THEN right_value ELSE left_value ).
+      IF known = abap_false.
+        CONTINUE.
+      ENDIF.
+      result = condition_predicate( EXPORTING node = condition CHANGING predicate = predicate ).
+      IF result > 0.
+        IF value = not_equals.
+          APPEND VALUE #( kind = zzxxmla1_cl_mdx_facts=>c_predicate-not children = VALUE #( ( result ) ) ) TO predicate.
+          result = lines( predicate ).
+        ENDIF.
+        RETURN.
+      ENDIF.
+    ENDDO.
+  ENDMETHOD.
+
+  METHOD constant_boolean.
+    CLEAR: is_known, value.
+    CASE node->kind.
+      WHEN zzxxmla1_cl_mdx_node=>c_kind-literal.
+        IF node->category = zzxxmla1_cl_mdx_node=>c_category-numeric.
+          is_known = abap_true.
+          value = xsdbool( node->number <> 0 ).
+        ENDIF.
+      WHEN zzxxmla1_cl_mdx_node=>c_kind-resolved_call.
+        DATA(name) = node->fun_def-name.
+        IF name = `()` AND lines( node->args ) = 1.
+          constant_boolean( EXPORTING node = node->args[ 1 ] IMPORTING is_known = is_known value = value ).
+        ELSEIF ( name = `=` OR name = `<>` ) AND lines( node->args ) = 2.
+          " getLiteralValue: two literals with a value; equal as Java's equals (a number and a string never are)
+          DATA(left) = node->args[ 1 ].
+          DATA(right) = node->args[ 2 ].
+          IF left->kind = zzxxmla1_cl_mdx_node=>c_kind-literal AND left->category <> zzxxmla1_cl_mdx_node=>c_category-null
+              AND right->kind = zzxxmla1_cl_mdx_node=>c_kind-literal
+              AND right->category <> zzxxmla1_cl_mdx_node=>c_category-null.
+            is_known = abap_true.
+            DATA(same_kind) = xsdbool( xsdbool( left->category = zzxxmla1_cl_mdx_node=>c_category-numeric )
+                                       = xsdbool( right->category = zzxxmla1_cl_mdx_node=>c_category-numeric ) ).
+            DATA(equal) = xsdbool( left->value = right->value AND same_kind = abap_true ).
+            value = xsdbool( equal = xsdbool( name = `=` ) ).
+          ENDIF.
+        ENDIF.
+    ENDCASE.
+  ENDMETHOD.
+
+  METHOD property_value_predicate.
+    DATA(reference) = property_reference( node ).
+    IF reference-found = abap_false.
+      RETURN.
+    ENDIF.
+    DATA(column) = VALUE zzxxmla1_cl_mdx_facts=>ty_value_column( hierarchy = reference-hierarchy
+                                                                 column    = reference-column ).
+    IF value IS NOT BOUND.
+      column-is_null = abap_true.
+    ELSE.
+      column-value = value->value.
+      " ValueColumnPredicate quotes the value as the column's type, a name or caption always as a string
+      DATA(hierarchy) = schema_reader->get_hierarchy( reference-hierarchy ).
+      DATA(level) = hierarchy-model-levels[ reference-level ].
+      column-quoted = xsdbool( reference-force_string = abap_true
+                               OR value->category <> zzxxmla1_cl_mdx_node=>c_category-numeric
+                               OR level-data_type <> `Numeric` ).
+    ENDIF.
+    APPEND VALUE #( kind = zzxxmla1_cl_mdx_facts=>c_predicate-value column = column ) TO predicate.
+    result = lines( predicate ).
+  ENDMETHOD.
+
+  METHOD property_reference.
+    IF node->kind <> zzxxmla1_cl_mdx_node=>c_kind-resolved_call.
+      RETURN.
+    ENDIF.
+    DATA(property) = node->fun_def-name.
+    IF to_upper( property ) = `PROPERTIES`.
+      IF lines( node->args ) <> 2 OR node->args[ 2 ]->kind <> zzxxmla1_cl_mdx_node=>c_kind-literal
+          OR node->args[ 2 ]->category <> zzxxmla1_cl_mdx_node=>c_category-string.
+        RETURN.
+      ENDIF.
+      property = node->args[ 2 ]->value.
+    ELSEIF lines( node->args ) <> 1.
+      RETURN.
+    ENDIF.
+    result = comparison_level( node->args[ 1 ] ).
+    IF result-found = abap_false.
+      RETURN.
+    ENDIF.
+    DATA(hierarchy) = schema_reader->get_hierarchy( result-hierarchy ).
+    DATA(level) = hierarchy-model-levels[ result-level ].
+    CASE to_upper( property ).
+      WHEN `KEY` OR `MEMBER_KEY`.
+        result-column = level-key_column.
+      WHEN `NAME` OR `CAPTION` OR `MEMBER_NAME` OR `MEMBER_CAPTION`.
+        " a level has no caption column: the caption is the name, the key without a name column
+        result-column = level-name_column.
+        result-force_string = abap_true.
+      WHEN OTHERS.
+        CLEAR result.
+    ENDCASE.
+  ENDMETHOD.
+
+  METHOD comparison_level.
+    IF node->kind <> zzxxmla1_cl_mdx_node=>c_kind-resolved_call OR to_upper( node->fun_def-name ) <> `CURRENTMEMBER`
+        OR lines( node->args ) <> 1.
+      RETURN.
+    ENDIF.
+    DATA(arg) = node->args[ 1 ].
+    DATA hierarchy TYPE i.
+    CASE arg->kind.
+      WHEN zzxxmla1_cl_mdx_node=>c_kind-level.
+        " the (All) level has no key column
+        DATA(level) = schema_reader->get_level( arg->element-id ).
+        IF level-key_level > 0.
+          result = VALUE #( found = abap_true hierarchy = level-hierarchy level = level-key_level ).
+        ENDIF.
+        RETURN.
+      WHEN zzxxmla1_cl_mdx_node=>c_kind-hierarchy.
+        hierarchy = arg->element-id.
+      WHEN zzxxmla1_cl_mdx_node=>c_kind-dimension.
+        " Dimension.getHierarchy: the first one
+        DATA(dimension) = schema_reader->get_dimension( arg->element-id ).
+        hierarchy = dimension-hierarchies[ 1 ].
+      WHEN OTHERS.
+        RETURN.
+    ENDCASE.
+    IF hierarchy = zzxxmla1_cl_mdx_schema_reader=>c_measures.
+      RETURN.
+    ENDIF.
+    " the lowest level that is not the (All) level
+    DATA(model) = schema_reader->get_hierarchy( hierarchy )-model.
+    DATA(levels) = lines( model-levels ).
+    IF levels > 0.
+      result = VALUE #( found = abap_true hierarchy = hierarchy level = levels ).
+    ENDIF.
   ENDMETHOD.
 
   METHOD unsupported_subcube.
