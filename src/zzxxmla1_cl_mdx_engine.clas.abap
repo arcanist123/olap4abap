@@ -380,6 +380,13 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       IMPORTING evaluator     TYPE ty_evaluator
       RETURNING VALUE(result) TYPE ty_cell
       RAISING   zzxxmla1_cx_xmla.
+    "! Whether the cells must be evaluated: a cell property that shows their values (VALUE, FORMATTED_VALUE,
+    "! FORMAT_STRING), a NON EMPTY axis (its empty positions are removed by them) or a calculated member in the context
+    "! or on an axis (its cell could fail the query). Our shortcut: the reference evaluates them always.
+    METHODS cells_needed
+      IMPORTING result        TYPE ty_result
+                non_empty     TYPE abap_bool
+      RETURNING VALUE(needed) TYPE abap_bool.
     "! NON EMPTY (RolapConnection.NonEmptyResult): removes the positions of the axis whose cells are all empty, and their
     "! cells.
     METHODS remove_empty_positions
@@ -1648,19 +1655,31 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
 
     " one cell per combination of the axes' tuples; no axis is one cell, an empty axis none (executeBody); again until
     " no cell is missed, the final cells kept
-    DATA(body) = evaluator->savepoint( ).
-    attempt = 0.
-    DO.
-      CLEAR result-cells.
-      evaluator->set_cell_reader( ).
-      execute_stripe( EXPORTING evaluator = evaluator axes = result-axes slicer = slicer_context
-                                axis_index = lines( result-axes )
-                      CHANGING  cells = result-cells ).
-      evaluator->restore( body ).
-      IF phase( CHANGING attempt = attempt ) = abap_false.
-        EXIT.
+    IF cells_needed( result = result non_empty = xsdbool( line_exists( query_axes[ non_empty = abap_true ] ) ) )
+       = abap_true.
+      DATA(body) = evaluator->savepoint( ).
+      attempt = 0.
+      DO.
+        CLEAR result-cells.
+        evaluator->set_cell_reader( ).
+        execute_stripe( EXPORTING evaluator = evaluator axes = result-axes slicer = slicer_context
+                                  axis_index = lines( result-axes )
+                        CHANGING  cells = result-cells ).
+        evaluator->restore( body ).
+        IF phase( CHANGING attempt = attempt ) = abap_false.
+          EXIT.
+        ENDIF.
+      ENDDO.
+    ELSE.
+      " no cell shows anything then, and only the first is written (Excel's member lists ask for CELL_ORDINAL only)
+      DATA(cell_count) = 1.
+      LOOP AT result-axes INTO DATA(cell_axis).
+        cell_count = cell_count * lines( cell_axis-tuples ).
+      ENDLOOP.
+      IF cell_count > 0.
+        result-cells = VALUE #( ( ordinal = 0 empty = abap_true ) ).
       ENDIF.
-    ENDDO.
+    ENDIF.
     fact_reader->set_batching( abap_false ).
     CLEAR final_cells.
 
@@ -2866,6 +2885,28 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       ENDLOOP.
     ENDIF.
     evaluator->restore( savepoint ).
+  ENDMETHOD.
+
+  METHOD cells_needed.
+    needed = abap_true.
+    IF non_empty = abap_true.
+      RETURN.
+    ENDIF.
+    LOOP AT result-cell_properties TRANSPORTING NO FIELDS
+         WHERE table_line = `VALUE` OR table_line = `FORMATTED_VALUE` OR table_line = `FORMAT_STRING`.
+      RETURN.
+    ENDLOOP.
+    IF line_exists( slicer_evaluator_context[ calculated = abap_true ] ).
+      RETURN.
+    ENDIF.
+    LOOP AT result-axes INTO DATA(axis).
+      LOOP AT axis-tuples INTO DATA(tuple).
+        IF line_exists( tuple[ calculated = abap_true ] ).
+          RETURN.
+        ENDIF.
+      ENDLOOP.
+    ENDLOOP.
+    needed = abap_false.
   ENDMETHOD.
 
   METHOD remove_empty_positions.

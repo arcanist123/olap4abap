@@ -185,7 +185,9 @@ Read before designing anything:
   name it) of a set the native crossjoin reads (also through named sets and an identity `Generate`) is native too, our
   extension (`native_order`, `ZZXXMLA1_CL_MDX_FACTS=>ordered_paths`), and `Head` of it is its `LIMIT`; any other
   `Order` sorts in ABAP, break keys evaluated once per tuple into a table and the indexes merge-sorted (step 8). Execute
-  answers carry the query's `DIMENSION PROPERTIES` (olap4j's standard member properties) and `CELL PROPERTIES`.
+  answers carry the query's `DIMENSION PROPERTIES` (olap4j's standard member properties) and `CELL PROPERTIES`; when
+  these show no cell's value (Excel's member lists ask for `CELL_ORDINAL` only), no axis is NON EMPTY and no member is
+  calculated, the cells are not evaluated (`cells_needed`, our shortcut; the answer is the same).
   Subselects (`FROM (SELECT ... FROM ...)`, Excel's pivot filters) are eMondrian's subcube: the axes of every inner
   SELECT become a predicate that every fact read adds (`Query.getSubcubePredicates`, `ZZXXMLA1_CL_MDX_FACTS=>set_subcube`),
   so totals cover only the subcube; member sets, `-`, `Head`, `CrossJoin`, `Union`, `Members` and `Filter` on the
