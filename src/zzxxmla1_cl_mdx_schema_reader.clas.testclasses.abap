@@ -123,3 +123,112 @@ CLASS ltc_lookup IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+
+"! Members read by SQL as needed (docs/mvp-scope.md, Member decision), answers of the reference server for ZFMSALES.
+CLASS ltc_members DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+  PRIVATE SECTION.
+    DATA reader TYPE REF TO zzxxmla1_cl_mdx_schema_reader.
+    METHODS setup RAISING zzxxmla1_cx_xmla.
+    METHODS member
+      IMPORTING mdx           TYPE string
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_schema_reader=>ty_member.
+    CLASS-METHODS names
+      IMPORTING members       TYPE zzxxmla1_cl_mdx_schema_reader=>ty_t_member
+      RETURNING VALUE(result) TYPE string_table.
+    "! children in hierarchy order, and their number
+    METHODS children FOR TESTING.
+    "! the parent of a member read alone, without its level
+    METHODS parent FOR TESTING.
+    "! Lag and Lead along a level across parents; the empty member (SID 0) comes first
+    METHODS lead FOR TESTING.
+    "! a range across parents, given either way round
+    METHODS range FOR TESTING.
+    "! members by their paths, in hierarchy order; a path without member left out
+    METHODS by_paths FOR TESTING.
+ENDCLASS.
+
+CLASS ltc_members IMPLEMENTATION.
+
+  METHOD setup.
+    reader = zzxxmla1_cl_mdx_schema_reader=>for_cube( catalog = `` name = `ZFMSALES` ).
+  ENDMETHOD.
+
+  METHOD member.
+    TRY.
+        result = reader->lookup_compound( segments = zzxxmla1_cl_mdx_parser=>parse_expression( mdx )->segments
+                                          category = zzxxmla1_cl_mdx_type=>c_category-member )-member.
+      CATCH zzxxmla1_cx_xmla INTO DATA(error).
+        cl_abap_unit_assert=>fail( error->description ).
+    ENDTRY.
+    cl_abap_unit_assert=>assert_not_initial( act = result msg = mdx ).
+  ENDMETHOD.
+
+  METHOD names.
+    result = VALUE #( FOR m IN members ( m-unique_name ) ).
+  ENDMETHOD.
+
+  METHOD children.
+    cl_abap_unit_assert=>assert_equals(
+      act = names( reader->get_member_children( member( `[Store].[USA].[CA]` ) ) )
+      exp = VALUE string_table( ( `[Store].[USA].[CA].[Alameda]` ) ( `[Store].[USA].[CA].[Beverly Hills]` )
+                                ( `[Store].[USA].[CA].[Los Angeles]` ) ( `[Store].[USA].[CA].[San Diego]` )
+                                ( `[Store].[USA].[CA].[San Francisco]` ) ) ).
+    cl_abap_unit_assert=>assert_equals(
+      act = names( reader->get_member_children( member( `[Store].[All Stores]` ) ) )
+      exp = VALUE string_table( ( `[Store].[Canada]` ) ( `[Store].[Mexico]` ) ( `[Store].[USA]` ) ) ).
+    " counted without reading the children
+    cl_abap_unit_assert=>assert_equals( act = reader->get_children_count( member( `[Store].[USA]` ) ) exp = 3 ).
+    cl_abap_unit_assert=>assert_equals( act = reader->get_children_count( member( `[Store].[All Stores]` ) ) exp = 3 ).
+    cl_abap_unit_assert=>assert_equals( act = reader->get_children_count( member( `[Store].[USA].[CA]` ) ) exp = 5 ).
+  ENDMETHOD.
+
+  METHOD parent.
+    cl_abap_unit_assert=>assert_equals(
+      act = reader->get_parent_member( member( `[Store].[USA].[CA].[Alameda]` ) )-unique_name
+      exp = `[Store].[USA].[CA]` ).
+    cl_abap_unit_assert=>assert_equals( act = reader->get_parent_member( member( `[Store].[USA]` ) )-unique_name
+                                        exp = `[Store].[All Stores]` ).
+    cl_abap_unit_assert=>assert_initial( reader->get_parent_member( member( `[Store].[All Stores]` ) ) ).
+  ENDMETHOD.
+
+  METHOD lead.
+    DATA(q1) = member( `[Time].[1997].[Q1]` ).
+    cl_abap_unit_assert=>assert_equals( act = reader->get_lead_member( member = member( `[Time].[1997].[Q4]` ) n = 1 )-unique_name
+                                        exp = `[Time].[1998].[Q1]` ).
+    cl_abap_unit_assert=>assert_equals( act = reader->get_lead_member( member = q1 n = 5 )-unique_name
+                                        exp = `[Time].[1998].[Q2]` ).
+    cl_abap_unit_assert=>assert_equals( act = reader->get_lead_member( member = q1 n = -1 )-unique_name
+                                        exp = `[Time].[0].[]` ).
+    cl_abap_unit_assert=>assert_initial( reader->get_lead_member( member = q1 n = -2 ) ).
+    cl_abap_unit_assert=>assert_equals( act = reader->get_lead_member( member = q1 n = 0 ) exp = q1 ).
+  ENDMETHOD.
+
+  METHOD range.
+    DATA(expected) = VALUE string_table( ( `[Time].[1997].[Q3]` ) ( `[Time].[1997].[Q4]` ) ( `[Time].[1998].[Q1]` )
+                                         ( `[Time].[1998].[Q2]` ) ).
+    DATA(q3) = member( `[Time].[1997].[Q3]` ).
+    DATA(q2) = member( `[Time].[1998].[Q2]` ).
+    cl_abap_unit_assert=>assert_equals( act = names( reader->get_member_range( member1 = q3 member2 = q2 ) )
+                                        exp = expected ).
+    cl_abap_unit_assert=>assert_equals( act = names( reader->get_member_range( member1 = q2 member2 = q3 ) )
+                                        exp = expected ).
+  ENDMETHOD.
+
+  METHOD by_paths.
+    DATA(sf) = member( `[Store].[USA].[CA].[San Francisco]` ).
+    DATA(alameda) = member( `[Store].[USA].[CA].[Alameda]` ).
+    DATA(level) = sf-level.
+    " a new reader: nothing read yet
+    TRY.
+        reader = zzxxmla1_cl_mdx_schema_reader=>for_cube( catalog = `` name = `ZFMSALES` ).
+      CATCH zzxxmla1_cx_xmla INTO DATA(error).
+        cl_abap_unit_assert=>fail( error->description ).
+    ENDTRY.
+    cl_abap_unit_assert=>assert_equals(
+      act = names( reader->get_members_by_paths( level = level
+                                                 paths = VALUE #( ( sf-path ) ( |nowhere{ zzxxmla1_cl_model=>c_separator }x| )
+                                                                  ( alameda-path ) ( sf-path ) ) ) )
+      exp = VALUE string_table( ( `[Store].[USA].[CA].[Alameda]` ) ( `[Store].[USA].[CA].[San Francisco]` ) ) ).
+  ENDMETHOD.
+
+ENDCLASS.

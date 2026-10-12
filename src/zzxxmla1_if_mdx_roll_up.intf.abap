@@ -21,7 +21,7 @@ INTERFACE zzxxmla1_if_mdx_roll_up
       hierarchy     TYPE string,
       hier_id       TYPE i,
       measure_index TYPE i,
-      ordinal       TYPE i,
+      order_key     TYPE string,
       key           TYPE string,
       key_level     TYPE i,
       path          TYPE string,

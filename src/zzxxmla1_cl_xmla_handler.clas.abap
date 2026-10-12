@@ -170,12 +170,22 @@ CLASS zzxxmla1_cl_xmla_handler DEFINITION
                 catalog_column TYPE string DEFAULT `CATALOG_NAME`
                 cube_column    TYPE string DEFAULT `CUBE_NAME`
       RETURNING VALUE(result)  TYPE ty_t_cube.
-    "! The members of one hierarchy of the model in hierarchy order: the All member if it has one, then the members
-    "! read from the dimension table (ZZXXMLA1_CL_MODEL=>MEMBERS).
+    "! The members of one hierarchy that the restrictions can select, level by level, each level in hierarchy order
+    "! (MdschemaMembersRowset.populateHierarchy), read through the cube's schema reader: for a MEMBER_UNIQUE_NAME the
+    "! member and the relatives its TREE_OP asks for, for a LEVEL_UNIQUE_NAME or LEVEL_NUMBER those levels, else all
+    "! (docs/mvp-scope.md, Member decision). select_members applies the restrictions.
     METHODS hierarchy_members
-      IMPORTING dim           TYPE zzxxmla1_cl_schema=>ty_dim
-                hier          TYPE zzxxmla1_cl_schema=>ty_hier
+      IMPORTING request       TYPE ty_request
+                reader        TYPE REF TO zzxxmla1_cl_mdx_schema_reader
+                hierarchy     TYPE string
       RETURNING VALUE(result) TYPE ty_t_member.
+    "! A member's relatives as TREE_OP asks for them (populate_member's): siblings, children or descendants, parent or
+    "! ancestors.
+    METHODS tree_members
+      IMPORTING reader        TYPE REF TO zzxxmla1_cl_mdx_schema_reader
+                member        TYPE zzxxmla1_cl_mdx_schema_reader=>ty_member
+                tree_op       TYPE i
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_schema_reader=>ty_t_member.
     "! The hierarchy of the model with the given names.
     METHODS model_hierarchy
       IMPORTING cube          TYPE clike
@@ -1018,34 +1028,97 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD hierarchy_members.
-    " The reference lists a hierarchy level by level (MdschemaMembersRowset.populateHierarchy), each level in hierarchy order
-    DATA(model) = model_hierarchy( cube = dim-cube_name dim = dim-dim_name hier = hier-hier_name ).
-    DATA(unique) = model-unique_name.
-    DATA(dimension) = |[{ dim-dim_name }]|.
-    DATA(members) = zzxxmla1_cl_model=>members( model ).
-    DATA(offset) = 0.
-    DATA(all_member) = VALUE string( ).
-    IF model-has_all = abap_true.
-      offset = 1.
-      all_member = |{ unique }.{ zzxxmla1_cl_model=>quote_name( model-all_member_name ) }|.
-      APPEND VALUE #( dimension = dimension hierarchy = unique level = |{ unique }.[(All)]| number = 0
-                      name = model-all_member_name unique = all_member type = 2
-                      cardinality = REDUCE i( INIT n = 0 FOR m IN members WHERE ( level_no = 1 ) NEXT n = n + 1 ) )
-             TO result.
+    " the reference gives no rows when the member type is restricted (select_members)
+    IF line_exists( request-restrictions[ name = 'MEMBER_TYPE' ] ).
+      RETURN.
     ENDIF.
-    LOOP AT model-levels INTO DATA(level).
-      DATA(level_no) = sy-tabix.
-      DATA(depth) = level_no - 1 + offset.
-      LOOP AT members INTO DATA(member) WHERE level_no = level_no.
-        DATA(parent) = COND string( WHEN member-parent IS NOT INITIAL THEN member-parent ELSE all_member ).
-        APPEND VALUE #( dimension = dimension hierarchy = unique level = |{ unique }.[{ level-level_name }]|
-                        number = depth name = member-name unique = member-unique_name type = 1
-                        cardinality = member-children parent = parent
-                        parent_level = COND #( WHEN depth > 0 THEN depth - 1 )
-                        parent_count = COND #( WHEN parent IS NOT INITIAL THEN 1 ) depth = depth )
-               TO result.
-      ENDLOOP.
+    DATA(definition) = VALUE zzxxmla1_cl_mdx_schema_reader=>ty_hierarchy( ).
+    LOOP AT reader->get_hierarchies( ) INTO DATA(candidate) WHERE unique_name = hierarchy.
+      definition = reader->get_hierarchy( candidate-id ).
+      EXIT.
     ENDLOOP.
+    IF definition-unique_name IS INITIAL.
+      RETURN.
+    ENDIF.
+    DATA(members) = VALUE zzxxmla1_cl_mdx_schema_reader=>ty_t_member( ).
+    IF line_exists( request-restrictions[ name = 'MEMBER_UNIQUE_NAME' ] ).
+      " the members named (exactly as they are named), with TREE_OP the first one's relatives
+      DATA(tree_op) = COND i( WHEN line_exists( request-restrictions[ name = 'TREE_OP' ] )
+                              THEN request-restrictions[ name = 'TREE_OP' ]-value ).
+      LOOP AT request-restrictions INTO DATA(restriction) WHERE name = 'MEMBER_UNIQUE_NAME'.
+        TRY.
+            DATA(id) = zzxxmla1_cl_mdx_parser=>parse_expression( restriction-value ).
+          CATCH zzxxmla1_cx_xmla.
+            CONTINUE.
+        ENDTRY.
+        IF id->kind <> zzxxmla1_cl_mdx_node=>c_kind-id.
+          CONTINUE.
+        ENDIF.
+        DATA(element) = reader->lookup_compound( segments = id->segments
+                                                 category = zzxxmla1_cl_mdx_type=>c_category-member ).
+        IF element-kind <> zzxxmla1_cl_mdx_schema_reader=>c_element-member
+            OR element-member-hier_id <> definition-id OR element-member-unique_name <> restriction-value.
+          CONTINUE.
+        ENDIF.
+        APPEND element-member TO members.
+        IF tree_op <> 0.
+          APPEND LINES OF tree_members( reader = reader member = element-member tree_op = tree_op ) TO members.
+          EXIT.
+        ENDIF.
+      ENDLOOP.
+    ELSE.
+      LOOP AT definition-levels INTO DATA(level_id).
+        DATA(level) = reader->get_level( level_id ).
+        IF is_allowed( request = request restriction = `LEVEL_UNIQUE_NAME` value = level-unique_name ) = abap_true
+            AND is_allowed( request = request restriction = `LEVEL_NUMBER` value = |{ level-depth }| ) = abap_true.
+          APPEND LINES OF reader->get_level_members( level_id ) TO members.
+        ENDIF.
+      ENDLOOP.
+    ENDIF.
+
+    " level by level, each level in hierarchy order, once each
+    SORT members BY level_number ASCENDING order_key ASCENDING unique_name ASCENDING.
+    DELETE ADJACENT DUPLICATES FROM members COMPARING unique_name.
+    reader->prefetch_children_counts( members ).
+    DATA(dimension) = reader->get_dimension( definition-dimension )-unique_name.
+    LOOP AT members INTO DATA(member).
+      DATA(depth) = member-level_number.
+      APPEND VALUE #( dimension = dimension hierarchy = definition-unique_name level = member-level_name
+                      number = depth name = member-caption unique = member-unique_name
+                      type = COND #( WHEN member-key_level = 0 THEN 2 ELSE 1 )
+                      cardinality = reader->get_children_count( member ) parent = member-parent_unique
+                      parent_level = COND #( WHEN depth > 0 THEN depth - 1 )
+                      parent_count = COND #( WHEN member-parent_unique IS NOT INITIAL THEN 1 ) depth = depth )
+             TO result.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD tree_members.
+    " TREE_OP: 1 children, 2 siblings, 4 parent, 8 self, 16 descendants, 32 ancestors
+    IF tree_op DIV 2 MOD 2 = 1.
+      DATA(parent) = reader->get_parent_member( member ).
+      APPEND LINES OF COND zzxxmla1_cl_mdx_schema_reader=>ty_t_member(
+                        WHEN parent IS INITIAL THEN reader->get_hierarchy_root_members( member-hier_id )
+                        ELSE reader->get_member_children( parent ) ) TO result.
+    ENDIF.
+    IF tree_op DIV 16 MOD 2 = 1 OR tree_op MOD 2 = 1.
+      LOOP AT reader->get_member_children( member ) INTO DATA(child).
+        APPEND child TO result.
+        IF tree_op DIV 16 MOD 2 = 1.
+          APPEND LINES OF tree_members( reader = reader member = child tree_op = 16 ) TO result.
+        ENDIF.
+      ENDLOOP.
+    ENDIF.
+    IF tree_op DIV 32 MOD 2 = 1 OR tree_op DIV 4 MOD 2 = 1.
+      DATA(ancestor) = reader->get_parent_member( member ).
+      WHILE ancestor IS NOT INITIAL.
+        APPEND ancestor TO result.
+        IF tree_op DIV 32 MOD 2 = 0.
+          EXIT.
+        ENDIF.
+        ancestor = reader->get_parent_member( ancestor ).
+      ENDWHILE.
+    ENDIF.
   ENDMETHOD.
 
   METHOD model_hierarchy.
@@ -1061,7 +1134,8 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
     ELSEIF hierarchy-has_all = abap_true.
       result = |{ hierarchy-unique_name }.{ zzxxmla1_cl_model=>quote_name( hierarchy-all_member_name ) }|.
     ELSE.
-      DATA(members) = zzxxmla1_cl_model=>members( hierarchy ).
+      " the first member of the first level, without reading the others
+      DATA(members) = zzxxmla1_cl_model=>read_members( hierarchy = hierarchy level_no = 1 limit = 1 ).
       result = VALUE #( members[ 1 ]-unique_name OPTIONAL ).
     ENDIF.
   ENDMETHOD.
@@ -1192,10 +1266,15 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
       SORT hierarchies BY unique ASCENDING.
 
       DATA(rows) = VALUE ty_t_member( ).
+      DATA reader TYPE REF TO zzxxmla1_cl_mdx_schema_reader.
+      CLEAR reader.
       LOOP AT hierarchies INTO DATA(hierarchy).
+        IF hierarchy-unique <> `[Measures]` AND reader IS NOT BOUND.
+          reader = zzxxmla1_cl_mdx_schema_reader=>for_cube( catalog = cube-catalog_name name = cube-cube_name ).
+        ENDIF.
         DATA(members) = COND ty_t_member(
           WHEN hierarchy-unique = `[Measures]` THEN measure_members( cube-cube_name )
-          ELSE hierarchy_members( dim = hierarchy-dim hier = hierarchy-hier ) ).
+          ELSE hierarchy_members( request = request reader = reader hierarchy = hierarchy-unique ) ).
         APPEND LINES OF select_members( request = request members = members ) TO rows.
       ENDLOOP.
       SORT rows STABLE BY dimension ASCENDING hierarchy ASCENDING level ASCENDING number ASCENDING.

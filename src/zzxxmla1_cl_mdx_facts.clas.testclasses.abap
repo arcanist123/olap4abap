@@ -12,15 +12,130 @@
 "! The facts of ZFMSALES (FoodMart 1997).
 CLASS ltc_facts DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
   PRIVATE SECTION.
+    DATA reader TYPE REF TO zzxxmla1_cl_mdx_schema_reader.
+    DATA facts TYPE REF TO zzxxmla1_cl_mdx_facts.
+    DATA unit_sales TYPE i.
+    METHODS setup RAISING zzxxmla1_cx_xmla.
+    METHODS teardown.
     METHODS non_empty_paths FOR TESTING RAISING zzxxmla1_cx_xmla.
+    METHODS batching FOR TESTING RAISING zzxxmla1_cx_xmla.
+    METHODS max_constraints FOR TESTING RAISING zzxxmla1_cx_xmla.
+    METHODS without_batching FOR TESTING RAISING zzxxmla1_cx_xmla.
+    METHODS top_count FOR TESTING RAISING zzxxmla1_cx_xmla.
+    "! the filter of a product family
+    METHODS family
+      IMPORTING name          TYPE string
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_facts=>ty_t_filter
+      RAISING   zzxxmla1_cx_xmla.
 ENDCLASS.
 
 CLASS ltc_facts IMPLEMENTATION.
 
+  METHOD setup.
+    reader = zzxxmla1_cl_mdx_schema_reader=>for_cube( catalog = `` name = `ZFMSALES` ).
+    facts = NEW zzxxmla1_cl_mdx_facts( cube = reader->cube hierarchies = reader->get_model_hierarchies( )
+                                       measures = reader->measures ).
+    unit_sales = line_index( reader->measures[ name = `Unit Sales` ] ).
+  ENDMETHOD.
+
+  METHOD teardown.
+    zzxxmla1_cl_mdx_facts=>max_constraints = 1000.
+  ENDMETHOD.
+
+  METHOD family.
+    DATA(member) = reader->lookup_compound( VALUE #( ( name = `Product` quoting = `QUOTED` )
+                                                     ( name = name quoting = `QUOTED` ) ) )-member.
+    result = VALUE #( ( hierarchy = member-hier_id level = member-key_level path = member-path ) ).
+  ENDMETHOD.
+
+  METHOD batching.
+    " FastBatchingCellReader: a cell not read yet is 0 for the pass, recorded, and read by load_aggregations
+    facts->set_batching( abap_true ).
+    DATA(drink) = facts->value( filters = family( `Drink` ) measure = unit_sales ).
+    cl_abap_unit_assert=>assert_false( drink-empty ).
+    cl_abap_unit_assert=>assert_equals( act = drink-amount exp = 0 ).
+    cl_abap_unit_assert=>assert_true( facts->is_dirty( ) ).
+    facts->value( filters = family( `Food` ) measure = unit_sales ).
+    cl_abap_unit_assert=>assert_equals( act = facts->get_miss_count( ) exp = 2 ).
+    cl_abap_unit_assert=>assert_true( facts->load_aggregations( ) ).
+    cl_abap_unit_assert=>assert_false( facts->is_dirty( ) ).
+    cl_abap_unit_assert=>assert_false( facts->load_aggregations( ) ).
+    cl_abap_unit_assert=>assert_equals( act = facts->value( filters = family( `Drink` ) measure = unit_sales )-amount
+                                        exp = 24597 ).
+    cl_abap_unit_assert=>assert_equals( act = facts->value( filters = family( `Food` ) measure = unit_sales )-amount
+                                        exp = 191940 ).
+    " the load was constrained to the families asked for: Non-Consumable is not read yet
+    facts->value( filters = family( `Non-Consumable` ) measure = unit_sales ).
+    cl_abap_unit_assert=>assert_true( facts->is_dirty( ) ).
+    cl_abap_unit_assert=>assert_equals( act = facts->get_miss_count( ) exp = 3 ).
+    facts->load_aggregations( ).
+    cl_abap_unit_assert=>assert_equals(
+      act = facts->value( filters = family( `Non-Consumable` ) measure = unit_sales )-amount exp = 50236 ).
+    cl_abap_unit_assert=>assert_equals( act = facts->get_miss_count( ) exp = 3 ).
+  ENDMETHOD.
+
+  METHOD max_constraints.
+    " more keys than max_constraints: the column is not constrained, so the other families are read too
+    zzxxmla1_cl_mdx_facts=>max_constraints = 1.
+    facts->set_batching( abap_true ).
+    facts->value( filters = family( `Drink` ) measure = unit_sales ).
+    facts->value( filters = family( `Food` ) measure = unit_sales ).
+    facts->load_aggregations( ).
+    cl_abap_unit_assert=>assert_equals( act = facts->value( filters = family( `Drink` ) measure = unit_sales )-amount
+                                        exp = 24597 ).
+    cl_abap_unit_assert=>assert_equals( act = facts->value( filters = family( `Food` ) measure = unit_sales )-amount
+                                        exp = 191940 ).
+    cl_abap_unit_assert=>assert_equals(
+      act = facts->value( filters = family( `Non-Consumable` ) measure = unit_sales )-amount exp = 50236 ).
+    cl_abap_unit_assert=>assert_false( facts->is_dirty( ) ).
+    cl_abap_unit_assert=>assert_equals( act = facts->get_miss_count( ) exp = 2 ).
+  ENDMETHOD.
+
+  METHOD without_batching.
+    " a missed cell is read at once; one without facts is empty, and known afterwards
+    cl_abap_unit_assert=>assert_equals( act = facts->value( filters = family( `Drink` ) measure = unit_sales )-amount
+                                        exp = 24597 ).
+    cl_abap_unit_assert=>assert_false( facts->is_dirty( ) ).
+    DATA(none) = family( `Drink` ).
+    none[ 1 ]-path = `999999999`.
+    cl_abap_unit_assert=>assert_true( facts->value( filters = none measure = unit_sales )-empty ).
+    cl_abap_unit_assert=>assert_true( facts->value( filters = none measure = unit_sales )-empty ).
+    cl_abap_unit_assert=>assert_equals( act = facts->get_miss_count( ) exp = 2 ).
+  ENDMETHOD.
+
+  METHOD top_count.
+    DATA(level) = reader->get_level( reader->lookup_compound( VALUE #( ( name = `Product` quoting = `QUOTED` )
+                                                                      ( name = `Product Family` quoting = `QUOTED` ) ) )-id ).
+    DATA(operands) = VALUE zzxxmla1_cl_mdx_facts=>ty_t_top_operand( ( hierarchy = level-hierarchy
+                                                                      level     = level-key_level ) ).
+    " the families: Drink, Food, Non-Consumable and the unassigned one (empty key, no facts)
+    cl_abap_unit_assert=>assert_equals( act = facts->operand_counts( operands )
+                                        exp = VALUE zzxxmla1_cl_mdx_facts=>ty_t_count( ( CONV #( 4 ) ) ) ).
+    DATA(filters) = family( `Drink` ).
+    DATA(drink) = filters[ 1 ]-path.
+    filters = family( `Food` ).
+    DATA(food) = filters[ 1 ]-path.
+    filters = family( `Non-Consumable` ).
+    DATA(non_consumable) = filters[ 1 ]-path.
+    " by unit sales, the empty family last
+    cl_abap_unit_assert=>assert_equals(
+      act = facts->top_count( operands = operands filters = VALUE #( ) measure = unit_sales count = 4 top = abap_true
+                              with_empty = abap_true )
+      exp = VALUE zzxxmla1_cl_mdx_facts=>ty_t_paths( ( VALUE #( ( food ) ) ) ( VALUE #( ( non_consumable ) ) )
+                                                     ( VALUE #( ( drink ) ) ) ( VALUE #( ( `` ) ) ) ) ).
+    " BottomCount: the empty family first
+    cl_abap_unit_assert=>assert_equals(
+      act = facts->top_count( operands = operands filters = VALUE #( ) measure = unit_sales count = 2 top = abap_false
+                              with_empty = abap_true )
+      exp = VALUE zzxxmla1_cl_mdx_facts=>ty_t_paths( ( VALUE #( ( `` ) ) ) ( VALUE #( ( drink ) ) ) ) ).
+    " without the empty tuples
+    cl_abap_unit_assert=>assert_equals(
+      act = lines( facts->top_count( operands = operands filters = VALUE #( ) measure = unit_sales count = 4
+                                     top = abap_true with_empty = abap_false ) )
+      exp = 3 ).
+  ENDMETHOD.
+
   METHOD non_empty_paths.
-    DATA(reader) = zzxxmla1_cl_mdx_schema_reader=>for_cube( catalog = `` name = `ZFMSALES` ).
-    DATA(facts) = NEW zzxxmla1_cl_mdx_facts( cube = reader->cube hierarchies = reader->get_model_hierarchies( )
-                                             measures = reader->measures ).
     DATA(family) = reader->lookup_compound( VALUE #( ( name = `Product` quoting = `QUOTED` )
                                                      ( name = `Product Family` quoting = `QUOTED` ) ) ).
     DATA(level) = reader->get_level( family-id ).

@@ -41,6 +41,12 @@ CLASS zzxxmla1_cl_sql DEFINITION
       IMPORTING column        TYPE csequence
                 key           TYPE csequence
       RETURNING VALUE(result) TYPE string.
+    "! The condition that a column holds one of the keys (a ListColumnPredicate): key_condition for one key, else an IN
+    "! list of the keys that are not empty, ORed with the empty case if one is.
+    CLASS-METHODS keys_condition
+      IMPORTING column        TYPE csequence
+                keys          TYPE string_table
+      RETURNING VALUE(result) TYPE string.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -100,6 +106,22 @@ CLASS zzxxmla1_cl_sql IMPLEMENTATION.
     ELSE.
       result = |{ column } = { literal( key ) }|.
     ENDIF.
+  ENDMETHOD.
+
+  METHOD keys_condition.
+    IF lines( keys ) = 1.
+      result = key_condition( column = column key = keys[ 1 ] ).
+      RETURN.
+    ENDIF.
+    DATA(literals) = VALUE string_table( FOR k IN keys WHERE ( table_line IS NOT INITIAL ) ( literal( k ) ) ).
+    DATA(conditions) = VALUE string_table( ).
+    IF literals IS NOT INITIAL.
+      APPEND |{ column } IN ( { concat_lines_of( table = literals sep = `, ` ) } )| TO conditions.
+    ENDIF.
+    IF line_exists( keys[ table_line = `` ] ).
+      APPEND key_condition( column = column key = `` ) TO conditions.
+    ENDIF.
+    result = |( { concat_lines_of( table = conditions sep = ` OR ` ) } )|.
   ENDMETHOD.
 
 ENDCLASS.

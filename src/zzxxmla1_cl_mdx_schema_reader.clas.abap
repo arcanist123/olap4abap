@@ -35,7 +35,7 @@ CLASS zzxxmla1_cl_mdx_schema_reader DEFINITION
         hierarchy     TYPE string,   " unique name of the hierarchy
         hier_id       TYPE i,        " id of the hierarchy: 0 for Measures, else the position in the model
         measure_index TYPE i,        " position in the measures (Measures hierarchy only)
-        ordinal       TYPE i,        " position in the hierarchy in hierarchy order, the All member first (0)
+        order_key     TYPE string,   " hierarchy order (ZZXXMLA1_CL_MODEL, ty_member-order_key); the All member empty
         key           TYPE string,   " value of the level column; empty for the All member
         key_level     TYPE i,        " the level in the model (1 the first below the All level), 0: the All member
         path          TYPE string,   " the keys of the model levels down to key_level (ZZXXMLA1_CL_MODEL)
@@ -144,25 +144,65 @@ CLASS zzxxmla1_cl_mdx_schema_reader DEFINITION
     METHODS get_level
       IMPORTING id            TYPE i
       RETURNING VALUE(result) TYPE ty_level.
-    "! The members of a hierarchy in hierarchy order (the All member first); read once.
+    "! The members of a hierarchy in hierarchy order (the All member first): every level read whole. Only for a query
+    "! that asks for all of them (Hierarchy.Members).
     METHODS get_hierarchy_members
       IMPORTING hierarchy     TYPE i
       RETURNING VALUE(result) TYPE ty_t_member.
+    "! The members of a level in hierarchy order, read whole (once). Only for a query that asks for all of them.
     METHODS get_level_members
       IMPORTING level         TYPE i
       RETURNING VALUE(result) TYPE ty_t_member.
-    "! The members of the first level of a hierarchy.
+    "! The members of the first level of a hierarchy: its All member, without one the first level read whole.
     METHODS get_hierarchy_root_members
       IMPORTING hierarchy     TYPE i
       RETURNING VALUE(result) TYPE ty_t_member.
+    "! The children of a member in hierarchy order (SqlMemberSource.getMemberChildren), read once.
     METHODS get_member_children
       IMPORTING member        TYPE ty_member
       RETURNING VALUE(result) TYPE ty_t_member.
-    "! The member with the unique name in the hierarchy; initial if there is none.
-    METHODS get_member
+    "! The All member of a hierarchy; initial if it has none.
+    METHODS get_all_member
       IMPORTING hierarchy     TYPE i
-                unique_name   TYPE string
       RETURNING VALUE(result) TYPE ty_member.
+    "! The stored members of a level with the paths (the keys from the first level, ZZXXMLA1_CL_MODEL), in hierarchy
+    "! order; a path without member is left out. Those not read yet are read in one query per
+    "! ZZXXMLA1_CL_MODEL=>C_MAX_CONSTRAINTS paths.
+    METHODS get_members_by_paths
+      IMPORTING level         TYPE i
+                paths         TYPE string_table
+      RETURNING VALUE(result) TYPE ty_t_member.
+    "! SmartMemberReader.getLeadMember: the member n positions after the member in its level (before it if n is
+    "! negative), across parents, in hierarchy order; initial if there is none. One query (LIMIT 1 OFFSET n - 1).
+    METHODS get_lead_member
+      IMPORTING member        TYPE ty_member
+                n             TYPE int8
+      RETURNING VALUE(result) TYPE ty_member.
+    "! SmartMemberReader.getMemberRange: the members of the level of two members from the one that comes first to the
+    "! other, in hierarchy order, across parents. One query.
+    METHODS get_member_range
+      IMPORTING member1       TYPE ty_member
+                member2       TYPE ty_member
+      RETURNING VALUE(result) TYPE ty_t_member.
+    "! The number of children of a stored member (Property CHILDREN_CARDINALITY, the XMLA DisplayInfo); counted in
+    "! one query with the ones of the members of its level that prefetch_children_counts was given.
+    METHODS get_children_count
+      IMPORTING member        TYPE ty_member
+      RETURNING VALUE(result) TYPE i.
+    "! Counts the children of the stored members in one query per level (and ZZXXMLA1_CL_MODEL=>C_MAX_CONSTRAINTS
+    "! members), for get_children_count.
+    METHODS prefetch_children_counts
+      IMPORTING members TYPE ty_t_member.
+    "! The id of the level of a hierarchy at a level of the model (from 1).
+    METHODS get_level_of
+      IMPORTING hierarchy     TYPE i
+                key_level     TYPE i
+      RETURNING VALUE(result) TYPE i.
+    "! The number of members of a level (SqlMemberSource.getLevelMemberCount, ZZXXMLA1_CL_MODEL=>LEVEL_CARDINALITY),
+    "! counted once; 1 for the (All) level, the measures for the measures' level.
+    METHODS get_level_cardinality
+      IMPORTING level         TYPE i
+      RETURNING VALUE(result) TYPE i.
     "! SchemaReader.getElementChild: OlapElement.lookupChild of the parent.
     METHODS get_element_child
       IMPORTING parent        TYPE ty_element
@@ -243,22 +283,56 @@ CLASS zzxxmla1_cl_mdx_schema_reader DEFINITION
                 found    TYPE abap_bool.
 
   PRIVATE SECTION.
-    TYPES ty_t_member_store TYPE STANDARD TABLE OF ty_member WITH EMPTY KEY
-      WITH NON-UNIQUE SORTED KEY by_parent COMPONENTS parent_unique
-      WITH NON-UNIQUE SORTED KEY by_unique COMPONENTS unique_name.
     TYPES:
-      "! the values of the member properties of a member, in the order of its level's properties
-      BEGIN OF ty_member_properties,
+      "! a stored member read (MemberCache), by its hierarchy, level in the model and path, with the values of its
+      "! level's member properties in their order
+      BEGIN OF ty_cached,
+        hier_id    TYPE i,
+        key_level  TYPE i,
+        path       TYPE string,
+        member     TYPE ty_member,
+        properties TYPE string_table,
+      END OF ty_cached.
+    TYPES:
+      "! a stored member by its unique name (the first one read with it): to find a calculated member's parent
+      BEGIN OF ty_named,
+        hier_id     TYPE i,
         unique_name TYPE string,
-        values      TYPE string_table,
-      END OF ty_member_properties,
-      ty_t_member_properties TYPE HASHED TABLE OF ty_member_properties WITH UNIQUE KEY unique_name.
+        key_level   TYPE i,
+        path        TYPE string,
+      END OF ty_named.
     TYPES:
-      BEGIN OF ty_cache,
-        hierarchy  TYPE i,
-        members    TYPE ty_t_member_store,
-        properties TYPE ty_t_member_properties,  " of the members whose level has properties
-      END OF ty_cache.
+      "! the children of a member (by its hierarchy, level in the model and path; the All member is level 0) in
+      "! hierarchy order
+      BEGIN OF ty_children,
+        hier_id   TYPE i,
+        key_level TYPE i,
+        path      TYPE string,
+        members   TYPE ty_t_member,
+      END OF ty_children.
+    TYPES:
+      BEGIN OF ty_level_members,
+        level   TYPE i,
+        members TYPE ty_t_member,
+      END OF ty_level_members.
+    TYPES:
+      "! the members a query of read gave, by its parameters
+      BEGIN OF ty_query,
+        key     TYPE string,
+        members TYPE ty_t_member,
+      END OF ty_query.
+    TYPES:
+      BEGIN OF ty_level_count,
+        level TYPE i,
+        count TYPE i,
+      END OF ty_level_count.
+    TYPES:
+      BEGIN OF ty_children_count,
+        hier_id   TYPE i,
+        key_level TYPE i,
+        path      TYPE string,
+        count     TYPE i,
+      END OF ty_children_count.
     TYPES:
       BEGIN OF ty_default_member,
         hierarchy TYPE i,
@@ -268,16 +342,53 @@ CLASS zzxxmla1_cl_mdx_schema_reader DEFINITION
     DATA hierarchies       TYPE ty_t_hierarchy.
     DATA levels            TYPE ty_t_level.
     DATA model_hierarchies TYPE zzxxmla1_cl_model=>ty_t_hierarchy.
-    DATA cache             TYPE HASHED TABLE OF ty_cache WITH UNIQUE KEY hierarchy.
+    DATA cached            TYPE HASHED TABLE OF ty_cached WITH UNIQUE KEY hier_id key_level path.
+    DATA named             TYPE HASHED TABLE OF ty_named WITH UNIQUE KEY hier_id unique_name.
+    DATA children_lists    TYPE HASHED TABLE OF ty_children WITH UNIQUE KEY hier_id key_level path.
+    DATA level_lists       TYPE HASHED TABLE OF ty_level_members WITH UNIQUE KEY level.
+    DATA level_counts      TYPE HASHED TABLE OF ty_level_count WITH UNIQUE KEY level.
+    DATA queries           TYPE HASHED TABLE OF ty_query WITH UNIQUE KEY key.
+    DATA children_counts   TYPE HASHED TABLE OF ty_children_count WITH UNIQUE KEY hier_id key_level path.
     DATA default_members   TYPE HASHED TABLE OF ty_default_member WITH UNIQUE KEY hierarchy.
     DATA calculated_members TYPE ty_t_calculated_member.
     DATA visual_totals TYPE ty_t_calculated_member.
 
     METHODS build
       RAISING zzxxmla1_cx_xmla.
-    "! Reads the members of a hierarchy once (the All member, then the members of the model in hierarchy order).
-    METHODS load_members
-      IMPORTING hierarchy TYPE i.
+    "! Reads members of a level of a hierarchy (ZZXXMLA1_CL_MODEL=>READ_MEMBERS) and keeps them: a member read before
+    "! is the one kept.
+    "! @parameter level_no | the level in the model, from 1
+    METHODS read
+      IMPORTING hierarchy     TYPE i
+                level_no      TYPE i
+                !condition    TYPE string OPTIONAL
+                descending    TYPE abap_bool DEFAULT abap_false
+                !limit        TYPE i DEFAULT 0
+                !offset       TYPE i DEFAULT 0
+      RETURNING VALUE(result) TYPE ty_t_member.
+    "! Keeps a member read from the model (a member read before is the one kept) and gives it.
+    METHODS remember
+      IMPORTING hierarchy     TYPE i
+                model_member  TYPE zzxxmla1_cl_model=>ty_member
+      RETURNING VALUE(result) TYPE ty_member.
+    "! The id of the level of a hierarchy at a level of the model (from 1).
+    METHODS level_of
+      IMPORTING hierarchy     TYPE i
+                level_no      TYPE i
+      RETURNING VALUE(result) TYPE i.
+    "! A stored member read before, by its level in the model and path; initial if none.
+    METHODS cached_member
+      IMPORTING hierarchy     TYPE i
+                key_level     TYPE i
+                !path         TYPE string
+      RETURNING VALUE(result) TYPE ty_member.
+    "! The first member of a level with a name (compared as names are), in hierarchy order; below a member (its
+    "! children) if one is given.
+    METHODS member_by_name
+      IMPORTING level         TYPE i
+                name          TYPE string
+                parent        TYPE ty_member OPTIONAL
+      RETURNING VALUE(result) TYPE ty_member.
     "! The All member of a hierarchy that has one, made without reading members (RolapHierarchy.init). Its children
     "! are not counted: set_display_info counts them with get_member_children.
     METHODS all_member
@@ -462,49 +573,268 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
 
   METHOD zzxxmla1_if_mdx_schema_reader~measure_member.
     DATA(level) = levels[ 1 ].
-    result = VALUE #( hierarchy = `[Measures]` hier_id = c_measures measure_index = index ordinal = index
+    result = VALUE #( hierarchy = `[Measures]` hier_id = c_measures measure_index = index
+                      order_key = |{ zzxxmla1_cl_model=>c_separator }0{ index WIDTH = 10 ALIGN = RIGHT PAD = `0` }|
                       unique_name = |[Measures].{ zzxxmla1_cl_mdx_node=>quote_identifier( measures[ index ]-name ) }|
                       caption = measures[ index ]-name level = level-id level_name = level-unique_name level_number = 0 ).
   ENDMETHOD.
 
-  METHOD load_members.
-    IF line_exists( cache[ hierarchy = hierarchy ] ).
+  METHOD read.
+    " a query asked before (a range or Lag in a calculation evaluated per cell) is answered from what it read
+    DATA(key) = |{ hierarchy }/{ level_no }/{ descending }/{ limit }/{ offset }/{ condition }|.
+    READ TABLE queries ASSIGNING FIELD-SYMBOL(<query>) WITH TABLE KEY key = key.
+    IF sy-subrc = 0.
+      result = <query>-members.
       RETURN.
     ENDIF.
-    DATA(model) = model_hierarchies[ hierarchy ].
-    DATA(element) = hierarchies[ hierarchy + 1 ].
-    DATA(model_members) = zzxxmla1_cl_model=>members( model ).
-    DATA(members) = VALUE ty_t_member_store( ).
-    DATA(properties) = VALUE ty_t_member_properties( ).
-    " the (All) level comes first if the hierarchy has one; the levels of the model follow it
-    DATA(offset) = 0.
-    DATA(all_unique) = VALUE string( ).
-    IF model-has_all = abap_true.
-      offset = 1.
-      DATA(all_entry) = all_member( hierarchy ).
-      all_unique = all_entry-unique_name.
-      APPEND all_entry TO members.
+    zzxxmla1_cl_model=>read_members( EXPORTING hierarchy  = model_hierarchies[ hierarchy ]
+                                               level_no   = level_no
+                                               condition  = condition
+                                               descending = descending
+                                               limit      = limit
+                                               offset     = offset
+                                     IMPORTING ancestors  = DATA(ancestors)
+                                     RECEIVING result     = DATA(model_members) ).
+    " the ancestors are kept too: a parent is then no query of its own
+    LOOP AT ancestors INTO DATA(model_member).
+      remember( hierarchy = hierarchy model_member = model_member ).
+    ENDLOOP.
+    LOOP AT model_members INTO model_member.
+      APPEND remember( hierarchy = hierarchy model_member = model_member ) TO result.
+    ENDLOOP.
+    INSERT VALUE #( key = key members = result ) INTO TABLE queries.
+  ENDMETHOD.
+
+  METHOD remember.
+    ASSIGN cached[ hier_id = hierarchy key_level = model_member-level_no path = model_member-path ]
+           TO FIELD-SYMBOL(<cached>).
+    IF sy-subrc <> 0.
+      DATA(model) = model_hierarchies[ hierarchy ].
+      DATA(level) = levels[ level_of( hierarchy = hierarchy level_no = model_member-level_no ) ].
+      DATA(all_unique) = COND string( WHEN model-has_all = abap_true THEN all_member( hierarchy )-unique_name ).
+      INSERT VALUE #( hier_id = hierarchy key_level = model_member-level_no path = model_member-path
+                      properties = model_member-properties
+                      member = VALUE #( hierarchy = model-unique_name hier_id = hierarchy
+                                        order_key = model_member-order_key key = model_member-key
+                                        key_level = model_member-level_no path = model_member-path
+                                        unique_name = model_member-unique_name caption = model_member-name
+                                        level = level-id level_name = level-unique_name level_number = level-depth
+                                        parent_unique = COND #( WHEN model_member-parent IS NOT INITIAL
+                                                                THEN model_member-parent ELSE all_unique ) ) )
+             INTO TABLE cached ASSIGNING <cached>.
+      INSERT VALUE #( hier_id = hierarchy unique_name = model_member-unique_name key_level = model_member-level_no
+                      path = model_member-path ) INTO TABLE named.
     ENDIF.
-    LOOP AT model_members INTO DATA(model_member).
-      DATA(level) = levels[ element-levels[ model_member-level_no + offset ] ].
-      APPEND VALUE #( hierarchy = model-unique_name hier_id = hierarchy ordinal = sy-tabix key = model_member-key
-                      key_level = model_member-level_no path = model_member-path
-                      unique_name = model_member-unique_name caption = model_member-name level = level-id
-                      level_name = level-unique_name level_number = level-depth
-                      parent_unique = COND #( WHEN model_member-parent IS NOT INITIAL THEN model_member-parent
-                                              ELSE all_unique )
-                      children = model_member-children ) TO members.
-      IF model_member-properties IS NOT INITIAL.
-        INSERT VALUE #( unique_name = model_member-unique_name values = model_member-properties ) INTO TABLE properties.
+    result = <cached>-member.
+  ENDMETHOD.
+
+  METHOD level_of.
+    DATA(element) = hierarchies[ hierarchy + 1 ].
+    result = element-levels[ level_no + COND i( WHEN element-has_all = abap_true THEN 1 ) ].
+  ENDMETHOD.
+
+  METHOD get_level_of.
+    result = level_of( hierarchy = hierarchy level_no = key_level ).
+  ENDMETHOD.
+
+  METHOD get_level_cardinality.
+    DATA(element) = levels[ level ].
+    IF element-hierarchy = c_measures.
+      result = lines( measures ).
+      RETURN.
+    ELSEIF element-key_level = 0.
+      result = 1.
+      RETURN.
+    ENDIF.
+    READ TABLE level_counts ASSIGNING FIELD-SYMBOL(<count>) WITH TABLE KEY level = level.
+    IF sy-subrc <> 0.
+      DATA(count) = COND i( WHEN line_exists( level_lists[ level = level ] )
+                            THEN lines( level_lists[ level = level ]-members )
+                            ELSE zzxxmla1_cl_model=>level_cardinality( hierarchy = model_hierarchies[ element-hierarchy ]
+                                                                       level_no  = element-key_level ) ).
+      INSERT VALUE #( level = level count = count ) INTO TABLE level_counts ASSIGNING <count>.
+    ENDIF.
+    result = <count>-count.
+  ENDMETHOD.
+
+  METHOD cached_member.
+    READ TABLE cached ASSIGNING FIELD-SYMBOL(<cached>)
+         WITH TABLE KEY hier_id = hierarchy key_level = key_level path = path.
+    IF sy-subrc = 0.
+      result = <cached>-member.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD member_by_name.
+    DATA(element) = levels[ level ].
+    IF element-key_level = 0 OR element-hierarchy = c_measures.
+      RETURN.
+    ENDIF.
+    " the children already read: the first with the name
+    IF parent IS NOT INITIAL.
+      READ TABLE children_lists ASSIGNING FIELD-SYMBOL(<children>)
+           WITH TABLE KEY hier_id = parent-hier_id key_level = parent-key_level path = parent-path.
+      IF sy-subrc = 0.
+        LOOP AT <children>-members INTO DATA(child).
+          IF equal_name( name1 = child-caption name2 = name ) = abap_true.
+            result = child.
+            RETURN.
+          ENDIF.
+        ENDLOOP.
+        RETURN.
+      ENDIF.
+    ENDIF.
+    DATA(model) = model_hierarchies[ element-hierarchy ].
+    DATA(condition) = zzxxmla1_cl_model=>name_condition( hierarchy = model level_no = element-key_level name = name ).
+    IF parent IS NOT INITIAL AND parent-key_level > 0.
+      condition = |{ zzxxmla1_cl_model=>path_condition( hierarchy = model level_no = parent-key_level
+                                                         path = parent-path ) } AND { condition }|.
+    ENDIF.
+    DATA(found) = read( hierarchy = element-hierarchy level_no = element-key_level condition = condition limit = 1 ).
+    IF found IS NOT INITIAL.
+      result = found[ 1 ].
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD get_all_member.
+    IF hierarchy <> c_measures AND model_hierarchies[ hierarchy ]-has_all = abap_true.
+      result = all_member( hierarchy ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD get_members_by_paths.
+    DATA(element) = levels[ level ].
+    IF element-key_level = 0 OR element-hierarchy = c_measures.
+      RETURN.
+    ENDIF.
+    DATA unique TYPE HASHED TABLE OF string WITH UNIQUE KEY table_line.
+    DATA(missing) = VALUE string_table( ).
+    LOOP AT paths INTO DATA(path).
+      INSERT path INTO TABLE unique.
+      IF sy-subrc = 0
+          AND NOT line_exists( cached[ hier_id = element-hierarchy key_level = element-key_level path = path ] ).
+        APPEND path TO missing.
       ENDIF.
     ENDLOOP.
-    INSERT VALUE #( hierarchy = hierarchy members = members properties = properties ) INTO TABLE cache.
+    DATA(model) = model_hierarchies[ element-hierarchy ].
+    DATA(chunk) = VALUE string_table( ).
+    LOOP AT missing INTO path.
+      DATA(last) = xsdbool( sy-tabix = lines( missing ) ).
+      APPEND path TO chunk.
+      IF lines( chunk ) < zzxxmla1_cl_model=>c_max_constraints AND last = abap_false.
+        CONTINUE.
+      ENDIF.
+      read( hierarchy = element-hierarchy level_no = element-key_level
+            condition = zzxxmla1_cl_model=>paths_condition( hierarchy = model level_no = element-key_level
+                                                            paths = chunk ) ).
+      CLEAR chunk.
+    ENDLOOP.
+    LOOP AT unique INTO path.
+      READ TABLE cached ASSIGNING FIELD-SYMBOL(<cached>)
+           WITH TABLE KEY hier_id = element-hierarchy key_level = element-key_level path = path.
+      IF sy-subrc = 0.
+        APPEND <cached>-member TO result.
+      ENDIF.
+    ENDLOOP.
+    SORT result BY order_key ASCENDING.
+  ENDMETHOD.
+
+  METHOD get_lead_member.
+    IF n = 0 OR member-is_null = abap_true OR member-hier_id = c_measures OR member-key_level = 0.
+      result = COND #( WHEN n = 0 THEN member ).
+      RETURN.
+    ENDIF.
+    DATA(model) = model_hierarchies[ member-hier_id ].
+    DATA(found) = read( hierarchy  = member-hier_id
+                        level_no   = member-key_level
+                        condition  = zzxxmla1_cl_model=>order_condition( hierarchy = model level_no = member-key_level
+                                                                         path = member-path
+                                                                         operator = COND #( WHEN n > 0 THEN `>`
+                                                                                            ELSE `<` ) )
+                        descending = xsdbool( n < 0 )
+                        limit      = 1
+                        offset     = CONV i( abs( n ) - 1 ) ).
+    IF found IS NOT INITIAL.
+      result = found[ 1 ].
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD get_member_range.
+    IF member1-level <> member2-level OR member1-hier_id = c_measures.
+      RETURN.
+    ENDIF.
+    IF member1-key_level = 0.
+      result = VALUE #( ( member1 ) ).
+      RETURN.
+    ENDIF.
+    DATA(first) = COND #( WHEN member1-order_key <= member2-order_key THEN member1 ELSE member2 ).
+    DATA(last) = COND #( WHEN member1-order_key <= member2-order_key THEN member2 ELSE member1 ).
+    DATA(model) = model_hierarchies[ first-hier_id ].
+    result = read( hierarchy = first-hier_id
+                   level_no  = first-key_level
+                   condition = |{ zzxxmla1_cl_model=>order_condition( hierarchy = model level_no = first-key_level
+                                                                      path = first-path operator = `>=` ) } AND | &&
+                               zzxxmla1_cl_model=>order_condition( hierarchy = model level_no = last-key_level
+                                                                   path = last-path operator = `<=` ) ).
+  ENDMETHOD.
+
+  METHOD get_children_count.
+    IF member-hier_id = c_measures OR member-calculated = abap_true OR member-is_null = abap_true
+        OR member-key_level >= lines( model_hierarchies[ member-hier_id ]-levels ).
+      RETURN.
+    ENDIF.
+    IF NOT line_exists( children_counts[ hier_id = member-hier_id key_level = member-key_level path = member-path ] ).
+      prefetch_children_counts( VALUE #( ( member ) ) ).
+    ENDIF.
+    result = VALUE #( children_counts[ hier_id = member-hier_id key_level = member-key_level
+                                       path = member-path ]-count OPTIONAL ).
+  ENDMETHOD.
+
+  METHOD prefetch_children_counts.
+    TYPES:
+      BEGIN OF ty_wanted,
+        hier_id   TYPE i,
+        key_level TYPE i,
+        paths     TYPE string_table,
+      END OF ty_wanted.
+    DATA wanted TYPE HASHED TABLE OF ty_wanted WITH UNIQUE KEY hier_id key_level.
+    DATA seen TYPE HASHED TABLE OF ty_named WITH UNIQUE KEY hier_id key_level path.
+    LOOP AT members INTO DATA(member) WHERE hier_id <> c_measures AND calculated = abap_false AND is_null = abap_false.
+      IF member-key_level >= lines( model_hierarchies[ member-hier_id ]-levels )
+          OR line_exists( children_counts[ hier_id = member-hier_id key_level = member-key_level path = member-path ] ).
+        CONTINUE.
+      ENDIF.
+      " a member counted already from its children read
+      READ TABLE children_lists ASSIGNING FIELD-SYMBOL(<children>)
+           WITH TABLE KEY hier_id = member-hier_id key_level = member-key_level path = member-path.
+      IF sy-subrc = 0.
+        INSERT VALUE #( hier_id = member-hier_id key_level = member-key_level path = member-path
+                        count = lines( <children>-members ) ) INTO TABLE children_counts.
+        CONTINUE.
+      ENDIF.
+      ASSIGN wanted[ hier_id = member-hier_id key_level = member-key_level ] TO FIELD-SYMBOL(<wanted>).
+      IF sy-subrc <> 0.
+        INSERT VALUE #( hier_id = member-hier_id key_level = member-key_level ) INTO TABLE wanted ASSIGNING <wanted>.
+      ENDIF.
+      INSERT VALUE #( hier_id = member-hier_id key_level = member-key_level path = member-path ) INTO TABLE seen.
+      IF sy-subrc = 0.
+        APPEND member-path TO <wanted>-paths.
+      ENDIF.
+    ENDLOOP.
+    LOOP AT wanted ASSIGNING <wanted>.
+      DATA(counts) = zzxxmla1_cl_model=>children_counts( hierarchy = model_hierarchies[ <wanted>-hier_id ]
+                                                         level_no = <wanted>-key_level paths = <wanted>-paths ).
+      LOOP AT <wanted>-paths INTO DATA(path).
+        INSERT VALUE #( hier_id = <wanted>-hier_id key_level = <wanted>-key_level path = path
+                        count = VALUE #( counts[ path = path ]-count OPTIONAL ) ) INTO TABLE children_counts.
+      ENDLOOP.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD all_member.
     DATA(model) = model_hierarchies[ hierarchy ].
     DATA(all_level) = levels[ hierarchies[ hierarchy + 1 ]-levels[ 1 ] ].
-    result = VALUE #( hierarchy = model-unique_name hier_id = hierarchy ordinal = 0
+    result = VALUE #( hierarchy = model-unique_name hier_id = hierarchy
                       unique_name = |{ model-unique_name }.{ zzxxmla1_cl_model=>quote_name( model-all_member_name ) }|
                       caption = model-all_member_name level = all_level-id level_name = all_level-unique_name
                       level_number = 0 ).
@@ -569,11 +899,10 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
       CLEAR property.
       RETURN.
     ENDIF.
-    load_members( member-hier_id ).
-    ASSIGN cache[ hierarchy = member-hier_id ] TO FIELD-SYMBOL(<cache>).
-    READ TABLE <cache>-properties INTO DATA(entry) WITH TABLE KEY unique_name = member-unique_name.
+    READ TABLE cached ASSIGNING FIELD-SYMBOL(<cached>)
+         WITH TABLE KEY hier_id = member-hier_id key_level = member-key_level path = member-path.
     IF sy-subrc = 0.
-      value = entry-values[ index ].
+      value = VALUE #( <cached>-properties[ index ] OPTIONAL ).
     ENDIF.
   ENDMETHOD.
 
@@ -584,44 +913,28 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
       ENDDO.
       RETURN.
     ENDIF.
-    load_members( hierarchy ).
-    ASSIGN cache[ hierarchy = hierarchy ] TO FIELD-SYMBOL(<cache>).
-    result = <cache>-members.
+    LOOP AT hierarchies[ hierarchy + 1 ]-levels INTO DATA(level).
+      APPEND LINES OF get_level_members( level ) TO result.
+    ENDLOOP.
+    SORT result STABLE BY order_key ASCENDING.
   ENDMETHOD.
 
   METHOD get_level_members.
-    DATA(hierarchy) = levels[ level ]-hierarchy.
-    IF hierarchy = c_measures.
-      result = get_hierarchy_members( hierarchy ).
+    DATA(element) = levels[ level ].
+    IF element-hierarchy = c_measures.
+      result = get_hierarchy_members( element-hierarchy ).
       RETURN.
     ENDIF.
-    IF levels[ level ]-is_all = abap_true.
-      result = VALUE #( ( all_member( hierarchy ) ) ).
+    IF element-is_all = abap_true.
+      result = VALUE #( ( all_member( element-hierarchy ) ) ).
       RETURN.
     ENDIF.
-    load_members( hierarchy ).
-    ASSIGN cache[ hierarchy = hierarchy ] TO FIELD-SYMBOL(<cache>).
-    LOOP AT <cache>-members INTO DATA(member) WHERE level = level.
-      APPEND member TO result.
-    ENDLOOP.
-  ENDMETHOD.
-
-  METHOD get_member.
-    IF hierarchy = c_measures.
-      DATA(measure_members) = get_hierarchy_members( hierarchy ).
-      READ TABLE measure_members INTO result WITH KEY unique_name = unique_name.
-      RETURN.
+    READ TABLE level_lists ASSIGNING FIELD-SYMBOL(<level>) WITH TABLE KEY level = level.
+    IF sy-subrc <> 0.
+      INSERT VALUE #( level = level members = read( hierarchy = element-hierarchy level_no = element-key_level ) )
+             INTO TABLE level_lists ASSIGNING <level>.
     ENDIF.
-    IF model_hierarchies[ hierarchy ]-has_all = abap_true.
-      DATA(all_entry) = all_member( hierarchy ).
-      IF all_entry-unique_name = unique_name.
-        result = all_entry.
-        RETURN.
-      ENDIF.
-    ENDIF.
-    load_members( hierarchy ).
-    ASSIGN cache[ hierarchy = hierarchy ] TO FIELD-SYMBOL(<cache>).
-    READ TABLE <cache>-members INTO result WITH KEY by_unique COMPONENTS unique_name = unique_name.
+    result = <level>-members.
   ENDMETHOD.
 
   METHOD get_hierarchy_root_members.
@@ -630,15 +943,25 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
 
   METHOD get_member_children.
     " the members whose parent it is, in hierarchy order
-    IF member-hier_id = c_measures OR member-calculated = abap_true.
+    IF member-hier_id = c_measures OR member-calculated = abap_true OR member-is_null = abap_true
+        OR member-key_level >= lines( model_hierarchies[ member-hier_id ]-levels ).
       RETURN.
     ENDIF.
-    load_members( member-hier_id ).
-    ASSIGN cache[ hierarchy = member-hier_id ] TO FIELD-SYMBOL(<cache>).
-    LOOP AT <cache>-members INTO DATA(child) USING KEY by_parent WHERE parent_unique = member-unique_name.
-      APPEND child TO result.
-    ENDLOOP.
-    SORT result BY ordinal ASCENDING.
+    READ TABLE children_lists ASSIGNING FIELD-SYMBOL(<children>)
+         WITH TABLE KEY hier_id = member-hier_id key_level = member-key_level path = member-path.
+    IF sy-subrc <> 0.
+      DATA(children) = COND ty_t_member(
+        WHEN member-key_level = 0
+        THEN get_level_members( level_of( hierarchy = member-hier_id level_no = 1 ) )
+        ELSE read( hierarchy = member-hier_id
+                   level_no  = member-key_level + 1
+                   condition = zzxxmla1_cl_model=>path_condition( hierarchy = model_hierarchies[ member-hier_id ]
+                                                                  level_no  = member-key_level
+                                                                  path      = member-path ) ) ).
+      INSERT VALUE #( hier_id = member-hier_id key_level = member-key_level path = member-path members = children )
+             INTO TABLE children_lists ASSIGNING <children>.
+    ENDIF.
+    result = <children>-members.
   ENDMETHOD.
 
   METHOD zzxxmla1_if_mdx_schema_reader~get_default_member.
@@ -650,8 +973,12 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
     " (RolapHierarchy.getDefaultMember)
     ASSIGN default_members[ hierarchy = hierarchy ] TO FIELD-SYMBOL(<default>).
     IF sy-subrc <> 0.
-      DATA(roots) = get_hierarchy_root_members( hierarchy ).
-      INSERT VALUE #( hierarchy = hierarchy member = roots[ 1 ] ) INTO TABLE default_members ASSIGNING <default>.
+      DATA(first) = get_all_member( hierarchy ).
+      IF first IS INITIAL.
+        DATA(roots) = read( hierarchy = hierarchy level_no = 1 limit = 1 ).
+        first = VALUE #( roots[ 1 ] OPTIONAL ).
+      ENDIF.
+      INSERT VALUE #( hierarchy = hierarchy member = first ) INTO TABLE default_members ASSIGNING <default>.
     ENDIF.
     result = <default>-member.
   ENDMETHOD.
@@ -739,10 +1066,35 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_parent_member.
-    IF member-parent_unique IS INITIAL.
+    IF member-parent_unique IS INITIAL OR member-hier_id = c_measures.
       RETURN.
     ENDIF.
-    result = get_member( hierarchy = member-hier_id unique_name = member-parent_unique ).
+    IF member-key_level = 1.
+      result = all_member( member-hier_id ).
+    ELSEIF member-key_level > 1.
+      " a stored member (or a visual total of one): the member with its path without the last key
+      DATA(parent_path) = substring_before( val = member-path sub = zzxxmla1_cl_model=>c_separator occ = -1 ).
+      result = cached_member( hierarchy = member-hier_id key_level = member-key_level - 1 path = parent_path ).
+      IF result IS INITIAL.
+        DATA(model) = model_hierarchies[ member-hier_id ].
+        DATA(found) = read( hierarchy = member-hier_id level_no = member-key_level - 1 limit = 1
+                            condition = zzxxmla1_cl_model=>path_condition( hierarchy = model
+                                                                           level_no  = member-key_level - 1
+                                                                           path      = parent_path ) ).
+        result = VALUE #( found[ 1 ] OPTIONAL ).
+      ENDIF.
+    ELSE.
+      " a calculated member: its parent is a stored member that was looked up when it was defined
+      IF get_all_member( member-hier_id )-unique_name = member-parent_unique.
+        result = all_member( member-hier_id ).
+        RETURN.
+      ENDIF.
+      READ TABLE named ASSIGNING FIELD-SYMBOL(<named>)
+           WITH TABLE KEY hier_id = member-hier_id unique_name = member-parent_unique.
+      IF sy-subrc = 0.
+        result = cached_member( hierarchy = member-hier_id key_level = <named>-key_level path = <named>-path ).
+      ENDIF.
+    ENDIF.
   ENDMETHOD.
 
   METHOD lookup_calculated_member.
@@ -831,30 +1183,28 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
       IF lines( segment-keys ) <> count.
         RETURN.
       ENDIF.
-      LOOP AT get_level_members( level ) INTO DATA(member).
-        SPLIT member-path AT zzxxmla1_cl_model=>c_separator INTO TABLE DATA(path).
-        DATA(matches) = abap_true.
-        LOOP AT segment-keys INTO DATA(key).
-          IF path[ element-key_level - sy-tabix + 1 ] <> key-name.
-            matches = abap_false.
-            EXIT.
-          ENDIF.
-        ENDLOOP.
-        IF matches = abap_true.
-          result = VALUE #( kind = c_element-member id = member-level member = member ).
-          RETURN.
-        ENDIF.
+      " the first key is the one of this level, the next ones of the levels above it
+      DATA(model) = model_hierarchies[ element-hierarchy ].
+      DATA(conditions) = VALUE string_table( ).
+      LOOP AT segment-keys INTO DATA(key).
+        DATA(key_column) = model-levels[ element-key_level - sy-tabix + 1 ]-key_column.
+        APPEND zzxxmla1_cl_sql=>key_condition( column = zzxxmla1_cl_sql=>quote( key_column ) key = key-name )
+               TO conditions.
       ENDLOOP.
+      DATA(found) = read( hierarchy = element-hierarchy level_no = element-key_level limit = 1
+                          condition = concat_lines_of( table = conditions sep = ` AND ` ) ).
+      IF found IS NOT INITIAL.
+        result = VALUE #( kind = c_element-member id = found[ 1 ]-level member = found[ 1 ] ).
+      ENDIF.
       RETURN.
     ENDIF.
 
-    LOOP AT get_level_members( level ) INTO DATA(named).
-      IF equal_name( name1 = named-caption name2 = segment-name ) = abap_true.
-        result = VALUE #( kind = c_element-member id = named-level member = named ).
-        RETURN.
-      ENDIF.
-    ENDLOOP.
-    LOOP AT get_calculated_members( element-hierarchy ) INTO named WHERE level = level.
+    DATA(named_member) = member_by_name( level = level name = segment-name ).
+    IF named_member IS NOT INITIAL.
+      result = VALUE #( kind = c_element-member id = named_member-level member = named_member ).
+      RETURN.
+    ENDIF.
+    LOOP AT get_calculated_members( element-hierarchy ) INTO DATA(named) WHERE level = level.
       IF equal_name( name1 = named-caption name2 = segment-name ) = abap_true.
         result = VALUE #( kind = c_element-member id = named-level member = named ).
         RETURN.
@@ -924,26 +1274,41 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD lookup_hierarchy_root_member.
-    DATA(roots) = get_hierarchy_root_members( hierarchy ).
-    LOOP AT roots INTO DATA(root).
-      IF equal_name( name1 = root-caption name2 = name ) = abap_true.
-        result = VALUE #( kind = c_element-member id = root-level member = root ).
-        RETURN.
-      ENDIF.
-    ENDLOOP.
-    " if the first level is the All level, '[USA]' stands for '[All Customers].[USA]'
-    IF roots IS NOT INITIAL AND roots[ 1 ]-level_number = 0 AND roots[ 1 ]-hier_id <> c_measures.
-      result = lookup_member_child_by_name( member = roots[ 1 ] name = name ).
+    IF hierarchy = c_measures.
+      LOOP AT get_hierarchy_members( hierarchy ) INTO DATA(measure).
+        IF equal_name( name1 = measure-caption name2 = name ) = abap_true.
+          result = VALUE #( kind = c_element-member id = measure-level member = measure ).
+          RETURN.
+        ENDIF.
+      ENDLOOP.
+      RETURN.
     ENDIF.
+    DATA(all) = get_all_member( hierarchy ).
+    IF all IS INITIAL.
+      DATA(root) = member_by_name( level = hierarchies[ hierarchy + 1 ]-levels[ 1 ] name = name ).
+      IF root IS NOT INITIAL.
+        result = VALUE #( kind = c_element-member id = root-level member = root ).
+      ENDIF.
+      RETURN.
+    ENDIF.
+    IF equal_name( name1 = all-caption name2 = name ) = abap_true.
+      result = VALUE #( kind = c_element-member id = all-level member = all ).
+      RETURN.
+    ENDIF.
+    " the first level is the All level: '[USA]' stands for '[All Customers].[USA]'
+    result = lookup_member_child_by_name( member = all name = name ).
   ENDMETHOD.
 
   METHOD lookup_member_child_by_name.
-    LOOP AT get_member_children( member ) INTO DATA(child).
-      IF equal_name( name1 = child-caption name2 = name ) = abap_true.
-        result = VALUE #( kind = c_element-member id = child-level member = child ).
-        RETURN.
-      ENDIF.
-    ENDLOOP.
+    IF member-hier_id = c_measures OR member-calculated = abap_true OR member-is_null = abap_true
+        OR member-key_level >= lines( model_hierarchies[ member-hier_id ]-levels ).
+      RETURN.
+    ENDIF.
+    DATA(child) = member_by_name( level = level_of( hierarchy = member-hier_id level_no = member-key_level + 1 )
+                                  name = name parent = member ).
+    IF child IS NOT INITIAL.
+      result = VALUE #( kind = c_element-member id = child-level member = child ).
+    ENDIF.
   ENDMETHOD.
 
   METHOD lookup_compound.

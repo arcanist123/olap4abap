@@ -121,8 +121,17 @@ Read before designing anything:
   (all 244 `reference/` cases pass; 394 of the 395 statements of `tests/mdx/applicable.json` give eMondrian's answer,
   #64 differs in the last digits of a sum eMondrian's database adds in another order).
   Hierarchies have levels: the schema's user hierarchies (Store, Product, Customers, Time, Weekly, Promotions) next to
-  the attribute hierarchies; members are read as a tree, cells are grouped by the level columns down to a member's
-  level. Time is a `TimeDimension` (level types `TimeYears`, ... on all its levels, `DIMENSION_TYPE` 1, the
+  the attribute hierarchies; cells are grouped by the level columns down to a member's level. Members are never read
+  as a whole hierarchy (a characteristic can have millions; `docs/mvp-scope.md`, Member decision): the schema reader
+  reads them by SQL as needed (`SqlMemberSource` in `ZZXXMLA1_CL_MODEL=>read_members`: children of a member, a member
+  by name, key or path, a parent, `Lag`/`Lead` and ranges along a level, children counts grouped) and keeps them for
+  the request (`MemberCache`); a level is read whole only where the query asks for all of its members. Cells are read
+  as the reference reads them (`FastBatchingCellReader`, `CellRequest`): each phase (slicer, axes, named sets, cells) is
+  evaluated with a batching reader that records the cells it misses (0 for the pass), they are read with one query per
+  pattern of hierarchies and levels constrained to the keys asked for (`ZZXXMLA1_CL_MDX_FACTS=>load_aggregations`,
+  a column of more than 1,000 keys not constrained, `MaxConstraints`), and the phase is evaluated again until it misses none (`RolapResult.phase`). Hierarchy
+  order is a member's order key, its typed keys from the first level (`RolapMemberBase.compareTo`), numbers ordered
+  as numbers where the column is a number in HANA's catalog. Time is a `TimeDimension` (level types `TimeYears`, ... on all its levels, `DIMENSION_TYPE` 1, the
   `LEVEL_TYPE` codes in the rowsets), so its hierarchy without All member is evaluated with its default member only;
   a hierarchy without All member of another dimension makes the slicer and the axes be evaluated once per root member
   and merged (`RolapResult.evalExecute`).
@@ -161,8 +170,12 @@ Read before designing anything:
   is eMondrian's `NonEmpty(<axis>, {the measures the query names})` (`Query.compile`): each axis is filtered on its
   own before the cells are evaluated, then empty positions are removed as before. Under a non-empty evaluator
   `Members`/`AllMembers` (a level of more than 300 members, `LevelPreCacheThreshold`), `Children` and `Descendants`
-  read only the members with facts in the context (`SqlContextConstraint`, `context_members`; `DrilldownLevel`
-  reads all children, as in the reference). Execute
+  read only the members with facts in the context (`SqlContextConstraint`, `context_members`): their paths from one
+  grouped fact query, then the members of these paths, no level read first; `DrilldownLevel` and `DrilldownMember`
+  too (the reference reads all children there). `TopCount`/`BottomCount` by a stored measure of a crossjoin (`CrossJoin`
+  or `*`) of level members, `Children` or `Descendants` is native (`RolapNativeTopCount`, `native_top_count`,
+  `ZZXXMLA1_CL_MDX_FACTS=>top_count`): the members' crossjoin left-joined to the grouped facts, ordered by the value
+  and limited in HANA (`docs/next-steps.md`, step 9). Execute
   answers carry the query's `DIMENSION PROPERTIES` (olap4j's standard member properties) and `CELL PROPERTIES`.
   Subselects (`FROM (SELECT ... FROM ...)`, Excel's pivot filters) are eMondrian's subcube: the axes of every inner
   SELECT become a predicate that every fact read adds (`Query.getSubcubePredicates`, `ZZXXMLA1_CL_MDX_FACTS=>set_subcube`),

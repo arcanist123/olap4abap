@@ -198,7 +198,10 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       BEGIN OF ty_cj_arg,
         hierarchy    TYPE i,
         level        TYPE i,
+        "! a member list's members; the All member of an All level; else none: the members are read with the tuples
         members      TYPE ty_t_member,
+        "! DescendantsCrossJoinArg below a member: its members are the ones under it
+        ancestor     TYPE ty_member,
         member_list  TYPE abap_bool,
         has_all      TYPE abap_bool,
         has_calc     TYPE abap_bool,
@@ -313,6 +316,32 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       IMPORTING evaluator     TYPE ty_evaluator
                 members       TYPE ty_t_member
       RETURNING VALUE(result) TYPE ty_t_member.
+    "! The SqlContextConstraint of context_members for members of a hierarchy: whether it applies, the filters of the
+    "! other hierarchies and the member of the hierarchy in the context (initial: none).
+    "! @parameter skip_own | the hierarchy's member in the context does not count (each member is set as it)
+    METHODS context_constraint
+      IMPORTING evaluator TYPE ty_evaluator
+                hierarchy TYPE i
+                skip_own  TYPE abap_bool DEFAULT abap_false
+      EXPORTING applies   TYPE abap_bool
+                filters   TYPE zzxxmla1_cl_mdx_facts=>ty_t_filter
+                own       TYPE ty_member.
+    "! The children of stored members of one level (of one hierarchy) in the order of the members, under a non-empty
+    "! evaluator only those with facts in the context (context_members): their paths read from the facts in one grouped
+    "! query, then the members of these paths, without reading all children first (docs/mvp-scope.md, Member decision).
+    "! @parameter as_context | each parent is the context's member of its hierarchy (non_empty_children for each)
+    METHODS context_children
+      IMPORTING evaluator     TYPE ty_evaluator
+                parents       TYPE ty_t_member
+                as_context    TYPE abap_bool DEFAULT abap_false
+      RETURNING VALUE(result) TYPE ty_t_member.
+    "! The members of a level with facts in the context (context_members), read from their paths; found is false where
+    "! the constraint does not apply.
+    METHODS context_level_members
+      IMPORTING evaluator     TYPE ty_evaluator
+                level         TYPE i
+      EXPORTING found         TYPE abap_bool
+      RETURNING VALUE(result) TYPE ty_t_member.
     "! The paths of the members of the hierarchy's level with facts with the filters (kept for the query).
     METHODS context_paths
       IMPORTING filters       TYPE zzxxmla1_cl_mdx_facts=>ty_t_filter
@@ -324,8 +353,20 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       IMPORTING path1         TYPE string
                 path2         TYPE string
       RETURNING VALUE(result) TYPE abap_bool.
+    "! RolapResult.phase: if the pass missed cells, they are read (ZZXXMLA1_CL_MDX_FACTS=>load_aggregations) and the
+    "! pass is to be evaluated again; more than MaxEvalDepth passes fail the query.
+    "! @parameter attempt | the passes so far, counted up
+    METHODS phase
+      CHANGING  attempt       TYPE i
+      RETURNING VALUE(result) TYPE abap_bool
+      RAISING   zzxxmla1_cx_xmla.
+    "! MaxEvalDepth: the most passes of a phase
+    CONSTANTS c_max_eval_depth TYPE i VALUE 10.
+    "! the cells of executeBody whose evaluation missed no cell, by ordinal: their value is final, a later pass keeps it
+    DATA final_cells TYPE HASHED TABLE OF ty_cell WITH UNIQUE KEY ordinal.
     "! The cells (RolapResult.executeStripe): each tuple of the axis at the index in turn is set in the context, and
-    "! the axes before it are run inside; at index 0 the slicer is set and the cell computed. The first axis runs fastest.
+    "! the axes before it are run inside; at index 0 the slicer is set and the cell computed (unless final). The first
+    "! axis runs fastest.
     METHODS execute_stripe
       IMPORTING evaluator  TYPE ty_evaluator
                 axes       TYPE ty_t_axis
@@ -477,12 +518,11 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
     METHODS hierarchize
       IMPORTING tuples        TYPE ty_t_tuple
       RETURNING VALUE(result) TYPE ty_t_tuple.
-    "! The key of a member for hierarchize: its own ordinal (the pre-order of the stored members), or with calculated
-    "! members in the set the path from the root, a stored member as 0 and its ordinal, a calculated one as 1, its
-    "! ordinal and its name (after its stored siblings and their descendants).
+    "! The key of a member for hierarchize: a stored member's order key (the keys from the root, each as 0 and its
+    "! key), a calculated one the key of its parent, then 1, its order key and its name (after its stored siblings and
+    "! their descendants).
     METHODS hierarchize_key
       IMPORTING member        TYPE ty_member
-                path          TYPE abap_bool
       RETURNING VALUE(result) TYPE string.
     METHODS drill_down_level_top
       IMPORTING evaluator     TYPE ty_evaluator
@@ -522,6 +562,21 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       IMPORTING evaluator     TYPE ty_evaluator
                 node          TYPE ty_node
                 top           TYPE abap_bool
+      RETURNING VALUE(result) TYPE ty_t_tuple
+      RAISING   zzxxmla1_cx_xmla.
+    "! RolapNativeTopCount: TopCount / BottomCount by a stored measure of a crossjoin (CrossJoin or *, our extension:
+    "! the reference's CrossJoinArgFactory knows only the function names) of a level's members (Members, Children,
+    "! Descendants), or of one such operand, in one query (ZZXXMLA1_CL_MDX_FACTS=>top_count): the members' crossjoin
+    "! joined to the facts of the context, ordered by the value and limited to the count. While the evaluator is
+    "! empty the set is the whole crossjoin (the empty tuples have the smallest value); while it is non-empty only a
+    "! CrossJoin the native crossjoin would read (its tuples have facts in the context). Else, and with calculated
+    "! members in the context, not native.
+    METHODS native_top_count
+      IMPORTING evaluator     TYPE ty_evaluator
+                node          TYPE ty_node
+                top           TYPE abap_bool
+                count         TYPE i
+      EXPORTING native        TYPE abap_bool
       RETURNING VALUE(result) TYPE ty_t_tuple
       RAISING   zzxxmla1_cx_xmla.
     "! member : member (RangeFunDef, FunUtil.memberRange): the members of their level from the one to the other in
@@ -974,9 +1029,12 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       RETURNING VALUE(result) TYPE ty_t_tuple
       RAISING   zzxxmla1_cx_xmla.
     "! flattenCrossJoinOperands: the operands of nested two-argument crossjoins.
+    "! @parameter with_star | the operator * too, and not NonEmptyCrossJoin (native_top_count: the crossjoins that
+    "!   keep the empty tuples; the reference's native crossjoin knows only the function names)
     METHODS crossjoin_operands
-      IMPORTING node     TYPE ty_node
-      CHANGING  operands TYPE zzxxmla1_cl_mdx_node=>ty_t_node.
+      IMPORTING node      TYPE ty_node
+                with_star TYPE abap_bool DEFAULT abap_false
+      CHANGING  operands  TYPE zzxxmla1_cl_mdx_node=>ty_t_node.
     "! CrossJoinArgFactory.checkCrossJoinArg without evaluation: Level.Members, Member.Children, Descendants(member,
     "! level or depth) and an enumeration of members (in braces, NativizeSet or a named set).
     METHODS direct_cj_arg
@@ -1264,7 +1322,8 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
     TYPES ty_unique_names TYPE HASHED TABLE OF string WITH UNIQUE KEY table_line.
     "! DrilldownMemberFunDef.drillDownObj: the drill-down of one tuple, added to the result.
     METHODS drilldown_member_tuple
-      IMPORTING tuple     TYPE ty_tuple
+      IMPORTING evaluator TYPE ty_evaluator
+                tuple     TYPE ty_tuple
                 drilled   TYPE ty_unique_names
                 recursive TYPE abap_bool
       CHANGING  result    TYPE ty_t_tuple
@@ -1415,8 +1474,11 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     fact_reader->set_subcube( subcube_predicate( resolved ) ).
     root_evaluator = zzxxmla1_cl_mdx_evaluator=>create( schema_reader = schema_reader facts = fact_reader calc = me ).
     DATA(evaluator) = CAST zzxxmla1_if_mdx_evaluator( root_evaluator ).
-    CLEAR: named_set_values, cell_slicer.
+    CLEAR: named_set_values, cell_slicer, final_cells.
     slicer_evaluator_context = evaluator->get_members( ).
+    " each phase below is evaluated until it misses no cell; the cells it misses are read between its passes
+    fact_reader->set_batching( abap_true ).
+    DATA attempt TYPE i.
 
     DATA(non_all_members) = load_special_members( evaluator ).
 
@@ -1424,8 +1486,14 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     " replace the root members of their hierarchies (Determine Slicer), then it is executed (Execute Slicer).
     IF resolved-slicer IS BOUND.
       DATA(slicer_members) = VALUE ty_t_member( ).
-      LOOP AT execute_axis( evaluator = evaluator expression = resolved-slicer non_empty = abap_false )
-           INTO DATA(slicer_tuple).
+      attempt = 0.
+      DO.
+        DATA(slicer_tuples) = execute_axis( evaluator = evaluator expression = resolved-slicer non_empty = abap_false ).
+        IF phase( CHANGING attempt = attempt ) = abap_false.
+          EXIT.
+        ENDIF.
+      ENDDO.
+      LOOP AT slicer_tuples INTO DATA(slicer_tuple).
         LOOP AT slicer_tuple INTO DATA(slicer_member).
           IF NOT line_exists( slicer_members[ unique_name = slicer_member-unique_name ] ).
             APPEND slicer_member TO slicer_members.
@@ -1433,8 +1501,14 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         ENDLOOP.
       ENDLOOP.
       replace_non_all_members( EXPORTING members = slicer_members CHANGING lists = non_all_members ).
-      DATA(slicer) = eval_execute( evaluator = evaluator lists = non_all_members index = lines( non_all_members )
-                                   expression = resolved-slicer non_empty = abap_false ).
+      attempt = 0.
+      DO.
+        DATA(slicer) = eval_execute( evaluator = evaluator lists = non_all_members index = lines( non_all_members )
+                                     expression = resolved-slicer non_empty = abap_false ).
+        IF phase( CHANGING attempt = attempt ) = abap_false.
+          EXIT.
+        ENDIF.
+      ENDDO.
       IF slicer IS INITIAL.
         fail( `The slicer must not be empty` ).
       ENDIF.
@@ -1454,8 +1528,15 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     IF non_all_members IS NOT INITIAL.
       DATA(axis_members) = VALUE ty_t_member( ).
       LOOP AT query_axes INTO DATA(query_axis).
-        LOOP AT top_members( execute_axis( evaluator = evaluator expression = query_axis-expression
-                                           non_empty = query_axis-non_empty ) ) INTO DATA(axis_member).
+        attempt = 0.
+        DO.
+          DATA(axis_tuples) = execute_axis( evaluator = evaluator expression = query_axis-expression
+                                            non_empty = query_axis-non_empty ).
+          IF phase( CHANGING attempt = attempt ) = abap_false.
+            EXIT.
+          ENDIF.
+        ENDDO.
+        LOOP AT top_members( axis_tuples ) INTO DATA(axis_member).
           IF NOT line_exists( axis_members[ unique_name = axis_member-unique_name ] ).
             APPEND axis_member TO axis_members.
           ENDIF.
@@ -1465,30 +1546,36 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     ENDIF.
 
     " Execute Axes: again without the dimension of a calculated member that starts an axis (redo)
+    attempt = 0.
     DO.
-      DATA(redo) = abap_false.
-      CLEAR result-axes.
-      LOOP AT query_axes INTO query_axis.
-        DATA(tuples) = eval_execute( evaluator = evaluator lists = non_all_members index = lines( non_all_members )
-                                     expression = query_axis-expression non_empty = query_axis-non_empty ).
-        IF non_all_members IS NOT INITIAL AND tuples IS NOT INITIAL.
-          LOOP AT tuples[ 1 ] INTO DATA(first) WHERE calculated = abap_true.
-            " a visual total: the dimension of the members it aggregates, its own
-            DATA(dimension) = COND i( WHEN first-calc_name IS NOT INITIAL THEN schema_reader->dimension_of( first-hier_id )
-                                      ELSE last_dimension( schema_reader->get_calculation( first )-expression ) ).
-            LOOP AT non_all_members INTO DATA(list).
-              IF schema_reader->dimension_of( list[ 1 ]-hier_id ) = dimension.
-                DELETE non_all_members INDEX sy-tabix.
-                redo = abap_true.
-                EXIT.
-              ENDIF.
+      DO.
+        DATA(redo) = abap_false.
+        CLEAR result-axes.
+        LOOP AT query_axes INTO query_axis.
+          DATA(tuples) = eval_execute( evaluator = evaluator lists = non_all_members index = lines( non_all_members )
+                                       expression = query_axis-expression non_empty = query_axis-non_empty ).
+          IF non_all_members IS NOT INITIAL AND tuples IS NOT INITIAL.
+            LOOP AT tuples[ 1 ] INTO DATA(first) WHERE calculated = abap_true.
+              " a visual total: the dimension of the members it aggregates, its own
+              DATA(dimension) = COND i( WHEN first-calc_name IS NOT INITIAL THEN schema_reader->dimension_of( first-hier_id )
+                                        ELSE last_dimension( schema_reader->get_calculation( first )-expression ) ).
+              LOOP AT non_all_members INTO DATA(list).
+                IF schema_reader->dimension_of( list[ 1 ]-hier_id ) = dimension.
+                  DELETE non_all_members INDEX sy-tabix.
+                  redo = abap_true.
+                  EXIT.
+                ENDIF.
+              ENDLOOP.
             ENDLOOP.
-          ENDLOOP.
+          ENDIF.
+          APPEND VALUE #( name = |Axis{ query_axis-ordinal }| tuples = tuples
+                          hierarchies = type_hierarchies( query_axis-expression->get_type( ) ) ) TO result-axes.
+        ENDLOOP.
+        IF redo = abap_false.
+          EXIT.
         ENDIF.
-        APPEND VALUE #( name = |Axis{ query_axis-ordinal }| tuples = tuples
-                        hierarchies = type_hierarchies( query_axis-expression->get_type( ) ) ) TO result-axes.
-      ENDLOOP.
-      IF redo = abap_false.
+      ENDDO.
+      IF phase( CHANGING attempt = attempt ) = abap_false.
         EXIT.
       ENDIF.
     ENDDO.
@@ -1509,13 +1596,23 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     ENDIF.
     want_format_string = xsdbool( line_exists( result-cell_properties[ table_line = `FORMAT_STRING` ] ) ).
 
-    " one cell per combination of the axes' tuples; no axis is one cell, an empty axis none (executeBody)
+    " one cell per combination of the axes' tuples; no axis is one cell, an empty axis none (executeBody); again until
+    " no cell is missed, the final cells kept
     DATA(body) = evaluator->savepoint( ).
-    evaluator->set_cell_reader( ).
-    execute_stripe( EXPORTING evaluator = evaluator axes = result-axes slicer = slicer_context
-                              axis_index = lines( result-axes )
-                    CHANGING  cells = result-cells ).
-    evaluator->restore( body ).
+    attempt = 0.
+    DO.
+      CLEAR result-cells.
+      evaluator->set_cell_reader( ).
+      execute_stripe( EXPORTING evaluator = evaluator axes = result-axes slicer = slicer_context
+                                axis_index = lines( result-axes )
+                      CHANGING  cells = result-cells ).
+      evaluator->restore( body ).
+      IF phase( CHANGING attempt = attempt ) = abap_false.
+        EXIT.
+      ENDIF.
+    ENDDO.
+    fact_reader->set_batching( abap_false ).
+    CLEAR final_cells.
 
     LOOP AT query_axes INTO query_axis WHERE non_empty = abap_true.
       remove_empty_positions( EXPORTING position = query_axis-ordinal + 1 CHANGING result = result ).
@@ -2352,43 +2449,45 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD non_empty_level_members.
-    result = schema_reader->get_level_members( level ).
-    IF evaluator->is_non_empty( ) = abap_true AND lines( result ) > c_level_pre_cache_threshold.
-      result = context_members( evaluator = evaluator members = result ).
+    IF evaluator->is_non_empty( ) = abap_true
+        AND schema_reader->get_level_cardinality( level ) > c_level_pre_cache_threshold.
+      context_level_members( EXPORTING evaluator = evaluator level = level
+                             IMPORTING found     = DATA(found)
+                             RECEIVING result    = result ).
+      IF found = abap_true.
+        RETURN.
+      ENDIF.
     ENDIF.
+    result = schema_reader->get_level_members( level ).
   ENDMETHOD.
 
   METHOD non_empty_children.
-    result = schema_reader->get_member_children( member ).
-    IF evaluator->is_non_empty( ) = abap_false OR result IS INITIAL.
+    IF evaluator->is_non_empty( ) = abap_false.
+      result = schema_reader->get_member_children( member ).
       RETURN.
     ENDIF.
     DATA(savepoint) = evaluator->savepoint( ).
     evaluator->set_context( member ).
-    result = context_members( evaluator = evaluator members = result ).
+    result = context_children( evaluator = evaluator parents = VALUE #( ( member ) ) ).
     evaluator->restore( savepoint ).
   ENDMETHOD.
 
-  METHOD context_members.
-    result = members.
-    IF members IS INITIAL OR evaluator->is_non_empty( ) = abap_false.
-      RETURN.
-    ENDIF.
-    DATA(hierarchy) = members[ 1 ]-hier_id.
-    IF hierarchy = zzxxmla1_cl_mdx_schema_reader=>c_measures.
+  METHOD context_constraint.
+    CLEAR: applies, filters, own.
+    IF evaluator->is_non_empty( ) = abap_false OR hierarchy = zzxxmla1_cl_mdx_schema_reader=>c_measures.
       RETURN.
     ENDIF.
     DATA(context) = evaluator->get_members( ).
     IF measures_conflict( context ) = abap_true.
       RETURN.
     ENDIF.
-    DATA filters TYPE zzxxmla1_cl_mdx_facts=>ty_t_filter.
-    DATA(own) = VALUE ty_member( ).
     LOOP AT context INTO DATA(member) WHERE hier_id <> zzxxmla1_cl_mdx_schema_reader=>c_measures.
-      IF member-unique_name = schema_reader->get_default_member( member-hier_id )-unique_name.
+      IF member-unique_name = schema_reader->get_default_member( member-hier_id )-unique_name
+          OR ( skip_own = abap_true AND member-hier_id = hierarchy ).
         CONTINUE.
       ENDIF.
       IF member-calculated = abap_true OR member-is_null = abap_true.
+        CLEAR: filters, own.
         RETURN.
       ENDIF.
       IF member-key_level = 0.
@@ -2400,11 +2499,114 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         APPEND VALUE #( hierarchy = member-hier_id level = member-key_level path = member-path ) TO filters.
       ENDIF.
     ENDLOOP.
+    applies = abap_true.
+  ENDMETHOD.
+
+  METHOD context_children.
+    DATA(stored) = VALUE ty_t_member( ).
+    LOOP AT parents INTO DATA(parent) WHERE calculated = abap_false AND is_null = abap_false
+                                        AND hier_id <> zzxxmla1_cl_mdx_schema_reader=>c_measures.
+      APPEND parent TO stored.
+    ENDLOOP.
+    IF stored IS NOT INITIAL.
+      context_constraint( EXPORTING evaluator = evaluator hierarchy = stored[ 1 ]-hier_id skip_own = as_context
+                          IMPORTING applies = DATA(applies) filters = DATA(filters) own = DATA(own) ).
+    ENDIF.
+    IF applies = abap_false.
+      LOOP AT parents INTO parent.
+        IF as_context = abap_true.
+          APPEND LINES OF non_empty_children( evaluator = evaluator member = parent ) TO result.
+        ELSE.
+          APPEND LINES OF schema_reader->get_member_children( parent ) TO result.
+        ENDIF.
+      ENDLOOP.
+      IF as_context = abap_false.
+        result = context_members( evaluator = evaluator members = result ).
+      ENDIF.
+      RETURN.
+    ENDIF.
+    " the paths of the level below with facts, under one of the parents and on the context member's line
+    DATA(hierarchy) = stored[ 1 ]-hier_id.
+    DATA(key_level) = stored[ 1 ]-key_level + 1.
+    IF key_level > lines( schema_reader->get_hierarchy( hierarchy )-model-levels ).
+      RETURN.
+    ENDIF.
+    DATA(paths) = VALUE string_table( ).
+    LOOP AT context_paths( filters = filters hierarchy = hierarchy key_level = key_level ) INTO DATA(path).
+      IF own IS INITIAL OR on_one_path( path1 = own-path path2 = path ) = abap_true.
+        APPEND path TO paths.
+      ENDIF.
+    ENDLOOP.
+    DATA(children) = schema_reader->get_members_by_paths( level = schema_reader->get_level_of( hierarchy = hierarchy
+                                                                                               key_level = key_level )
+                                                         paths = paths ).
+    " in the order of the parents, each one's children in hierarchy order
+    TYPES:
+      BEGIN OF ty_family,
+        path     TYPE string,
+        children TYPE ty_t_member,
+      END OF ty_family.
+    DATA families TYPE HASHED TABLE OF ty_family WITH UNIQUE KEY path.
+    LOOP AT children INTO DATA(child).
+      DATA(parent_path) = COND string( WHEN key_level > 1 THEN substring_before( val = child-path
+                                                                                 sub = zzxxmla1_cl_model=>c_separator
+                                                                                 occ = -1 ) ).
+      ASSIGN families[ path = parent_path ] TO FIELD-SYMBOL(<family>).
+      IF sy-subrc <> 0.
+        INSERT VALUE #( path = parent_path ) INTO TABLE families ASSIGNING <family>.
+      ENDIF.
+      APPEND child TO <family>-children.
+    ENDLOOP.
+    LOOP AT parents INTO parent.
+      IF parent-calculated = abap_true OR parent-is_null = abap_true OR parent-hier_id <> hierarchy
+          OR parent-key_level <> key_level - 1.
+        APPEND LINES OF schema_reader->get_member_children( parent ) TO result.
+        CONTINUE.
+      ENDIF.
+      ASSIGN families[ path = parent-path ] TO <family>.
+      IF sy-subrc = 0.
+        APPEND LINES OF <family>-children TO result.
+      ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD context_level_members.
+    CLEAR found.
+    DATA(element) = schema_reader->get_level( level ).
+    IF element-key_level = 0.
+      RETURN.
+    ENDIF.
+    context_constraint( EXPORTING evaluator = evaluator hierarchy = element-hierarchy
+                        IMPORTING applies = found filters = DATA(filters) own = DATA(own) ).
+    IF found = abap_false.
+      RETURN.
+    ENDIF.
+    DATA(paths) = VALUE string_table( ).
+    LOOP AT context_paths( filters = filters hierarchy = element-hierarchy key_level = element-key_level )
+         INTO DATA(path).
+      IF own IS INITIAL OR on_one_path( path1 = own-path path2 = path ) = abap_true.
+        APPEND path TO paths.
+      ENDIF.
+    ENDLOOP.
+    result = schema_reader->get_members_by_paths( level = level paths = paths ).
+  ENDMETHOD.
+
+  METHOD context_members.
+    result = members.
+    IF members IS INITIAL.
+      RETURN.
+    ENDIF.
+    DATA(hierarchy) = members[ 1 ]-hier_id.
+    context_constraint( EXPORTING evaluator = evaluator hierarchy = hierarchy
+                        IMPORTING applies = DATA(applies) filters = DATA(filters) own = DATA(own) ).
+    IF applies = abap_false.
+      RETURN.
+    ENDIF.
 
     CLEAR result.
     DATA(key_level) = -1.
     DATA paths TYPE ty_path_set.
-    LOOP AT members INTO member.
+    LOOP AT members INTO DATA(member).
       IF member-hier_id <> hierarchy OR member-calculated = abap_true OR member-key_level = 0.
         " not read from the facts
         APPEND member TO result.
@@ -2576,12 +2778,31 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     ENDCASE.
   ENDMETHOD.
 
+  METHOD phase.
+    IF fact_reader->load_aggregations( ) = abap_false.
+      RETURN.
+    ENDIF.
+    attempt = attempt + 1.
+    IF attempt > c_max_eval_depth.
+      fail( |Failed to load all aggregations after { c_max_eval_depth } passes; there's probably a cycle| ).
+    ENDIF.
+    result = abap_true.
+  ENDMETHOD.
+
   METHOD execute_stripe.
     DATA(savepoint) = evaluator->savepoint( ).
     IF axis_index = 0.
-      evaluator->set_context_members( slicer ).
-      DATA(cell) = compute_cell( evaluator ).
-      cell-ordinal = lines( cells ).
+      DATA(ordinal) = lines( cells ).
+      READ TABLE final_cells INTO DATA(cell) WITH TABLE KEY ordinal = ordinal.
+      IF sy-subrc <> 0.
+        evaluator->set_context_members( slicer ).
+        DATA(misses) = fact_reader->get_miss_count( ).
+        cell = compute_cell( evaluator ).
+        cell-ordinal = ordinal.
+        IF fact_reader->get_miss_count( ) = misses.
+          INSERT cell INTO TABLE final_cells.
+        ENDIF.
+      ENDIF.
       APPEND cell TO cells.
     ELSE.
       " a savepoint per tuple, as the reference (the stack decides the context stack of an infinite loop)
@@ -2722,7 +2943,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
           LOOP AT schema_reader->get_hierarchy( hierarchy )-levels INTO DATA(level).
             APPEND LINES OF non_empty_level_members( evaluator = evaluator level = level ) TO members.
           ENDLOOP.
-          SORT members BY ordinal ASCENDING.
+          SORT members BY order_key ASCENDING.
           result = VALUE #( FOR non_empty_member IN members ( VALUE #( ( non_empty_member ) ) ) ).
         ELSE.
           result = VALUE #( FOR hierarchy_member IN schema_reader->get_hierarchy_members( hierarchy )
@@ -3434,18 +3655,11 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         tuple TYPE ty_tuple,
       END OF ty_keyed.
     DATA keyed TYPE STANDARD TABLE OF ty_keyed WITH EMPTY KEY.
-    DATA(path) = abap_false.
     LOOP AT tuples INTO DATA(tuple).
-      IF line_exists( tuple[ calculated = abap_true ] ).
-        path = abap_true.
-        EXIT.
-      ENDIF.
-    ENDLOOP.
-    LOOP AT tuples INTO tuple.
-      " a tab after each member: an ancestor's key is a prefix of its descendants' and sorts first
+      " a separator after each member: an ancestor's key is a prefix of its descendants' and sorts first
       DATA(key) = VALUE string( ).
       LOOP AT tuple INTO DATA(member).
-        key = key && hierarchize_key( member = member path = path ) && cl_abap_char_utilities=>horizontal_tab.
+        key = key && hierarchize_key( member ) && zzxxmla1_cl_model=>c_separator.
       ENDLOOP.
       APPEND VALUE #( key = key tuple = tuple ) TO keyed.
     ENDLOOP.
@@ -3454,19 +3668,16 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD hierarchize_key.
-    DATA(current) = member.
-    DO.
-      result = COND #( WHEN current-calculated = abap_true
-                       THEN |1{ current-ordinal WIDTH = 10 ALIGN = RIGHT PAD = '0' }{ current-caption }|
-                       ELSE |0{ current-ordinal WIDTH = 10 ALIGN = RIGHT PAD = '0' }| ) && result.
-      IF path = abap_false.
-        RETURN.
-      ENDIF.
-      current = schema_reader->get_parent_member( current ).
-      IF current IS INITIAL.
-        RETURN.
-      ENDIF.
-    ENDDO.
+    " a stored member: its order key, which has its ancestors' keys; a calculated member after the stored children of
+    " its parent, by its own order key (a visual total has the one of its member), then by its name
+    IF member-calculated = abap_false.
+      result = member-order_key.
+      RETURN.
+    ENDIF.
+    DATA(parent) = schema_reader->get_parent_member( member ).
+    result = COND string( WHEN parent IS NOT INITIAL THEN hierarchize_key( parent ) )
+             && zzxxmla1_cl_model=>c_separator && `1` && member-order_key && zzxxmla1_cl_model=>c_separator
+             && member-caption.
   ENDMETHOD.
 
   METHOD non_empty_list.
@@ -3558,6 +3769,12 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     IF count <= 0.
       RETURN.
     ENDIF.
+    DATA native TYPE abap_bool.
+    result = native_top_count( EXPORTING evaluator = evaluator node = node top = top count = count
+                               IMPORTING native = native ).
+    IF native = abap_true.
+      RETURN.
+    ENDIF.
     result = evaluate_set( evaluator = evaluator node = node->args[ 1 ] ).
     IF lines( node->args ) < 3.
       IF top = abap_true.
@@ -3587,6 +3804,129 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     DELETE result FROM count + 1.
   ENDMETHOD.
 
+  METHOD native_top_count.
+    CLEAR native.
+    IF lines( node->args ) <> 3.
+      RETURN.
+    ENDIF.
+    " the value: a stored measure (RolapNativeSql.generateTopCountOrderBy)
+    DATA(value) = node->args[ 3 ].
+    IF value->kind <> zzxxmla1_cl_mdx_node=>c_kind-member
+        OR value->element-member-hier_id <> zzxxmla1_cl_mdx_schema_reader=>c_measures
+        OR value->element-member-calculated = abap_true OR value->element-member-measure_index <= 0.
+      RETURN.
+    ENDIF.
+    " the set: while the evaluator is non-empty a CrossJoin that is read natively (only the tuples with facts), else
+    " a crossjoin (CrossJoin or *) or one operand, with the empty tuples
+    DATA(set) = node->args[ 1 ].
+    DATA operands TYPE zzxxmla1_cl_mdx_node=>ty_t_node.
+    DATA(with_empty) = abap_true.
+    IF evaluator->is_non_empty( ) = abap_true.
+      IF set->kind <> zzxxmla1_cl_mdx_node=>c_kind-resolved_call OR lines( set->args ) <> 2
+          OR set->fun_def-implementation <> `CrossJoinFunDef` OR to_upper( set->fun_def-name ) <> `CROSSJOIN`.
+        RETURN.
+      ENDIF.
+      crossjoin_operands( EXPORTING node = set CHANGING operands = operands ).
+      with_empty = abap_false.
+    ELSE.
+      crossjoin_operands( EXPORTING node = set with_star = abap_true CHANGING operands = operands ).
+    ENDIF.
+
+    " the operands: a level's members, below a member if there is one (DescendantsCrossJoinArg)
+    DATA args TYPE ty_t_cj_arg.
+    DATA top_operands TYPE zzxxmla1_cl_mdx_facts=>ty_t_top_operand.
+    LOOP AT operands INTO DATA(operand).
+      direct_cj_arg( EXPORTING node = operand IMPORTING arg = DATA(arg) found = DATA(found) ).
+      IF found = abap_false OR arg-member_list = abap_true
+          OR arg-hierarchy = zzxxmla1_cl_mdx_schema_reader=>c_measures
+          OR line_exists( args[ hierarchy = arg-hierarchy ] ).
+        RETURN.
+      ENDIF.
+      DATA(key_level) = schema_reader->get_level( arg-level )-key_level.
+      IF key_level = 0 OR arg-ancestor-key_level > key_level.
+        RETURN.
+      ENDIF.
+      APPEND arg TO args.
+      APPEND VALUE #( hierarchy = arg-hierarchy level = key_level
+                      ancestor_level = arg-ancestor-key_level ancestor_path = arg-ancestor-path ) TO top_operands.
+    ENDLOOP.
+    IF with_empty = abap_false AND valid_cj_args( evaluator = evaluator args = args ) = abap_false.
+      RETURN.
+    ENDIF.
+
+    " the context: the cell's filters, the stored non-All members of the other hierarchies (evaluate_current); with a
+    " calculated or null member not native. The native crossjoin's tuples have facts with the context without the
+    " default members (read_native_tuples, removeCalculatedAndDefaultMembers).
+    DATA filters TYPE zzxxmla1_cl_mdx_facts=>ty_t_filter.
+    DATA tuple_filters TYPE zzxxmla1_cl_mdx_facts=>ty_t_filter.
+    LOOP AT evaluator->get_members( ) INTO DATA(context) WHERE hier_id <> zzxxmla1_cl_mdx_schema_reader=>c_measures.
+      IF line_exists( args[ hierarchy = context-hier_id ] ).
+        CONTINUE.
+      ENDIF.
+      IF context-calculated = abap_true OR context-calc_name IS NOT INITIAL OR context-is_null = abap_true.
+        RETURN.
+      ENDIF.
+      IF context-key_level = 0.
+        CONTINUE.
+      ENDIF.
+      DATA(filter) = VALUE zzxxmla1_cl_mdx_facts=>ty_filter( hierarchy = context-hier_id level = context-key_level
+                                                             path = context-path ).
+      APPEND filter TO filters.
+      IF context-unique_name <> schema_reader->get_default_member( context-hier_id )-unique_name.
+        APPEND filter TO tuple_filters.
+      ENDIF.
+    ENDLOOP.
+
+    " the whole crossjoin fails on the result limit as the interpreted one does, before it is built
+    IF with_empty = abap_true.
+      DATA(size) = CONV decfloat34( 1 ).
+      LOOP AT fact_reader->operand_counts( top_operands ) INTO DATA(member_count).
+        check_result_limit( CONV #( member_count ) ).
+        size = size * member_count.
+        check_result_limit( size ).
+      ENDLOOP.
+    ENDIF.
+
+    DATA(rows) = fact_reader->top_count( operands      = top_operands
+                                         filters       = filters
+                                         measure       = value->element-member-measure_index
+                                         count         = count
+                                         top           = top
+                                         with_empty    = with_empty
+                                         tuple_filters = tuple_filters ).
+    " the members of the paths, read per operand in one query
+    TYPES:
+      BEGIN OF ty_found,
+        operand TYPE i,
+        path    TYPE string,
+        member  TYPE ty_member,
+      END OF ty_found.
+    DATA found_members TYPE HASHED TABLE OF ty_found WITH UNIQUE KEY operand path.
+    LOOP AT args INTO arg.
+      DATA(position) = sy-tabix.
+      LOOP AT schema_reader->get_members_by_paths( level = arg-level
+                                                   paths = VALUE #( FOR r IN rows ( r[ position ] ) ) )
+           INTO DATA(member).
+        INSERT VALUE #( operand = position path = member-path member = member ) INTO TABLE found_members.
+      ENDLOOP.
+    ENDLOOP.
+    LOOP AT rows INTO DATA(row).
+      DATA(tuple) = VALUE ty_tuple( ).
+      LOOP AT row INTO DATA(path).
+        position = sy-tabix.
+        READ TABLE found_members INTO DATA(found_member) WITH TABLE KEY operand = position path = path.
+        IF sy-subrc <> 0.
+          " a path the member read does not find (not expected): not native
+          CLEAR result.
+          RETURN.
+        ENDIF.
+        APPEND found_member-member TO tuple.
+      ENDLOOP.
+      APPEND tuple TO result.
+    ENDLOOP.
+    native = abap_true.
+  ENDMETHOD.
+
   METHOD range.
     " SmartMemberReader.getMemberRange: the start, then its next members in the level (also across parents) to the
     " end; empty if the end comes first, then FunUtil.memberRange tries the members the other way round
@@ -3595,12 +3935,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     IF member0-level <> member1-level.
       zzxxmla1_cx_mdx_evaluation=>raise_error( `Members must belong to the same level` ).
     ENDIF.
-    DATA(first) = nmin( val1 = member0-ordinal val2 = member1-ordinal ).
-    DATA(last) = nmax( val1 = member0-ordinal val2 = member1-ordinal ).
-    LOOP AT schema_reader->get_level_members( member0-level ) INTO DATA(member)
-         WHERE ordinal >= first AND ordinal <= last.
-      APPEND VALUE #( ( member ) ) TO result.
-    ENDLOOP.
+    result = VALUE #( FOR member IN schema_reader->get_member_range( member1 = member0 member2 = member1 )
+                      ( VALUE #( ( member ) ) ) ).
   ENDMETHOD.
 
   METHOD descendants.
@@ -3675,7 +4011,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
                                      before = before self = self after = after leaves = leaves ).
     ENDIF.
     " hierarchizeMemberList( result, false ): pre-order
-    SORT result BY ordinal ASCENDING.
+    SORT result BY order_key ASCENDING.
   ENDMETHOD.
 
   METHOD descendants_by_depth.
@@ -3699,12 +4035,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         ENDIF.
         APPEND LINES OF children TO result.
       ENDIF.
-      DATA(next_members) = VALUE ty_t_member( ).
-      LOOP AT children INTO DATA(child).
-        APPEND LINES OF schema_reader->get_member_children( child ) TO next_members.
-      ENDLOOP.
       " getMemberChildren( children, context ): the non-empty ones under a non-empty evaluator
-      next_members = context_members( evaluator = evaluator members = next_members ).
+      DATA(next_members) = context_children( evaluator = evaluator parents = children ).
       IF next_members IS INITIAL.
         EXIT.
       ENDIF.
@@ -3788,11 +4120,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
           APPEND member TO fertile.
         ENDIF.
       ENDLOOP.
-      members = VALUE #( ).
-      LOOP AT fertile INTO member.
-        APPEND LINES OF schema_reader->get_member_children( member ) TO members.
-      ENDLOOP.
-      members = context_members( evaluator = evaluator members = members ).
+      members = context_children( evaluator = evaluator parents = fertile ).
     ENDWHILE.
   ENDMETHOD.
 
@@ -3884,6 +4212,28 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD sort_tuples.
+    " the values of break keys first, once per tuple (the comparisons find them in sort_values; an error is left to
+    " the comparison that meets it): if a cell is missed, this pass is evaluated again once it is read, so the tuples
+    " are not sorted in this one (the reference sorts them, by the value 0 of the missed cells)
+    IF lines( tuples ) > 1 AND NOT line_exists( keys[ brk = abap_false ] ).
+      DATA(savepoint) = evaluator->savepoint( ).
+      LOOP AT tuples INTO DATA(tuple).
+        LOOP AT keys INTO DATA(key).
+          DATA(key_index) = sy-tabix.
+          TRY.
+              sort_value( evaluator = evaluator key = key key_index = key_index run = run
+                          members   = COND #( WHEN lines( tuple ) = 1 THEN tuple
+                                              ELSE dependent_members( key = key tuple = tuple ) ) ).
+            CATCH zzxxmla1_cx_xmla.
+              evaluator->restore( savepoint ).
+          ENDTRY.
+        ENDLOOP.
+      ENDLOOP.
+      IF fact_reader->is_dirty( ) = abap_true.
+        RETURN.
+      ENDIF.
+    ENDIF.
+
     " bottom-up merge sort: stable, as Java sorts lists and arrays of objects
     DATA source TYPE ty_t_tuple.
     DATA(count) = lines( tuples ).
@@ -4117,8 +4467,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       result = COND #( WHEN member1-calculated = abap_true THEN 1 ELSE -1 ).
       RETURN.
     ENDIF.
-    IF member1-ordinal <> member2-ordinal.
-      result = COND #( WHEN member1-ordinal < member2-ordinal THEN -1 ELSE 1 ).
+    IF member1-order_key <> member2-order_key.
+      result = COND #( WHEN member1-order_key < member2-order_key THEN -1 ELSE 1 ).
       RETURN.
     ENDIF.
     " RolapMemberBase.compareTo: by key; calculated members by name
@@ -4712,16 +5062,27 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       result = known-tuples.
       RETURN.
     ENDIF.
-    " RolapResult.evaluateExp: a child of the slicer evaluator, evaluating the axes if the context is
+    " RolapResult.evaluateExp: a child of the slicer evaluator, evaluating the axes if the context is; evaluated until
+    " it misses no cell. The cells missed before by the pass it is part of are read too, so that pass is still dirty.
+    DATA(dirty) = fact_reader->is_dirty( ).
+    DATA(attempt) = 0.
     DATA(savepoint) = evaluator->savepoint( ).
     TRY.
         evaluator->set_context_members( slicer_evaluator_context ).
         evaluator->set_non_empty( abap_false ).
-        result = evaluate_set( evaluator = evaluator node = node->set_expression ).
+        DO.
+          result = evaluate_set( evaluator = evaluator node = node->set_expression ).
+          IF phase( CHANGING attempt = attempt ) = abap_false.
+            EXIT.
+          ENDIF.
+        ENDDO.
       CLEANUP.
         evaluator->restore( savepoint ).
     ENDTRY.
     evaluator->restore( savepoint ).
+    IF dirty = abap_true.
+      fact_reader->set_dirty( ).
+    ENDIF.
     DELETE TABLE named_set_values WITH TABLE KEY key = node->set_key.
     INSERT VALUE #( key = node->set_key tuples = result ) INTO TABLE named_set_values.
   ENDMETHOD.
@@ -4894,16 +5255,10 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       RETURN.
     ENDIF.
     " SiblingIterator: the members of the level in hierarchy order, across parents
-    DATA(members) = schema_reader->get_level_members( member-level ).
-    READ TABLE members WITH KEY unique_name = member-unique_name TRANSPORTING NO FIELDS.
-    IF sy-subrc = 0.
-      DATA(target) = sy-tabix + n.
-      IF target >= 1 AND target <= lines( members ).
-        result = members[ target ].
-        RETURN.
-      ENDIF.
+    result = schema_reader->get_lead_member( member = member n = n ).
+    IF result IS INITIAL.
+      result = null_member( member-hier_id ).
     ENDIF.
-    result = null_member( member-hier_id ).
   ENDMETHOD.
 
   METHOD ancestor.
@@ -5075,10 +5430,11 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       ENDIF.
       first = children[ 1 ].
     ENDWHILE.
-    LOOP AT schema_reader->get_level_members( member-level ) INTO DATA(period)
-         WHERE ordinal >= first-ordinal AND ordinal <= member-ordinal.
-      APPEND VALUE #( ( period ) ) TO result.
-    ENDLOOP.
+    IF first-order_key > member-order_key.
+      RETURN.
+    ENDIF.
+    result = VALUE #( FOR period IN schema_reader->get_member_range( member1 = first member2 = member )
+                      ( VALUE #( ( period ) ) ) ).
   ENDMETHOD.
 
   METHOD xtd.
@@ -5216,9 +5572,9 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
                hierarchy = slicer_member-hier_id
                dimension_of_hierarchy = schema_reader->dimension_of( slicer_member-hier_id )
                definitely = abap_true ) = abap_true.
-            DATA(all) = schema_reader->get_hierarchy_members( slicer_member-hier_id ).
-            IF all IS NOT INITIAL AND all[ 1 ]-key_level = 0.
-              evaluator->set_context( all[ 1 ] ).
+            DATA(all) = schema_reader->get_all_member( slicer_member-hier_id ).
+            IF all IS NOT INITIAL.
+              evaluator->set_context( all ).
             ENDIF.
           ENDIF.
         ENDLOOP.
@@ -5346,18 +5702,18 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       RETURN.
     ENDIF.
     LOOP AT tuples INTO DATA(tuple).
-      " the key: per member its position in its operand, else its ordinal in the hierarchy, ten digits each
+      " the key: per member its position in its operand (ten digits), else its order key in the hierarchy
       DATA(key) = ``.
       LOOP AT tuple INTO DATA(member).
-        DATA(rank) = member-ordinal.
+        DATA(rank) = |1{ member-order_key }|.
         IF sy-tabix <= lines( orders ).
           ASSIGN orders[ sy-tabix ] TO FIELD-SYMBOL(<positions>).
           READ TABLE <positions> INTO DATA(position) WITH TABLE KEY unique_name = member-unique_name.
           IF sy-subrc = 0.
-            rank = position-position.
+            rank = |0{ position-position WIDTH = 10 ALIGN = RIGHT PAD = '0' }|.
           ENDIF.
         ENDIF.
-        key = key && |{ rank WIDTH = 10 ALIGN = RIGHT PAD = '0' }|.
+        key = key && rank && zzxxmla1_cl_model=>c_separator.
       ENDLOOP.
       APPEND VALUE #( key = key tuple = tuple ) TO keyed.
     ENDLOOP.
@@ -5367,9 +5723,12 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
 
   METHOD crossjoin_operands.
     IF node->kind = zzxxmla1_cl_mdx_node=>c_kind-resolved_call AND lines( node->args ) = 2
-        AND ( to_upper( node->fun_def-name ) = `CROSSJOIN` OR to_upper( node->fun_def-name ) = `NONEMPTYCROSSJOIN` ).
-      crossjoin_operands( EXPORTING node = node->args[ 1 ] CHANGING operands = operands ).
-      crossjoin_operands( EXPORTING node = node->args[ 2 ] CHANGING operands = operands ).
+        AND ( to_upper( node->fun_def-name ) = `CROSSJOIN`
+              OR ( with_star = abap_false AND to_upper( node->fun_def-name ) = `NONEMPTYCROSSJOIN` )
+              OR ( with_star = abap_true AND node->fun_def-name = `*`
+                   AND node->fun_def-implementation = `CrossJoinFunDef` ) ).
+      crossjoin_operands( EXPORTING node = node->args[ 1 ] with_star = with_star CHANGING operands = operands ).
+      crossjoin_operands( EXPORTING node = node->args[ 2 ] with_star = with_star CHANGING operands = operands ).
     ELSE.
       APPEND node TO operands.
     ENDIF.
@@ -5444,13 +5803,13 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     ELSE.
       RETURN.
     ENDIF.
-    " DescendantsCrossJoinArg: the level's members, below the member if there is one
-    arg = VALUE #( hierarchy = schema_reader->get_level( level )-hierarchy level = level has_non_calc = abap_true ).
-    LOOP AT schema_reader->get_level_members( level ) INTO DATA(member).
-      IF ancestor IS INITIAL OR is_ancestor_of( ancestor = ancestor member = member ) = abap_true.
-        APPEND member TO arg-members.
-      ENDIF.
-    ENDLOOP.
+    " DescendantsCrossJoinArg: the level's members, below the member if there is one; read with the tuples, only the
+    " ones with facts (the All level: its member)
+    arg = VALUE #( hierarchy = schema_reader->get_level( level )-hierarchy level = level has_non_calc = abap_true
+                   ancestor = ancestor ).
+    IF schema_reader->get_level( level )-key_level = 0.
+      arg-members = schema_reader->get_level_members( level ).
+    ENDIF.
     found = abap_true.
   ENDMETHOD.
 
@@ -5655,6 +6014,31 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     IF read IS INITIAL.
       RETURN.
     ENDIF.
+    DATA(combinations) = fact_reader->non_empty_paths( filters ).
+    " a level's members (not a member list): the members of the paths read, those under the ancestor if there is one
+    LOOP AT read INTO DATA(position).
+      DATA(index) = sy-tabix.
+      arg = args[ position ].
+      IF arg-member_list = abap_true.
+        CONTINUE.
+      ENDIF.
+      DATA(prefix) = COND string( WHEN arg-ancestor-key_level > 0
+                                  THEN arg-ancestor-path && zzxxmla1_cl_model=>c_separator ).
+      DATA(paths) = VALUE string_table( ).
+      LOOP AT combinations INTO DATA(combination).
+        DATA(path) = combination[ index ].
+        IF prefix IS INITIAL OR strlen( path ) > strlen( prefix )
+            AND substring( val = path len = strlen( prefix ) ) = prefix.
+          APPEND path TO paths.
+        ENDIF.
+      ENDLOOP.
+      SORT paths.
+      DELETE ADJACENT DUPLICATES FROM paths.
+      ASSIGN lookups[ position ] TO FIELD-SYMBOL(<read_lookup>).
+      LOOP AT schema_reader->get_members_by_paths( level = arg-level paths = paths ) INTO member.
+        INSERT VALUE #( path = member-path member = member ) INTO TABLE <read_lookup>.
+      ENDLOOP.
+    ENDLOOP.
 
     " the combinations, ordered by the hierarchy order of the members, the first argument first
     TYPES:
@@ -5663,16 +6047,16 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         tuple TYPE ty_tuple,
       END OF ty_sorted.
     DATA sorted TYPE SORTED TABLE OF ty_sorted WITH NON-UNIQUE KEY key.
-    LOOP AT fact_reader->non_empty_paths( filters ) INTO DATA(paths).
+    LOOP AT combinations INTO combination.
       DATA(tuple) = VALUE ty_tuple( ).
       DATA(key) = ``.
       DATA(complete) = abap_true.
       LOOP AT args INTO arg.
-        DATA(index) = sy-tabix.
-        READ TABLE read TRANSPORTING NO FIELDS WITH KEY table_line = index.
+        DATA(arg_index) = sy-tabix.
+        READ TABLE read TRANSPORTING NO FIELDS WITH KEY table_line = arg_index.
         IF sy-subrc = 0.
-          DATA(path) = paths[ sy-tabix ].
-          ASSIGN lookups[ index ][ path = path ] TO FIELD-SYMBOL(<lookup>).
+          path = combination[ sy-tabix ].
+          ASSIGN lookups[ arg_index ][ path = path ] TO FIELD-SYMBOL(<lookup>).
           IF sy-subrc <> 0.
             complete = abap_false.
             EXIT.
@@ -5687,7 +6071,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
           member = arg-members[ 1 ].
         ENDIF.
         APPEND member TO tuple.
-        key = key && |{ member-ordinal WIDTH = 10 ALIGN = RIGHT PAD = '0' }|.
+        key = key && member-order_key && zzxxmla1_cl_model=>c_separator.
       ENDLOOP.
       IF complete = abap_true.
         INSERT VALUE #( key = key tuple = tuple ) INTO TABLE sorted.
@@ -5745,8 +6129,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     LOOP AT segments INTO segment FROM start + 1.
       DATA(position) = sy-tabix.
       DATA(candidates) = COND ty_t_member(
-        WHEN current IS INITIAL THEN VALUE #( FOR m IN schema_reader->get_hierarchy_members( hierarchy )
-                                              WHERE ( level = first_level ) ( m ) )
+        WHEN current IS INITIAL THEN schema_reader->get_level_members( first_level )
         ELSE schema_reader->get_member_children( current ) ).
       DATA(exact) = VALUE ty_member( ).
       LOOP AT candidates INTO DATA(candidate).
@@ -5995,7 +6378,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         result = VALUE #( kind = zzxxmla1_cl_mdx_evaluator=>c_value-integer number = type ).
       WHEN `CHILDREN_CARDINALITY`.
         result = VALUE #( kind = zzxxmla1_cl_mdx_evaluator=>c_value-integer
-                          number = lines( schema_reader->get_member_children( member ) ) ).
+                          number = schema_reader->get_children_count( member ) ).
       WHEN `PARENT_LEVEL`.
         result = VALUE #( kind = zzxxmla1_cl_mdx_evaluator=>c_value-integer
                           number = COND #( WHEN parent IS NOT INITIAL THEN depth_of( parent ) ) ).
@@ -6156,7 +6539,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       LOOP AT tuples INTO DATA(tuple).
         APPEND tuple TO result.
         DATA(drilled) = tuple[ index + 1 ].
-        DATA(children) = schema_reader->get_member_children( drilled ).
+        DATA(children) = non_empty_children( evaluator = evaluator member = drilled ).
         LOOP AT calculated INTO DATA(calculated_child) WHERE parent_unique = drilled-unique_name.
           APPEND calculated_child TO children.
         ENDLOOP.
@@ -6196,11 +6579,21 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         APPEND member TO parents.
       ENDIF.
     ENDLOOP.
-    " the children after the whole set
+    " the children after the whole set; under a non-empty evaluator only those with facts, read for all parents at once
+    " (the reference reads all children here: docs/mvp-scope.md, Member decision)
+    DATA(non_empty) = COND ty_t_member( WHEN evaluator->is_non_empty( ) = abap_true
+                                        THEN context_children( evaluator = evaluator parents = parents
+                                                               as_context = abap_true ) ).
     LOOP AT parents INTO DATA(parent).
-      LOOP AT schema_reader->get_member_children( parent ) INTO child.
-        APPEND VALUE #( ( child ) ) TO result.
-      ENDLOOP.
+      IF evaluator->is_non_empty( ) = abap_true.
+        LOOP AT non_empty INTO child WHERE parent_unique = parent-unique_name.
+          APPEND VALUE #( ( child ) ) TO result.
+        ENDLOOP.
+      ELSE.
+        LOOP AT schema_reader->get_member_children( parent ) INTO child.
+          APPEND VALUE #( ( child ) ) TO result.
+        ENDLOOP.
+      ENDIF.
       LOOP AT calculated INTO calculated_child WHERE parent_unique = parent-unique_name.
         APPEND VALUE #( ( calculated_child ) ) TO result.
       ENDLOOP.
@@ -6223,7 +6616,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     DATA(recursive) = xsdbool( lines( node->args ) = 3 AND to_upper( node->args[ 3 ]->value ) = `RECURSIVE` ).
     LOOP AT tuples INTO DATA(tuple).
       APPEND tuple TO result.
-      drilldown_member_tuple( EXPORTING tuple = tuple drilled = drilled recursive = recursive CHANGING result = result ).
+      drilldown_member_tuple( EXPORTING evaluator = evaluator tuple = tuple drilled = drilled recursive = recursive
+                              CHANGING result = result ).
     ENDLOOP.
   ENDMETHOD.
 
@@ -6234,11 +6628,13 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         CONTINUE.
       ENDIF.
       DATA(clone) = tuple.
-      LOOP AT schema_reader->get_member_children( member ) INTO DATA(child).
+      " under a non-empty evaluator only the children with facts (the reference reads all of them)
+      LOOP AT non_empty_children( evaluator = evaluator member = member ) INTO DATA(child).
         clone[ position ] = child.
         APPEND clone TO result.
         IF recursive = abap_true.
-          drilldown_member_tuple( EXPORTING tuple = clone drilled = drilled recursive = recursive CHANGING result = result ).
+          drilldown_member_tuple( EXPORTING evaluator = evaluator tuple = clone drilled = drilled recursive = recursive
+                                  CHANGING result = result ).
         ENDIF.
       ENDLOOP.
       RETURN.
@@ -6695,32 +7091,26 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
   METHOD set_display_info.
     " The reference: the number of children (at most 0xffff), 0x10000 if the next tuple's member is a child of this one,
     " 0x20000 if the parent is the one of the previous tuple's member
-    TYPES:
-      BEGIN OF ty_child_count,
-        unique_name TYPE string,
-        count       TYPE i,
-      END OF ty_child_count.
-    " the children of an All member are counted once, not for every tuple it is in
-    DATA child_counts TYPE HASHED TABLE OF ty_child_count WITH UNIQUE KEY unique_name.
+    " the stored members, and the ones visual totals stand for: their children counted in one query per level
+    DATA(stored) = VALUE ty_t_member( ).
+    LOOP AT tuples INTO DATA(tuple).
+      LOOP AT tuple INTO DATA(member) WHERE is_null = abap_false
+                                        AND ( calculated = abap_false OR calc_name IS NOT INITIAL ).
+        member-calculated = abap_false.
+        APPEND member TO stored.
+      ENDLOOP.
+    ENDLOOP.
+    schema_reader->prefetch_children_counts( stored ).
     DATA(count) = lines( tuples ).
     DO count TIMES.
       DATA(position) = sy-index.
       LOOP AT tuples[ position ] ASSIGNING FIELD-SYMBOL(<member>).
         DATA(k) = sy-tabix.
-        DATA(children) = <member>-children.
-        " an All member (or a visual total of one) is made without its children counted (getMemberChildren.size)
-        IF <member>-key_level = 0 AND <member>-is_null = abap_false
-            AND <member>-hier_id <> zzxxmla1_cl_mdx_schema_reader=>c_measures
-            AND ( <member>-calculated = abap_false OR <member>-calc_name IS NOT INITIAL ).
-          ASSIGN child_counts[ unique_name = <member>-unique_name ] TO FIELD-SYMBOL(<child_count>).
-          IF sy-subrc <> 0.
-            DATA(all_member) = <member>.
-            all_member-calculated = abap_false.
-            INSERT VALUE #( unique_name = <member>-unique_name
-                            count = lines( schema_reader->get_member_children( all_member ) ) )
-              INTO TABLE child_counts ASSIGNING <child_count>.
-          ENDIF.
-          children = <child_count>-count.
+        DATA(children) = 0.
+        IF <member>-is_null = abap_false AND ( <member>-calculated = abap_false OR <member>-calc_name IS NOT INITIAL ).
+          DATA(counted) = <member>.
+          counted-calculated = abap_false.
+          children = schema_reader->get_children_count( counted ).
         ENDIF.
         <member>-display_info = nmin( val1 = children val2 = 65535 ).
         IF position < count AND tuples[ position + 1 ][ k ]-parent_unique IS NOT INITIAL

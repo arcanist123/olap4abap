@@ -56,6 +56,29 @@ Decisions taken by the project owner on 2026-10-02, with reasons.
   ABAP SQL: `<SQL>` variants are raw SQL embedded in the statement. Compile-time checks of table and column names are
   given up; correctness comes from integration tests that run the same way against SAP and eMondrian.
 
+## Member decision (2026-10-12)
+
+- **The target is BW on HANA, and a characteristic can have many millions of members.** The engine never reads a
+  whole hierarchy or level into ABAP unless the query really asks for all of its members; whatever HANA can do on
+  members is pushed down to it, as the facts are: the children of a member, a member by name or key, a member's
+  parent, the members of a range, the number of children, and, under a non-empty evaluator, only the members with
+  facts in the context and the subcube (one grouped query, not a filter of members already read).
+- Members are read as the reference's `SqlMemberSource` reads them (by parent, by key, by name) and kept for the
+  request in the schema reader's member cache (`MemberCache`); nothing is kept between requests yet (Session
+  decision).
+- Hierarchy order is the order of a member's keys from the first level (`RolapMemberBase.compareTo`, children by
+  key), compared in ABAP, not a position in a list of all members.
+- Deviation: `DrilldownLevel` and `DrilldownMember` under a non-empty evaluator read only the children with facts in
+  the context, as `Children` does (`SqlContextConstraint`); the reference reads all children there. A NON EMPTY axis
+  removes the others anyway, except where a calculated measure has a value without facts (which `Children` under a
+  non-empty evaluator does not show in the reference either).
+- Cell values are read only for the members asked for, in passes as the reference reads them (`CellRequest`,
+  `FastBatchingCellReader`), never grouped over the whole fact table. As in the reference, a level column with more
+  than `MaxConstraints` (1,000) keys is not constrained (`Aggregation.optimizePredicates`). Deviations: the reference
+  also drops constraints by its bloat estimate (it needs column cardinalities), this is not ported; `Order`/`TopCount` do not sort in a pass that missed
+  cells (its result is thrown away; the values are still asked for); a cell whose evaluation missed none is kept
+  instead of being evaluated again in the next pass.
+
 ## Catalog decision (2026-10-06, may be revisited)
 
 - Mondrian's levels are **data source → catalog → schema → cube**: `/WEB-INF/datasources.xml` lists data sources, each

@@ -12,9 +12,66 @@ period functions: all 244 `reference/` cases pass, and of the 395 statements of 
 
 No statement stops at a function the engine does not evaluate any more; #64 differs in the last digits of a sum
 eMondrian's database adds in another order (`docs/test-strategy.md`). The run (three statements at once) takes about
-four minutes; the slowest on SAP are #85 (79 s) and #46 (77 s), then #116 (24 s); everything else is below 15 s.
+four minutes; the slowest on SAP is #85 (105 s, `Order` in ABAP, step 8 below); #46 takes 2.3 s with the native
+`TopCount` (step 9); everything else is below 10 s.
 
-## Now: the schema generator
+## Now: members pushed down to HANA
+
+Decision in `mvp-scope.md` (Member decision, 2026-10-12). Found with Excel on the wide demo `ZXMLWIDE`: a label filter
+on `[Dimension 00]` (100,000 members) made every query read and sort all 100,000 members in ABAP to show one
+(`DrilldownLevel` → `get_member_children` → `load_members`), 2-3 s per query. Order, each step with all `reference/`
+cases and the applicable statements passing:
+
+1. Done (2026-10-12): hierarchy order without positions: members carry an order key built from their typed keys
+   (`RolapMemberBase.compareTo`; `ZZXXMLA1_CL_MODEL=>order_key`, the key columns' types from HANA's catalog);
+   `Hierarchize`, `Order`, ranges and the native crossjoin's order use it instead of the position in the loaded
+   hierarchy.
+2. Done (2026-10-12): the schema reader reads members by SQL and caches them (`SqlMemberSource` in
+   `ZZXXMLA1_CL_MODEL=>read_members`, `MemberCache`): children of a member, a member by name under its parent or on a
+   level (UPPER on both sides, a plain comparison for names without letters or of number columns), by key, a
+   member's parent (by its path), a level's members only when asked for, ranges and `Lag`/`Lead` along a level (one
+   query each, `order_condition`), children counts in one grouped query per level (DisplayInfo,
+   `CHILDREN_CARDINALITY`), the ancestors kept with every read, each query answered once per request.
+   `load_members` is gone.
+3. Done (2026-10-12): members from the facts (native crossjoin) are read by their paths in one query per 1,000
+   (`get_members_by_paths`; an IN list on the key of a level of unique members), not looked up in the level's members.
+4. Done (2026-10-12): `Children`, `Members` (above 300 members), `Descendants`, `DrilldownLevel` and
+   `DrilldownMember` under a non-empty evaluator: only the members with facts in the context and the subcube, their
+   paths from one grouped fact query (`context_children`, `context_level_members`). Excel's label filter on
+   `[Dimension 00]` of `ZXMLWIDE`: 0.13 s per query instead of 2-3 s, the same answers.
+5. Done (2026-10-12): `MDSCHEMA_MEMBERS` reads through the schema reader only what its restrictions can select (a
+   member and its TREE_OP relatives, the restricted levels); `MDSCHEMA_HIERARCHIES`' default member of a hierarchy
+   without All member is its first member (LIMIT 1).
+6. Open: a wide-demo characteristic with millions of members to measure against.
+7. Done (2026-10-12): cell values are read as the reference reads them (`FastBatchingCellReader`, `CellRequest`,
+   `Segment`): each phase of a query (slicer, axes, named sets, cells) is evaluated with a batching reader that records
+   the cells it misses (their value 0 for the pass, `RolapUtil.valueNotReadyException`), then the recorded cells of each
+   pattern of hierarchies and levels are read with one grouped query whose level columns are constrained to the keys
+   asked for (`IN` lists, `ZZXXMLA1_CL_MDX_FACTS=>load_aggregations`), and the phase is evaluated again until it misses
+   none (`RolapResult.phase`, at most `MaxEvalDepth` 10 passes). What was read is kept as segments: a cell a segment
+   covers without a group has no facts. The native crossjoin's tuple read is constrained to its fixed members the same
+   way. Applicable statements: same answers, the whole run 191 s instead of about 240 s; #46 and #85 (Order/TopCount
+   over 100,000+ tuples) take about 105 s instead of about 80 s, the second pass evaluating every value again.
+8. Open: an unqualified member name (`[USA]`) is looked for by name in every hierarchy, one query each (100 on
+   `ZXMLWIDE`). `Order`/`TopCount` over large sets is slow in ABAP (#85: `Head(Order(...), 5)` over about 85,000
+   tuples, 105 s; #46 took as long before step 9): the merge sort calls a method per comparison and finds each value
+   by a string key; evaluating each sort value once into a table and sorting that with `SORT ... STABLE` would help.
+9. Done (2026-10-12): native `TopCount`/`BottomCount` (`RolapNativeTopCount`, `ZZXXMLA1_CL_MDX_ENGINE=>native_top_count`,
+   `ZZXXMLA1_CL_MDX_FACTS=>top_count`): by a stored measure, of a crossjoin (`CrossJoin` or `*`, our extension: the
+   reference's `CrossJoinArgFactory` knows only the function names, so it sorts #46 in memory) of level members,
+   `Children` or `Descendants`, or of one of them. One query: the crossjoin of the operands' members (the distinct key
+   columns of each dimension table) left-joined to the facts grouped by these columns with the context and the
+   subcube, `ORDER BY` the value (`DESC NULLS LAST` for TopCount, `ASC NULLS FIRST` for BottomCount: the empty value
+   is the smallest), then the members' keys (the stable sort keeps the set's order), `LIMIT` the count. Under a
+   non-empty evaluator only a `CrossJoin` the native crossjoin would read, inner-joined to the facts of the context
+   without the default members (its tuples) and left-joined to the value's. The whole crossjoin's size is counted
+   first (one query) and fails on the result limit as the interpreted one does. Not native with calculated members in
+   the context (a compound slicer, #73 and #297-#301: about 8 s each), a calculated measure or another set
+   (`Distinct`, a member list). #46: 2.3 s instead of 104 s (eMondrian 3 s), the same answers; all 47 applicable
+   statements with `TopCount`/`BottomCount` and 13 more edge cases (empty tuples, ties, an empty key, `Fact Count`,
+   slicer, subselect, `NON EMPTY`) give eMondrian's answers.
+
+## Then: the schema generator
 
 Design in `schema-generator.md`. Order:
 
@@ -195,5 +252,5 @@ evaluation (`MemberArrayValueCalc`; before, `([Measures].[Foo], [Time].CurrentMe
 - The result limit is a class attribute; a setting (per system, like Mondrian's property file) would let it be changed
   without a transport.
 - Done: the native NON EMPTY crossjoin. Not yet: its context constraint with calculated members (Aggregate members
-  and compound slicers expanded, `expandSupportedCalculatedMembers`), native `Filter`, `TopCount` and member lists
-  (`RolapNativeFilter`, `RolapNativeTopCount`, `SqlMemberSource`).
+  and compound slicers expanded, `expandSupportedCalculatedMembers`), native `Filter` and member lists
+  (`RolapNativeFilter`, `SqlMemberSource`). Native `TopCount` is done (members pushed down, step 9).

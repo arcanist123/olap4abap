@@ -112,7 +112,7 @@ CLASS zzxxmla1_cl_mdx_node DEFINITION
         hierarchy     TYPE string,   " unique name of the hierarchy
         hier_id       TYPE i,        " id of the hierarchy: 0 for Measures, else the position in the model
         measure_index TYPE i,        " position in the measures (Measures hierarchy only)
-        ordinal       TYPE i,        " position in the hierarchy in hierarchy order, the All member first (0)
+        order_key     TYPE string,   " hierarchy order (ZZXXMLA1_CL_MODEL, ty_member-order_key); the All member empty
         key           TYPE string,   " value of the level column; empty for the All member
         key_level     TYPE i,        " the level in the model (1 the first below the All level), 0: the All member
         path          TYPE string,   " the keys of the model levels down to key_level (ZZXXMLA1_CL_MODEL)
