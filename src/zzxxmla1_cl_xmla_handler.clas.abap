@@ -265,6 +265,12 @@ CLASS zzxxmla1_cl_xmla_handler DEFINITION
     "! The answer of an Execute request without statement: an empty root, as the reference gives it.
     METHODS empty_execute_response
       RETURNING VALUE(result) TYPE string.
+    "! The leading keywords of a statement of MDX's data definition that the grammar (MdxParser.jj) does not know, upper
+    "! case and single-spaced (`CREATE SESSION CUBE`, `CREATE SUBCUBE`, `ALTER CUBE`, `DROP CUBE`, ...); initial for
+    "! any other statement.
+    CLASS-METHODS unsupported_statement
+      IMPORTING statement     TYPE string
+      RETURNING VALUE(result) TYPE string.
     "! The response body with the Session header element of the request's session, if it has one.
     METHODS with_session
       IMPORTING body          TYPE string
@@ -348,6 +354,14 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
         " no statement (Excel opens its session so): an empty answer, as the reference gives
         result = empty_execute_response( ).
         RETURN.
+      ENDIF.
+      " Excel sends CREATE SESSION CUBE when members of a PivotTable are grouped; the reference fails it as a syntax
+      " error at its second keyword, here the client is told that the statement is not supported
+      DATA(unsupported) = unsupported_statement( request-statement ).
+      IF unsupported IS NOT INITIAL.
+        zzxxmla1_cx_xmla=>raise_code(
+          kind = `Server` code = `00HSBB01` text = `XMLA SOAP Body processing error`
+          description = |olap4abap Error:{ unsupported } statements are not supported| ).
       ENDIF.
       DATA(statement) = zzxxmla1_cl_mdx_parser=>parse( request-statement ).
       IF statement-kind = `DRILLTHROUGH`.
@@ -434,6 +448,13 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
           description = |Rowset { request-type } is not implemented yet| ).
     ENDCASE.
     result = discover_response( request = request rows = rows ).
+  ENDMETHOD.
+
+  METHOD unsupported_statement.
+    DATA(text) = to_upper( condense( replace( val = statement regex = `\s+` with = ` ` occ = 0 ) ) ).
+    result = match( val   = text
+                    regex = `^(CREATE (SESSION |GLOBAL )?(SUB)?CUBE|ALTER CUBE|DROP (SESSION |GLOBAL )?(SUB)?CUBE)(\W|$)` ).
+    result = condense( replace( val = result regex = `\W$` with = `` ) ).
   ENDMETHOD.
 
   METHOD drill_through.

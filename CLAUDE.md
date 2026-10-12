@@ -172,6 +172,9 @@ Read before designing anything:
   `ZZXXMLA1_CL_MDX_FACTS=>drill_through`, `DrillThroughQuerySpec`; `ZZXXMLA1_CL_XMLA_TABULAR`, `TabularRowSet`): every
   level column of the cube's star (named by the first level that uses it, in hierarchy order) and the measure, the
   levels of the cell's members constrained, the subcube and a compound slicer applied, column types from HANA's catalog.
+  MDX data definition the grammar does not know (`CREATE SESSION CUBE`, which Excel sends to group members of a
+  PivotTable, `CREATE SUBCUBE`, `ALTER CUBE`, `DROP CUBE`) is answered with a fault "... statements are not supported"
+  before parsing (`ZZXXMLA1_CL_XMLA_HANDLER=>unsupported_statement`); the reference gives a syntax error there.
   See `docs/test-strategy.md`, section Execute (MDX) cases.
 - Schema definition (step 1 of moving the model to Mondrian schema XML, see `docs/mvp-scope.md`, schema decision):
   `ZZXXMLA1_CL_SCHEMA_DEF` reads any Mondrian schema as `MondrianDef` does and writes it back as `toXML` does,
