@@ -472,7 +472,8 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
     IF fixed IS INITIAL.
       RETURN.
     ENDIF.
-    DATA(fact) = views->fact_layout( provider = cube fixed = fixed ).
+    DATA(fact) = views->fact_layout( provider  = cube
+                                     selection = zzxxmla1_cl_bw_view_gen=>selection_of( fixed ) ).
     LOOP AT fact-notes INTO DATA(note).
       APPEND VALUE #( iobjnm = note-iobjnm reason = note-reason ) TO provider-notes.
     ENDLOOP.
@@ -490,7 +491,8 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
 
   METHOD fact_view.
     " the view as it is, if it has every column it is generated with now; else a placeholder, generated on accept
-    result = views->existing_fact_view( provider = provider fixed = fixed ).
+    result = views->existing_fact_view( provider  = provider
+                                        selection = zzxxmla1_cl_bw_view_gen=>selection_of( fixed ) ).
     IF result IS NOT INITIAL.
       DATA(view_columns) = columns_of( result ).
       LOOP AT layout-columns INTO DATA(column).
@@ -564,7 +566,8 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
     " compounded or fixed characteristics: the facts are read from the fact view, which has the SID of each compounded
     " one whose compounding is not all fixed and is filtered on the fixed ones, every field named without namespace
     " (docs/bw-schema-design-guide.md, sections 3.7 and 3.8)
-    DATA(fact) = views->fact_layout( provider = adso fixed = fixed ).
+    DATA(fact) = views->fact_layout( provider  = adso
+                                     selection = zzxxmla1_cl_bw_view_gen=>selection_of( fixed ) ).
     LOOP AT fact-notes INTO DATA(note).
       APPEND VALUE #( iobjnm = note-iobjnm reason = note-reason ) TO provider-notes.
     ENDLOOP.
@@ -588,7 +591,8 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
 
   METHOD characteristic.
     result = VALUE #( iobjnm = iobjnm text = text_of( iobjnm ) iobjtp = iobjtp fact_column = fact_column ).
-    DATA(layout) = views->layout( characteristic = iobjnm fixed = fixed ).
+    DATA(layout) = views->layout( characteristic = iobjnm
+                                  selection      = zzxxmla1_cl_bw_view_gen=>selection_of( fixed ) ).
     result-basic = layout-tables-basic.
     SELECT iobjcmp FROM rsdiobjcmp
       WHERE iobjnm = @result-basic AND objvers = 'A'
@@ -627,7 +631,8 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
 
     " the view as it is, if it has every column it is generated with now; else the schema names a placeholder, and
     " accepting it generates the view again (it keeps its name)
-    result-view = views->existing_view( characteristic = CONV #( result-basic ) fixed = fixed ).
+    result-view = views->existing_view( characteristic = CONV #( result-basic )
+                                        selection      = zzxxmla1_cl_bw_view_gen=>selection_of( fixed ) ).
     IF result-view IS NOT INITIAL.
       DATA(view_columns) = columns_of( result-view ).
       LOOP AT layout-columns INTO column.

@@ -1655,11 +1655,12 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
         " the aDSO's facts with the SID of the room (characteristic of the view: the aDSO)
         APPEND generator->generate_fact_view( c_adso ) TO result.
         " the K4 schemas: the facts of both filtered on the variant, the variant, the year and the period filtered on it
-        APPEND generator->generate_fact_view( provider = c_cube fixed = k4( ) ) TO result.
-        APPEND generator->generate_fact_view( provider = c_adso fixed = k4( ) ) TO result.
-        APPEND generator->generate( characteristic = 'ZCLFISCVR' fixed = k4( ) ) TO result.
-        APPEND generator->generate( characteristic = 'ZCLFISCYR' fixed = k4( ) ) TO result.
-        APPEND generator->generate( characteristic = 'ZCLFISCPR' fixed = k4( ) ) TO result.
+        DATA(selection) = zzxxmla1_cl_bw_view_gen=>selection_of( k4( ) ).
+        APPEND generator->generate_fact_view( provider = c_cube selection = selection ) TO result.
+        APPEND generator->generate_fact_view( provider = c_adso selection = selection ) TO result.
+        APPEND generator->generate( characteristic = 'ZCLFISCVR' selection = selection ) TO result.
+        APPEND generator->generate( characteristic = 'ZCLFISCYR' selection = selection ) TO result.
+        APPEND generator->generate( characteristic = 'ZCLFISCPR' selection = selection ) TO result.
       CATCH cx_dd_ddl_exception INTO DATA(error).
         write( |views: FAILED, { error->get_text( ) }| ).
     ENDTRY.

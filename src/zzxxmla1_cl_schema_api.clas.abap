@@ -607,7 +607,9 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
         DATA(fixed) = VALUE #( selections[ table = table ]-fixed OPTIONAL ).
         TRY.
             IF zzxxmla1_cl_bw_view_gen=>provider_of_fact_placeholder( table ) IS NOT INITIAL.
-              DATA(fact_view) = generator->generate_fact_view( provider = CONV #( characteristic ) fixed = fixed ).
+              DATA(fact_view) = generator->generate_fact_view(
+                                  provider  = CONV #( characteristic )
+                                  selection = zzxxmla1_cl_bw_view_gen=>selection_of( fixed ) ).
               IF fact_view IS INITIAL.
                 RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400
                   message = |{ characteristic } needs no fact view (no compounded characteristic of an aDSO, | &&
@@ -615,7 +617,8 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
               ENDIF.
               APPEND fact_view TO views.
             ELSE.
-              APPEND generator->generate( characteristic = CONV #( characteristic ) fixed = fixed ) TO views.
+              APPEND generator->generate( characteristic = CONV #( characteristic )
+                                          selection      = zzxxmla1_cl_bw_view_gen=>selection_of( fixed ) ) TO views.
             ENDIF.
           CATCH cx_dd_ddl_exception INTO DATA(ddl_error).
             RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 500
@@ -1066,8 +1069,9 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     IF entry-kind = zzxxmla1_cl_bw_view_gen=>c_kind-fact.
       entry-selection = zzxxmla1_cl_bw_view_gen=>selection_text( fixed ).
     ELSE.
-      entry-selection = zzxxmla1_cl_bw_view_gen=>selection_text(
-        NEW zzxxmla1_cl_bw_view_gen( )->view_selection( characteristic = CONV #( entry-object ) fixed = fixed ) ).
+      entry-selection = zzxxmla1_cl_bw_selection=>selection_text(
+        NEW zzxxmla1_cl_bw_view_gen( )->view_selection( characteristic = CONV #( entry-object )
+                                                        selection      = zzxxmla1_cl_bw_view_gen=>selection_of( fixed ) ) ).
     ENDIF.
     READ TABLE selections INTO DATA(other) WITH KEY table = table.
     IF sy-subrc <> 0.

@@ -151,8 +151,18 @@ Steps:
     row, one `I EQ` row written `C=v`); a hash would only be a shorter form of the same text. Selections equal in
     meaning but written differently (`I BT '001' '012'`, `E CP '*013'`...) get views of their own, a duplicate and
     never a wrong one. Uniqueness is the generator's: it looks the view up before it generates one.
-15. Views: a characteristic's view filtered on the selections of its key fields (both modes); the fact view filtered
-    on the filter-the-cube characteristics only, and none when there are none.
+15. Done (2026-10-13): views: a characteristic's view filtered on the selections of its key fields (both modes); the
+    fact view filtered on the filter-the-cube characteristics only, and none when there are none.
+    `ZZXXMLA1_CL_BW_VIEW_GEN` takes a selection (`ty_t_selection`, `ZZXXMLA1_CL_BW_SELECTION`'s characteristics with
+    mode and rows) instead of fixed values: `WHERE` with the selection class's condition on the key field; only a
+    single `I EQ` value of the compounding leaves `COMPOUND_KEY`. An InfoCube's fact view joins the SID table of a
+    filtered characteristic on the SID alone and has the condition in `WHERE` (a condition of several rows is no join
+    condition; the demo's K4 view regenerated gives the same visits). The callers still speak fixed values until step
+    16 and pass `selection_of( fixed )` (filter the cube, one `I EQ` row each; same canonical text, so the existing
+    rows of `ZZXXMLA1_VIEW` stay valid). Checked on SAP: views of the clinic demo for `ZCLFISCVR` in K1 or K4 with a
+    period range in restrict members (`I BT`, `E EQ`), and for K4 with the period filtered (`I CP`, `E NB`), activate,
+    the period views have the rows of their SID table under the same condition and the aDSO's fact views the aDSO's
+    visits.
 16. Schema and API: annotations `olap4abap.filter.<characteristic>` and `olap4abap.members.<characteristic>`, the old
     `olap4abap.fixed.` read as filter `I EQ` and rewritten by `POST fix`; `POST fix` takes `filter.C=<rows>` and
     `members.C=<rows>` (`fixed.C=v` still as `filter.C=I EQ 'v'`); the uncompounding rule on one `I EQ` value in

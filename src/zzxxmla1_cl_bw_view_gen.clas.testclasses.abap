@@ -56,8 +56,18 @@ CLASS ltc_bw_view_gen DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION 
     "! an aDSO whose cube fixes the site: the facts filtered on it, and the room, compounded with the site only, still
     "! with its SID column, so that a schema keys it the same way
     METHODS fact_view_fixed_adso FOR TESTING.
-    "! an InfoCube whose cube fixes the site: its fact table inner-joined to the site's SID table on the SID and value
+    "! an InfoCube whose cube fixes the site: its fact table inner-joined to the site's SID table on the SID, the value
+    "! in the WHERE
     METHODS fact_view_fixed_cube FOR TESTING.
+    "! the fiscal period with its special periods excluded (restrict members) under the variant fixed (filter the
+    "! cube): both filter its view, the variant fixed to one value leaves COMPOUND_KEY; the label has no quote
+    METHODS compounded_range FOR TESTING.
+    "! the variant restricted to two values: the view filtered on both, and still compounded
+    METHODS compounding_two_values FOR TESTING.
+    "! the facts are filtered on the characteristics of mode filter the cube only, by the condition of their rows
+    METHODS fact_view_filter_mode FOR TESTING.
+    "! fixed values are a selection of mode filter the cube with one I EQ row each
+    METHODS selection_of_fixed FOR TESTING.
     "! the selection as table ZZXXMLA1_VIEW keys it: sorted by characteristic
     METHODS selection_text FOR TESTING.
     "! a characteristic without attribute table: the SID table alone
@@ -372,7 +382,9 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
       compounding    = VALUE #( ( iobjnm = '0FISCVARNT' field = 'FISCVARNT' ) ) ).
     DATA(fixed) = VALUE zzxxmla1_cl_bw_view_gen=>ty_t_fixed( ( iobjnm = '0FISCVARNT' value = `K4` )
                                                               ( iobjnm = '0VERSION' value = `000` ) ).
-    DATA(layout) = zzxxmla1_cl_bw_view_gen=>build_layout( metadata = metadata fixed = fixed ).
+    DATA(layout) = zzxxmla1_cl_bw_view_gen=>build_layout(
+                     metadata  = metadata
+                     selection = zzxxmla1_cl_bw_view_gen=>selection_of( fixed ) ).
     cl_abap_unit_assert=>assert_equals( act = layout-selection exp = `0FISCVARNT=K4` ).
     cl_abap_unit_assert=>assert_false( xsdbool( line_exists(
       layout-columns[ name = zzxxmla1_cl_bw_view_gen=>c_compound_key ] ) ) ).
@@ -394,8 +406,8 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
             |where s.fiscvarnt = 'K4'{ nl }| ).
     " fixed, but not its compounding: the plain view, compounded
     layout = zzxxmla1_cl_bw_view_gen=>build_layout(
-      metadata = metadata
-      fixed    = VALUE #( ( iobjnm = '0VERSION' value = `000` ) ) ).
+      metadata  = metadata
+      selection = zzxxmla1_cl_bw_view_gen=>selection_of( VALUE #( ( iobjnm = '0VERSION' value = `000` ) ) ) ).
     cl_abap_unit_assert=>assert_initial( layout-selection ).
     cl_abap_unit_assert=>assert_initial( layout-filters ).
     cl_abap_unit_assert=>assert_true( xsdbool( line_exists(
@@ -410,9 +422,9 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
                                 ( field = 'FISCPER'   datatype = 'CHAR' length = 7 key = abap_true )
                                 ( field = 'SID'       datatype = 'INT4' length = 10 ) )
       compounding    = VALUE #( ( iobjnm = '0FISCVARNT' field = 'FISCVARNT' ) ) ).
-    DATA(fixed) = VALUE zzxxmla1_cl_bw_view_gen=>ty_t_fixed( ( iobjnm = '0FISCVARNT' value = `K4` )
-                                                              ( iobjnm = '0FISCPER' value = `2024001` ) ).
-    DATA(layout) = zzxxmla1_cl_bw_view_gen=>build_layout( metadata = metadata fixed = fixed ).
+    DATA(fixed) = zzxxmla1_cl_bw_view_gen=>selection_of( VALUE #( ( iobjnm = '0FISCVARNT' value = `K4` )
+                                                                  ( iobjnm = '0FISCPER' value = `2024001` ) ) ).
+    DATA(layout) = zzxxmla1_cl_bw_view_gen=>build_layout( metadata = metadata selection = fixed ).
     cl_abap_unit_assert=>assert_equals( act = layout-selection exp = `0FISCPER=2024001;0FISCVARNT=K4` ).
     cl_abap_unit_assert=>assert_equals(
       act = layout-filters
@@ -425,7 +437,7 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
                           tables         = VALUE #( basic = '0FISCVARNT' sids = '/BI0/SFISCVARNT' key_field = 'FISCVARNT' )
                           sid_columns    = VALUE #( ( field = 'FISCVARNT' datatype = 'CHAR' length = 2 key = abap_true )
                                                     ( field = 'SID'       datatype = 'INT4' length = 10 ) ) )
-      fixed    = fixed ).
+      selection = fixed ).
     cl_abap_unit_assert=>assert_equals( act = layout-selection exp = `0FISCVARNT=K4` ).
     cl_abap_unit_assert=>assert_equals( act = layout-filters exp = VALUE string_table( ( `s.fiscvarnt = 'K4'` ) ) ).
     " a reference characteristic: its view is its basic one's, not filtered
@@ -434,14 +446,14 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
                           tables         = VALUE #( basic = '0CUSTOMER' sids = '/BI0/SCUSTOMER' key_field = 'CUSTOMER' )
                           sid_columns    = VALUE #( ( field = 'CUSTOMER' datatype = 'CHAR' length = 10 key = abap_true )
                                                     ( field = 'SID'      datatype = 'INT4' length = 10 ) ) )
-      fixed    = VALUE #( ( iobjnm = '0SOLD_TO' value = `1000` ) ) ).
+      selection = zzxxmla1_cl_bw_view_gen=>selection_of( VALUE #( ( iobjnm = '0SOLD_TO' value = `1000` ) ) ) ).
     cl_abap_unit_assert=>assert_initial( layout-selection ).
     cl_abap_unit_assert=>assert_initial( layout-filters ).
   ENDMETHOD.
 
   METHOD fact_view_fixed_adso.
     DATA(metadata) = fact_metadata_of_room( ).
-    metadata-fixed = VALUE #( ( iobjnm = 'ZCLSITE' value = `NORTH` ) ).
+    metadata-filtered = VALUE #( ( iobjnm = 'ZCLSITE' rows = zzxxmla1_cl_bw_selection=>equals( `NORTH` ) ) ).
     DATA(layout) = zzxxmla1_cl_bw_view_gen=>build_fact_layout( metadata ).
     cl_abap_unit_assert=>assert_initial( layout-notes ).
     cl_abap_unit_assert=>assert_equals( act = lines( layout-joins ) exp = 1 ).
@@ -461,8 +473,8 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
       fields     = VALUE #( ( field = 'SID_ZCLSITE'   datatype = 'INT4' length = 10 iobjnm = 'ZCLSITE' )
                             ( field = 'SID_ZCLROOM'   datatype = 'INT4' length = 10 iobjnm = 'ZCLROOM' )
                             ( field = '/BIC/ZCLVISNO' datatype = 'DEC'  length = 17 iobjnm = 'ZCLVISNO' ) )
-      fixed      = VALUE #( ( iobjnm = 'ZCLSITE' value = `NORTH` sids = '/BIC/SZCLSITE'
-                              sid_keys = VALUE #( ( field = '/BIC/ZCLSITE' value = `NORTH` ) ) ) ) ).
+      filtered   = VALUE #( ( iobjnm = 'ZCLSITE' rows = zzxxmla1_cl_bw_selection=>equals( `NORTH` )
+                              sids = '/BIC/SZCLSITE' key_field = '/BIC/ZCLSITE' ) ) ).
     DATA(layout) = zzxxmla1_cl_bw_view_gen=>build_fact_layout( metadata ).
     cl_abap_unit_assert=>assert_equals(
       act = zzxxmla1_cl_bw_view_gen=>fact_ddl_source( provider = 'ZCLVISIT' view_name = 'ZZXXMLA1V0000091' layout = layout )
@@ -473,12 +485,104 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
             |define view ZZXXMLA1_C0000091{ nl }| &&
             |  as select from /bic/fzclvisit as a{ nl }| &&
             |    inner join /bic/szclsite as f1 on  f1.sid = a.sid_zclsite{ nl }| &&
-            |                                        and f1./bic/zclsite = 'NORTH'{ nl }| &&
             |\{{ nl }| &&
             |  a.sid_zclsite as SID_ZCLSITE,{ nl }| &&
             |  a.sid_zclroom as SID_ZCLROOM,{ nl }| &&
             |  a./bic/zclvisno as ZCLVISNO{ nl }| &&
-            |\}{ nl }| ).
+            |\}{ nl }| &&
+            |where f1./bic/zclsite = 'NORTH'{ nl }| ).
+  ENDMETHOD.
+
+  METHOD compounded_range.
+    DATA(metadata) = VALUE ty_metadata(
+      characteristic = '0FISCPER'
+      tables         = VALUE #( basic = '0FISCPER' sids = '/BI0/SFISCPER' key_field = 'FISCPER' )
+      sid_columns    = VALUE #( ( field = 'FISCVARNT' datatype = 'CHAR' length = 2 key = abap_true )
+                                ( field = 'FISCPER'   datatype = 'NUMC' length = 7 key = abap_true )
+                                ( field = 'SID'       datatype = 'INT4' length = 10 ) )
+      compounding    = VALUE #( ( iobjnm = '0FISCVARNT' field = 'FISCVARNT' ) ) ).
+    DATA(selection) = VALUE zzxxmla1_cl_bw_view_gen=>ty_t_selection(
+      ( iobjnm = '0FISCPER' mode = zzxxmla1_cl_bw_selection=>c_mode-members
+        rows   = VALUE #( ( sign = 'E' option = 'CP' low = `*014` ) ( sign = 'E' option = 'CP' low = `*013` ) ) )
+      ( iobjnm = '0FISCVARNT' mode = zzxxmla1_cl_bw_selection=>c_mode-filter
+        rows   = zzxxmla1_cl_bw_selection=>equals( `K4` ) ) ).
+    DATA(layout) = zzxxmla1_cl_bw_view_gen=>build_layout( metadata = metadata selection = selection ).
+    cl_abap_unit_assert=>assert_equals( act = layout-selection exp = `0FISCPER=E CP '*013',E CP '*014';0FISCVARNT=K4` ).
+    cl_abap_unit_assert=>assert_equals(
+      act = layout-filters
+      exp = VALUE string_table( ( `s.fiscvarnt = 'K4'` )
+                                ( `s.fiscper not like '%013' and s.fiscper not like '%014'` ) ) ).
+    cl_abap_unit_assert=>assert_false( xsdbool( line_exists(
+      layout-columns[ name = zzxxmla1_cl_bw_view_gen=>c_compound_key ] ) ) ).
+    " the same view in the other mode
+    selection[ iobjnm = '0FISCPER' ]-mode = zzxxmla1_cl_bw_selection=>c_mode-filter.
+    cl_abap_unit_assert=>assert_equals(
+      act = zzxxmla1_cl_bw_view_gen=>build_layout( metadata = metadata selection = selection )
+      exp = layout ).
+    " the label is a literal of the source: no quote in it
+    DATA(source) = zzxxmla1_cl_bw_view_gen=>ddl_source( characteristic = '0FISCPER'
+                                                        view_name      = 'ZZXXMLA1V0000013'
+                                                        layout         = layout ).
+    SPLIT source AT cl_abap_char_utilities=>newline INTO TABLE DATA(lines).
+    cl_abap_unit_assert=>assert_char_cp( act = lines[ 4 ]
+                                         exp = `@EndUserText.label: 'BW characteristic 0FISCPER: 0FISCPER = E CP *013*` ).
+    cl_abap_unit_assert=>assert_equals( act = count( val = lines[ 4 ] sub = `'` ) exp = 2 ).
+    cl_abap_unit_assert=>assert_char_cp(
+      act = source
+      exp = |*where s.fiscvarnt = 'K4'{ cl_abap_char_utilities=>newline }| &&
+            |  and s.fiscper not like '%013' and s.fiscper not like '%014'{ cl_abap_char_utilities=>newline }| ).
+  ENDMETHOD.
+
+  METHOD compounding_two_values.
+    DATA(metadata) = VALUE ty_metadata(
+      characteristic = '0FISCPER'
+      tables         = VALUE #( basic = '0FISCPER' sids = '/BI0/SFISCPER' key_field = 'FISCPER' )
+      sid_columns    = VALUE #( ( field = 'FISCVARNT' datatype = 'CHAR' length = 2 key = abap_true )
+                                ( field = 'FISCPER'   datatype = 'NUMC' length = 7 key = abap_true )
+                                ( field = 'SID'       datatype = 'INT4' length = 10 ) )
+      compounding    = VALUE #( ( iobjnm = '0FISCVARNT' field = 'FISCVARNT' ) ) ).
+    DATA(layout) = zzxxmla1_cl_bw_view_gen=>build_layout(
+      metadata  = metadata
+      selection = VALUE #( ( iobjnm = '0FISCVARNT' mode = zzxxmla1_cl_bw_selection=>c_mode-filter
+                             rows   = VALUE #( ( sign = 'I' option = 'EQ' low = `K4` )
+                                               ( sign = 'I' option = 'EQ' low = `K1` ) ) ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = layout-selection exp = `0FISCVARNT=I EQ 'K1',I EQ 'K4'` ).
+    cl_abap_unit_assert=>assert_equals(
+      act = layout-filters
+      exp = VALUE string_table( ( `( s.fiscvarnt = 'K1' or s.fiscvarnt = 'K4' )` ) ) ).
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists(
+      layout-columns[ name = zzxxmla1_cl_bw_view_gen=>c_compound_key ] ) ) ).
+  ENDMETHOD.
+
+  METHOD fact_view_filter_mode.
+    DATA(selection) = VALUE zzxxmla1_cl_bw_view_gen=>ty_t_selection(
+      ( iobjnm = 'ZCLROOM' mode = zzxxmla1_cl_bw_selection=>c_mode-members
+        rows   = VALUE #( ( sign = 'E' option = 'EQ' low = `R99` ) ) )
+      ( iobjnm = 'ZCLSITE' mode = zzxxmla1_cl_bw_selection=>c_mode-filter
+        rows   = VALUE #( ( sign = 'I' option = 'BT' low = `A` high = `M` ) ) ) ).
+    DATA(filter) = zzxxmla1_cl_bw_view_gen=>filter_selection( selection ).
+    cl_abap_unit_assert=>assert_equals( act = lines( filter ) exp = 1 ).
+    cl_abap_unit_assert=>assert_equals( act = filter[ 1 ]-iobjnm exp = 'ZCLSITE' ).
+    DATA(metadata) = fact_metadata_of_room( ).
+    metadata-filtered = VALUE #( FOR f IN filter ( iobjnm = f-iobjnm rows = f-rows ) ).
+    DATA(layout) = zzxxmla1_cl_bw_view_gen=>build_fact_layout( metadata ).
+    cl_abap_unit_assert=>assert_equals( act = layout-filters
+                                        exp = VALUE string_table( ( `a./bic/zclsite between 'A' and 'M'` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = layout-selection exp = `ZCLSITE=I BT 'A' 'M'` ).
+    " restrict members only: the facts as they are, no fact view without a compounded characteristic
+    metadata = fact_metadata_of_room( ).
+    CLEAR metadata-compounded.
+    cl_abap_unit_assert=>assert_initial( zzxxmla1_cl_bw_view_gen=>filter_selection(
+      VALUE #( ( selection[ iobjnm = 'ZCLROOM' ] ) ) ) ).
+    cl_abap_unit_assert=>assert_initial( zzxxmla1_cl_bw_view_gen=>build_fact_layout( metadata )-columns ).
+  ENDMETHOD.
+
+  METHOD selection_of_fixed.
+    cl_abap_unit_assert=>assert_equals(
+      act = zzxxmla1_cl_bw_view_gen=>selection_of( VALUE #( ( iobjnm = '0FISCVARNT' value = `K4` ) ) )
+      exp = VALUE zzxxmla1_cl_bw_view_gen=>ty_t_selection(
+              ( iobjnm = '0FISCVARNT' mode = zzxxmla1_cl_bw_selection=>c_mode-filter
+                rows   = VALUE #( ( sign = 'I' option = 'EQ' low = `K4` ) ) ) ) ).
   ENDMETHOD.
 
   METHOD selection_text.
