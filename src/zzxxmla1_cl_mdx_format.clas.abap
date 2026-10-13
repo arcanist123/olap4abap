@@ -127,8 +127,21 @@ CLASS zzxxmla1_cl_mdx_format DEFINITION
     "! the double quote, which encloses literal text in format strings
     CLASS-DATA double_quote TYPE string.
 
-    "! The Format of a format string (constructor and parseFormatString).
+    TYPES:
+      BEGIN OF ty_parsed,
+        format_string TYPE string,
+        format        TYPE ty_format,
+      END OF ty_parsed.
+    "! Format.get's cache of the formats parsed so far (at most cache_limit, then emptied)
+    CLASS-DATA parsed TYPE HASHED TABLE OF ty_parsed WITH UNIQUE KEY format_string.
+    CONSTANTS c_cache_limit TYPE i VALUE 1000.
+
+    "! The Format of a format string (Format.get: parsed once, then from the cache).
     CLASS-METHODS parse
+      IMPORTING format_string TYPE string
+      RETURNING VALUE(result) TYPE ty_format.
+    "! The Format of a format string (constructor and parseFormatString).
+    CLASS-METHODS parse_format
       IMPORTING format_string TYPE string
       RETURNING VALUE(result) TYPE ty_format.
     "! parseFormatString: the first section of the rest of the format string; the rest is changed to what follows it.
@@ -447,6 +460,19 @@ CLASS zzxxmla1_cl_mdx_format IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD parse.
+    ASSIGN parsed[ format_string = format_string ] TO FIELD-SYMBOL(<parsed>).
+    IF sy-subrc = 0.
+      result = <parsed>-format.
+      RETURN.
+    ENDIF.
+    result = parse_format( format_string ).
+    IF lines( parsed ) >= c_cache_limit.
+      CLEAR parsed.
+    ENDIF.
+    INSERT VALUE #( format_string = format_string format = result ) INTO TABLE parsed.
+  ENDMETHOD.
+
+  METHOD parse_format.
     DATA(rest) = format_string.
     DATA(format_type) = ``.
     WHILE rest IS NOT INITIAL.
@@ -932,6 +958,13 @@ CLASS zzxxmla1_cl_mdx_format IMPLEMENTATION.
     IF value = 0.
       RETURN.
     ENDIF.
+    " an integer below 10^15 is its own shortest decimal: doubles there are less than 1 apart
+    IF value < 1000000000000000 AND frac( value ) = 0.
+      digits = |{ CONV int8( value ) }|.
+      exponent = strlen( digits ) - 1.
+      digits = shift_right( val = digits sub = `0` ).
+      RETURN.
+    ENDIF.
     " the double's value to about 33 digits (CONV decfloat34 keeps only about 17): mantissa * 2^exponent, so that
     " the rounding below picks the decimal nearest to it, as Double.toString does
     DATA(two) = CONV f( 2 ).
@@ -949,12 +982,16 @@ CLASS zzxxmla1_cl_mdx_format IMPLEMENTATION.
     DATA(low) = mantissa_f - high * ipow( base = two exp = 26 ).
     DATA(exact) = ( CONV decfloat34( CONV i( high ) ) * 67108864 + CONV decfloat34( CONV i( low ) ) )
                 * ipow( base = CONV decfloat34( 2 ) exp = binary_exponent ).
+    " the fewest digits that give the double back; from 15 on: a decimal of at most 15 digits comes back from its double
+    " rounded to 15 digits (DBL_DIG), so a shorter one is these with trailing zeros, which are cut below
     DATA(shortest) = exact.
-    DO 17 TIMES.
-      shortest = round( val = exact prec = sy-index ).
+    DATA(precision) = 15.
+    DO 3 TIMES.
+      shortest = round( val = exact prec = precision ).
       IF CONV f( shortest ) = value.
         EXIT.
       ENDIF.
+      precision = precision + 1.
     ENDDO.
     DATA(ten) = CONV decfloat34( 10 ).
     exponent = floor( log10( shortest ) ).

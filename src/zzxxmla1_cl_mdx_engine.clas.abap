@@ -7542,6 +7542,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
   METHOD compute_cell.
     " an evaluation error is the value of this cell only (RolapResult.executeStripe)
     DATA(savepoint) = evaluator->savepoint( ).
+    DATA(misses) = fact_reader->get_miss_count( ).
     TRY.
         DATA(value) = evaluator->evaluate_current( ).
       CATCH zzxxmla1_cx_mdx_evaluation INTO DATA(error).
@@ -7558,6 +7559,11 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     ENDIF.
     IF value-empty = abap_true.
       result-empty = abap_true.
+      RETURN.
+    ENDIF.
+    " a cell that missed facts still to be read is evaluated again after they are read: its value is not written now
+    " (the reference formats a cell only when it is written, RolapCell.getFormattedValue)
+    IF fact_reader->get_miss_count( ) <> misses AND fact_reader->is_dirty( ) = abap_true.
       RETURN.
     ENDIF.
     CASE value-kind.

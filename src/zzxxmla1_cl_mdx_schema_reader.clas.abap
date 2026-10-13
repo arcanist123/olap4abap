@@ -166,8 +166,10 @@ CLASS zzxxmla1_cl_mdx_schema_reader DEFINITION
       IMPORTING hierarchy     TYPE i
       RETURNING VALUE(result) TYPE ty_member.
     "! The stored members of a level with the paths (the keys from the first level, ZZXXMLA1_CL_MODEL), in hierarchy
-    "! order; a path without member is left out. Those not read yet are read in one query per
-    "! ZZXXMLA1_CL_MODEL=>C_MAX_CONSTRAINTS paths.
+    "! order; a path without member is left out. The paths are ones with facts (read from the facts by the caller), so
+    "! the members are read without the restriction to the members with facts. Those not read yet are read in one
+    "! query per ZZXXMLA1_CL_MODEL=>C_MAX_CONSTRAINTS paths, or with the whole level if they are more than one query's
+    "! and more than half of the level.
     METHODS get_members_by_paths
       IMPORTING level         TYPE i
                 paths         TYPE string_table
@@ -358,6 +360,8 @@ CLASS zzxxmla1_cl_mdx_schema_reader DEFINITION
     "! Reads members of a level of a hierarchy (ZZXXMLA1_CL_MODEL=>READ_MEMBERS) and keeps them: a member read before
     "! is the one kept.
     "! @parameter level_no | the level in the model, from 1
+    "! with_facts: the condition selects members with facts only, so the members are read from the dimension table
+    "! without the restriction to the members with facts (ZZXXMLA1_CL_MODEL=>MEMBER_TABLE)
     METHODS read
       IMPORTING hierarchy     TYPE i
                 level_no      TYPE i
@@ -365,6 +369,7 @@ CLASS zzxxmla1_cl_mdx_schema_reader DEFINITION
                 descending    TYPE abap_bool DEFAULT abap_false
                 !limit        TYPE i DEFAULT 0
                 !offset       TYPE i DEFAULT 0
+                with_facts    TYPE abap_bool DEFAULT abap_false
       RETURNING VALUE(result) TYPE ty_t_member.
     "! Keeps a member read from the model (a member read before is the one kept) and gives it.
     METHODS remember
@@ -587,7 +592,11 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
       result = <query>-members.
       RETURN.
     ENDIF.
-    zzxxmla1_cl_model=>read_members( EXPORTING hierarchy  = model_hierarchies[ hierarchy ]
+    DATA(model) = model_hierarchies[ hierarchy ].
+    IF with_facts = abap_true.
+      model-members_with_facts = abap_false.
+    ENDIF.
+    zzxxmla1_cl_model=>read_members( EXPORTING hierarchy  = model
                                                level_no   = level_no
                                                condition  = condition
                                                descending = descending
@@ -717,6 +726,12 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
     DATA(model) = model_hierarchies[ element-hierarchy ].
+    " more than one query's paths and most of the level: the level in one query
+    IF lines( missing ) > zzxxmla1_cl_model=>c_max_constraints
+        AND lines( missing ) * 2 > get_level_cardinality( level ).
+      get_level_members( level ).
+      CLEAR missing.
+    ENDIF.
     DATA(chunk) = VALUE string_table( ).
     LOOP AT missing INTO path.
       DATA(last) = xsdbool( sy-tabix = lines( missing ) ).
@@ -724,9 +739,10 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
       IF lines( chunk ) < zzxxmla1_cl_model=>c_max_constraints AND last = abap_false.
         CONTINUE.
       ENDIF.
-      read( hierarchy = element-hierarchy level_no = element-key_level
-            condition = zzxxmla1_cl_model=>paths_condition( hierarchy = model level_no = element-key_level
-                                                            paths = chunk ) ).
+      read( hierarchy  = element-hierarchy level_no = element-key_level
+            condition  = zzxxmla1_cl_model=>paths_condition( hierarchy = model level_no = element-key_level
+                                                             paths = chunk )
+            with_facts = abap_true ).
       CLEAR chunk.
     ENDLOOP.
     LOOP AT unique INTO path.

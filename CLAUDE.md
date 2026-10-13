@@ -134,7 +134,8 @@ Read before designing anything:
   the request (`MemberCache`); a level is read whole only where the query asks for all of its members. A dimension annotated `olap4abap.membersWithFacts` on its
   `DimensionUsage` (our extension, not on time dimensions yet; `docs/mvp-scope.md`, Members with facts decision) has
   only the members whose key is in the cube's fact table (`ZZXXMLA1_CL_MODEL=>member_table`, every member read goes
-  through it); tested on the clinic demo with `scripts/clinic_test.py`, FoodMart is not annotated. Cells are read
+  through it, except members read by paths that come from the facts, `get_members_by_paths`: the restriction is a
+  semi-join over the whole fact table per query); tested on the clinic demo with `scripts/clinic_test.py`, FoodMart is not annotated. Cells are read
   as the reference reads them (`FastBatchingCellReader`, `CellRequest`): each phase (slicer, axes, named sets, cells) is
   evaluated with a batching reader that records the cells it misses (0 for the pass), they are read with one query per
   pattern of hierarchies and levels constrained to the keys asked for (`ZZXXMLA1_CL_MDX_FACTS=>load_aggregations`,
