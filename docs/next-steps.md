@@ -115,6 +115,66 @@ term):
   the provider references is refused for the same reason. Long term: views (and placeholders) per characteristic and
   selection, so a reference characteristic gets its own filtered view and both cases work.
 
+### Selections (decided 2026-10-13)
+
+Fixing is not enough to make `0FISCPER` a time dimension: its SID table holds the special periods 013 to 016 when
+any provider posts to them, and the positional time functions (`Lag(12)`, `ParallelPeriod`, `ClosingPeriod`) count
+them. Usually the cube's own facts have the twelve regular periods only. Decided with the user, the model in
+`bw-schema-design-guide.md`, section 3.8:
+
+- **A fixed value is one case of a selection**: a BW range table per characteristic (`I`/`E`, `EQ` ... `CP`, `NP`,
+  BW's patterns), in one of two modes: **filter the cube** (members and facts, as fixing does now; the fixed value is
+  `I EQ v`) or **restrict members** (only the characteristic's view; the facts are not filtered at query time).
+- **The facts must agree with restricted members**: a probe of the facts (distinct values of the fact column against
+  the SID table with the negated selection) refuses the schema whenever the facts hold an excluded value, always, not
+  only for time dimensions; no unsynced schema is written. A fiscal period whose facts have special periods is not
+  time in that cube; the calendar characteristics are, or the cube is filtered.
+- **Not chosen:** folding the special periods into period 012 in the fact view (a computed column over hundreds of
+  millions of rows on every query, and period 012 no longer BW's); excluding them from the facts by default (silently
+  changes BW's year totals); `olap4abap.membersWithFacts` (a semi-join over the facts per query, not allowed on time,
+  and it drops regular periods without facts, which breaks the positional functions as much).
+- **A global probe** in the schema builder's start page runs the probes of all catalogs, because a load after the
+  accept can bring an excluded value into the facts.
+
+Steps:
+
+13. Selection class: a global class (`ZZXXMLA1_CL_BW_SELECTION`) with the range table type, parsing and writing the
+    annotation text, the canonical text for `ZZXXMLA1_VIEW`, the SQL condition (CDS and native; `CP`/`NP` to `LIKE`
+    with `%`/`_` escaped, `NB`, `NE`), its negation for the probe, "one `I EQ` value" for the uncompounding rule, and
+    the checks (`EQ` needs a SID, `BT`/`NB` a high value, no quote). Unit tests.
+14. Table `ZZXXMLA1_VIEW`: `SELECTION` is a CHAR 255 key field, too short for range tables. It becomes an `SSTRING`
+    of 1,333 (enough for now; the table is read with ABAP SQL only, not through ADBC), no longer key: 1,333
+    characters do not fit the table's key length, so the key is `DDL_NAME` (one row per view anyway), and the
+    generator finds a view by kind, object and selection in the `WHERE` as now. The existing rows keep their values.
+    Decided 2026-10-13: no hash. A view is found by its selection's canonical text, which only the selection class
+    writes (characteristics sorted, rows sorted by sign, option, low, high and without duplicates, one format per
+    row, one `I EQ` row written `C=v`); a hash would only be a shorter form of the same text. Selections equal in
+    meaning but written differently (`I BT '001' '012'`, `E CP '*013'`...) get views of their own, a duplicate and
+    never a wrong one. Uniqueness is the generator's: it looks the view up before it generates one.
+15. Views: a characteristic's view filtered on the selections of its key fields (both modes); the fact view filtered
+    on the filter-the-cube characteristics only, and none when there are none.
+16. Schema and API: annotations `olap4abap.filter.<characteristic>` and `olap4abap.members.<characteristic>`, the old
+    `olap4abap.fixed.` read as filter `I EQ` and rewritten by `POST fix`; `POST fix` takes `filter.C=<rows>` and
+    `members.C=<rows>` (`fixed.C=v` still as `filter.C=I EQ 'v'`); the uncompounding rule on one `I EQ` value in
+    either mode; `characteristics` of the answers carry the mode and the rows; check refuses different selections of
+    a shared dimension as for fixed values.
+17. The probe (`ZZXXMLA1_CL_SCHEMA_PROBE`): per cube and restrict-members characteristic, the excluded values in its
+    facts with their counts (at most 20). Run by `POST fix`, accept, `check?probe=true` and `POST probe[?catalog=X]`
+    (every catalog, or one: `{catalogs: [{catalog, cubes: [{cube, characteristics: [{name, ok, values: [{value,
+    facts}]}]}], runtime}]}`, nothing written). Measure it on `ZXMLWIDE` (1,000,000 facts) and a bigger load.
+18. UI: the dimension pane's "Fixed value" becomes "Selection": a table of rows (sign, option, low, high; values from
+    `GET values` for `EQ`/`BT`, free text for patterns) and the mode switch; a fixed value stays one click (`I EQ`).
+    Accept's dialog runs `check?probe=true` and shows a refusal's values. The start page gets "Probe all catalogs" with
+    a result per catalog (ok, or the cube, characteristic and values).
+19. Test data: the clinic demo's period `ZCLFISCPR` gets special periods (013 to 016) in its master data only, for a
+    restrict-members catalog, and facts in period 013 under one variant only, so the probe refuses that variant and
+    accepts the others.
+20. Tests: unit tests of 13 and 15; `fixed_selection_test.py` extended (ranges in both modes, the probe's refusal,
+    the old annotation); `schema_api_test.py` (`POST probe`, refusals); `schema_ui_test.py` (the selection table, the
+    probe on the start page).
+21. Then fiscal time: the fiscal time master data for a fixed variant from `T009B` (step 8 above), so every regular
+    period of every year is a member, and a fiscal year > period hierarchy on a fiscal period marked as time.
+
 ## Now: members pushed down to HANA
 
 Decision in `mvp-scope.md` (Member decision, 2026-10-12). Found with Excel on the wide demo `ZXMLWIDE`: a label filter

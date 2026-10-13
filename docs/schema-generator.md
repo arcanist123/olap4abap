@@ -232,7 +232,9 @@ cube, accepted as one catalog; a cube is moved to another catalog by removing it
 ## Fixing
 
 A cube fixes characteristics of its provider to one value each (`bw-schema-design-guide.md`, section 3.8; decided
-2026-10-13 as an edit, `next-steps.md`, fixed selections). `POST fix` (`ZZXXMLA1_CL_SCHEMA_FIX`) rewrites the schema
+2026-10-13 as an edit, `next-steps.md`, fixed selections). Planned the same day: fixing becomes one case of
+selections (range tables, filter the cube or restrict members with a probe of the facts, a global probe on the start
+page; `next-steps.md`, selections, steps 13 to 21); this section describes what is built. `POST fix` (`ZZXXMLA1_CL_SCHEMA_FIX`) rewrites the schema
 for the new selection, with BW's metadata, so that the user's work stays:
 1. the provider is the one whose facts the cube reads: a fact placeholder's, a fact view of table `ZZXXMLA1_VIEW`, or
    the InfoCube or aDSO whose fact table or reporting view it is (looked for among the providers whose name is in the

@@ -225,43 +225,90 @@ Not used: a hierarchy with the compounding as a level above (the schemas are fla
 columns (HANA cannot use them); keys of several
 columns (not in the reference's schema format).
 
-### 3.8 Fixed selections
+### 3.8 Selections
 
-Decided 2026-10-13 (`next-steps.md`, fixed selections; fixing as an edit the same day). A cube can fix
-characteristics of its provider to one value each, as a BW query's fixed filter does: `0FISCVARNT = K4`, `0VERSION =
-000`. The selection is part of the cube, not a slicer: it holds for every cell, the totals and the members, and no MDX
-removes it. It is an edit of the schema, made on a dimension's pane of the schema builder (`POST fix`,
-`schema-generator.md`, Fixing): the proposal fixes nothing. It is recorded on the cube, one annotation per
-characteristic:
+Decided 2026-10-13 (`next-steps.md`, fixed selections, fixing as an edit and selections; all the same day). A cube can
+restrict characteristics of its provider by a selection, a BW range table per characteristic: rows of sign (`I`
+include, `E` exclude), option (`EQ`, `NE`, `GT`, `GE`, `LT`, `LE`, `BT`, `NB`, `CP`, `NP`), low and high, as a BW
+query's fixed filter or a select option. A value matches when no `I` row or some `I` row matches it, and no `E` row
+does. Values are BW's internal ones (NUMC with its zeros, compared as text, which orders fixed-width NUMC correctly);
+`CP`/`NP` take BW's pattern (`*` any string, `+` one character), written as `LIKE` with the SQL wildcards escaped.
+
+The selection is part of the cube, not a slicer: no MDX removes it. It is an edit of the schema, made on a dimension's
+pane of the schema builder (`POST fix`, `schema-generator.md`, Fixing): the proposal selects nothing. Each restricted
+characteristic has one of two modes, which says what the selection applies to:
+
+| Mode | Annotation | Members (the characteristic's view) | Facts | Checked |
+|---|---|---|---|---|
+| **Filter the cube** | `olap4abap.filter.<characteristic>` | filtered | the fact view filtered | nothing to check |
+| **Restrict members** | `olap4abap.members.<characteristic>` | filtered | not touched | the probe: refused if the facts hold a value the selection excludes |
 
 ```xml
 <Cube name="ZCLVISITA" ...>
-  <Annotations><Annotation name="olap4abap.fixed.0FISCVARNT">K4</Annotation></Annotations>
+  <Annotations>
+    <Annotation name="olap4abap.filter.0FISCVARNT">I EQ 'K4'</Annotation>
+    <Annotation name="olap4abap.members.0FISCPER">E CP '*013';E CP '*014';E CP '*015';E CP '*016'</Annotation>
+  </Annotations>
 ```
 
-- **The value** is BW's internal one (NUMC with its zeros) and must have a SID. A compounded characteristic can be
-  fixed only together with its compounding.
-- **A fixed characteristic keeps its dimension, with one member**: its view is filtered on its value, so every
-  hierarchy of it has that member under All, and the user's hierarchies, properties and drill-through columns stay.
+The value of an annotation is its rows separated by `;`, each `sign option 'low'` or `sign option 'low' 'high'`
+(`BT`, `NB`), the values in single quotes (a quote in a value is refused, as for fixing). A fixed value, as built
+first, is filter the cube with one `I EQ` row: `olap4abap.fixed.<characteristic>` = `v` of an existing schema is read
+as `olap4abap.filter.<characteristic>` = `I EQ 'v'`, and `POST fix` writes the new name.
+
+- **Filter the cube** is what a BW query's fixed filter is: the facts outside the selection are not in the cube
+  (`0FISCVARNT = K4` on facts that hold K1 and K2 too, `0VERSION BT 000 001`). Totals cover only the selection.
+- **Restrict members** is for master data wider than the cube's facts: `0FISCPER`'s SID table holds the special
+  periods 013 to 016 because one provider out of many posts to them, while this cube's facts have the twelve regular
+  periods only. Excluding them leaves the dimension with the periods the cube can have, without a filter on the facts
+  at query time. Filtering the members alone is only correct while the facts agree, otherwise a query by period drops
+  facts (the inner join to the view) that a query without the dimension counts. So the facts are probed (below) and a
+  schema whose facts hold an excluded value is always refused, in either case: a fiscal period whose facts do have
+  special periods is not a time characteristic in this cube; make `0CALMONTH`/`0CALYEAR` the time dimension, or filter
+  the cube.
+- **The probe** asks the facts for the values of a restricted characteristic outside its selection: the distinct
+  values of the fact column (the SIDs of an InfoCube, the values of an aDSO's fact view), matched against the
+  characteristic's SID table with the negated selection, so the large table is only grouped on one column (HANA
+  answers it from the column's dictionary) and the condition runs on the small one. A refusal lists the values and
+  their counts of facts (at most 20). It runs on `POST fix`, on accept, on the check before accept (`check?probe=true`;
+  not on the check run while the user types) and on demand for all catalogs (`POST probe`, the start page's "Probe
+  all catalogs"), because a load after the accept can bring an excluded value into the facts; that run is the remedy.
+- **A value of `EQ`** must have a SID, as for fixing; the other options need none (a range or a pattern can match
+  nothing). `BT` and `NB` need a high value not below the low one. The rows of a compounded characteristic compare its
+  own key field, under every value of its compounding (`E CP '*013'` on `0FISCPER` excludes period 013 of every
+  variant); restricted together with a selection of its compounding, both conditions hold. An `EQ` value needs a SID
+  under some value of the compounding.
+- **A restricted characteristic keeps its dimension, with the members of its selection** (a fixed one with one member):
+  its view is filtered on its selection, so every
+  hierarchy of it has those members under All, and the user's hierarchies, properties and drill-through columns stay.
   Removing the dimension from the cube is an ordinary edit. Not filtered: a reference characteristic (`0SOLD_TO`), whose
   view is its basic one's; with members with facts it still shows its one value. A basic characteristic that another
   characteristic of the provider references cannot be fixed (they share a view). Both are open questions for later
   (`next-steps.md`, fixed selections).
-- **A characteristic whose compounding is all fixed is not compounded** in this cube: `0FISCPER` under `0FISCVARNT =
-  K4` is named by its own key (`2024001`, no `COMPOUND_KEY`, no `OrderByColumn`). It stays keyed by its SID, on an aDSO
+- **A characteristic whose compounding is all fixed is not compounded** in this cube, fixed meaning restricted to one
+  `I EQ` value in either mode (in restrict members the probe has shown that the facts hold only that value): `0FISCPER`
+  under `0FISCVARNT = K4` is named by its own key (`2024001`, no `COMPOUND_KEY`, no `OrderByColumn`). It stays keyed by its SID, on an aDSO
   too (its fact view keeps `SID_<field>`), so fixing changes no attribute of its dimension, only columns (an open question for later, `next-steps.md`). With part of
   its compounding fixed it stays compounded on the rest.
 - **The engine knows nothing of it.** The selection is in the views, so the schema stays in the reference's format and
   the reference answers the same on copies of the views:
-  - the cube's fact table is its fact view, on an InfoCube too: the aDSO's reporting view with `WHERE` on the fixed
-    fields, the InfoCube's fact table inner-joined to the SID table of each fixed characteristic on the SID and the
-    fixed value. Every field without namespace, and `SID_<field>` for every compounded characteristic of an aDSO (3.7);
-  - a fixed characteristic and a characteristic compounded with a fixed one are on a filtered view of their own: the
-    plain view (section 4) with `WHERE` on the fixed key fields, one row per own key.
-- **Shared dimensions:** a dimension is on one view, so cubes of a schema that use it must fix the same values of its
-  compounding; `check` refuses a schema where they do not, and one whose views were generated for another selection
-  than the cube's annotations (an annotation edited by hand in the XML: fix on the dimension's pane instead). Schemas
-  of different catalogs fixing the same values share the views.
+  - with a characteristic in filter the cube, the cube's fact table is its fact view, on an InfoCube too: the aDSO's
+    reporting view with `WHERE` on the selection of the filtered fields, the InfoCube's fact table inner-joined to the
+    SID table of each filtered characteristic on the SID with `WHERE` on its selection. Every field without namespace,
+    and `SID_<field>` for every compounded characteristic of an aDSO (3.7). Characteristics in restrict members are
+    not in the fact view's selection: a cube that only restricts members keeps the facts it had;
+  - a restricted characteristic and a characteristic compounded with a restricted one are on a filtered view of their
+    own: the plain view (section 4) with `WHERE` on the selections of its key fields, one row per own key. The view
+    is the same in both modes, so its selection names no mode.
+- **Shared dimensions:** a dimension is on one view, so cubes of a schema that use it must restrict it and its
+  compounding the same way; `check` refuses a schema where they do not, and one whose views were generated for another
+  selection than the cube's annotations (an annotation edited by hand in the XML: restrict on the dimension's pane
+  instead). Each cube is probed on its own facts. Schemas of different catalogs with the same selections share the
+  views.
+- **Fiscal periods as time**: restricting members makes a fiscal period's members regular (twelve per year under a
+  fixed variant), which the positional functions (`Lag`, `ParallelPeriod`, `ClosingPeriod`, ranges) need. They also
+  need every regular period of every year to be a member, which the SID table has only for the periods with data
+  somewhere: the fiscal time master data for a fixed variant (`next-steps.md`, selections, step 21) fills the gaps.
 
 Views are tracked in table `ZZXXMLA1_VIEW` (section 4, rule 8).
 
@@ -293,8 +340,9 @@ a field the view lacks, is left out with a note. The hand-written demo views are
 7. Check the text flags in `RSDCHABAS` (`TXTTABFL`, `NOLANGU`, `TXTTIMFL`) and the attribute types in `RSDBCHATR`
    (`ATTRITP` `NAV`/`DIS`, `ATRTIMFL`) before writing the joins.
 8. **Every generated view is a row of table `ZZXXMLA1_VIEW`**: kind (`C` a characteristic's view, `F` a provider's
-   fact view), object (the basic characteristic, the provider), selection (the fixed values it filters, section 3.8,
-   written `0FISCVARNT=K4`, several sorted by characteristic and separated by `;`; empty for the plain view) and the
+   fact view), object (the basic characteristic, the provider), selection (the selections it filters, section 3.8,
+   written `0FISCVARNT=K4` for one `I EQ` value, else `0FISCPER=E CP '*013',E CP '*014'`, several sorted by
+   characteristic and separated by `;`; empty for the plain view) and the
    database view and DDL source. The generator finds a view by these three, no longer by the DDL source's description,
    which stays a label for ADT ("BW characteristic 0FISCPER: 0FISCVARNT = K4"); a plain view of an older run, found by
    its description, is registered when it is generated again. The views are local objects (`$TMP`) and so is the
