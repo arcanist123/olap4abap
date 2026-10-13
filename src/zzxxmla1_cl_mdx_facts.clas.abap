@@ -42,7 +42,7 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
     "! A node of the subcube predicate (the reference server's StarPredicate of Query.getSubcubePredicates): AND, OR or NOT of its
     "! children (indexes in the predicate table), MEMBER (the facts of a member: the key columns of its levels equal
     "! its path; the All member any fact), VALUE (a column of a hierarchy's table equal to a value, as text if quoted, or NULL,
-    "! ValueColumnPredicate), TRUE or FALSE.
+    "! ValueColumnPredicate; or compared by its operator, the reference server's LabelColumnPredicate), TRUE or FALSE.
     TYPES ty_t_index TYPE STANDARD TABLE OF i WITH EMPTY KEY.
     TYPES:
       BEGIN OF ty_value_column,
@@ -51,6 +51,8 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
         value     TYPE string,
         is_null   TYPE abap_bool,   " the column IS NULL
         quoted    TYPE abap_bool,   " the value is compared as a string literal, else as a number
+        "! empty (=), <, <=, >, >=, or BEGINS, ENDS, CONTAINS (the text of the column, LIKE): Excel's label filters
+        operator  TYPE string,
       END OF ty_value_column.
     TYPES:
       BEGIN OF ty_predicate,
@@ -686,13 +688,23 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
           APPEND id TO joined.
         ENDIF.
         DATA(column) = |s{ id }.{ zzxxmla1_cl_sql=>quote( node-column-column ) }|.
+        DATA(operator) = COND string( WHEN node-column-operator IS INITIAL THEN `=` ELSE node-column-operator ).
         IF node-column-is_null = abap_true.
           result = |{ column } IS NULL|.
+        ELSEIF operator = `BEGINS` OR operator = `ENDS` OR operator = `CONTAINS`.
+          " LIKE with \ as escape character for \, % and _
+          DATA(pattern) = replace( val = node-column-value sub = `\` with = `\\` occ = 0 ).
+          pattern = replace( val = pattern sub = `%` with = `\%` occ = 0 ).
+          pattern = replace( val = pattern sub = `_` with = `\_` occ = 0 ).
+          pattern = COND #( WHEN operator = `BEGINS` THEN pattern && `%`
+                            WHEN operator = `ENDS` THEN `%` && pattern
+                            ELSE `%` && pattern && `%` ).
+          result = |TO_NVARCHAR( { column } ) LIKE { zzxxmla1_cl_sql=>literal( pattern ) } ESCAPE '\\'|.
         ELSEIF node-column-quoted = abap_true.
           " a string comparison: the column may be a number, so its text is compared
-          result = |TO_NVARCHAR( { column } ) = { zzxxmla1_cl_sql=>literal( node-column-value ) }|.
+          result = |TO_NVARCHAR( { column } ) { operator } { zzxxmla1_cl_sql=>literal( node-column-value ) }|.
         ELSE.
-          result = |{ column } = { node-column-value }|.
+          result = |{ column } { operator } { node-column-value }|.
         ENDIF.
       WHEN c_predicate-true.
         result = `1 = 1`.

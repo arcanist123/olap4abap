@@ -1311,6 +1311,25 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
                 right         TYPE ty_node
       CHANGING  predicate     TYPE zzxxmla1_cl_mdx_facts=>ty_t_predicate
       RETURNING VALUE(result) TYPE i.
+    "! createLabelFilterSubcubePredicate, our extension of the reference server: one of Excel's label filters other
+    "! than equals, a property of the current member compared to a literal (&lt;, &lt;=, &gt;, &gt;=; between and not
+    "! between are AND and OR of these), Left or Right of it equal to a string (begins with, ends with: Left(...,
+    "! Len("s")) = "s") and InStr of it compared to 0 (contains: InStr(1, ..., "s") &gt; 0, = 0). operator is =, &lt;,
+    "! &lt;=, &gt; or &gt;= (&lt;&gt; is the negation of =); 0 for any other comparison.
+    METHODS label_predicate
+      IMPORTING operator      TYPE string
+                left          TYPE ty_node
+                right         TYPE ty_node
+      CHANGING  predicate     TYPE zzxxmla1_cl_mdx_facts=>ty_t_predicate
+      RETURNING VALUE(result) TYPE i.
+    "! The length argument of Left or Right: a numeric literal (whole) or Len of a string literal; -1 for any other.
+    CLASS-METHODS literal_length
+      IMPORTING node          TYPE ty_node
+      RETURNING VALUE(result) TYPE i.
+    "! getLiteralComparisonValue: whether a node is a string or numeric literal (MDX has no logical ones).
+    CLASS-METHODS is_comparison_literal
+      IMPORTING node          TYPE ty_node
+      RETURNING VALUE(result) TYPE abap_bool.
     "! createBooleanComparisonSubcubePredicate: = or <> of constant truth values, or of a condition and one.
     METHODS boolean_comparison_predicate
       IMPORTING left          TYPE ty_node
@@ -2139,6 +2158,11 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
           result = comparison_predicate( EXPORTING left = node->args[ 1 ] right = node->args[ 2 ]
                                          CHANGING  predicate = predicate ).
           IF result = 0.
+            " = only: the predicate of <> is negated below
+            result = label_predicate( EXPORTING operator = `=` left = node->args[ 1 ] right = node->args[ 2 ]
+                                      CHANGING  predicate = predicate ).
+          ENDIF.
+          IF result = 0.
             result = boolean_comparison_predicate( EXPORTING left       = node->args[ 1 ]
                                                              right      = node->args[ 2 ]
                                                              not_equals = xsdbool( name = `<>` )
@@ -2148,23 +2172,133 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
             result = lines( predicate ).
           ENDIF.
         ENDIF.
+      WHEN `<` OR `<=` OR `>` OR `>=`.
+        IF count = 2.
+          result = label_predicate( EXPORTING operator = name left = node->args[ 1 ] right = node->args[ 2 ]
+                                    CHANGING  predicate = predicate ).
+        ENDIF.
     ENDCASE.
   ENDMETHOD.
 
   METHOD comparison_predicate.
-    " getLiteralComparisonValue: a string or numeric literal (MDX has no logical ones)
-    IF right->kind = zzxxmla1_cl_mdx_node=>c_kind-literal
-        AND ( right->category = zzxxmla1_cl_mdx_node=>c_category-string
-              OR right->category = zzxxmla1_cl_mdx_node=>c_category-numeric ).
+    IF is_comparison_literal( right ) = abap_true.
       result = property_value_predicate( EXPORTING node = left value = right CHANGING predicate = predicate ).
       IF result > 0.
         RETURN.
       ENDIF.
     ENDIF.
-    IF left->kind = zzxxmla1_cl_mdx_node=>c_kind-literal
-        AND ( left->category = zzxxmla1_cl_mdx_node=>c_category-string
-              OR left->category = zzxxmla1_cl_mdx_node=>c_category-numeric ).
+    IF is_comparison_literal( left ) = abap_true.
       result = property_value_predicate( EXPORTING node = right value = left CHANGING predicate = predicate ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD is_comparison_literal.
+    result = xsdbool( node->kind = zzxxmla1_cl_mdx_node=>c_kind-literal
+                      AND ( node->category = zzxxmla1_cl_mdx_node=>c_category-string
+                            OR node->category = zzxxmla1_cl_mdx_node=>c_category-numeric ) ).
+  ENDMETHOD.
+
+  METHOD label_predicate.
+    DATA(comparison) = operator.
+    DATA(value) = right.
+    DATA(expression) = left.
+    IF is_comparison_literal( right ) = abap_false.
+      IF is_comparison_literal( left ) = abap_false.
+        RETURN.
+      ENDIF.
+      " the literal on the left: the operator seen from the right
+      value = left.
+      expression = right.
+      comparison = SWITCH #( operator WHEN `<` THEN `>` WHEN `<=` THEN `>=` WHEN `>` THEN `<` WHEN `>=` THEN `<=`
+                                      ELSE operator ).
+    ENDIF.
+    DATA(is_string) = xsdbool( value->category = zzxxmla1_cl_mdx_node=>c_category-string ).
+
+    IF comparison <> `=`.
+      DATA(reference) = property_reference( expression ).
+      IF reference-found = abap_true.
+        " compared as strings like a name or caption, or as the column's type (property_value_predicate)
+        DATA(hierarchy) = schema_reader->get_hierarchy( reference-hierarchy ).
+        DATA(level) = hierarchy-model-levels[ reference-level ].
+        APPEND VALUE #( kind   = zzxxmla1_cl_mdx_facts=>c_predicate-value
+                        column = VALUE #( hierarchy = reference-hierarchy column = reference-column
+                                          value     = value->value operator = comparison
+                                          quoted    = xsdbool( reference-force_string = abap_true OR is_string = abap_true
+                                                               OR level-data_type <> `Numeric` ) ) ) TO predicate.
+        result = lines( predicate ).
+        RETURN.
+      ENDIF.
+    ENDIF.
+
+    IF expression->kind <> zzxxmla1_cl_mdx_node=>c_kind-resolved_call.
+      RETURN.
+    ENDIF.
+    DATA(args) = lines( expression->args ).
+    DATA(name) = to_upper( expression->fun_def-name ).
+    IF ( name = `LEFT` OR name = `RIGHT` ) AND args = 2 AND comparison = `=` AND is_string = abap_true.
+      " begins with, ends with
+      reference = property_reference( expression->args[ 1 ] ).
+      DATA(length) = literal_length( expression->args[ 2 ] ).
+      " a part shorter than the string is never equal to it
+      IF reference-found = abap_false OR length < strlen( value->value ).
+        RETURN.
+      ENDIF.
+      " the whole value shorter than the length: the string
+      APPEND VALUE #( kind   = zzxxmla1_cl_mdx_facts=>c_predicate-value
+                      column = VALUE #( hierarchy = reference-hierarchy column = reference-column value = value->value
+                                        quoted    = abap_true
+                                        operator  = COND #( WHEN length > strlen( value->value ) THEN `=`
+                                                            WHEN name = `LEFT` THEN `BEGINS`
+                                                            ELSE `ENDS` ) ) ) TO predicate.
+      result = lines( predicate ).
+    ELSEIF name = `INSTR` AND ( args = 2 OR args = 3 ) AND is_string = abap_false.
+      " contains, does not contain
+      DATA(first) = args - 1.
+      IF first = 2.
+        DATA(start) = expression->args[ 1 ].
+        IF start->kind <> zzxxmla1_cl_mdx_node=>c_kind-literal OR start->category <> zzxxmla1_cl_mdx_node=>c_category-numeric
+            OR start->number <> 1.
+          RETURN.
+        ENDIF.
+      ENDIF.
+      reference = property_reference( expression->args[ first ] ).
+      DATA(search) = expression->args[ first + 1 ].
+      IF reference-found = abap_false OR search->kind <> zzxxmla1_cl_mdx_node=>c_kind-literal
+          OR search->category <> zzxxmla1_cl_mdx_node=>c_category-string.
+        RETURN.
+      ENDIF.
+      " InStr is 0 if the string does not contain the search, a position from 1 on if it does: the comparison must hold
+      " for all positions or for none
+      DATA(number) = value->number.
+      DATA(contains) = COND string( WHEN ( comparison = `>` AND number = 0 ) OR ( comparison = `>=` AND number = 1 )
+                                      THEN `X`
+                                    WHEN ( comparison = `=` AND number = 0 ) OR ( comparison = `<` AND number = 1 )
+                                         OR ( comparison = `<=` AND number = 0 )
+                                      THEN `-` ).
+      IF contains IS INITIAL.
+        RETURN.
+      ENDIF.
+      APPEND VALUE #( kind   = zzxxmla1_cl_mdx_facts=>c_predicate-value
+                      column = VALUE #( hierarchy = reference-hierarchy column = reference-column value = search->value
+                                        quoted    = abap_true operator = `CONTAINS` ) ) TO predicate.
+      result = lines( predicate ).
+      IF contains = `-`.
+        APPEND VALUE #( kind = zzxxmla1_cl_mdx_facts=>c_predicate-not children = VALUE #( ( result ) ) ) TO predicate.
+        result = lines( predicate ).
+      ENDIF.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD literal_length.
+    result = -1.
+    IF node->kind = zzxxmla1_cl_mdx_node=>c_kind-literal AND node->category = zzxxmla1_cl_mdx_node=>c_category-numeric.
+      IF frac( node->number ) = 0.
+        result = node->number.
+      ENDIF.
+    ELSEIF node->kind = zzxxmla1_cl_mdx_node=>c_kind-resolved_call AND to_upper( node->fun_def-name ) = `LEN`
+        AND lines( node->args ) = 1 AND node->args[ 1 ]->kind = zzxxmla1_cl_mdx_node=>c_kind-literal
+        AND node->args[ 1 ]->category = zzxxmla1_cl_mdx_node=>c_category-string.
+      result = strlen( node->args[ 1 ]->value ).
     ENDIF.
   ENDMETHOD.
 

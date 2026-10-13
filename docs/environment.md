@@ -59,7 +59,10 @@ slicer of several tuples had empty axes and no cells (Mondrian's own tests expec
 4,163). The patch exempts the placeholder. `subcube-filter-member-caption.patch` (2026-10-12):
 `Query.addFilterToSubcubePredicates` accepts `.Name`, `.Caption` and `.Key` of the current member but not
 `.member_caption`, which Excel's label filters send, so every label filter failed; the patch reads `MEMBER_CAPTION` and
-`MEMBER_NAME` as `Caption` and `Name`. To put a patched jar into the running container without a full rebuild:
+`MEMBER_NAME` as `Caption` and `Name`. `subcube-filter-label.patch` (2026-10-13), our extension: the subcube also
+accepts Excel's other label filters (`<`, `<=`, `>`, `>=`, `Left`/`Right(..., Len("s")) = "s"`, `InStr(1, ..., "s")`
+compared to 0) as a `LabelColumnPredicate` in `Query.java` (comparison or `LIKE ... ESCAPE ''`, the column cast to a
+string for names and captions); olap4abap does the same (`ZZXXMLA1_CL_MDX_ENGINE=>label_predicate`). To put a patched jar into the running container without a full rebuild:
 
     git -C mondrian apply ../scripts/patches/compound-slicer.patch
     (cd mondrian/mondrian && mvn -B -o install -DskipTests)     # about 30 s

@@ -197,7 +197,10 @@ Read before designing anything:
   SELECT become a predicate that every fact read adds (`Query.getSubcubePredicates`, `ZZXXMLA1_CL_MDX_FACTS=>set_subcube`),
   so totals cover only the subcube; member sets, `-`, `Head`, `CrossJoin`, `Union`, `Members` and `Filter` on the
   name, caption or key of the current member (`addFilterToSubcubePredicates`; also `member_caption`, Excel's "equals"
-  label filter, our fix of eMondrian, `scripts/patches/subcube-filter-member-caption.patch`) are understood, any other
+  label filter, our fix of eMondrian, `scripts/patches/subcube-filter-member-caption.patch`) are understood, and all of
+  Excel's label filters: `<`, `<=`, `>`, `>=` (between, not between), `Left`/`Right(..., Len("s")) = "s"` (begins, ends
+  with) and `InStr(1, ..., "s") > 0`/`= 0` (contains), as comparisons and `LIKE` on the level's column (our extension of
+  eMondrian, `scripts/patches/subcube-filter-label.patch`, `ZZXXMLA1_CL_MDX_ENGINE=>label_predicate`); any other
   function or condition fails the query as in eMondrian.
   `DRILLTHROUGH` (Excel's double click on a cell, `MAXROWS`, `FIRSTROWSET`, `RETURN`) gives the fact rows of the
   query's first cell as a tabular rowset (`ZZXXMLA1_CL_MDX_ENGINE=>drill_through`, `RolapCell.drillThroughInternal`;

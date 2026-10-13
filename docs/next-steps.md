@@ -298,7 +298,9 @@ add_subcube_filter`: `=`, `<>`, `NOT`, `AND`, `OR`, `IsEmpty` of the current mem
 count as `Caption`/`Name` in olap4abap and in the reference (`scripts/patches/subcube-filter-member-caption.patch`), so
 Excel's "equals"/"does not equal" label filters work. The current member of a hierarchy compares its lowest level
 (`getCurrentMemberComparisonLevel`), so they work on flat hierarchies (the schema builder's), not on a level above the
-lowest of a user hierarchy. The other label filters, value filters and Top 10 still fail as in the reference. One
+lowest of a user hierarchy. Extended 2026-10-13 to all of Excel's label filters in both servers (comparisons,
+between, begins/ends with, contains; `scripts/patches/subcube-filter-label.patch`, `label_predicate`; cases
+`execute_subselect_filter_label_compare` and `_text`); value filters and Top 10 still fail as in the reference. One
 deviation: a constant true condition (`1 = 1`) makes eMondrian fail with a NullPointerException
 (`LiteralStarPredicate` has no column); olap4abap does not restrict the subcube.
 
