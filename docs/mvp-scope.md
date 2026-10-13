@@ -105,8 +105,9 @@ Decisions taken by the project owner on 2026-10-02, with reasons.
   dimensions (standard dimensions over `0CALYEAR`, ...) are not annotated in the clinic demo either.
 - Tested on the clinic demo (`clinic-demo.md`, `scripts/clinic_test.py`), whose patients include 300 registered
   without a visit; FoodMart (`ZFMSALES`) stays without the annotation, so the reference's answers still apply.
-- Open: the schema generator does not propose the annotation yet (the XML tab can add it); HANA's plan for the
-  semi-join on a large provider (a fact scan per member read, kept for the request by the member cache) not measured.
+- The schema generator proposes the annotation on every dimension of the cube (on by default, 2026-10-13); the UI
+  switches it per dimension in the cube pane and removes it from a dimension marked as time.
+- Open: HANA's plan for the semi-join on a large provider (a fact scan per member read, kept for the request by the member cache) not measured.
 
 ## Catalog decision (2026-10-06, may be revisited)
 

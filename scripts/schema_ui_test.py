@@ -125,6 +125,28 @@ def main():
         check("with the suggested level type", page.locator("tr:has(.kind) select").input_value() == "TimeMonths")
         shot(page, "4-adso-time")
 
+        # members with facts: proposed on every dimension of the cube, dropped from the one marked time (the server
+        # refuses it there); switched off for the store, its annotation goes
+        page.click(".tree .item:has-text('ZFMSALESA') >> nth=1")
+        dims = page.locator("section:has(h3:text('Dimensions of the cube'))")
+        boxes = dims.locator("input[aria-label='Only members with facts']")
+        annotated = boxes.count()
+        check("members with facts proposed on every other dimension", boxes.count() == dims.locator("tbody tr").count() - 1
+              and all(boxes.nth(i).is_checked() for i in range(boxes.count())), boxes.count())
+        check("not on the time dimension", "time" in dims.locator("tr:has-text('0CALMONTH')").inner_text())
+        dims.locator("tr:has-text('ZFMSTORE') input[aria-label='Only members with facts']").uncheck()
+        page.wait_for_selector(".status.busy", timeout=5000)
+        loads = "Loads" in status(page)
+        page.click("role=tab[name='XML']")
+        xml = page.input_value("textarea.xml")
+        store = re.search(r'<DimensionUsage source="ZFMSTORE"[^>]*?(/>|>.*?</DimensionUsage>)', xml, re.S).group(0)
+        month = re.search(r'<DimensionUsage source="0CALMONTH"[^>]*?(/>|>.*?</DimensionUsage>)', xml, re.S).group(0)
+        check("switched off for the store", loads and "membersWithFacts" not in store, store)
+        check("the time dimension has none", "membersWithFacts" not in month, month)
+        check("the others keep it", xml.count('<Annotation name="olap4abap.membersWithFacts">true</Annotation>')
+              == annotated - 1, (annotated, xml.count('olap4abap.membersWithFacts')))
+        page.click("role=tab[name='Outline']")
+
         # the double-click columns: the proposal's default drill-through action (each characteristic's value, its
         # text where it has one); a measure added; a renamed dimension's columns follow
         page.click(".tree .item:has-text('ZFMSALESA') >> nth=1")

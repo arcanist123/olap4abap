@@ -36,7 +36,9 @@
 "!   per characteristic its value and its text, if it has one, named by the characteristic's text.
 "! Identifiers are BW's technical names, so they are unique and never change; captions are texts. Whatever is not
 "! proposed is a note with its reason; a level type the user may want when marking a dimension as time is a
-"! suggestion. The proposal is written as schema XML and read as the reference reads it (ZZXXMLA1_CL_SCHEMA_DEF), so the
+"! suggestion. Every dimension of the cube shows only its members with facts (the annotation olap4abap.membersWithFacts
+"! on its DimensionUsage, docs/mvp-scope.md, Members with facts decision): a characteristic is shared by many providers,
+"! which use few of its values; the UI switches it per dimension. The proposal is written as schema XML and read as the reference reads it (ZZXXMLA1_CL_SCHEMA_DEF), so the
 "! definition has the reference's defaults and the XML is toXML.
 "! Run (F9): prints the proposals for the FoodMart providers ZFMSALESA and ZFMSALES.
 CLASS zzxxmla1_cl_schema_proposal DEFINITION
@@ -373,10 +375,16 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
                                               ( name = `defaultMeasure` value = VALUE #( measures[ 1 ]-name OPTIONAL ) ) ) ).
     leaf( name = `Table` attributes = VALUE #( ( name = `name` value = provider-fact_table ) ) ).
     LOOP AT usages INTO DATA(usage).
-      leaf( name = `DimensionUsage` attributes = VALUE #( ( name = `name` value = usage-name )
+      open( name = `DimensionUsage` attributes = VALUE #( ( name = `name` value = usage-name )
                                                           ( name = `caption` value = usage-caption )
                                                           ( name = `source` value = usage-name )
                                                           ( name = `foreignKey` value = usage-foreign_key ) ) ).
+      open( `Annotations` ).
+      xml = xml && repeat( val = ` ` occ = 2 * depth )
+                && |<Annotation name="{ zzxxmla1_cl_schema=>c_members_with_facts }">true</Annotation>|
+                && cl_abap_char_utilities=>newline.
+      close( `Annotations` ).
+      close( `DimensionUsage` ).
     ENDLOOP.
     LOOP AT measures INTO DATA(measure).
       leaf( name = `Measure` attributes = VALUE #( ( name = `name` value = measure-name )

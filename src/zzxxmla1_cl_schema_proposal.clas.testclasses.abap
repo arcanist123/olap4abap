@@ -116,6 +116,11 @@ CLASS ltc_proposal IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = usage->caption exp = `Store` ).
     cl_abap_unit_assert=>assert_equals( act = usage->source exp = `ZFMSTORE` ).
     cl_abap_unit_assert=>assert_equals( act = usage->foreign_key exp = `/BIC/ZFMSTORE` ).
+    " only the members with facts: a characteristic is shared by many providers
+    cl_abap_unit_assert=>assert_bound( usage->annotations ).
+    cl_abap_unit_assert=>assert_equals( act = usage->annotations->array
+                                        exp = VALUE zzxxmla1_cl_schema_def=>ty_t_annotation(
+                                                ( name = zzxxmla1_cl_schema=>c_members_with_facts cdata = `true` ) ) ).
   ENDMETHOD.
 
   METHOD hierarchies.

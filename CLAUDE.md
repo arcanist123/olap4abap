@@ -92,7 +92,8 @@ Read before designing anything:
   (members keyed by SID, named by the key, the EN text and the display attributes as member properties) and a flat
   hierarchy `<char>__<attribute>` per navigation attribute the provider switches on; no attribute hierarchies, no
   user hierarchies (the user makes them in the UI); a default drill-through action with each characteristic's value
-  and text, which the UI's "Double-click columns" adjusts. The views (`ZZXXMLA1_CL_BW_VIEW_GEN`, one per basic
+  and text, which the UI's "Double-click columns" adjusts; every dimension of the cube annotated
+  `olap4abap.membersWithFacts`, which the UI's "Members with facts" switches per dimension (not on time ones). The views (`ZZXXMLA1_CL_BW_VIEW_GEN`, one per basic
   characteristic) carry the EN texts and the time-dependent attributes at 9999-12-31. A compounded characteristic
   (`0FISCPER` with `0FISCVARNT`) is named and ordered by `COMPOUND_KEY` of its view (`K4/2024001`, `#/#`; the key
   attribute's `NameColumn` and `OrderByColumn`), and an aDSO with one is read from its fact view

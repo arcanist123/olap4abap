@@ -79,7 +79,12 @@ catalogs `NWCOMPANY` and `NWPRODUCT` (`examples/bw-schema/`):
   an InfoCube's value from the view (one join per characteristic). In the UI the cube's section "Double-click
   columns" renames, orders, removes and adds columns (any attribute of the cube's dimensions, or measures, which are
   then shown in every row instead of the cell's) or removes the action; renaming or removing a dimension, an
-  attribute or a measure updates the columns that name it.
+  attribute or a measure updates the columns that name it;
+- on every `DimensionUsage` the annotation `olap4abap.membersWithFacts` `true` (`mvp-scope.md`, Members with facts
+  decision): the cube shows only the members with facts, since a characteristic is shared by many providers, which
+  use few of its values. In the UI the column "Members with facts" of the cube's dimensions switches it (off for a
+  dimension whose shared `Dimension` has it writes `false` on the usage); marking a dimension as time removes it from
+  the dimension and its usages, as the server refuses it there.
 
 ### Time
 

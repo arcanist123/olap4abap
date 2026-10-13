@@ -112,6 +112,42 @@ const usagesOf = (doc, dim) =>
     .map((usage) => ({ cube, usage })));
 const isShared = (dim) => dim.parentNode.tagName === 'Schema';
 
+// Our extension (ZZXXMLA1_CL_SCHEMA, c_members_with_facts): a dimension of a cube shows only its members with facts;
+// on a DimensionUsage it overrides the shared Dimension's, not on a time dimension.
+const MEMBERS_WITH_FACTS = 'olap4abap.membersWithFacts';
+const annotationOf = (el, name) => kids(kids(el, 'Annotations')[0], 'Annotation').find((a) => attr(a, 'name') === name);
+// sets the annotation's text, or removes it (and its Annotations if that is empty) for null
+function setAnnotation(el, name, value) {
+  const old = annotationOf(el, name);
+  if (value == null) {
+    if (!old) return;
+    const annotations = old.parentNode;
+    old.remove();
+    if (!annotations.children.length) annotations.remove();
+    return;
+  }
+  if (old) {
+    old.textContent = value;
+    return;
+  }
+  let annotations = kids(el, 'Annotations')[0];
+  if (!annotations) {
+    annotations = el.ownerDocument.createElement('Annotations');
+    el.insertBefore(annotations, el.firstElementChild);
+  }
+  annotations.appendChild(create(el.ownerDocument, 'Annotation', { name })).textContent = value;
+}
+const annotatedTrue = (el) => {
+  const a = annotationOf(el, MEMBERS_WITH_FACTS);
+  return a ? a.textContent.trim().toLowerCase() === 'true' : null;
+};
+const membersWithFacts = (usage, dim) => annotatedTrue(usage) ?? annotatedTrue(dim) ?? false;
+function setMembersWithFacts(usage, dim, on) {
+  if (on) setAnnotation(usage, MEMBERS_WITH_FACTS, 'true');
+  else if (annotatedTrue(dim)) setAnnotation(usage, MEMBERS_WITH_FACTS, 'false');
+  else setAnnotation(usage, MEMBERS_WITH_FACTS, null);
+}
+
 // The selection is a path, so it survives undo (which replaces the document).
 function resolve(doc, sel) {
   if (sel.kind === 'cube') return cubesOf(doc)[sel.ci];
@@ -135,6 +171,9 @@ function setTimeDimension(dim, on, suggestions) {
   const attributes = attributesOf(dim);
   if (on) {
     dim.setAttribute('type', 'TimeDimension');
+    // the server refuses members with facts on a time dimension (not supported yet)
+    setAnnotation(dim, MEMBERS_WITH_FACTS, null);
+    if (isShared(dim)) usagesOf(dim.ownerDocument, dim).forEach(({ usage }) => setAnnotation(usage, MEMBERS_WITH_FACTS, null));
     // Mondrian requires a time level type on every level of a time dimension, the attribute hierarchies' too
     for (const a of attributes) {
       if (!TIME_TYPES.includes(attr(a, 'levelType'))) a.setAttribute('levelType', suggestionFor(suggestions, dim, a) || 'TimeUndefined');
@@ -495,16 +534,23 @@ function CubePane({ doc, edit, cube, select }) {
     <section class="section">
       <header><h3>Dimensions of the cube</h3><span class="spacer"></span><span class="muted small">joined on the fact table's foreign key</span></header>
       <div class="body scroll-x"><table>
-        <thead><tr><th>Name in the cube</th><th>Dimension</th><th>Foreign key</th><th></th></tr></thead>
+        <thead><tr><th>Name in the cube</th><th>Dimension</th><th>Foreign key</th>
+          <th title="Only the members whose key is in the cube's fact table (olap4abap.membersWithFacts); not on a time dimension">Members with facts</th>
+          <th></th></tr></thead>
         <tbody>
           ${usages.map((u, i) => {
             const di = sharedDims(doc).findIndex((d) => attr(d, 'name') === attr(u, 'source'));
+            const def = sharedDims(doc)[di];
+            const facts = html`<td>${def && isTime(def) ? html`<span class="muted small">time</span>`
+              : html`<input type="checkbox" checked=${membersWithFacts(u, def)} aria-label="Only members with facts"
+                  onChange=${(e) => edit(() => setMembersWithFacts(u, def, e.target.checked))} />`}</td>`;
             return html`<tr key=${'u' + i}>
               <td><${TextField} value=${attr(u, 'name')} validate=${unique('A dimension', dimNames.filter((n) => n !== attr(u, 'name')))}
                 onCommit=${(v) => edit(() => { renameActionDimension(cube, attr(u, 'name'), v); u.setAttribute('name', v); })} /></td>
               <td>${di >= 0 ? html`<button class="link" onClick=${() => select({ kind: 'dim', ci: null, di })}>${attr(u, 'source')}</button>`
                 : html`<span class="field-error">${attr(u, 'source')} (missing)</span>`}</td>
               <td class="mono small">${attr(u, 'foreignKey')}</td>
+              ${facts}
               <td class="actions"><button class="icon danger" title="Remove from the cube (the dimension stays)"
                 onClick=${() => confirm(`Remove '${attr(u, 'name')}' from cube '${attr(cube, 'name')}'?`) && edit(() => {
                   columnsOfDimension(cube, attr(u, 'name')).forEach((c) => c.remove());
@@ -515,7 +561,11 @@ function CubePane({ doc, edit, cube, select }) {
           ${privates.map((d, i) => html`<tr key=${'p' + i}>
             <td>${attr(d, 'name')}</td>
             <td><button class="link" onClick=${() => select({ kind: 'dim', ci: cubesOf(doc).indexOf(cube), di: i })}>private dimension</button></td>
-            <td class="mono small">${attr(d, 'foreignKey')}</td><td></td>
+            <td class="mono small">${attr(d, 'foreignKey')}</td>
+            <td>${isTime(d) ? html`<span class="muted small">time</span>`
+              : html`<input type="checkbox" checked=${annotatedTrue(d) ?? false} aria-label="Only members with facts"
+                  onChange=${(e) => edit(() => setAnnotation(d, MEMBERS_WITH_FACTS, e.target.checked ? 'true' : null))} />`}</td>
+            <td></td>
           </tr>`)}
         </tbody>
       </table></div>

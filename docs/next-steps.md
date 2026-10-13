@@ -107,7 +107,9 @@ that have facts in it, by the annotation `olap4abap.membersWithFacts` on its `Di
    found, counts, ranges, native `TopCount`, `LEVEL_CARDINALITY`, time not restricted). FoodMart unchanged: the
    `reference/` cases and the applicable statements give the same answers.
 2. Open: time dimensions (decide whether and how a period without facts is a member).
-3. Open: the schema generator proposes the annotation (per characteristic, on by default?) and the UI switches it.
+3. Done (2026-10-13): the schema generator proposes the annotation on every `DimensionUsage` (on by default:
+   a characteristic is shared by many providers, which use few of its values); the cube pane's "Members with facts"
+   column switches it per dimension, and marking a dimension as time removes it (`scripts/schema_ui_test.py`).
 4. Open: measure the semi-join on a large provider (`ZXMLWIDE` with more records).
 
 ## Then: the schema generator
