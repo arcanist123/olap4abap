@@ -102,7 +102,13 @@ Read before designing anything:
   attribute's `NameColumn` and `OrderByColumn`), and an aDSO with one is read from its fact view
   (`ZZXXMLA1_CL_BW_VIEW_GEN=>generate_fact_view`: the reporting view with `SID_<field>` per compounded characteristic,
   placeholder `ZZXXMLA1_F_<aDSO>` until accept), so it is keyed by the SID as on an InfoCube
-  (`docs/bw-schema-design-guide.md`, section 3.7). The UI (`web/schema/`, Preact with htm, no build step) is served from
+  (`docs/bw-schema-design-guide.md`, section 3.7). A cube can fix characteristics to one value each
+  (`GET proposal?fixed.0FISCVARNT=K4`, backend only, no UI yet; section 3.8): the cube is annotated
+  `olap4abap.fixed.<characteristic>`, the fixed characteristic has no dimension, the facts are a fact view filtered on
+  it (an InfoCube's too) and a characteristic compounded with it a view filtered on it, so `0FISCPER` is not
+  compounded there (`2024001`); the engine is not changed. Every generated view is a row of table `ZZXXMLA1_VIEW`
+  (kind, characteristic or provider, selection), by which the generator finds it; accept and remove delete the
+  filtered views no catalog's schema names (`scripts/fixed_selection_test.py`). The UI (`web/schema/`, Preact with htm, no build step) is served from
   the code below `/schema/` by `ZZXXMLA1_CL_WEB_APP`: the generated class `ZZXXMLA1_CL_WEB_APP_FILES` has a method per
   file returning its text (`scripts/generate-web-app-abap.py`, run after every change of `web/schema/`, then
   `sap-write.py` the class; nothing is uploaded or written by the setup); it
@@ -229,7 +235,8 @@ Read before designing anything:
   reference database holds copies of the BW tables and the same views (`docs/environment.md`, the reference database
   holds the BW tables).
 - Setup: program `ZZXXMLA1_SETUP` (`ZZXXMLA1_CL_SETUP`) makes a system ready after the package is imported (the table
-  `ZZXXMLA1_FILE` comes with it, `src/zzxxmla1_file.tabl.xml`, which sapcli neither exports nor imports): it deletes
+  `ZZXXMLA1_FILE` comes with it, `src/zzxxmla1_file.tabl.xml`, and so does `ZZXXMLA1_VIEW`, which sapcli neither
+  exports nor imports): it deletes
   the schema builder's old copies below `/schema/` and, if there is none, writes a
   `/WEB-INF/datasources.xml` without catalogs; with its checkbox also the clinic demo (`docs/clinic-demo.md`): InfoCube
   `ZCLVISIT` and aDSO `ZCLVISITA` with made-up visits of patients to a clinic, their schemas and catalogs

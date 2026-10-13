@@ -40,6 +40,10 @@
 "! on its DimensionUsage, docs/mvp-scope.md, Members with facts decision): a characteristic is shared by many providers,
 "! which use few of its values; the UI switches it per dimension. The proposal is written as schema XML and read as the reference reads it (ZZXXMLA1_CL_SCHEMA_DEF), so the
 "! definition has the reference's defaults and the XML is toXML.
+"! A provider read for fixed characteristics (docs/bw-schema-design-guide.md, section 3.8, 0FISCVARNT = K4) gives a
+"! cube with an annotation olap4abap.fixed.CHARACTERISTIC per fixed one, whose value is the fixed value, and no
+"! dimension for it; a characteristic whose compounding is all fixed is proposed as one that is not compounded (the
+"! provider reads it so: no name column, on an aDSO keyed by its value).
 "! A NUMC value is proposed as BW holds it (0042, typed String; docs/mvp-scope.md, NUMC decision); where the view has
 "! its number too (COLUMN_INT) the proposal lists it, so the UI can switch a dimension to numbers (42).
 "! Run (F9): prints the proposals for the FoodMart providers ZFMSALESA and ZFMSALES.
@@ -50,6 +54,10 @@ CLASS zzxxmla1_cl_schema_proposal DEFINITION
 
   PUBLIC SECTION.
     INTERFACES if_oo_adt_classrun.
+
+    "! The name of a cube's annotation that fixes a characteristic, followed by the characteristic; its value is the
+    "! fixed value (docs/bw-schema-design-guide.md, section 3.8).
+    CONSTANTS c_fixed_annotation TYPE string VALUE `olap4abap.fixed.`.
 
     TYPES:
       "! the level type the UI pre-selects for an attribute when the user marks its dimension as time; the generator
@@ -237,8 +245,11 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
     DATA usages TYPE ty_t_usage.
 
     open( name = `Schema` attributes = VALUE #( ( name = `name` value = provider-name ) ) ).
-    " the cube's dimensions in the provider's order
+    " the cube's dimensions in the provider's order; a fixed characteristic has none (it would have one member)
     LOOP AT provider-characteristics INTO DATA(characteristic).
+      IF line_exists( provider-fixed[ iobjnm = CONV rsiobjnm( characteristic-iobjnm ) ] ).
+        CONTINUE.
+      ENDIF.
       DATA(name) = write_dimension( kind = provider-kind characteristic = characteristic ).
       IF name IS NOT INITIAL.
         APPEND VALUE #( name = name caption = characteristic-text foreign_key = characteristic-fact_column-name )
@@ -397,6 +408,17 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
     open( name = `Cube` attributes = VALUE #( ( name = `name` value = provider-name )
                                               ( name = `caption` value = provider-text )
                                               ( name = `defaultMeasure` value = VALUE #( measures[ 1 ]-name OPTIONAL ) ) ) ).
+    IF provider-fixed IS NOT INITIAL.
+      open( `Annotations` ).
+      LOOP AT provider-fixed INTO DATA(fixed).
+        xml = xml && repeat( val = ` ` occ = 2 * depth )
+                  && |<Annotation name="{ escape( val = |{ c_fixed_annotation }{ fixed-iobjnm }|
+                                                  format = cl_abap_format=>e_xml_attr ) }">|
+                  && |{ escape( val = fixed-value format = cl_abap_format=>e_xml_text ) }</Annotation>|
+                  && cl_abap_char_utilities=>newline.
+      ENDLOOP.
+      close( `Annotations` ).
+    ENDIF.
     leaf( name = `Table` attributes = VALUE #( ( name = `name` value = provider-fact_table ) ) ).
     LOOP AT usages INTO DATA(usage).
       open( name = `DimensionUsage` attributes = VALUE #( ( name = `name` value = usage-name )

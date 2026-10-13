@@ -19,6 +19,12 @@
 "!   group > diagnosis), for authorizations that combine both characteristics,
 "! - the room ZCLROOM, compounded with the site ZCLSITE: the same rooms R01 to R04 at both sites, so a room is a member
 "!   only with its site (docs/bw-schema-design-guide.md, section 3.7),
+"! - the fiscal time, a dimension of its own: the fiscal year variant ZCLFISCVR (K1, K2, K4), the fiscal year ZCLFISCYR
+"!   and the fiscal period ZCLFISCPR, both compounded with the variant. Each visit is booked under one variant, by its
+"!   number; all three follow the calendar (the period is the month), so 2024001 exists under each
+"!   (docs/bw-schema-design-guide.md, sections 3.7 and 3.8: a cube that fixes ZCLFISCVR = K4 has a third of the visits,
+"!   its periods by their own key). They are the demo's own, not BW's 0FISC*, whose periods BW checks against the
+"!   source system's fiscal year variants,
 "! - the cube-type aDSO ZCLVISITA with the same visits and BW's standard time characteristics in place of the date,
 "!   read through its fact view (the SID of the room, ZZXXMLA1_CL_BW_VIEW_GEN),
 "! loads both, generates the CDS views of the characteristics (ZZXXMLA1_CL_BW_VIEW_GEN), writes a schema per provider
@@ -205,6 +211,13 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
         calquarter TYPE n LENGTH 5,
         calyear    TYPE n LENGTH 4,
       END OF ty_calendar.
+    TYPES:
+      "! the fiscal time of a visit: its fiscal year variant, the period and the year in it
+      BEGIN OF ty_fiscal,
+        fiscvarnt TYPE c LENGTH 2,
+        fiscper   TYPE n LENGTH 7,
+        fiscyear  TYPE n LENGTH 4,
+      END OF ty_fiscal.
 
     DATA log TYPE string_table.
     DATA seed TYPE int8.
@@ -269,6 +282,9 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     METHODS calendar IMPORTING day TYPE d RETURNING VALUE(result) TYPE ty_calendar.
     "! The site and room of a visit, from its physician and patient: no random number, so the visits stay as they were.
     METHODS room IMPORTING visit TYPE ty_visit RETURNING VALUE(result) TYPE ty_room.
+    "! The fiscal time of a visit: the variant by the visit's number (K1, K2, K4 in turn), the period and the year of
+    "! the calendar, as all three follow it.
+    METHODS fiscal IMPORTING visit TYPE ty_visit index TYPE i RETURNING VALUE(result) TYPE ty_fiscal.
 
     METHODS delete_all.
     METHODS delete_cube.
@@ -417,6 +433,10 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       ( name = 'ZCLWEEK'  text = 'Week of Year'      datatp = 'NUMC' leng = 2 )
       ( name = 'ZCLDAYOM' text = 'Day of Month'      datatp = 'NUMC' leng = 2 )
       ( name = 'ZCLRTYPE' text = 'Room Type'         leng = 20 )
+      " the fiscal year variant before the period and year compounded with it
+      ( name = 'ZCLFISCVR' text = 'Fiscal Year Variant' leng = 2 )
+      ( name = 'ZCLFISCYR' text = 'Fiscal Year'   datatp = 'NUMC' leng = 4 compounding = VALUE #( ( 'ZCLFISCVR' ) ) )
+      ( name = 'ZCLFISCPR' text = 'Fiscal Period' datatp = 'NUMC' leng = 7 compounding = VALUE #( ( 'ZCLFISCVR' ) ) )
       " the site before the room compounded with it
       ( name = 'ZCLSITE'  text = 'Site'       leng = 10
         attributes = VALUE #( ( 'ZCLCITY' ) ) )
@@ -459,7 +479,9 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       ( suffix = '3' text = 'Diagnosis'  iobjtp = 'CHA' iobjnms = VALUE #( ( 'ZCLDIAG' ) ) )
       ( suffix = '4' text = 'Visit Type' iobjtp = 'CHA' iobjnms = VALUE #( ( 'ZCLVTYPE' ) ) )
       ( suffix = '5' text = 'Time'       iobjtp = 'CHA' iobjnms = VALUE #( ( 'ZCLDATE' ) ) )
-      ( suffix = '6' text = 'Room'       iobjtp = 'CHA' iobjnms = VALUE #( ( 'ZCLSITE' ) ( 'ZCLROOM' ) ) ) ).
+      ( suffix = '6' text = 'Room'       iobjtp = 'CHA' iobjnms = VALUE #( ( 'ZCLSITE' ) ( 'ZCLROOM' ) ) )
+      ( suffix = '7' text = 'Fiscal Time' iobjtp = 'CHA'
+        iobjnms = VALUE #( ( 'ZCLFISCVR' ) ( 'ZCLFISCYR' ) ( 'ZCLFISCPR' ) ) ) ).
   ENDMETHOD.
 
   METHOD all_iobjnm.
@@ -468,7 +490,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD dimension_characteristics.
-    result = VALUE #( ( 'ZCLPAT' ) ( 'ZCLDOC' ) ( 'ZCLDIAG' ) ( 'ZCLVTYPE' ) ( 'ZCLDATE' ) ( 'ZCLSITE' ) ( 'ZCLROOM' ) ).
+    result = VALUE #( ( 'ZCLPAT' ) ( 'ZCLDOC' ) ( 'ZCLDIAG' ) ( 'ZCLVTYPE' ) ( 'ZCLDATE' ) ( 'ZCLSITE' ) ( 'ZCLROOM' )
+                      ( 'ZCLFISCVR' ) ( 'ZCLFISCYR' ) ( 'ZCLFISCPR' ) ).
   ENDMETHOD.
 
   METHOD random.
@@ -1044,6 +1067,12 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     result-room = |R0{ visit-patient MOD rooms + 1 }|.
   ENDMETHOD.
 
+  METHOD fiscal.
+    result-fiscvarnt = SWITCH #( index MOD 3 WHEN 1 THEN 'K1' WHEN 2 THEN 'K2' ELSE 'K4' ).
+    result-fiscyear = visit-day(4).
+    result-fiscper = |{ visit-day(4) }0{ visit-day+4(2) }|.
+  ENDMETHOD.
+
   METHOD calendar.
     DATA week TYPE scal-week.
     result-calday     = day.
@@ -1330,11 +1359,12 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
                       textlong  = dime-text
                       iobjtp    = dime-iobjtp ) TO dimension_table.
       LOOP AT dime-iobjnms INTO DATA(iobjnm).
+        DATA(dimension_position) = sy-tabix.
         position = position + 1.
         APPEND VALUE #( infocube   = c_cube
                         objvers    = rs_c_objvers-modified
                         dimension  = dimension
-                        posit      = sy-tabix
+                        posit      = dimension_position
                         infoobject = iobjnm ) TO dimension_infoobjects.
         APPEND VALUE #( infocube   = c_cube
                         objvers    = rs_c_objvers-modified
@@ -1516,6 +1546,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     CREATE DATA data TYPE HANDLE table_type.
     ASSIGN data->* TO <table>.
     LOOP AT visits INTO DATA(visit).
+      DATA(index) = sy-tabix.
       APPEND INITIAL LINE TO <table> ASSIGNING <row>.
       ASSIGN COMPONENT 'ZCLPAT' OF STRUCTURE <row> TO <value>.
       <value> = COND string( WHEN visit-patient <> 0 THEN |{ visit-patient }| ).
@@ -1532,6 +1563,13 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       <value> = room-site.
       ASSIGN COMPONENT 'ZCLROOM' OF STRUCTURE <row> TO <value>.
       <value> = room-room.
+      DATA(fiscal) = fiscal( visit = visit index = index ).
+      ASSIGN COMPONENT 'ZCLFISCVR' OF STRUCTURE <row> TO <value>.
+      <value> = fiscal-fiscvarnt.
+      ASSIGN COMPONENT 'ZCLFISCPR' OF STRUCTURE <row> TO <value>.
+      <value> = fiscal-fiscper.
+      ASSIGN COMPONENT 'ZCLFISCYR' OF STRUCTURE <row> TO <value>.
+      <value> = fiscal-fiscyear.
       ASSIGN COMPONENT 'ZCLVISNO' OF STRUCTURE <row> TO <value>.
       <value> = 1.
       ASSIGN COMPONENT 'ZCLDUR' OF STRUCTURE <row> TO <value>.
@@ -1609,7 +1647,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     " the characteristics of the cube with BW's calendar in place of the date; 0CALDAY has no SID table, so no view
     objects = VALUE #( FOR c IN VALUE ty_t_iobjnm( ( 'ZCLPAT' ) ( 'ZCLDOC' ) ( 'ZCLDIAG' ) ( 'ZCLVTYPE' ) ( 'ZCLSITE' )
                                                    ( 'ZCLROOM' ) ( '0CALDAY' ) ( '0CALWEEK' ) ( '0CALMONTH' )
-                                                   ( '0CALQUARTER' ) ( '0CALYEAR' ) )
+                                                   ( '0CALQUARTER' ) ( '0CALYEAR' ) ( 'ZCLFISCVR' )
+                                                   ( 'ZCLFISCYR' ) ( 'ZCLFISCPR' ) )
                        ( iobjnm = c sid_determination_mode = 'S' ) ).
     LOOP AT key_figures( ) INTO DATA(kyf).
       APPEND VALUE #( iobjnm = kyf-name aggregation = 'SUM' ) TO objects.
@@ -1681,7 +1720,11 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     DATA(calmonth) = iobj_field( struct = line iobjnm = '0CALMONTH' ).
     DATA(calquarter) = iobj_field( struct = line iobjnm = '0CALQUARTER' ).
     DATA(calyear) = iobj_field( struct = line iobjnm = '0CALYEAR' ).
+    DATA(fiscvarnt) = iobj_field( struct = line iobjnm = 'ZCLFISCVR' ).
+    DATA(fiscper) = iobj_field( struct = line iobjnm = 'ZCLFISCPR' ).
+    DATA(fiscyear) = iobj_field( struct = line iobjnm = 'ZCLFISCYR' ).
     LOOP AT visits INTO DATA(visit).
+      DATA(index) = sy-tabix.
       APPEND INITIAL LINE TO <table> ASSIGNING <row>.
       ASSIGN COMPONENT patient OF STRUCTURE <row> TO <value>.
       <value> = COND string( WHEN visit-patient <> 0 THEN |{ visit-patient }| ).
@@ -1717,6 +1760,13 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       <value> = calendar-calquarter.
       ASSIGN COMPONENT calyear OF STRUCTURE <row> TO <value>.
       <value> = calendar-calyear.
+      DATA(fiscal) = fiscal( visit = visit index = index ).
+      ASSIGN COMPONENT fiscvarnt OF STRUCTURE <row> TO <value>.
+      <value> = fiscal-fiscvarnt.
+      ASSIGN COMPONENT fiscper OF STRUCTURE <row> TO <value>.
+      <value> = fiscal-fiscper.
+      ASSIGN COMPONENT fiscyear OF STRUCTURE <row> TO <value>.
+      <value> = fiscal-fiscyear.
     ENDLOOP.
     CALL FUNCTION 'RSDSO_WRITE_API'
       EXPORTING

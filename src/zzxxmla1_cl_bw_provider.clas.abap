@@ -23,6 +23,9 @@
 "! A compounded characteristic has a name column, its compounding and its value (docs/bw-schema-design-guide.md,
 "! section 3.7). An aDSO with one is read from its fact view (ZZXXMLA1_CL_BW_VIEW_GEN, a placeholder if it is not
 "! generated yet): its fields without namespace, and the compounded characteristic's SID as its fact column.
+"! Read for a cube that fixes characteristics (section 3.8, 0FISCVARNT = K4), the provider is read from its fact view
+"! for them, an InfoCube too, and a characteristic compounded with fixed ones from its view for them: one whose
+"! compounding is all fixed has no name column and, on an aDSO, its value as fact column.
 CLASS zzxxmla1_cl_bw_provider DEFINITION
   PUBLIC
   FINAL
@@ -110,6 +113,8 @@ CLASS zzxxmla1_cl_bw_provider DEFINITION
         text            TYPE string,
         infoarea        TYPE string,
         fact_table      TYPE string,
+        "! the characteristics fixed to a value; they are in characteristics too
+        fixed           TYPE zzxxmla1_cl_bw_view_gen=>ty_t_fixed,
         characteristics TYPE ty_t_characteristic,  " in the order of the provider
         key_figures     TYPE ty_t_key_figure,
         notes           TYPE ty_t_note,
@@ -118,10 +123,17 @@ CLASS zzxxmla1_cl_bw_provider DEFINITION
     "! The HANA-optimised InfoCubes and cube-type aDSOs, by name.
     METHODS providers
       RETURNING VALUE(result) TYPE ty_t_entry.
-    "! The metadata of an InfoCube or aDSO.
+    "! The metadata of an InfoCube or aDSO, for a cube that fixes the given characteristics.
     METHODS read
       IMPORTING name          TYPE csequence
+                fixed         TYPE zzxxmla1_cl_bw_view_gen=>ty_t_fixed OPTIONAL
       RETURNING VALUE(result) TYPE ty_provider
+      RAISING   zzxxmla1_cx_bw_provider.
+    "! Refuses the fixed characteristics of a provider read with them: each must be a characteristic of the provider,
+    "! fixed together with its compounding, to a value that has a SID and no quote; the selection fits table
+    "! ZZXXMLA1_VIEW (255 characters).
+    METHODS check_fixed
+      IMPORTING provider TYPE ty_provider
       RAISING   zzxxmla1_cx_bw_provider.
 
   PROTECTED SECTION.
@@ -129,6 +141,8 @@ CLASS zzxxmla1_cl_bw_provider DEFINITION
     TYPES ty_t_column TYPE HASHED TABLE OF ty_column WITH UNIQUE KEY name.
 
     DATA views TYPE REF TO zzxxmla1_cl_bw_view_gen.
+    "! the characteristics the provider is read for as fixed
+    DATA fixed TYPE zzxxmla1_cl_bw_view_gen=>ty_t_fixed.
     "! the notes of the attributes, collected while the characteristics are read
     DATA notes TYPE ty_t_note.
     "! an InfoCube's navigation attributes, CHARACTERISTIC__ATTRIBUTE
@@ -142,6 +156,12 @@ CLASS zzxxmla1_cl_bw_provider DEFINITION
       IMPORTING adso     TYPE rsoadsonm
       CHANGING  provider TYPE ty_provider
       RAISING   zzxxmla1_cx_bw_provider.
+    "! The provider's fact view for the fixed characteristics if it has every column of the layout, else its
+    "! placeholder.
+    METHODS fact_view
+      IMPORTING provider      TYPE rsinfoprov
+                layout        TYPE zzxxmla1_cl_bw_view_gen=>ty_fact_layout
+      RETURNING VALUE(result) TYPE string.
     "! A characteristic with its view and attributes; adso_navigation: an aDSO switches on its navigation attributes.
     METHODS characteristic
       IMPORTING iobjnm          TYPE rsiobjnm
@@ -201,6 +221,7 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
   METHOD read.
     views = NEW #( ).
     CLEAR: notes, cube_navigation.
+    me->fixed = fixed.
     DATA(upper) = to_upper( name ).
     DATA cube TYPE rsinfocube.
     DATA adso TYPE rsoadsonm.
@@ -223,7 +244,46 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
       result = VALUE #( name = found kind = c_kind-adso ).
       read_adso( EXPORTING adso = adso CHANGING provider = result ).
     ENDIF.
+    result-fixed = fixed.
     APPEND LINES OF notes TO result-notes.
+  ENDMETHOD.
+
+  METHOD check_fixed.
+    IF strlen( zzxxmla1_cl_bw_view_gen=>selection_text( provider-fixed ) ) > 255.
+      fail( |The fixed characteristics are longer than 255 characters together| ).
+    ENDIF.
+    IF views IS NOT BOUND.
+      views = NEW #( ).
+    ENDIF.
+    LOOP AT provider-fixed INTO DATA(value).
+      IF NOT line_exists( provider-characteristics[ iobjnm = CONV string( value-iobjnm ) ] ).
+        fail( |{ value-iobjnm } is not a characteristic of { provider-name }| ).
+      ENDIF.
+      IF value-value CA `'`.
+        fail( |{ value-iobjnm }: a fixed value cannot contain a quote| ).
+      ENDIF.
+      " its compounding fixed too, and a SID for all its key fields
+      DATA(tables) = views->tables( value-iobjnm ).
+      IF tables-sids IS INITIAL.
+        fail( |{ value-iobjnm } has no SID table| ).
+      ENDIF.
+      DATA(conditions) = |{ tables-key_field } = '{ value-value }'|.
+      SELECT c~iobjcmp, o~fieldnm FROM rsdiobjcmp AS c
+        INNER JOIN rsdiobj AS o ON o~iobjnm = c~iobjcmp AND o~objvers = 'A'
+        WHERE c~iobjnm = @tables-basic AND c~objvers = 'A'
+        INTO TABLE @DATA(compounding).
+      LOOP AT compounding INTO DATA(compounded_with).
+        READ TABLE provider-fixed INTO DATA(compounding_value) WITH TABLE KEY iobjnm = compounded_with-iobjcmp.
+        IF sy-subrc <> 0.
+          fail( |{ value-iobjnm } is compounded with { compounded_with-iobjcmp }, which must be fixed too| ).
+        ENDIF.
+        conditions = |{ conditions } AND { compounded_with-fieldnm } = '{ compounding_value-value }'|.
+      ENDLOOP.
+      SELECT COUNT(*) FROM (tables-sids) WHERE (conditions).
+      IF sy-dbcnt = 0.
+        fail( |{ value-iobjnm } has no value { value-value }| ).
+      ENDIF.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD read_cube.
@@ -298,6 +358,43 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
       ENDIF.
       APPEND key_figure( iobjnm = key_figure-iobjnm fact_column = column ) TO provider-key_figures.
     ENDLOOP.
+
+    " fixed characteristics: the facts are read from the fact view, filtered on them, every field without namespace
+    " (docs/bw-schema-design-guide.md, section 3.8)
+    IF fixed IS INITIAL.
+      RETURN.
+    ENDIF.
+    DATA(fact) = views->fact_layout( provider = cube fixed = fixed ).
+    LOOP AT fact-notes INTO DATA(note).
+      APPEND VALUE #( iobjnm = note-iobjnm reason = note-reason ) TO provider-notes.
+    ENDLOOP.
+    IF fact-columns IS INITIAL.
+      RETURN.
+    ENDIF.
+    provider-fact_table = fact_view( provider = cube layout = fact ).
+    LOOP AT provider-characteristics ASSIGNING FIELD-SYMBOL(<characteristic>).
+      <characteristic>-fact_column-name = zzxxmla1_cl_bw_view_gen=>view_column( <characteristic>-fact_column-name ).
+    ENDLOOP.
+    LOOP AT provider-key_figures ASSIGNING FIELD-SYMBOL(<key_figure>).
+      <key_figure>-fact_column-name = zzxxmla1_cl_bw_view_gen=>view_column( <key_figure>-fact_column-name ).
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD fact_view.
+    " the view as it is, if it has every column it is generated with now; else a placeholder, generated on accept
+    result = views->existing_fact_view( provider = provider fixed = fixed ).
+    IF result IS NOT INITIAL.
+      DATA(view_columns) = columns_of( result ).
+      LOOP AT layout-columns INTO DATA(column).
+        IF NOT line_exists( view_columns[ name = column-name ] ).
+          CLEAR result.
+          EXIT.
+        ENDIF.
+      ENDLOOP.
+    ENDIF.
+    IF result IS INITIAL.
+      result = zzxxmla1_cl_bw_view_gen=>fact_placeholder( provider ).
+    ENDIF.
   ENDMETHOD.
 
   METHOD read_adso.
@@ -361,31 +458,19 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
       ENDCASE.
     ENDLOOP.
 
-    " compounded characteristics: the facts are read from the fact view, which has the SID of each, every field named
-    " without namespace (docs/bw-schema-design-guide.md, section 3.7)
-    DATA(fact) = views->fact_layout( adso ).
+    " compounded or fixed characteristics: the facts are read from the fact view, which has the SID of each compounded
+    " one whose compounding is not all fixed and is filtered on the fixed ones, every field named without namespace
+    " (docs/bw-schema-design-guide.md, sections 3.7 and 3.8)
+    DATA(fact) = views->fact_layout( provider = adso fixed = fixed ).
     LOOP AT fact-notes INTO DATA(note).
       APPEND VALUE #( iobjnm = note-iobjnm reason = note-reason ) TO provider-notes.
     ENDLOOP.
     IF fact-columns IS INITIAL.
       RETURN.
     ENDIF.
-    " the view as it is, if it has every column it is generated with now; else a placeholder, generated on accept
-    provider-fact_table = views->existing_fact_view( adso ).
-    IF provider-fact_table IS NOT INITIAL.
-      DATA(view_columns) = columns_of( provider-fact_table ).
-      LOOP AT fact-columns INTO DATA(fact_column).
-        IF NOT line_exists( view_columns[ name = fact_column-name ] ).
-          CLEAR provider-fact_table.
-          EXIT.
-        ENDIF.
-      ENDLOOP.
-    ENDIF.
-    IF provider-fact_table IS INITIAL.
-      provider-fact_table = zzxxmla1_cl_bw_view_gen=>fact_placeholder( adso ).
-    ENDIF.
+    provider-fact_table = fact_view( provider = adso layout = fact ).
     LOOP AT provider-characteristics ASSIGNING FIELD-SYMBOL(<characteristic>).
-      READ TABLE fact-columns INTO fact_column WITH KEY iobjnm = <characteristic>-iobjnm sid = abap_true.
+      READ TABLE fact-columns INTO DATA(fact_column) WITH KEY iobjnm = <characteristic>-iobjnm sid = abap_true.
       IF sy-subrc = 0.
         <characteristic>-fact_column = VALUE #( name = fact_column-name datatype = `INT4` length = 10 ).
         <characteristic>-fact_sid = abap_true.
@@ -400,7 +485,7 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
 
   METHOD characteristic.
     result = VALUE #( iobjnm = iobjnm text = text_of( iobjnm ) iobjtp = iobjtp fact_column = fact_column ).
-    DATA(layout) = views->layout( iobjnm ).
+    DATA(layout) = views->layout( characteristic = iobjnm fixed = fixed ).
     result-basic = layout-tables-basic.
     READ TABLE layout-columns INTO DATA(key) WITH KEY iobjnm = result-basic text = abap_false.
     result-has_sids = xsdbool( sy-subrc = 0 ).
@@ -434,7 +519,7 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
 
     " the view as it is, if it has every column it is generated with now; else the schema names a placeholder, and
     " accepting it generates the view again (it keeps its name)
-    result-view = views->existing_view( CONV #( result-basic ) ).
+    result-view = views->existing_view( characteristic = CONV #( result-basic ) fixed = fixed ).
     IF result-view IS NOT INITIAL.
       DATA(view_columns) = columns_of( result-view ).
       LOOP AT layout-columns INTO column.

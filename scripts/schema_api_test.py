@@ -142,6 +142,16 @@ def main():
           status == 400 and any(text in body.get("error", "") for text in
                                 ["by an unnamed Hierarchy and by the attribute", "is defined twice"]), body)
 
+    # fixed selections (docs/bw-schema-design-guide.md, section 3.8): what cannot be fixed is refused; accepted ones
+    # are tested by scripts/fixed_selection_test.py, which writes catalogs
+    for provider, fixed, text in (
+            ("ZFMSALESA", {"fixed.0FISCVARNT": "K4"}, "is not a characteristic of"),
+            ("ZCLVISITA", {"fixed.ZCLFISCPR": "2024001"}, "which must be fixed too"),
+            ("ZCLVISITA", {"fixed.ZCLFISCVR": "ZZ"}, "has no value ZZ"),
+            ("ZCLVISITA", {"fixed.ZCLFISCVR": "K'"}, "cannot contain a quote")):
+        status, body, _ = call(args.url, args.client, "GET", "proposal", {"provider": provider, **fixed})
+        check(f"proposal of {provider} refuses {fixed}", status == 400 and text in body.get("error", ""), body)
+
     # the time master data: only read; time/fill is called with what it refuses before writing
     status, body, _ = call(args.url, args.client, "GET", "time", {"from": "1997-01-01", "to": "1997-12-31"})
     found = {c["name"]: c for c in body.get("characteristics", [])}

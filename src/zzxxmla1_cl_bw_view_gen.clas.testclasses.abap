@@ -47,6 +47,16 @@ CLASS ltc_bw_view_gen DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION 
     METHODS fact_view FOR TESTING.
     "! no compounded characteristic, or none whose compounding the aDSO has: no fact view
     METHODS fact_view_not_needed FOR TESTING.
+    "! the fiscal period with the fiscal year variant fixed: the view filters the variant and has no COMPOUND_KEY; a
+    "! fixed characteristic that is not its compounding leaves the plain view
+    METHODS compounded_fixed FOR TESTING.
+    "! an aDSO whose cube fixes the site: the facts filtered on it, and the room, compounded with the site only, without
+    "! SID column
+    METHODS fact_view_fixed_adso FOR TESTING.
+    "! an InfoCube whose cube fixes the site: its fact table inner-joined to the site's SID table on the SID and value
+    METHODS fact_view_fixed_cube FOR TESTING.
+    "! the selection as table ZZXXMLA1_VIEW keys it: sorted by characteristic
+    METHODS selection_text FOR TESTING.
     "! a characteristic without attribute table: the SID table alone
     METHODS without_attributes FOR TESTING.
     "! no SID table, no view
@@ -296,8 +306,8 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
 
   METHOD fact_metadata_of_room.
     result = VALUE #(
-      adso           = 'ZCLVISITA'
-      reporting_view = '/BIC/AZCLVISITA7'
+      provider       = 'ZCLVISITA'
+      fact_table     = '/BIC/AZCLVISITA7'
       fields         = VALUE #( ( field = 'REQTSN'        datatype = 'NUMC' length = 23 )
                                 ( field = '/BIC/ZCLSITE'  datatype = 'CHAR' length = 10 iobjnm = 'ZCLSITE' )
                                 ( field = '/BIC/ZCLROOM'  datatype = 'CHAR' length = 4  iobjnm = 'ZCLROOM' )
@@ -315,7 +325,7 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
       exp = VALUE string_table( ( `REQTSN  ` ) ( `ZCLSITE ZCLSITE ` ) ( `ZCLROOM ZCLROOM ` ) ( `ZCLVISNO ZCLVISNO ` )
                                 ( `SID_ZCLROOM ZCLROOM X` ) ) ).
     cl_abap_unit_assert=>assert_equals(
-      act = zzxxmla1_cl_bw_view_gen=>fact_ddl_source( adso = 'ZCLVISITA' view_name = 'ZZXXMLA1V0000090' layout = layout )
+      act = zzxxmla1_cl_bw_view_gen=>fact_ddl_source( provider = 'ZCLVISITA' view_name = 'ZZXXMLA1V0000090' layout = layout )
       exp = |@AbapCatalog.sqlViewName: 'ZZXXMLA1V0000090'{ nl }| &&
             |@AbapCatalog.compiler.compareFilter: true{ nl }| &&
             |@AccessControl.authorizationCheck: #NOT_REQUIRED{ nl }| &&
@@ -346,6 +356,97 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
       act = layout-notes
       exp = VALUE zzxxmla1_cl_bw_view_gen=>ty_t_note(
               ( iobjnm = `ZCLROOM` reason = `compounded with ZCLSITE, which is not a field of the aDSO` ) ) ).
+  ENDMETHOD.
+
+  METHOD compounded_fixed.
+    DATA(nl) = cl_abap_char_utilities=>newline.
+    DATA(metadata) = VALUE ty_metadata(
+      characteristic = '0FISCPER'
+      tables         = VALUE #( basic = '0FISCPER' sids = '/BI0/SFISCPER' key_field = 'FISCPER' )
+      sid_columns    = VALUE #( ( field = 'FISCVARNT' datatype = 'CHAR' length = 2 key = abap_true )
+                                ( field = 'FISCPER'   datatype = 'CHAR' length = 7 key = abap_true )
+                                ( field = 'SID'       datatype = 'INT4' length = 10 ) )
+      compounding    = VALUE #( ( iobjnm = '0FISCVARNT' field = 'FISCVARNT' ) ) ).
+    DATA(fixed) = VALUE zzxxmla1_cl_bw_view_gen=>ty_t_fixed( ( iobjnm = '0FISCVARNT' value = `K4` )
+                                                              ( iobjnm = '0VERSION' value = `000` ) ).
+    DATA(layout) = zzxxmla1_cl_bw_view_gen=>build_layout( metadata = metadata fixed = fixed ).
+    cl_abap_unit_assert=>assert_equals( act = layout-selection exp = `0FISCVARNT=K4` ).
+    cl_abap_unit_assert=>assert_false( xsdbool( line_exists(
+      layout-columns[ name = zzxxmla1_cl_bw_view_gen=>c_compound_key ] ) ) ).
+    cl_abap_unit_assert=>assert_equals(
+      act = zzxxmla1_cl_bw_view_gen=>ddl_source( characteristic = '0FISCPER'
+                                                 view_name      = 'ZZXXMLA1V0000012'
+                                                 layout         = layout )
+      exp = |@AbapCatalog.sqlViewName: 'ZZXXMLA1V0000012'{ nl }| &&
+            |@AbapCatalog.compiler.compareFilter: true{ nl }| &&
+            |@AccessControl.authorizationCheck: #NOT_REQUIRED{ nl }| &&
+            |@EndUserText.label: 'BW characteristic 0FISCPER: 0FISCVARNT = K4'{ nl }| &&
+            |define view ZZXXMLA1_C0000012{ nl }| &&
+            |  as select from /bi0/sfiscper as s{ nl }| &&
+            |\{{ nl }| &&
+            |  key s.sid as SID,{ nl }| &&
+            |      s.fiscvarnt as FISCVARNT,{ nl }| &&
+            |      s.fiscper as FISCPER{ nl }| &&
+            |\}{ nl }| &&
+            |where s.fiscvarnt = 'K4'{ nl }| ).
+    " fixed, but not its compounding: the plain view, compounded
+    layout = zzxxmla1_cl_bw_view_gen=>build_layout(
+      metadata = metadata
+      fixed    = VALUE #( ( iobjnm = '0VERSION' value = `000` ) ) ).
+    cl_abap_unit_assert=>assert_initial( layout-selection ).
+    cl_abap_unit_assert=>assert_initial( layout-filters ).
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists(
+      layout-columns[ name = zzxxmla1_cl_bw_view_gen=>c_compound_key ] ) ) ).
+  ENDMETHOD.
+
+  METHOD fact_view_fixed_adso.
+    DATA(metadata) = fact_metadata_of_room( ).
+    metadata-fixed = VALUE #( ( iobjnm = 'ZCLSITE' value = `NORTH` ) ).
+    DATA(layout) = zzxxmla1_cl_bw_view_gen=>build_fact_layout( metadata ).
+    cl_abap_unit_assert=>assert_initial( layout-notes ).
+    cl_abap_unit_assert=>assert_initial( layout-joins ).
+    cl_abap_unit_assert=>assert_equals( act = layout-filters exp = VALUE string_table( ( `a./bic/zclsite = 'NORTH'` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = layout-selection exp = `ZCLSITE=NORTH` ).
+    cl_abap_unit_assert=>assert_equals(
+      act = VALUE string_table( FOR c IN layout-columns ( c-name ) )
+      exp = VALUE string_table( ( `REQTSN` ) ( `ZCLSITE` ) ( `ZCLROOM` ) ( `ZCLVISNO` ) ) ).
+  ENDMETHOD.
+
+  METHOD fact_view_fixed_cube.
+    DATA(nl) = cl_abap_char_utilities=>newline.
+    DATA(metadata) = VALUE zzxxmla1_cl_bw_view_gen=>ty_fact_metadata(
+      provider   = 'ZCLVISIT'
+      cube       = abap_true
+      fact_table = '/BIC/FZCLVISIT'
+      fields     = VALUE #( ( field = 'SID_ZCLSITE'   datatype = 'INT4' length = 10 iobjnm = 'ZCLSITE' )
+                            ( field = 'SID_ZCLROOM'   datatype = 'INT4' length = 10 iobjnm = 'ZCLROOM' )
+                            ( field = '/BIC/ZCLVISNO' datatype = 'DEC'  length = 17 iobjnm = 'ZCLVISNO' ) )
+      fixed      = VALUE #( ( iobjnm = 'ZCLSITE' value = `NORTH` sids = '/BIC/SZCLSITE'
+                              sid_keys = VALUE #( ( field = '/BIC/ZCLSITE' value = `NORTH` ) ) ) ) ).
+    DATA(layout) = zzxxmla1_cl_bw_view_gen=>build_fact_layout( metadata ).
+    cl_abap_unit_assert=>assert_equals(
+      act = zzxxmla1_cl_bw_view_gen=>fact_ddl_source( provider = 'ZCLVISIT' view_name = 'ZZXXMLA1V0000091' layout = layout )
+      exp = |@AbapCatalog.sqlViewName: 'ZZXXMLA1V0000091'{ nl }| &&
+            |@AbapCatalog.compiler.compareFilter: true{ nl }| &&
+            |@AccessControl.authorizationCheck: #NOT_REQUIRED{ nl }| &&
+            |@EndUserText.label: 'BW provider ZCLVISIT: facts of ZCLSITE = NORTH'{ nl }| &&
+            |define view ZZXXMLA1_C0000091{ nl }| &&
+            |  as select from /bic/fzclvisit as a{ nl }| &&
+            |    inner join /bic/szclsite as f1 on  f1.sid = a.sid_zclsite{ nl }| &&
+            |                                        and f1./bic/zclsite = 'NORTH'{ nl }| &&
+            |\{{ nl }| &&
+            |  a.sid_zclsite as SID_ZCLSITE,{ nl }| &&
+            |  a.sid_zclroom as SID_ZCLROOM,{ nl }| &&
+            |  a./bic/zclvisno as ZCLVISNO{ nl }| &&
+            |\}{ nl }| ).
+  ENDMETHOD.
+
+  METHOD selection_text.
+    cl_abap_unit_assert=>assert_equals(
+      act = zzxxmla1_cl_bw_view_gen=>selection_text( VALUE #( ( iobjnm = '0VERSION' value = `000` )
+                                                              ( iobjnm = '0FISCVARNT' value = `K4` ) ) )
+      exp = `0FISCVARNT=K4;0VERSION=000` ).
+    cl_abap_unit_assert=>assert_initial( zzxxmla1_cl_bw_view_gen=>selection_text( VALUE #( ) ) ).
   ENDMETHOD.
 
   METHOD without_attributes.
@@ -400,9 +501,9 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
     cl_abap_unit_assert=>assert_initial( zzxxmla1_cl_bw_view_gen=>characteristic_of_placeholder( `ZZXXMLA1_C0000011` ) ).
     DATA(fact) = zzxxmla1_cl_bw_view_gen=>fact_placeholder( 'ZCLVISITA' ).
     cl_abap_unit_assert=>assert_equals( act = fact exp = `ZZXXMLA1_F_ZCLVISITA` ).
-    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_bw_view_gen=>adso_of_fact_placeholder( fact ) exp = `ZCLVISITA` ).
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_bw_view_gen=>provider_of_fact_placeholder( fact ) exp = `ZCLVISITA` ).
     cl_abap_unit_assert=>assert_initial( zzxxmla1_cl_bw_view_gen=>characteristic_of_placeholder( fact ) ).
-    cl_abap_unit_assert=>assert_initial( zzxxmla1_cl_bw_view_gen=>adso_of_fact_placeholder( placeholder ) ).
+    cl_abap_unit_assert=>assert_initial( zzxxmla1_cl_bw_view_gen=>provider_of_fact_placeholder( placeholder ) ).
   ENDMETHOD.
 
   METHOD tables_of_zfmstore.

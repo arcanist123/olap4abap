@@ -15,6 +15,36 @@ eMondrian's database adds in another order (`docs/test-strategy.md`). The run (t
 two minutes; #85 takes 1 s with the native `Order` (step 8, 105 s before), #46 2.3 s with the native `TopCount` (step
 9); everything else is below 10 s.
 
+## Now: fixed selections
+
+Decided 2026-10-13; the model is in `bw-schema-design-guide.md`, section 3.8. A cube fixes characteristics of its
+provider to one value each (`0FISCVARNT = K4`); a characteristic whose compounding is all fixed is then not
+compounded (`0FISCPER` named `2024001`, joined by its value on an aDSO), and the fixed characteristic has no
+dimension. The selection is in generated views, the engine is not changed. Backend only: the UI comes later, and so
+does a default selection in the proposal (the only variant with facts, ...).
+
+1. Table `ZZXXMLA1_VIEW` (kind, object, selection; view and DDL source), `src/zzxxmla1_view.tabl.xml`.
+   `ZZXXMLA1_CL_BW_VIEW_GEN` finds and registers views through it, a plain view of an older run by its description.
+2. Views with a selection: a characteristic's view filtered on its fixed compounding (no `COMPOUND_KEY` when all of
+   it is fixed); a provider's fact view filtered on the fixed characteristics, on an InfoCube too (inner join to the
+   SID tables), with `SID_<field>` only for the characteristics still compounded.
+3. Provider and proposal: `ZZXXMLA1_CL_BW_PROVIDER=>read` and the proposal take the selection; the proposal drops
+   the fixed dimensions, treats the fully fixed compounded ones as plain and writes the annotations
+   `olap4abap.fixed.<characteristic>` on the cube. A value without SID, or a compounded characteristic fixed without
+   its compounding, is refused.
+4. API: `GET proposal?provider=X&fixed.<characteristic>=<value>`; accept generates the views of the cube's selection
+   for the placeholders; check refuses views of another selection than the cube's annotations and a dimension shared
+   by cubes with different selections; accept and remove delete the views with a selection no schema file names.
+5. Done: test data. The clinic demo has its own fiscal time in `ZCLVISIT` and `ZCLVISITA` (`clinic-demo.md`): the
+   variant `ZCLFISCVR` (K1, K2, K4, each visit under one), the period `ZCLFISCPR` and the year `ZCLFISCYR` compounded
+   with it. Not BW's `0FISC*`: BW checks their values against the source system's fiscal year variants (T009), and
+   the warehouse's truth is its SID and fact tables. Its hand-written schemas stay as they are.
+   `scripts/fixed_selection_test.py` (2026-10-13, all passed): the plain proposal accepted as oracle (periods
+   `K1/2024001` ...), the proposal with K4 fixed accepted (11,318 visits, periods `2024001` ... `2025012`, three
+   filtered views), both removed and the filtered views deleted; `schema_api_test.py` checks the refusals.
+6. Later: the fiscal time master data for a fixed variant (`time-master-data.md`, open step 6 of compounded
+   characteristics); a fiscal year > period hierarchy on a fiscal period; the UI for fixed characteristics.
+
 ## Now: members pushed down to HANA
 
 Decision in `mvp-scope.md` (Member decision, 2026-10-12). Found with Excel on the wide demo `ZXMLWIDE`: a label filter

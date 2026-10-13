@@ -225,6 +225,39 @@ Not used: a hierarchy with the compounding as a level above (the schemas are fla
 columns (HANA cannot use them); keys of several
 columns (not in the reference's schema format).
 
+### 3.8 Fixed selections
+
+Decided 2026-10-13 (`next-steps.md`, fixed selections). A cube can fix characteristics of its provider to one value
+each, as a BW query's fixed filter does: `0FISCVARNT = K4`, `0VERSION = 000`. The selection is part of the cube, not
+a slicer: it holds for every cell, the totals and the members, and no MDX removes it. It is given with the proposal
+(`GET proposal?provider=X&fixed.0FISCVARNT=K4`; the UI comes later) and recorded on the cube, one annotation per
+characteristic:
+
+```xml
+<Cube name="ZCLVISITA" ...>
+  <Annotations><Annotation name="olap4abap.fixed.0FISCVARNT">K4</Annotation></Annotations>
+```
+
+- **The value** is BW's internal one (NUMC with its zeros) and must have a SID. A compounded characteristic can be
+  fixed only together with its compounding.
+- **A fixed characteristic has no dimension** (it would have one member) and no drill-through column.
+- **A characteristic whose compounding is all fixed is not compounded** in this cube: `0FISCPER` under `0FISCVARNT =
+  K4` is named by its own key (`2024001`, no `COMPOUND_KEY`, no member property `Key`, no `OrderByColumn`), and on an
+  aDSO it is keyed and joined by its value, without a SID column. With part of its compounding fixed it stays
+  compounded on the rest.
+- **The engine knows nothing of it.** The selection is in the views, so the schema stays in the reference's format and
+  the reference answers the same on copies of the views:
+  - the cube's fact table is its fact view, on an InfoCube too: the aDSO's reporting view with `WHERE` on the fixed
+    fields, the InfoCube's fact table inner-joined to the SID table of each fixed characteristic on the SID and the
+    fixed value. Every field without namespace, and `SID_<field>` for the characteristics that stay compounded (3.7);
+  - a characteristic compounded with a fixed one is on a filtered view of its own: its plain view (section 4) with
+    `WHERE` on the fixed compounding fields, one row per own key.
+- **Shared dimensions:** a dimension is on one view, so cubes of a schema that use it must fix the same values of its
+  compounding; `check` refuses a schema where they do not, and one whose views were generated for another selection
+  than the cube's annotations (an annotation edited by hand: propose again).
+
+Views are tracked in table `ZZXXMLA1_VIEW` (section 4, rule 8).
+
 ## 4. Views
 
 The generated views (`ZZXXMLA1_CL_BW_VIEW_GEN`, one per basic characteristic) follow these rules: SID, the key with
@@ -252,6 +285,15 @@ a field the view lacks, is left out with a note. The hand-written demo views are
    view of `0D_NW_CUST`, and their fact columns hold its SIDs.
 7. Check the text flags in `RSDCHABAS` (`TXTTABFL`, `NOLANGU`, `TXTTIMFL`) and the attribute types in `RSDBCHATR`
    (`ATTRITP` `NAV`/`DIS`, `ATRTIMFL`) before writing the joins.
+8. **Every generated view is a row of table `ZZXXMLA1_VIEW`**: kind (`C` a characteristic's view, `F` a provider's
+   fact view), object (the basic characteristic, the provider), selection (the fixed values it filters, section 3.8,
+   written `0FISCVARNT=K4`, several sorted by characteristic and separated by `;`; empty for the plain view) and the
+   database view and DDL source. The generator finds a view by these three, no longer by the DDL source's description,
+   which stays a label for ADT ("BW characteristic 0FISCPER: 0FISCVARNT = K4"); a plain view of an older run, found by
+   its description, is registered when it is generated again. The views are local objects (`$TMP`) and so is the
+   table's content: it is not transported. After every accept and remove of the schema API the views with a selection
+   that no schema file names any more are deleted with their rows; the plain views stay (other schemas can use them,
+   as before).
 
 Example, product with category (time-independent) and group (time-dependent):
 

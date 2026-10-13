@@ -33,14 +33,20 @@
 "! The facts of a cube-type aDSO hold values, not SIDs, so the value of a compounded characteristic does not find one
 "! row of its view: an aDSO with a compounded characteristic gets a fact view too, the reporting view with every field
 "! (named without namespace) and SID_FIELD per compounded characteristic, from a left outer join to its SID table on
-"! all key fields, which schemas join its view on. Its DDL source is numbered as the characteristics' are, found by its
-"! description ("BW aDSO ZCLVISITA: ...").
+"! all key fields, which schemas join its view on.
+"! A cube can fix characteristics to one value each (docs/bw-schema-design-guide.md, section 3.8, 0FISCVARNT = K4): a
+"! characteristic compounded with a fixed one gets a view of its own filtered on the fixed compounding (WHERE), its
+"! COMPOUND_KEY made of the other key fields only (none if all are fixed), and the provider a fact view filtered on the
+"! fixed characteristics, an InfoCube too (an inner join to the SID table of each on the SID and the fixed values), with
+"! SID_FIELD only for the compounded characteristics whose compounding is not all fixed.
 "! The views are DDIC-based CDS views, the kind NetWeaver 7.50 has, named by a number: database view ZZXXMLA1V and DDL
 "! source ZZXXMLA1_C followed by the same 7 digits (a characteristic does not fit: 16 and 30 characters at most, and a
-"! namespace has slashes). The database view is what the schema names. The DDL source's description names the
-"! characteristic ("BW characteristic ZFMSTORE: ..."), so the view of a characteristic is found by it; a view keeps its
-"! number when it is generated again, a new one gets the next free number. A source of an older name (ZZXXMLA1_C_
-"! followed by the characteristic) gets its number's name when it is generated again.
+"! namespace has slashes). The database view is what the schema names. Each view is a row of table ZZXXMLA1_VIEW, by
+"! kind (C a characteristic's, F a provider's fact view), characteristic or provider and selection (selection_text,
+"! initial for the plain view), and is found by it; a plain view of a run before the table is found by the DDL source's
+"! description ("BW characteristic ZFMSTORE: ...", "BW aDSO ZCLVISITA: ...") and registered when it is generated again.
+"! A view keeps its number when it is generated again, a new one gets the next free number. A source of an older name
+"! (ZZXXMLA1_C_ followed by the characteristic) gets its number's name when it is generated again.
 CLASS zzxxmla1_cl_bw_view_gen DEFINITION
   PUBLIC
   FINAL
@@ -54,13 +60,30 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
     CONSTANTS c_default_package TYPE devclass VALUE '$TMP'.
     "! The view column that names a compounded characteristic's values by all their key fields.
     CONSTANTS c_compound_key TYPE string VALUE `COMPOUND_KEY`.
+    CONSTANTS:
+      "! The kinds of view in table ZZXXMLA1_VIEW: a characteristic's view, a provider's fact view.
+      BEGIN OF c_kind,
+        characteristic TYPE c LENGTH 1 VALUE 'C',
+        fact           TYPE c LENGTH 1 VALUE 'F',
+      END OF c_kind.
     TYPES:
+      "! the characteristic of the view (or the provider of a fact view, kind F), its selection (selection_text) and its
+      "! names
       BEGIN OF ty_view,
+        kind           TYPE c LENGTH 1,
         characteristic TYPE rsiobjnm,
         ddl_name       TYPE ddlname,
         view_name      TYPE viewname,
+        selection      TYPE string,
       END OF ty_view,
       ty_t_view TYPE STANDARD TABLE OF ty_view WITH EMPTY KEY.
+    TYPES:
+      "! a characteristic a cube fixes to one value, BW's internal one (docs/bw-schema-design-guide.md, section 3.8)
+      BEGIN OF ty_fixed,
+        iobjnm TYPE rsiobjnm,
+        value  TYPE string,
+      END OF ty_fixed,
+      ty_t_fixed TYPE SORTED TABLE OF ty_fixed WITH UNIQUE KEY iobjnm.
     TYPES:
       "! The tables of a characteristic and the field of its key in them; a table is initial if the characteristic
       "! has none, or if the key field is not a column of it.
@@ -99,7 +122,14 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
       END OF ty_attribute,
       ty_t_attribute TYPE STANDARD TABLE OF ty_attribute WITH EMPTY KEY.
     TYPES:
-      "! What BW has of a characteristic, all its view is made of.
+      "! A characteristic the compounded one is compounded with, and its field in the SID table.
+      BEGIN OF ty_compounding,
+        iobjnm TYPE rsiobjnm,
+        field  TYPE fieldname,
+      END OF ty_compounding,
+      ty_t_compounding TYPE STANDARD TABLE OF ty_compounding WITH EMPTY KEY.
+    TYPES:
+      "! What BW has of a characteristic, all its view is made of; compounding: of the basic characteristic (RSDIOBJCMP).
       BEGIN OF ty_metadata,
         characteristic         TYPE rsiobjnm,
         tables                 TYPE ty_tables,
@@ -108,6 +138,7 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
         time_attribute_columns TYPE ty_t_column,
         texts                  TYPE ty_text_table,
         attributes             TYPE ty_t_attribute,
+        compounding            TYPE ty_t_compounding,
       END OF ty_metadata.
     TYPES:
       "! A column of the view: its name, its expression in the DDL source, the DDIC type of the field it is made of
@@ -126,11 +157,12 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
       END OF ty_view_column,
       ty_t_view_column TYPE STANDARD TABLE OF ty_view_column WITH EMPTY KEY.
     TYPES:
-      "! A left outer join of the view: table, alias and the conditions, combined with AND.
+      "! A join of the view: table, alias and the conditions, combined with AND; a left outer join, inner if so marked.
       BEGIN OF ty_join,
         table      TYPE tabname,
         alias      TYPE string,
         conditions TYPE string_table,
+        inner      TYPE abap_bool,
       END OF ty_join,
       ty_t_join TYPE STANDARD TABLE OF ty_join WITH EMPTY KEY.
     TYPES:
@@ -141,17 +173,20 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
       END OF ty_note,
       ty_t_note TYPE STANDARD TABLE OF ty_note WITH EMPTY KEY.
     TYPES:
-      "! The view of a characteristic: its tables, the joins to its SID table (alias s), its columns and what it leaves
-      "! out. No columns if the characteristic has no SID table.
+      "! The view of a characteristic: its tables, the joins to its SID table (alias s), its columns, the conditions
+      "! of its fixed compounding (WHERE, combined with AND), their selection (selection_text, initial for the plain
+      "! view) and what it leaves out. No columns if the characteristic has no SID table.
       BEGIN OF ty_layout,
-        tables  TYPE ty_tables,
-        joins   TYPE ty_t_join,
-        columns TYPE ty_t_view_column,
-        notes   TYPE ty_t_note,
+        tables    TYPE ty_tables,
+        joins     TYPE ty_t_join,
+        columns   TYPE ty_t_view_column,
+        filters   TYPE string_table,
+        selection TYPE string,
+        notes     TYPE ty_t_note,
       END OF ty_layout.
     TYPES:
-      "! A field of an aDSO's reporting view: DDIC field and type, the InfoObject whose value it is (initial for the
-      "! technical fields).
+      "! A field of the facts (an aDSO's reporting view, an InfoCube's fact table): DDIC field and type, the InfoObject
+      "! whose value (on an InfoCube: SID) it is, initial for the technical fields.
       BEGIN OF ty_fact_field,
         field    TYPE fieldname,
         datatype TYPE datatype_d,
@@ -160,12 +195,22 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
       END OF ty_fact_field,
       ty_t_fact_field TYPE STANDARD TABLE OF ty_fact_field WITH EMPTY KEY.
     TYPES:
-      "! A characteristic the compounded one is compounded with, and its field in the SID table.
-      BEGIN OF ty_compounding,
-        iobjnm TYPE rsiobjnm,
-        field  TYPE fieldname,
-      END OF ty_compounding,
-      ty_t_compounding TYPE STANDARD TABLE OF ty_compounding WITH EMPTY KEY.
+      "! A key field of a SID table and its fixed value.
+      BEGIN OF ty_key_value,
+        field TYPE fieldname,
+        value TYPE string,
+      END OF ty_key_value,
+      ty_t_key_value TYPE STANDARD TABLE OF ty_key_value WITH EMPTY KEY.
+    TYPES:
+      "! A characteristic the cube fixes: its value; on an InfoCube also its SID table and the fixed value of each of
+      "! its key fields there (its own and its compounding's), which the facts' SID is joined on.
+      BEGIN OF ty_fixed_field,
+        iobjnm   TYPE rsiobjnm,
+        value    TYPE string,
+        sids     TYPE tabname,
+        sid_keys TYPE ty_t_key_value,
+      END OF ty_fixed_field,
+      ty_t_fixed_field TYPE STANDARD TABLE OF ty_fixed_field WITH EMPTY KEY.
     TYPES:
       "! A compounded characteristic of an aDSO: its SID table, its own key field there and its compounding.
       BEGIN OF ty_compounded,
@@ -176,12 +221,16 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
       END OF ty_compounded,
       ty_t_compounded TYPE STANDARD TABLE OF ty_compounded WITH EMPTY KEY.
     TYPES:
-      "! What BW has of an aDSO that its fact view is made of.
+      "! What BW has of a provider that its fact view is made of: the facts (an aDSO's reporting view, an InfoCube's
+      "! fact table), their fields, the compounded characteristics (an aDSO's, whose facts hold values) and the fixed
+      "! ones.
       BEGIN OF ty_fact_metadata,
-        adso           TYPE rsoadsonm,
-        reporting_view TYPE tabname,
-        fields         TYPE ty_t_fact_field,
-        compounded     TYPE ty_t_compounded,
+        provider   TYPE rsinfoprov,
+        cube       TYPE abap_bool,
+        fact_table TYPE tabname,
+        fields     TYPE ty_t_fact_field,
+        compounded TYPE ty_t_compounded,
+        fixed      TYPE ty_t_fixed_field,
       END OF ty_fact_metadata.
     TYPES:
       "! A column of a fact view: name, expression, DDIC type, the InfoObject whose value it is, and whether it is the
@@ -196,13 +245,16 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
       END OF ty_fact_column,
       ty_t_fact_column TYPE STANDARD TABLE OF ty_fact_column WITH EMPTY KEY.
     TYPES:
-      "! The fact view of an aDSO: its reporting view (alias a), the joins to the SID tables, its columns and what it
-      "! leaves out. No columns if the aDSO has no compounded characteristic, so it needs none.
+      "! The fact view of a provider: its facts (alias a), the joins to the SID tables, its columns, the conditions of
+      "! the fixed characteristics (WHERE), their selection (selection_text) and what it leaves out. No columns if the
+      "! provider needs none: nothing fixed and no compounded characteristic of an aDSO that is not fixed.
       BEGIN OF ty_fact_layout,
-        reporting_view TYPE tabname,
-        joins          TYPE ty_t_join,
-        columns        TYPE ty_t_fact_column,
-        notes          TYPE ty_t_note,
+        fact_table TYPE tabname,
+        joins      TYPE ty_t_join,
+        columns    TYPE ty_t_fact_column,
+        filters    TYPE string_table,
+        selection  TYPE string,
+        notes      TYPE ty_t_note,
       END OF ty_fact_layout.
 
     "! package: the package new views are created in.
@@ -214,13 +266,15 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
       IMPORTING cube          TYPE rsinfocube
       RETURNING VALUE(result) TYPE ty_t_view
       RAISING   cx_dd_ddl_exception.
-    "! The database view of the characteristic's DDL source, if there is one; nothing is changed.
+    "! The database view of the characteristic's DDL source for a cube's fixed characteristics (those of its
+    "! compounding filter it), if there is one; nothing is changed.
     METHODS existing_view
       IMPORTING characteristic TYPE rsiobjnm
+                fixed          TYPE ty_t_fixed OPTIONAL
       RETURNING VALUE(result)  TYPE viewname.
     "! The table name a schema gives the view of a characteristic that is not generated yet (ZZXXMLA1_C_ followed by
     "! the characteristic): a name only for the schema, never one of the DDIC; accepting the schema generates the view
-    "! and puts in its database view (ZZXXMLA1_CL_SCHEMA_API).
+    "! (for the selection of the cube that uses it) and puts in its database view (ZZXXMLA1_CL_SCHEMA_API).
     CLASS-METHODS placeholder
       IMPORTING characteristic TYPE csequence
       RETURNING VALUE(result)  TYPE string.
@@ -232,29 +286,38 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
     CLASS-METHODS view_column
       IMPORTING field         TYPE csequence
       RETURNING VALUE(result) TYPE string.
+    "! A selection as table ZZXXMLA1_VIEW keys it: CHARACTERISTIC=value, sorted by characteristic, separated by ;
+    "! (0FISCVARNT=K4); initial for none.
+    CLASS-METHODS selection_text
+      IMPORTING fixed         TYPE ty_t_fixed
+      RETURNING VALUE(result) TYPE string.
     "! BW's tables of a characteristic and its key field.
     METHODS tables
       IMPORTING characteristic TYPE rsiobjnm
       RETURNING VALUE(result)  TYPE ty_tables.
-    "! What BW has of a characteristic: tables, their columns, attributes and texts.
+    "! What BW has of a characteristic: tables, their columns, attributes, texts and compounding.
     METHODS metadata
       IMPORTING characteristic TYPE rsiobjnm
       RETURNING VALUE(result)  TYPE ty_metadata.
-    "! The view of a characteristic as it is generated.
+    "! The view of a characteristic as it is generated for a cube's fixed characteristics.
     METHODS layout
       IMPORTING characteristic TYPE rsiobjnm
+                fixed          TYPE ty_t_fixed OPTIONAL
       RETURNING VALUE(result)  TYPE ty_layout.
-    "! The view made of a characteristic's metadata; reads nothing.
+    "! The view made of a characteristic's metadata; reads nothing. Of the fixed characteristics those of its
+    "! compounding filter it (WHERE) and leave COMPOUND_KEY, which is made of the key fields not fixed only.
     CLASS-METHODS build_layout
       IMPORTING metadata      TYPE ty_metadata
+                fixed         TYPE ty_t_fixed OPTIONAL
       RETURNING VALUE(result) TYPE ty_layout.
-    "! Creates or updates the view of one characteristic and activates it.
+    "! Creates or updates the view of one characteristic for a cube's fixed characteristics and activates it.
     METHODS generate
       IMPORTING characteristic TYPE rsiobjnm
+                fixed          TYPE ty_t_fixed OPTIONAL
       RETURNING VALUE(result)  TYPE ty_view
       RAISING   cx_dd_ddl_exception.
-    "! Deletes the view of a characteristic (DDL source and database view) if there is one: BW refuses to delete a
-    "! characteristic whose data elements a view still uses. Returns whether there was one.
+    "! Deletes every view of a characteristic (DDL source and database view, the filtered ones too) if there is one:
+    "! BW refuses to delete a characteristic whose data elements a view still uses. Returns whether there was one.
     METHODS delete
       IMPORTING characteristic TYPE rsiobjnm
       RETURNING VALUE(result)  TYPE abap_bool
@@ -272,49 +335,72 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
       IMPORTING columns       TYPE ty_t_column
       RETURNING VALUE(result) TYPE string.
 
-    "! What BW has of an aDSO for its fact view: the reporting view, its fields and the compounded characteristics.
+    "! What BW has of a provider (InfoCube or aDSO) for its fact view: the facts, their fields, the compounded
+    "! characteristics and the fixed ones.
     METHODS fact_metadata
-      IMPORTING adso          TYPE rsoadsonm
+      IMPORTING provider      TYPE rsinfoprov
+                fixed         TYPE ty_t_fixed OPTIONAL
       RETURNING VALUE(result) TYPE ty_fact_metadata.
-    "! The fact view of an aDSO as it is generated; no columns if it needs none.
+    "! The fact view of a provider as it is generated; no columns if it needs none.
     METHODS fact_layout
-      IMPORTING adso          TYPE rsoadsonm
+      IMPORTING provider      TYPE rsinfoprov
+                fixed         TYPE ty_t_fixed OPTIONAL
       RETURNING VALUE(result) TYPE ty_fact_layout.
-    "! The fact view made of an aDSO's metadata; reads nothing.
+    "! The fact view made of a provider's metadata; reads nothing.
     CLASS-METHODS build_fact_layout
       IMPORTING metadata      TYPE ty_fact_metadata
       RETURNING VALUE(result) TYPE ty_fact_layout.
-    "! The DDL source of the fact view of an aDSO.
+    "! The DDL source of the fact view of a provider.
     CLASS-METHODS fact_ddl_source
-      IMPORTING adso          TYPE rsoadsonm
+      IMPORTING provider      TYPE rsinfoprov
                 view_name     TYPE viewname
                 layout        TYPE ty_fact_layout
       RETURNING VALUE(result) TYPE string.
-    "! Creates or updates the fact view of an aDSO and activates it (characteristic of the result: the aDSO); nothing
-    "! if the aDSO needs none (the result is initial).
+    "! Creates or updates the fact view of a provider for a cube's fixed characteristics and activates it
+    "! (characteristic of the result: the provider); nothing if the provider needs none (the result is initial).
     METHODS generate_fact_view
-      IMPORTING adso          TYPE rsoadsonm
+      IMPORTING provider      TYPE rsinfoprov
+                fixed         TYPE ty_t_fixed OPTIONAL
       RETURNING VALUE(result) TYPE ty_view
       RAISING   cx_dd_ddl_exception.
-    "! The database view of the aDSO's fact view, if there is one; nothing is changed.
+    "! The database view of the provider's fact view for the fixed characteristics, if there is one; nothing is
+    "! changed.
     METHODS existing_fact_view
-      IMPORTING adso          TYPE rsoadsonm
+      IMPORTING provider      TYPE rsinfoprov
+                fixed         TYPE ty_t_fixed OPTIONAL
       RETURNING VALUE(result) TYPE viewname.
-    "! Deletes the fact view of an aDSO if there is one (BW cannot delete an aDSO a view selects from). Returns whether
-    "! there was one.
+    "! Deletes every fact view of a provider if there is one (BW cannot delete an aDSO a view selects from). Returns
+    "! whether there was one.
     METHODS delete_fact_view
-      IMPORTING adso          TYPE rsoadsonm
+      IMPORTING provider      TYPE rsinfoprov
       RETURNING VALUE(result) TYPE abap_bool
       RAISING   cx_dd_ddl_exception.
-    "! The table name a schema gives the fact view of an aDSO that is not generated yet (ZZXXMLA1_F_ followed by the
-    "! aDSO), as placeholder does for a characteristic's view.
+    "! The table name a schema gives the fact view of a provider that is not generated yet (ZZXXMLA1_F_ followed by
+    "! the provider), as placeholder does for a characteristic's view.
     CLASS-METHODS fact_placeholder
-      IMPORTING adso          TYPE csequence
+      IMPORTING provider      TYPE csequence
       RETURNING VALUE(result) TYPE string.
-    "! The aDSO of a fact placeholder, initial for any other name.
-    CLASS-METHODS adso_of_fact_placeholder
+    "! The provider of a fact placeholder, initial for any other name.
+    CLASS-METHODS provider_of_fact_placeholder
       IMPORTING table         TYPE csequence
       RETURNING VALUE(result) TYPE string.
+    "! The fixed characteristics among the compounding of a characteristic's basic one: the selection of its view for
+    "! a cube that fixes them.
+    METHODS fixed_compounding
+      IMPORTING characteristic TYPE rsiobjnm
+                fixed          TYPE ty_t_fixed
+      RETURNING VALUE(result)  TYPE ty_t_fixed.
+    "! The views of table ZZXXMLA1_VIEW, of a kind (initial: both) and characteristic or provider (initial: all).
+    METHODS registered
+      IMPORTING kind          TYPE c DEFAULT space
+                object_name   TYPE csequence DEFAULT space
+      RETURNING VALUE(result) TYPE ty_t_view.
+    "! Deletes the views with a selection whose database view is not among the used ones (the tables the schema files
+    "! name), with their rows; the plain views stay. Returns the deleted ones.
+    METHODS delete_unused
+      IMPORTING used          TYPE string_table
+      RETURNING VALUE(result) TYPE ty_t_view
+      RAISING   cx_dd_ddl_exception.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -343,35 +429,88 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
     CLASS-METHODS ddl_name
       IMPORTING view_name     TYPE viewname
       RETURNING VALUE(result) TYPE ddlname.
-    "! The description of the DDL source of a characteristic's view, by which it is found.
+    "! The description of the DDL source of a characteristic's view: a label for ADT, and how a plain view of a run
+    "! before table ZZXXMLA1_VIEW is found.
     CLASS-METHODS description
       IMPORTING characteristic TYPE rsiobjnm
+                selection      TYPE string OPTIONAL
       RETURNING VALUE(result)  TYPE ddtext.
-    "! The description of the DDL source of an aDSO's fact view, by which it is found.
+    "! The description of the DDL source of a provider's fact view, as description.
     CLASS-METHODS fact_description
-      IMPORTING adso          TYPE rsoadsonm
+      IMPORTING provider      TYPE rsinfoprov
+                selection     TYPE string OPTIONAL
       RETURNING VALUE(result) TYPE ddtext.
-    "! The DDL source of a view, found by its description; initial if there is none.
-    METHODS existing_ddl_name
+    "! The selection as a label: CHARACTERISTIC = value, separated by commas.
+    CLASS-METHODS selection_label
+      IMPORTING selection     TYPE string
+      RETURNING VALUE(result) TYPE string.
+    "! The DDL source of a view of a run before table ZZXXMLA1_VIEW, found by its description; initial if there is none.
+    METHODS ddl_of_description
       IMPORTING !description  TYPE ddtext
       RETURNING VALUE(result) TYPE ddlname.
-    "! The names of the view of a description: the existing database view if it is numbered, else the next number. An
-    "! active source can rename neither itself nor its database view: a source of another name (an older one, or one
-    "! whose view is not numbered) is deleted, and its view is created again by the numbered source.
+    "! The DDL source of the view of a kind, characteristic or provider and selection: the one of its row of table
+    "! ZZXXMLA1_VIEW if that source exists (a row without source is deleted), else for the plain view one of a run
+    "! before the table, by its description; initial if there is none.
+    METHODS existing_ddl_name
+      IMPORTING kind          TYPE c
+                object_name   TYPE csequence
+                selection     TYPE string
+                !description  TYPE ddtext
+      RETURNING VALUE(result) TYPE ddlname.
     "! The active database view of a DDL source; initial if there is none.
     METHODS view_of_ddl
       IMPORTING ddl_name      TYPE ddlname
       RETURNING VALUE(result) TYPE viewname.
+    "! The names of the view of a kind, characteristic or provider and selection: the existing database view if it is
+    "! numbered, else the next number. An active source can rename neither itself nor its database view: a source of
+    "! another name (an older one, or one whose view is not numbered) is deleted, and its view is created again by
+    "! the numbered source.
     METHODS numbered_names
-      IMPORTING !description  TYPE ddtext
+      IMPORTING kind          TYPE c
+                object_name   TYPE csequence
+                selection     TYPE string
+                !description  TYPE ddtext
       RETURNING VALUE(result) TYPE ty_view
       RAISING   cx_dd_ddl_exception.
-    "! Saves a DDL source in the package and activates it.
+    "! Saves a DDL source in the package, activates it and registers it in table ZZXXMLA1_VIEW.
     METHODS save
-      IMPORTING ddl_name     TYPE ddlname
+      IMPORTING kind         TYPE c
+                object_name  TYPE csequence
+                !view        TYPE ty_view
                 !description TYPE ddtext
                 source       TYPE string
       RAISING   cx_dd_ddl_exception.
+    "! Deletes the views of a kind and characteristic or provider (DDL source, database view and row), and a plain
+    "! one of a run before table ZZXXMLA1_VIEW; returns whether there was one.
+    METHODS delete_all
+      IMPORTING kind          TYPE c
+                object_name   TYPE csequence
+                !description  TYPE ddtext
+      RETURNING VALUE(result) TYPE abap_bool
+      RAISING   cx_dd_ddl_exception.
+    "! The compounding of a basic characteristic in BW's order, with its fields (RSDIOBJCMP).
+    METHODS compounding
+      IMPORTING basic         TYPE rsiobjnm
+      RETURNING VALUE(result) TYPE ty_t_compounding.
+    "! A value as a literal of the DDL source.
+    CLASS-METHODS literal
+      IMPORTING value         TYPE string
+      RETURNING VALUE(result) TYPE string.
+    "! The joins of a DDL source, a line per condition.
+    CLASS-METHODS joins_source
+      IMPORTING joins         TYPE ty_t_join
+      RETURNING VALUE(result) TYPE string.
+    "! The WHERE of a DDL source, after the select list; initial without conditions.
+    CLASS-METHODS where_source
+      IMPORTING filters       TYPE string_table
+      RETURNING VALUE(result) TYPE string.
+    "! The fact table of an InfoCube (RSD_FACTTAB_GET_FOR_CUBE); initial if BW gives none.
+    METHODS cube_fact_table
+      IMPORTING cube          TYPE rsinfocube
+      RETURNING VALUE(result) TYPE tabname.
+    "! The reporting view of an aDSO, its fields and its compounded characteristics.
+    METHODS adso_fact_metadata
+      CHANGING metadata TYPE ty_fact_metadata.
     "! The database view of an existing DDL source if it follows the numbering, else the next free number.
     METHODS view_name_for
       IMPORTING ddl_name      TYPE ddlname
@@ -459,18 +598,27 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD generate.
-    DATA(text) = description( characteristic ).
-    result = numbered_names( text ).
+    DATA(layout) = layout( characteristic = characteristic fixed = fixed ).
+    DATA(text) = description( characteristic = characteristic selection = layout-selection ).
+    result = numbered_names( kind        = c_kind-characteristic
+                             object_name = characteristic
+                             selection   = layout-selection
+                             description = text ).
     result-characteristic = characteristic.
-    save( ddl_name    = result-ddl_name
+    result-selection = layout-selection.
+    save( kind        = c_kind-characteristic
+          object_name = characteristic
+          view        = result
           description = text
-          source      = ddl_source( characteristic = characteristic
-                                    view_name      = result-view_name
-                                    layout         = layout( characteristic ) ) ).
+          source      = ddl_source( characteristic = characteristic view_name = result-view_name layout = layout ) ).
   ENDMETHOD.
 
   METHOD numbered_names.
-    DATA(existing) = existing_ddl_name( description ).
+    DATA(existing) = existing_ddl_name( kind        = kind
+                                        object_name = object_name
+                                        selection   = selection
+                                        description = description ).
+    result-kind = kind.
     result-view_name = view_name_for( existing ).
     result-ddl_name = ddl_name( result-view_name ).
     IF existing IS NOT INITIAL AND existing <> result-ddl_name.
@@ -479,82 +627,224 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD save.
-    ddl_handler( )->save( name         = ddl_name
+    ddl_handler( )->save( name         = view-ddl_name
                           put_state    = 'N'
-                          ddddlsrcv_wa = VALUE #( ddlname    = ddl_name
+                          ddddlsrcv_wa = VALUE #( ddlname    = view-ddl_name
                                                   ddlanguage = sy-langu
                                                   ddtext     = description
                                                   source     = source ) ).
-    cl_dd_ddl_handler=>if_dd_ddl_handler~write_tadir( objectname = ddl_name
+    cl_dd_ddl_handler=>if_dd_ddl_handler~write_tadir( objectname = view-ddl_name
                                                       devclass   = package
                                                       prid       = -1 ).
-    ddl_handler( )->activate( ddl_name ).
+    ddl_handler( )->activate( view-ddl_name ).
+    DATA(row) = VALUE zzxxmla1_view( kind        = kind
+                                     object_name = object_name
+                                     selection   = view-selection
+                                     view_name   = view-view_name
+                                     ddl_name    = view-ddl_name
+                                     changed_by  = sy-uname ).
+    GET TIME STAMP FIELD row-changed_at.
+    MODIFY zzxxmla1_view FROM @row.
   ENDMETHOD.
 
   METHOD delete.
-    DATA(ddl_name) = existing_ddl_name( description( characteristic ) ).
-    result = xsdbool( ddl_name IS NOT INITIAL ).
-    IF result = abap_true.
-      ddl_handler( )->delete( ddl_name ).
+    result = delete_all( kind        = c_kind-characteristic
+                         object_name = characteristic
+                         description = description( characteristic ) ).
+  ENDMETHOD.
+
+  METHOD delete_all.
+    DATA(object) = CONV zzxxmla1_view-object_name( object_name ).
+    SELECT ddl_name FROM zzxxmla1_view WHERE kind = @kind AND object_name = @object INTO TABLE @DATA(rows).
+    LOOP AT rows INTO DATA(row).
+      SELECT SINGLE ddlname FROM ddddlsrc WHERE ddlname = @row-ddl_name INTO @DATA(found).
+      IF sy-subrc = 0.
+        ddl_handler( )->delete( found ).
+        result = abap_true.
+      ENDIF.
+    ENDLOOP.
+    DELETE FROM zzxxmla1_view WHERE kind = @kind AND object_name = @object.
+    " a plain view of a run before the table
+    DATA(older) = ddl_of_description( description ).
+    IF older IS NOT INITIAL.
+      ddl_handler( )->delete( older ).
+      result = abap_true.
     ENDIF.
+  ENDMETHOD.
+
+  METHOD registered.
+    SELECT kind, object_name, selection, view_name, ddl_name FROM zzxxmla1_view
+      ORDER BY kind ASCENDING, object_name ASCENDING, selection ASCENDING
+      INTO TABLE @DATA(rows).
+    LOOP AT rows INTO DATA(row).
+      IF ( kind IS INITIAL OR row-kind = kind ) AND ( object_name IS INITIAL OR row-object_name = object_name ).
+        APPEND VALUE #( kind           = row-kind
+                        characteristic = row-object_name
+                        selection      = row-selection
+                        view_name      = row-view_name
+                        ddl_name       = row-ddl_name ) TO result.
+      ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD delete_unused.
+    LOOP AT registered( ) INTO DATA(view) WHERE selection IS NOT INITIAL.
+      IF line_exists( used[ table_line = CONV string( view-view_name ) ] ).
+        CONTINUE.
+      ENDIF.
+      SELECT SINGLE ddlname FROM ddddlsrc WHERE ddlname = @view-ddl_name INTO @DATA(found).
+      IF sy-subrc = 0.
+        ddl_handler( )->delete( found ).
+      ENDIF.
+      DATA(selection) = CONV zzxxmla1_view-selection( view-selection ).
+      DELETE FROM zzxxmla1_view
+        WHERE kind = @view-kind AND object_name = @view-characteristic AND selection = @selection.
+      APPEND view TO result.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD generate_fact_view.
-    DATA(layout) = fact_layout( adso ).
+    DATA(layout) = fact_layout( provider = provider fixed = fixed ).
     IF layout-columns IS INITIAL.
       RETURN.
     ENDIF.
-    DATA(text) = fact_description( adso ).
-    result = numbered_names( text ).
-    result-characteristic = adso.
-    save( ddl_name    = result-ddl_name
+    DATA(text) = fact_description( provider = provider selection = layout-selection ).
+    result = numbered_names( kind        = c_kind-fact
+                             object_name = provider
+                             selection   = layout-selection
+                             description = text ).
+    result-characteristic = provider.
+    result-selection = layout-selection.
+    save( kind        = c_kind-fact
+          object_name = provider
+          view        = result
           description = text
-          source      = fact_ddl_source( adso = adso view_name = result-view_name layout = layout ) ).
+          source      = fact_ddl_source( provider = provider view_name = result-view_name layout = layout ) ).
   ENDMETHOD.
 
   METHOD delete_fact_view.
-    DATA(ddl_name) = existing_ddl_name( fact_description( adso ) ).
-    result = xsdbool( ddl_name IS NOT INITIAL ).
-    IF result = abap_true.
-      ddl_handler( )->delete( ddl_name ).
-    ENDIF.
+    result = delete_all( kind = c_kind-fact object_name = provider description = fact_description( provider ) ).
   ENDMETHOD.
 
   METHOD existing_fact_view.
-    result = view_of_ddl( existing_ddl_name( fact_description( adso ) ) ).
+    DATA(selection) = selection_text( fixed ).
+    result = view_of_ddl( existing_ddl_name( kind        = c_kind-fact
+                                             object_name = provider
+                                             selection   = selection
+                                             description = fact_description( provider  = provider
+                                                                             selection = selection ) ) ).
   ENDMETHOD.
 
   METHOD fact_layout.
-    result = build_fact_layout( fact_metadata( adso ) ).
+    result = build_fact_layout( fact_metadata( provider = provider fixed = fixed ) ).
   ENDMETHOD.
 
   METHOD fact_metadata.
+    result-provider = provider.
+    SELECT SINGLE infocube FROM rsdcube WHERE infocube = @provider AND objvers = 'A' INTO @DATA(cube).
+    result-cube = xsdbool( sy-subrc = 0 ).
+    IF result-cube = abap_true.
+      result-fact_table = cube_fact_table( cube ).
+      LOOP AT table_columns( result-fact_table ) INTO DATA(column).
+        APPEND VALUE #( field = column-field datatype = column-datatype length = column-length ) TO result-fields.
+      ENDLOOP.
+      " the SID column of each characteristic, the field of each key figure
+      SELECT d~iobjnm FROM rsddimeiobj AS d
+        INNER JOIN rsdiobj AS o ON o~iobjnm = d~iobjnm AND o~objvers = 'A'
+        WHERE d~infocube = @cube AND d~objvers = 'A' AND ( o~iobjtp = 'CHA' OR o~iobjtp = 'TIM' )
+        INTO TABLE @DATA(characteristics).
+      LOOP AT characteristics INTO DATA(characteristic).
+        DATA sid_column TYPE rs_char30.
+        CALL FUNCTION 'RSD_SIDNM_GET_FROM_IOBJNM'
+          EXPORTING
+            i_iobjnm     = characteristic-iobjnm
+          IMPORTING
+            e_sidfieldnm = sid_column
+          EXCEPTIONS
+            name_error   = 1
+            OTHERS       = 2.
+        READ TABLE result-fields ASSIGNING FIELD-SYMBOL(<sid>) WITH KEY field = sid_column.
+        IF sy-subrc = 0 AND sid_column IS NOT INITIAL.
+          <sid>-iobjnm = characteristic-iobjnm.
+        ENDIF.
+      ENDLOOP.
+      SELECT c~iobjnm, o~fieldnm FROM rsdcubeiobj AS c
+        INNER JOIN rsdiobj AS o ON o~iobjnm = c~iobjnm AND o~objvers = 'A'
+        WHERE c~infocube = @cube AND c~objvers = 'A' AND o~iobjtp = 'KYF'
+        INTO TABLE @DATA(key_figures).
+      LOOP AT key_figures INTO DATA(key_figure).
+        READ TABLE result-fields ASSIGNING FIELD-SYMBOL(<key_figure>) WITH KEY field = key_figure-fieldnm.
+        IF sy-subrc = 0.
+          <key_figure>-iobjnm = key_figure-iobjnm.
+        ENDIF.
+      ENDLOOP.
+    ELSE.
+      adso_fact_metadata( CHANGING metadata = result ).
+    ENDIF.
+    IF result-fact_table IS INITIAL.
+      RETURN.
+    ENDIF.
+    " the fixed characteristics; on an InfoCube their SID table and the fixed values of its key fields
+    LOOP AT fixed INTO DATA(value).
+      DATA(entry) = VALUE ty_fixed_field( iobjnm = value-iobjnm value = value-value ).
+      IF result-cube = abap_true.
+        DATA(fixed_tables) = tables( value-iobjnm ).
+        entry-sids = fixed_tables-sids.
+        LOOP AT compounding( fixed_tables-basic ) INTO DATA(compounding).
+          READ TABLE fixed INTO DATA(compounding_value) WITH TABLE KEY iobjnm = compounding-iobjnm.
+          IF sy-subrc = 0.
+            APPEND VALUE #( field = compounding-field value = compounding_value-value ) TO entry-sid_keys.
+          ENDIF.
+        ENDLOOP.
+        APPEND VALUE #( field = fixed_tables-key_field value = value-value ) TO entry-sid_keys.
+      ENDIF.
+      APPEND entry TO result-fixed.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD cube_fact_table.
+    DATA fact_table TYPE rsd_s_cube-facttab.
+    CALL FUNCTION 'RSD_FACTTAB_GET_FOR_CUBE'
+      EXPORTING
+        i_infocube = cube
+      IMPORTING
+        e_facttab  = fact_table
+      EXCEPTIONS
+        name_error = 1
+        OTHERS     = 2.
+    IF sy-subrc = 0.
+      result = fact_table.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD adso_fact_metadata.
     DATA objects TYPE cl_rso_adso_api=>tn_t_object.
-    result-adso = adso.
+    DATA adso TYPE rsoadsonm.
+    adso = metadata-provider.
     TRY.
         cl_rso_adso_api=>read( EXPORTING i_adsonm               = adso
                                          i_with_enqueue         = rs_c_false
                                          i_with_authority_check = rs_c_false
                                IMPORTING e_t_object             = objects ).
         DATA(tables) = cl_rso_adso=>get_tablnm( adso ).
-        result-reporting_view = VALUE #( tables[ dsotabtype = cl_rsdso_constants=>n_c_viewtype_reporting ]-name
-                                         OPTIONAL ).
+        metadata-fact_table = VALUE #( tables[ dsotabtype = cl_rsdso_constants=>n_c_viewtype_reporting ]-name
+                                       OPTIONAL ).
       CATCH cx_rs_all_msg cx_rs_not_found.
-        CLEAR result-reporting_view.
+        CLEAR metadata-fact_table.
     ENDTRY.
-    IF result-reporting_view IS INITIAL.
+    IF metadata-fact_table IS INITIAL.
       RETURN.
     ENDIF.
-    LOOP AT table_columns( result-reporting_view ) INTO DATA(column).
-      APPEND VALUE #( field = column-field datatype = column-datatype length = column-length ) TO result-fields.
+    LOOP AT table_columns( metadata-fact_table ) INTO DATA(column).
+      APPEND VALUE #( field = column-field datatype = column-datatype length = column-length ) TO metadata-fields.
     ENDLOOP.
     " the field of each InfoObject: the one BW names after it, else the aDSO's own field name (as the provider reads it)
     LOOP AT objects INTO DATA(object) WHERE iobjnm IS NOT INITIAL.
       SELECT SINGLE iobjtp, fieldnm FROM rsdiobj WHERE iobjnm = @object-iobjnm AND objvers = 'A'
         INTO @DATA(infoobject).
-      READ TABLE result-fields ASSIGNING FIELD-SYMBOL(<field>) WITH KEY field = infoobject-fieldnm.
+      READ TABLE metadata-fields ASSIGNING FIELD-SYMBOL(<field>) WITH KEY field = infoobject-fieldnm.
       IF sy-subrc <> 0.
-        READ TABLE result-fields ASSIGNING <field> WITH KEY field = object-fieldname.
+        READ TABLE metadata-fields ASSIGNING <field> WITH KEY field = object-fieldname.
       ENDIF.
       IF sy-subrc <> 0.
         CONTINUE.
@@ -565,27 +855,45 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
       ENDIF.
       " compounded: the compounding of its basic characteristic, whose SID table it has
       DATA(char_tables) = tables( object-iobjnm ).
-      SELECT c~iobjcmp, o~fieldnm FROM rsdiobjcmp AS c
-        INNER JOIN rsdiobj AS o ON o~iobjnm = c~iobjcmp AND o~objvers = 'A'
-        WHERE c~iobjnm = @char_tables-basic AND c~objvers = 'A'
-        ORDER BY c~posit ASCENDING
-        INTO TABLE @DATA(compounding).
+      DATA(compounding) = compounding( char_tables-basic ).
       IF compounding IS NOT INITIAL AND char_tables-sids IS NOT INITIAL.
         APPEND VALUE #( iobjnm      = object-iobjnm
                         sids        = char_tables-sids
                         key_field   = char_tables-key_field
-                        compounding = VALUE #( FOR c IN compounding ( iobjnm = c-iobjcmp field = c-fieldnm ) ) )
-          TO result-compounded.
+                        compounding = compounding ) TO metadata-compounded.
       ENDIF.
     ENDLOOP.
   ENDMETHOD.
 
   METHOD build_fact_layout.
-    result-reporting_view = metadata-reporting_view.
-    IF metadata-compounded IS INITIAL.
+    result-fact_table = metadata-fact_table.
+    " each fixed characteristic: on an aDSO a condition on its field, on an InfoCube an inner join of its SID table on
+    " the SID and the fixed values
+    DATA selection TYPE ty_t_fixed.
+    LOOP AT metadata-fixed INTO DATA(fixed).
+      READ TABLE metadata-fields INTO DATA(fixed_field) WITH KEY iobjnm = fixed-iobjnm.
+      IF sy-subrc <> 0.
+        APPEND VALUE #( iobjnm = fixed-iobjnm reason = |fixed, but not a field of { metadata-provider }| )
+          TO result-notes.
+        CONTINUE.
+      ENDIF.
+      IF metadata-cube = abap_true.
+        DATA(fixed_join) = VALUE ty_join( table = fixed-sids alias = |f{ lines( selection ) + 1 }| inner = abap_true ).
+        APPEND |{ fixed_join-alias }.sid = a.{ to_lower( fixed_field-field ) }| TO fixed_join-conditions.
+        LOOP AT fixed-sid_keys INTO DATA(key).
+          APPEND |{ fixed_join-alias }.{ to_lower( key-field ) } = { literal( key-value ) }| TO fixed_join-conditions.
+        ENDLOOP.
+        APPEND fixed_join TO result-joins.
+      ELSE.
+        APPEND |a.{ to_lower( fixed_field-field ) } = { literal( fixed-value ) }| TO result-filters.
+      ENDIF.
+      INSERT VALUE #( iobjnm = fixed-iobjnm value = fixed-value ) INTO TABLE selection.
+    ENDLOOP.
+    result-selection = selection_text( selection ).
+    IF metadata-compounded IS INITIAL AND selection IS INITIAL.
       RETURN.
     ENDIF.
-    " every field of the reporting view, without namespace
+    " every field of the facts, without namespace
     LOOP AT metadata-fields INTO DATA(field).
       APPEND VALUE #( name       = view_column( field-field )
                       expression = |a.{ to_lower( field-field ) }|
@@ -593,12 +901,23 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
                       length     = field-length
                       iobjnm     = field-iobjnm ) TO result-columns.
     ENDLOOP.
-    " per compounded characteristic its SID: its SID table joined on all key fields
+    " per compounded characteristic its SID: its SID table joined on all key fields; none if all its compounding is
+    " fixed, as it is then unique by its value
+    DATA(sid_joins) = 0.
     LOOP AT metadata-compounded INTO DATA(compounded).
-      READ TABLE metadata-fields INTO DATA(own) WITH KEY iobjnm = compounded-iobjnm.
-      DATA(join) = VALUE ty_join( table = compounded-sids alias = |s{ lines( result-joins ) + 1 }| ).
-      DATA(reason) = ``.
+      DATA(all_fixed) = abap_true.
       LOOP AT compounded-compounding INTO DATA(compounding).
+        IF NOT line_exists( selection[ iobjnm = compounding-iobjnm ] ).
+          all_fixed = abap_false.
+        ENDIF.
+      ENDLOOP.
+      IF all_fixed = abap_true.
+        CONTINUE.
+      ENDIF.
+      READ TABLE metadata-fields INTO DATA(own) WITH KEY iobjnm = compounded-iobjnm.
+      DATA(join) = VALUE ty_join( table = compounded-sids alias = |s{ sid_joins + 1 }| ).
+      DATA(reason) = ``.
+      LOOP AT compounded-compounding INTO compounding.
         READ TABLE metadata-fields INTO DATA(value) WITH KEY iobjnm = compounding-iobjnm.
         IF sy-subrc <> 0.
           reason = |compounded with { compounding-iobjnm }, which is not a field of the aDSO|.
@@ -616,6 +935,7 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
       ENDIF.
       APPEND |{ join-alias }.{ to_lower( compounded-key_field ) } = a.{ to_lower( own-field ) }| TO join-conditions.
       APPEND join TO result-joins.
+      sid_joins = sid_joins + 1.
       APPEND VALUE #( name       = name
                       expression = |{ join-alias }.sid|
                       datatype   = `INT4`
@@ -623,8 +943,8 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
                       iobjnm     = compounded-iobjnm
                       sid        = abap_true ) TO result-columns.
     ENDLOOP.
-    " no SID column: no fact view needed
-    IF result-joins IS INITIAL.
+    " neither a SID column nor a fixed characteristic: no fact view needed
+    IF result-joins IS INITIAL AND result-filters IS INITIAL.
       CLEAR result-columns.
     ENDIF.
   ENDMETHOD.
@@ -634,24 +954,16 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
     result = |@AbapCatalog.sqlViewName: '{ view_name }'| && nl &&
              |@AbapCatalog.compiler.compareFilter: true| && nl &&
              |@AccessControl.authorizationCheck: #NOT_REQUIRED| && nl &&
-             |@EndUserText.label: '{ fact_description( adso ) }'| && nl &&
+             |@EndUserText.label: '{ fact_description( provider = provider selection = layout-selection ) }'| && nl &&
              |define view { ddl_name( view_name ) }| && nl &&
-             |  as select from { to_lower( layout-reporting_view ) } as a| && nl.
-    LOOP AT layout-joins INTO DATA(join).
-      LOOP AT join-conditions INTO DATA(condition).
-        IF sy-tabix = 1.
-          result = result && |    left outer join { to_lower( join-table ) } as { join-alias } on  { condition }| && nl.
-        ELSE.
-          result = result && |                                        and { condition }| && nl.
-        ENDIF.
-      ENDLOOP.
-    ENDLOOP.
-    result = result && |\{| && nl.
+             |  as select from { to_lower( layout-fact_table ) } as a| && nl &&
+             joins_source( layout-joins ) &&
+             |\{| && nl.
     LOOP AT layout-columns INTO DATA(column).
       result = result && COND string( WHEN sy-tabix = 1 THEN `  ` ELSE |,{ nl }  | ) &&
                |{ column-expression } as { column-name }|.
     ENDLOOP.
-    result = result && nl && |\}| && nl.
+    result = result && nl && |\}| && where_source( layout-filters ) && nl.
   ENDMETHOD.
 
   METHOD compound_key_expression.
@@ -723,7 +1035,7 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD layout.
-    result = build_layout( metadata( characteristic ) ).
+    result = build_layout( metadata = metadata( characteristic ) fixed = fixed ).
   ENDMETHOD.
 
   METHOD build_layout.
@@ -773,8 +1085,25 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
                             iobjnm = COND string( WHEN column-field = key_field THEN metadata-tables-basic )
                   CHANGING  layout = result ).
     ENDLOOP.
-    " compounded: the name of a value by all key fields
-    DATA(key_columns) = VALUE ty_t_column( FOR c IN metadata-sid_columns WHERE ( key = abap_true ) ( c ) ).
+    " the fixed compounding filters the view (docs/bw-schema-design-guide.md, section 3.8)
+    DATA fixed_fields TYPE STANDARD TABLE OF fieldname WITH EMPTY KEY.
+    DATA selection TYPE ty_t_fixed.
+    LOOP AT metadata-compounding INTO DATA(compounding).
+      READ TABLE fixed INTO DATA(value) WITH TABLE KEY iobjnm = compounding-iobjnm.
+      IF sy-subrc = 0.
+        INSERT value INTO TABLE selection.
+        APPEND compounding-field TO fixed_fields.
+        APPEND |s.{ to_lower( compounding-field ) } = { literal( value-value ) }| TO result-filters.
+      ENDIF.
+    ENDLOOP.
+    result-selection = selection_text( selection ).
+    " compounded: the name of a value by all key fields that are not fixed
+    DATA key_columns TYPE ty_t_column.
+    LOOP AT metadata-sid_columns INTO column WHERE key = abap_true.
+      IF NOT line_exists( fixed_fields[ table_line = column-field ] ).
+        APPEND column TO key_columns.
+      ENDIF.
+    ENDLOOP.
     IF lines( key_columns ) > 1.
       APPEND VALUE #( name       = c_compound_key
                       expression = compound_key_expression( key_columns )
@@ -908,24 +1237,42 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
     result = |@AbapCatalog.sqlViewName: '{ view_name }'| && nl &&
              |@AbapCatalog.compiler.compareFilter: true| && nl &&
              |@AccessControl.authorizationCheck: #NOT_REQUIRED| && nl &&
-             |@EndUserText.label: '{ description( characteristic ) }'| && nl &&
+             |@EndUserText.label: '{ description( characteristic = characteristic
+                                                  selection      = layout-selection ) }'| && nl &&
              |define view { ddl_name( view_name ) }| && nl &&
-             |  as select from { to_lower( layout-tables-sids ) } as s| && nl.
-    LOOP AT layout-joins INTO DATA(join).
+             |  as select from { to_lower( layout-tables-sids ) } as s| && nl &&
+             joins_source( layout-joins ) &&
+             |\{| && nl.
+    LOOP AT layout-columns INTO DATA(column).
+      result = result && COND string( WHEN sy-tabix = 1 THEN `  key ` ELSE |,{ nl }      | ) &&
+               |{ column-expression } as { column-name }|.
+    ENDLOOP.
+    result = result && nl && |\}| && where_source( layout-filters ) && nl.
+  ENDMETHOD.
+
+  METHOD joins_source.
+    DATA(nl) = cl_abap_char_utilities=>newline.
+    LOOP AT joins INTO DATA(join).
+      DATA(kind) = COND string( WHEN join-inner = abap_true THEN `inner join` ELSE `left outer join` ).
       LOOP AT join-conditions INTO DATA(condition).
         IF sy-tabix = 1.
-          result = result && |    left outer join { to_lower( join-table ) } as { join-alias } on  { condition }| && nl.
+          result = result && |    { kind } { to_lower( join-table ) } as { join-alias } on  { condition }| && nl.
         ELSE.
           result = result && |                                        and { condition }| && nl.
         ENDIF.
       ENDLOOP.
     ENDLOOP.
-    result = result && |\{| && nl.
-    LOOP AT layout-columns INTO DATA(column).
-      result = result && COND string( WHEN sy-tabix = 1 THEN `  key ` ELSE |,{ nl }      | ) &&
-               |{ column-expression } as { column-name }|.
+  ENDMETHOD.
+
+  METHOD where_source.
+    LOOP AT filters INTO DATA(filter).
+      result = result && cl_abap_char_utilities=>newline &&
+               COND string( WHEN sy-tabix = 1 THEN |where { filter }| ELSE |  and { filter }| ).
     ENDLOOP.
-    result = result && nl && |\}| && nl.
+  ENDMETHOD.
+
+  METHOD literal.
+    result = |'{ replace( val = value sub = `'` with = `''` occ = 0 ) }'|.
   ENDMETHOD.
 
   METHOD add_column.
@@ -989,18 +1336,37 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
 
   METHOD description.
     " at most 49 characters up to the colon, so the description of every characteristic is a different one
-    result = |BW characteristic { characteristic }: SID with active attributes|.
+    IF selection IS INITIAL.
+      result = |BW characteristic { characteristic }: SID with active attributes|.
+    ELSE.
+      result = |BW characteristic { characteristic }: { selection_label( selection ) }|.
+    ENDIF.
   ENDMETHOD.
 
   METHOD fact_description.
-    result = |BW aDSO { adso }: facts with SIDs of compounding|.
+    IF selection IS INITIAL.
+      result = |BW aDSO { provider }: facts with SIDs of compounding|.
+    ELSE.
+      result = |BW provider { provider }: facts of { selection_label( selection ) }|.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD selection_text.
+    LOOP AT fixed INTO DATA(value).
+      result = COND #( WHEN result IS INITIAL THEN |{ value-iobjnm }={ value-value }|
+                       ELSE |{ result };{ value-iobjnm }={ value-value }| ).
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD selection_label.
+    result = replace( val = replace( val = selection sub = `=` with = ` = ` occ = 0 ) sub = `;` with = `, ` occ = 0 ).
   ENDMETHOD.
 
   METHOD fact_placeholder.
-    result = |{ c_fact_placeholder_prefix }{ adso }|.
+    result = |{ c_fact_placeholder_prefix }{ provider }|.
   ENDMETHOD.
 
-  METHOD adso_of_fact_placeholder.
+  METHOD provider_of_fact_placeholder.
     DATA(length) = strlen( c_fact_placeholder_prefix ).
     IF strlen( table ) > length AND substring( val = table len = length ) = c_fact_placeholder_prefix.
       result = substring( val = table off = length ).
@@ -1008,6 +1374,24 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD existing_ddl_name.
+    DATA(object) = CONV zzxxmla1_view-object_name( object_name ).
+    DATA(key) = CONV zzxxmla1_view-selection( selection ).
+    SELECT SINGLE ddl_name FROM zzxxmla1_view
+      WHERE kind = @kind AND object_name = @object AND selection = @key
+      INTO @DATA(registered).
+    IF sy-subrc = 0.
+      SELECT SINGLE ddlname FROM ddddlsrc WHERE ddlname = @registered INTO @result.
+      IF sy-subrc = 0.
+        RETURN.
+      ENDIF.
+      CLEAR result.
+    ENDIF.
+    IF selection IS INITIAL.
+      result = ddl_of_description( description ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD ddl_of_description.
     " a numbered source sorts before one of the older name (ZZXXMLA1_C_<characteristic>)
     DATA(pattern) = |{ c_ddl_prefix }%|.
     SELECT t~ddlname FROM ddddlsrct AS t
@@ -1018,6 +1402,27 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
     IF names IS NOT INITIAL.
       result = names[ 1 ]-ddlname.
     ENDIF.
+  ENDMETHOD.
+
+  METHOD fixed_compounding.
+    IF fixed IS INITIAL.
+      RETURN.
+    ENDIF.
+    LOOP AT compounding( tables( characteristic )-basic ) INTO DATA(compounding).
+      READ TABLE fixed INTO DATA(value) WITH TABLE KEY iobjnm = compounding-iobjnm.
+      IF sy-subrc = 0.
+        INSERT value INTO TABLE result.
+      ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD compounding.
+    SELECT c~iobjcmp, o~fieldnm FROM rsdiobjcmp AS c
+      INNER JOIN rsdiobj AS o ON o~iobjnm = c~iobjcmp AND o~objvers = 'A'
+      WHERE c~iobjnm = @basic AND c~objvers = 'A'
+      ORDER BY c~posit ASCENDING
+      INTO TABLE @DATA(rows).
+    result = VALUE #( FOR row IN rows ( iobjnm = row-iobjcmp field = row-fieldnm ) ).
   ENDMETHOD.
 
   METHOD tables.
@@ -1075,6 +1480,7 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
     result-attribute_columns = table_columns( result-tables-attributes ).
     result-time_attribute_columns = table_columns( result-tables-time_attributes ).
     result-texts = text_table( result-tables ).
+    result-compounding = compounding( result-tables-basic ).
     " the attributes of the basic characteristic in BW's order; a characteristic among them has its own texts
     SELECT a~attrinm, a~attritp, o~fieldnm, o~iobjtp FROM rsdbchatr AS a
       INNER JOIN rsdiobj AS o ON o~iobjnm = a~attrinm AND o~objvers = 'A'
@@ -1098,7 +1504,12 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD existing_view.
-    result = view_of_ddl( existing_ddl_name( description( characteristic ) ) ).
+    DATA(selection) = selection_text( fixed_compounding( characteristic = characteristic fixed = fixed ) ).
+    result = view_of_ddl( existing_ddl_name( kind        = c_kind-characteristic
+                                             object_name = characteristic
+                                             selection   = selection
+                                             description = description( characteristic = characteristic
+                                                                        selection      = selection ) ) ).
   ENDMETHOD.
 
   METHOD view_of_ddl.

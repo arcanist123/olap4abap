@@ -29,6 +29,15 @@ on a test system: the visits are thinned evenly over the days, so every day keep
   (`docs/bw-schema-design-guide.md`, section 3.7). The south rooms are loaded first, so their SIDs come before the
   north ones and the members' order (by name, `OrderByColumn`) differs from the SIDs'. The aDSO is read through its
   fact view (the SID of the room, `ZZXXMLA1_CL_BW_VIEW_GEN=>generate_fact_view`), which a run deletes before the aDSO.
+- The fiscal time, in both providers (the InfoCube's dimension `ZCLVISIT7`, Fiscal Time): the fiscal year variant
+  `ZCLFISCVR` (K1, K2, K4), the fiscal year `ZCLFISCYR` and the fiscal period `ZCLFISCPR`, both **compounded** with
+  the variant. Each visit is booked under one variant, by its number (K1, K2, K4 in turn); all three follow the
+  calendar (the period is the month), so `2024001` exists under each, and without a fixed variant the periods are
+  members `K1/2024001` ... `K4/2025012`. A cube that fixes `ZCLFISCVR = K4` (`docs/bw-schema-design-guide.md`,
+  section 3.8) has a third of the visits (11,318), its periods named `2024001` ... `2025012`
+  (`scripts/fixed_selection_test.py`). They are the demo's own characteristics, not BW's `0FISC*`: BW checks those
+  against the fiscal year variants of the source system's customizing (T009), which a warehouse does not maintain.
+  Their SIDs come with the loads (no master data). The demo's own schemas do not use them.
 - The physician `ZCLDOC` is **authorization relevant** and has two hierarchies, `ZCLDOC_ORG` and `ZCLDOC_SITE`, and
   the diagnosis `ZCLDIAG` is authorization relevant too, with the hierarchy `ZCLDIAG_ICD` (see below), for working
   with BW's analysis authorizations, also in combination. BW's own queries on `ZCLVISIT`/`ZCLVISITA` (RSRT, BEx,

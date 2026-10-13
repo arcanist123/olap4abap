@@ -153,8 +153,11 @@ a refused request is `{"error": "..."}` with 400 (the request is wrong), 404 (no
 `Allow`) or 500.
 
 - `GET providers`: `{"providers": [{name, kind, text, infoarea}]}`.
-- `GET proposal?provider=X`: `{provider: {name, kind, text, infoarea, factTable}, xml, outline, notes: [{iobjnm,
-  reason}], suggestions: [{dimension, attribute, levelType}]}`. The outline is the schema as the UI lists it:
+- `GET proposal?provider=X&fixed.<characteristic>=<value>`: `{provider: {name, kind, text, infoarea, factTable, fixed:
+  [{characteristic, value}]}, xml, outline, notes: [{iobjnm, reason}], suggestions: [{dimension, attribute,
+  levelType}]}`. A `fixed.` parameter per characteristic the cube fixes (`bw-schema-design-guide.md`, section 3.8);
+  400 if one cannot be fixed (not a characteristic of the provider, compounded with one not fixed, no SID of the
+  value, a quote in it). The outline is the schema as the UI lists it:
   `{name, dimensions: [dimension], cubes: [{name, caption, factTable, defaultMeasure, dimensions: [{name, source,
   foreignKey} | {name, foreignKey, dimension}], measures: [{name, column, aggregator, formatString}]}]}`, a dimension
   being `{name, type, table, attributes: [{name, usage, keyColumn, nameColumn, levelType}], hierarchies: [{name,
@@ -169,10 +172,15 @@ a refused request is `{"error": "..."}` with 400 (the request is wrong), 404 (no
   adds the catalog, and the characteristics whose views it would generate. The UI calls it while the user edits, to
   show the reader's errors early.
 - `POST accept?catalog=X`: the body is the edited schema XML (no JSON to parse on the server); without `catalog` the
-  schema's name is the catalog. Answer `{catalog, file, views: [{characteristic, ddlName, viewName}], xml}`, the XML
-  as written.
-- `POST remove?catalog=X`: removes the catalog and its cubes (Removing). Answer `{catalog, removedFiles: [path]}`;
-  404 if no data source has the catalog.
+  schema's name is the catalog. Answer `{catalog, file, views: [{characteristic, ddlName, viewName, selection}],
+  deletedViews: [view], xml}`, the XML as written. A placeholder's view is generated for the fixed characteristics of
+  the cube that uses it (its annotations `olap4abap.fixed.<characteristic>`); check and accept refuse a table that
+  cubes with different fixed characteristics use, a view of table `ZZXXMLA1_VIEW` generated for another selection,
+  and a cube that fixes characteristics on facts that are not its fact view. Afterwards the views of a selection
+  that no catalog's schema names are deleted (`deletedViews`).
+- `POST remove?catalog=X`: removes the catalog and its cubes (Removing). Answer `{catalog, removedFiles: [path],
+  deletedViews: [view]}`, the views of a selection that no catalog's schema names any more; 404 if no data source
+  has the catalog.
 
 The schema file of an existing catalog is its `<Definition>`, so a schema reopened with `GET schema` goes back to its
 own file (`FoodmartBW.xml` for `ZFOODMART`); `accept` under an existing catalog therefore replaces its schema, and the

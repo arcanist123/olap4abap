@@ -161,7 +161,7 @@ CLASS ltc_api IMPLEMENTATION.
     cl_abap_unit_assert=>assert_initial( api->characteristic_of( names[ 2 ] ) ).
     cl_abap_unit_assert=>assert_initial( api->characteristic_of( names[ 3 ] ) ).
 
-    api->map_tables( EXPORTING views  = VALUE #( ( characteristic = 'ZFMSTORE' ddl_name = 'ZZXXMLA1_C_ZFMSTORE'
+    api->map_tables( EXPORTING views  = VALUE #( ( kind = 'C' characteristic = 'ZFMSTORE' ddl_name = 'ZZXXMLA1_C_ZFMSTORE'
                                                    view_name = 'ZZXXMLA1V0000003' ) )
                      CHANGING  schema = schema ).
     cl_abap_unit_assert=>assert_equals( act = schema-dimensions[ 1 ]-table exp = `ZZXXMLA1V0000003` ).
@@ -176,7 +176,7 @@ CLASS ltc_api IMPLEMENTATION.
     DATA(names) = api->map_tables( CHANGING schema = schema ).
     cl_abap_unit_assert=>assert_equals( act = names[ 2 ] exp = `ZZXXMLA1_F_ZFMSALESA` ).
     cl_abap_unit_assert=>assert_equals( act = api->characteristic_of( names[ 2 ] ) exp = `ZFMSALESA` ).
-    api->map_tables( EXPORTING views  = VALUE #( ( characteristic = 'ZFMSALESA' ddl_name = 'ZZXXMLA1_C0000099'
+    api->map_tables( EXPORTING views  = VALUE #( ( kind = 'F' characteristic = 'ZFMSALESA' ddl_name = 'ZZXXMLA1_C0000099'
                                                    view_name = 'ZZXXMLA1V0000099' ) )
                      CHANGING  schema = schema ).
     DATA(fact) = CAST zzxxmla1_cl_schema_def=>ty_table( schema-cubes[ 1 ]-fact-def ).

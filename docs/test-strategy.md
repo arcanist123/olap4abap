@@ -100,8 +100,12 @@ types and invalid XML get a SOAP fault with HTTP 500 (checked by hand).
 
 `python scripts/schema_api_test.py` calls `/zzxxmla1/schema/api` over HTTP as the UI will: providers, the proposals of
 `ZFMSALES` and `ZFMSALESA`, the errors (unknown provider or resource, wrong method, unreadable schema, bad catalog
-name, a catalog name another schema file has); the aDSO proposal has no time dimension, only dimensions on views.
-It changes nothing on the server. The unit tests of `ZZXXMLA1_CL_SCHEMA_API` cover the same plus adding a catalog to
+name, a catalog name another schema file has, fixed characteristics that cannot be fixed); the aDSO proposal has no
+time dimension, only dimensions on views. It changes nothing on the server.
+`python scripts/fixed_selection_test.py` does change it: for the clinic demo's `ZCLVISIT` and `ZCLVISITA` it proposes
+a schema with the fiscal year variant `ZCLFISCVR` fixed to K4 (`bw-schema-design-guide.md`, section 3.8), accepts it
+into a test catalog, checks the visits (those under K4, from the plain proposal accepted as oracle) and the periods
+(named by their own key), and removes both catalogs, checking that the filtered views are deleted. The unit tests of `ZZXXMLA1_CL_SCHEMA_API` cover the same plus adding a catalog to
 the data sources file and replacing DDL names by views; one checks that `accept` loads all catalogs together (the
 `ZFMSALES` proposal clashes with `ZFOODMART`'s cube). A successful `accept` changes the server's files, so it is
 checked by hand: accept a proposal with the cube renamed under a test catalog, query it through XMLA, then restore
