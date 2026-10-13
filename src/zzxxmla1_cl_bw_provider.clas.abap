@@ -134,8 +134,8 @@ CLASS zzxxmla1_cl_bw_provider DEFINITION
       RAISING   zzxxmla1_cx_bw_provider.
     "! Refuses the fixed characteristics of a provider read with them: each must be a characteristic of the provider,
     "! fixed together with its compounding, to a value that has a SID and no quote, and not referenced by another
-    "! characteristic of the provider (which shares its view); the selection fits table ZZXXMLA1_VIEW (255
-    "! characters).
+    "! characteristic of the provider (which shares its view); the selection fits table ZZXXMLA1_VIEW
+    "! (c_selection_length of the view generator).
     METHODS check_fixed
       IMPORTING provider TYPE ty_provider
       RAISING   zzxxmla1_cx_bw_provider.
@@ -283,8 +283,9 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD check_fixed.
-    IF strlen( zzxxmla1_cl_bw_view_gen=>selection_text( provider-fixed ) ) > 255.
-      fail( |The fixed characteristics are longer than 255 characters together| ).
+    IF strlen( zzxxmla1_cl_bw_view_gen=>selection_text( provider-fixed ) ) > zzxxmla1_cl_bw_view_gen=>c_selection_length.
+      fail( |The fixed characteristics are longer than { zzxxmla1_cl_bw_view_gen=>c_selection_length
+            } characters together| ).
     ENDIF.
     IF views IS NOT BOUND.
       views = NEW #( ).

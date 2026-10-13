@@ -44,9 +44,9 @@
 "! one's.
 "! The views are DDIC-based CDS views, the kind NetWeaver 7.50 has, named by a number: database view ZZXXMLA1V and DDL
 "! source ZZXXMLA1_C followed by the same 7 digits (a characteristic does not fit: 16 and 30 characters at most, and a
-"! namespace has slashes). The database view is what the schema names. Each view is a row of table ZZXXMLA1_VIEW, by
-"! kind (C a characteristic's, F a provider's fact view), characteristic or provider and selection (selection_text,
-"! initial for the plain view), and is found by it; a plain view of a run before the table is found by the DDL source's
+"! namespace has slashes). The database view is what the schema names. Each view is a row of table ZZXXMLA1_VIEW, keyed
+"! by its DDL source, with its kind (C a characteristic's, F a provider's fact view), characteristic or provider and
+"! selection (selection_text, initial for the plain view), and is found by these; a plain view of a run before the table is found by the DDL source's
 "! description ("BW characteristic ZFMSTORE: ...", "BW aDSO ZCLVISITA: ...") and registered when it is generated again.
 "! A view keeps its number when it is generated again, a new one gets the next free number. A source of an older name
 "! (ZZXXMLA1_C_ followed by the characteristic) gets its number's name when it is generated again.
@@ -63,6 +63,8 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
     CONSTANTS c_default_package TYPE devclass VALUE '$TMP'.
     "! The view column that names a compounded characteristic's values by all their key fields.
     CONSTANTS c_compound_key TYPE string VALUE `COMPOUND_KEY`.
+    "! The length of a selection in table ZZXXMLA1_VIEW (SSTRING).
+    CONSTANTS c_selection_length TYPE i VALUE 1333.
     CONSTANTS:
       "! The kinds of view in table ZZXXMLA1_VIEW: a characteristic's view, a provider's fact view.
       BEGIN OF c_kind,
@@ -649,6 +651,10 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
                                      ddl_name    = view-ddl_name
                                      changed_by  = sy-uname ).
     GET TIME STAMP FIELD row-changed_at.
+    " the table is keyed by the DDL source: a view of the same kind, object and selection under another name is gone
+    DELETE FROM zzxxmla1_view
+      WHERE kind = @row-kind AND object_name = @row-object_name AND selection = @row-selection
+        AND ddl_name <> @row-ddl_name.
     MODIFY zzxxmla1_view FROM @row.
   ENDMETHOD.
 
@@ -701,9 +707,7 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
       IF sy-subrc = 0.
         ddl_handler( )->delete( found ).
       ENDIF.
-      DATA(selection) = CONV zzxxmla1_view-selection( view-selection ).
-      DELETE FROM zzxxmla1_view
-        WHERE kind = @view-kind AND object_name = @view-characteristic AND selection = @selection.
+      DELETE FROM zzxxmla1_view WHERE ddl_name = @view-ddl_name.
       APPEND view TO result.
     ENDLOOP.
   ENDMETHOD.
@@ -1377,9 +1381,8 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
 
   METHOD existing_ddl_name.
     DATA(object) = CONV zzxxmla1_view-object_name( object_name ).
-    DATA(key) = CONV zzxxmla1_view-selection( selection ).
     SELECT SINGLE ddl_name FROM zzxxmla1_view
-      WHERE kind = @kind AND object_name = @object AND selection = @key
+      WHERE kind = @kind AND object_name = @object AND selection = @selection
       INTO @DATA(registered).
     IF sy-subrc = 0.
       SELECT SINGLE ddlname FROM ddddlsrc WHERE ddlname = @registered INTO @result.

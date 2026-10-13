@@ -343,7 +343,8 @@ a field the view lacks, is left out with a note. The hand-written demo views are
    fact view), object (the basic characteristic, the provider), selection (the selections it filters, section 3.8,
    written `0FISCVARNT=K4` for one `I EQ` value, else `0FISCPER=E CP '*013',E CP '*014'`, several sorted by
    characteristic and separated by `;`; empty for the plain view) and the
-   database view and DDL source. The generator finds a view by these three, no longer by the DDL source's description,
+   database view and DDL source, the key (the selection is an `SSTRING` of 1,333, too long for a key). The
+   generator finds a view by these three, no longer by the DDL source's description,
    which stays a label for ADT ("BW characteristic 0FISCPER: 0FISCVARNT = K4"); a plain view of an older run, found by
    its description, is registered when it is generated again. The views are local objects (`$TMP`) and so is the
    table's content: it is not transported. After every accept and remove of the schema API the views with a selection

@@ -142,7 +142,7 @@ Steps:
     annotation text, the canonical text for `ZZXXMLA1_VIEW`, the SQL condition (CDS and native; `CP`/`NP` to `LIKE`
     with `%`/`_` escaped, `NB`, `NE`), its negation for the probe, "one `I EQ` value" for the uncompounding rule, and
     the checks (`EQ` needs a SID, `BT`/`NB` a high value, no quote). Unit tests.
-14. Table `ZZXXMLA1_VIEW`: `SELECTION` is a CHAR 255 key field, too short for range tables. It becomes an `SSTRING`
+14. Done: table `ZZXXMLA1_VIEW`: `SELECTION` is a CHAR 255 key field, too short for range tables. It becomes an `SSTRING`
     of 1,333 (enough for now; the table is read with ABAP SQL only, not through ADBC), no longer key: 1,333
     characters do not fit the table's key length, so the key is `DDL_NAME` (one row per view anyway), and the
     generator finds a view by kind, object and selection in the `WHERE` as now. The existing rows keep their values.
