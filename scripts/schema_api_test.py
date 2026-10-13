@@ -142,15 +142,42 @@ def main():
           status == 400 and any(text in body.get("error", "") for text in
                                 ["by an unnamed Hierarchy and by the attribute", "is defined twice"]), body)
 
-    # fixed selections (docs/bw-schema-design-guide.md, section 3.8): what cannot be fixed is refused; accepted ones
-    # are tested by scripts/fixed_selection_test.py, which writes catalogs
+    # fixed selections (docs/bw-schema-design-guide.md, section 3.8), an edit of the schema (POST fix): the proposal
+    # lists the characteristics with their dimensions, what cannot be fixed is refused; fixing and accepting is tested
+    # by scripts/fixed_selection_test.py, which writes catalogs
+    proposals = {}
+    for provider in ("ZFMSALESA", "ZCLVISITA"):
+        status, body, _ = call(args.url, args.client, "GET", "proposal", {"provider": provider})
+        proposals[provider] = body.get("xml", "")
+        if provider == "ZCLVISITA":
+            listed = {c["name"]: c for c in body.get("characteristics", [])}
+            check("proposal lists the characteristics, the period compounded with the variant, none fixed",
+                  status == 200 and listed.get("ZCLFISCPR", {}).get("compounding") == ["ZCLFISCVR"]
+                  and listed.get("ZCLFISCPR", {}).get("dimension") == "ZCLFISCPR"
+                  and listed["ZCLFISCPR"].get("foreignKey") == "SID_ZCLFISCPR"
+                  and not any(c["fixed"] for c in listed.values()), body.get("characteristics"))
     for provider, fixed, text in (
             ("ZFMSALESA", {"fixed.0FISCVARNT": "K4"}, "is not a characteristic of"),
             ("ZCLVISITA", {"fixed.ZCLFISCPR": "2024001"}, "which must be fixed too"),
             ("ZCLVISITA", {"fixed.ZCLFISCVR": "ZZ"}, "has no value ZZ"),
             ("ZCLVISITA", {"fixed.ZCLFISCVR": "K'"}, "cannot contain a quote")):
-        status, body, _ = call(args.url, args.client, "GET", "proposal", {"provider": provider, **fixed})
-        check(f"proposal of {provider} refuses {fixed}", status == 400 and text in body.get("error", ""), body)
+        status, body, _ = call(args.url, args.client, "POST", "fix", fixed, proposals[provider])
+        check(f"fix of {provider} refuses {fixed}", status == 400 and text in body.get("error", ""), body)
+    status, body, _ = call(args.url, args.client, "POST", "fix", {"cube": "NO_SUCH_CUBE"}, proposals["ZCLVISITA"])
+    check("fix of an unknown cube", status == 400 and "no cube 'NO_SUCH_CUBE'" in body.get("error", ""), body)
+    status, body, headers = call(args.url, args.client, "GET", "fix")
+    check("fix needs POST", status == 405 and headers.get("allow", headers.get("Allow")) == "POST", body)
+    # the values the UI offers to fix: a compounded characteristic's only for its compounding fixed
+    status, body, _ = call(args.url, args.client, "GET", "values", {"characteristic": "ZCLFISCVR"})
+    check("values of the fiscal year variant", status == 200 and body.get("values") == ["K1", "K2", "K4"]
+          and body.get("more") is False, body)
+    status, body, _ = call(args.url, args.client, "GET", "values", {"characteristic": "ZCLFISCPR"})
+    check("values of the period refused without its variant",
+          status == 400 and "which must be fixed too" in body.get("error", ""), body)
+    status, body, _ = call(args.url, args.client, "GET", "values",
+                           {"characteristic": "ZCLFISCPR", "fixed.ZCLFISCVR": "K4"})
+    check("values of the period under K4", status == 200 and len(body.get("values", [])) == 24
+          and body["values"][0] == "2024001", body)
 
     # the time master data: only read; time/fill is called with what it refuses before writing
     status, body, _ = call(args.url, args.client, "GET", "time", {"from": "1997-01-01", "to": "1997-12-31"})

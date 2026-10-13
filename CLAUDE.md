@@ -102,11 +102,13 @@ Read before designing anything:
   attribute's `NameColumn` and `OrderByColumn`), and an aDSO with one is read from its fact view
   (`ZZXXMLA1_CL_BW_VIEW_GEN=>generate_fact_view`: the reporting view with `SID_<field>` per compounded characteristic,
   placeholder `ZZXXMLA1_F_<aDSO>` until accept), so it is keyed by the SID as on an InfoCube
-  (`docs/bw-schema-design-guide.md`, section 3.7). A cube can fix characteristics to one value each
-  (`GET proposal?fixed.0FISCVARNT=K4`, backend only, no UI yet; section 3.8): the cube is annotated
-  `olap4abap.fixed.<characteristic>`, the fixed characteristic has no dimension, the facts are a fact view filtered on
-  it (an InfoCube's too) and a characteristic compounded with it a view filtered on it, so `0FISCPER` is not
-  compounded there (`2024001`); the engine is not changed. Every generated view is a row of table `ZZXXMLA1_VIEW`
+  (`docs/bw-schema-design-guide.md`, section 3.7). A cube can fix characteristics to one value each (section 3.8), an
+  edit of the schema: "Fixed value" on a dimension's pane (values from `GET values`), `POST fix?fixed.0FISCVARNT=K4`
+  (`ZZXXMLA1_CL_SCHEMA_FIX`) rewrites the cube's tables and columns for the new selection and leaves the user's work;
+  the proposal fixes nothing. The cube is annotated `olap4abap.fixed.<characteristic>`, the fixed characteristic keeps
+  its dimension with one member (its view filtered on the value), the facts are a fact view filtered on it (an
+  InfoCube's too) and a characteristic compounded with it a view filtered on it, so `0FISCPER` is not compounded there
+  (`2024001`, still keyed by its SID); the engine is not changed. Every generated view is a row of table `ZZXXMLA1_VIEW`
   (kind, characteristic or provider, selection), by which the generator finds it; accept and remove delete the
   filtered views no catalog's schema names (`scripts/fixed_selection_test.py`). The UI (`web/schema/`, Preact with htm, no build step) is served from
   the code below `/schema/` by `ZZXXMLA1_CL_WEB_APP`: the generated class `ZZXXMLA1_CL_WEB_APP_FILES` has a method per
@@ -240,7 +242,9 @@ Read before designing anything:
   the schema builder's old copies below `/schema/` and, if there is none, writes a
   `/WEB-INF/datasources.xml` without catalogs; with its checkbox also the clinic demo (`docs/clinic-demo.md`): InfoCube
   `ZCLVISIT` and aDSO `ZCLVISITA` with made-up visits of patients to a clinic, their schemas and catalogs
-  (`ZZXXMLA1_CL_BW_CLINIC_GEN`); its room `ZCLROOM` is compounded with the site `ZCLSITE`. 300 of its patients are registered without a visit, and its schemas annotate every
+  (`ZZXXMLA1_CL_BW_CLINIC_GEN`), and per provider a catalog with the fiscal year variant fixed to K4 (`ZCLVISIT_K4`,
+  `ZCLVISITA_K4`, the variant a dimension with one member); its room `ZCLROOM` is compounded with the site `ZCLSITE`, its fiscal year and period with the
+  variant `ZCLFISCVR`. 300 of its patients are registered without a visit, and its schemas annotate every
   dimension but time `olap4abap.membersWithFacts`. The clinic demo is the
   project's own demo data; FoodMart stays the test source.
   For looking into BW's analysis authorizations its physician `ZCLDOC` is authorization relevant and has two

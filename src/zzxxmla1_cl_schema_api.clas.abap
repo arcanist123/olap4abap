@@ -15,12 +15,22 @@
 "! - GET providers: the InfoCubes and cube-type aDSOs (ZZXXMLA1_CL_BW_PROVIDER);
 "! - GET proposal?provider=X: the proposed schema (ZZXXMLA1_CL_SCHEMA_PROPOSAL) as XML and as an outline for the UI,
 "!   with the notes, the time suggestions and the NUMC columns of its views that have a number (COLUMN_INT), which the
-"!   UI names in their place when a dimension is switched to numbers. A parameter fixed.CHARACTERISTIC=value per
-"!   characteristic the cube fixes (docs/bw-schema-design-guide.md, section 3.8; refused with 400 if it cannot be);
+"!   UI names in their place when a dimension is switched to numbers, and the cube's characteristics (below). Nothing
+"!   is fixed: fixing is an edit (fix);
+"! - GET values?characteristic=C: the values C can be fixed to (its SID table, at most 500, more: true if there are
+"!   more), with a parameter fixed.CHARACTERISTIC=value for each characteristic C is compounded with;
+"! - POST fix?cube=X&fixed.CHARACTERISTIC=value...: the body is the edited schema XML; the cube (without cube the
+"!   first one) fixes the given characteristics, all it fixes (docs/bw-schema-design-guide.md, section 3.8), its
+"!   tables and columns following (ZZXXMLA1_CL_SCHEMA_FIX); answers the new XML and outline, the tables replaced, the
+"!   NUMC numbers of the characteristics' tables and the cube's characteristics; 400 if the selection or the schema is
+"!   refused. Nothing is changed on the server;
 "! - GET schemas: the catalogs of /WEB-INF/datasources.xml, each name once (its first definition, as the XMLA endpoint
 "!   reads them), with their schema files;
 "! - GET schema?catalog=X: the catalog's schema as XML and as an outline, to edit an accepted schema again, with the
-"!   columns of its tables that have a number (a column COLUMN_INT next to COLUMN, from the dictionary);
+"!   columns of its tables that have a number (a column COLUMN_INT next to COLUMN, from the dictionary) and the
+"!   cube's characteristics;
+"!   The cube's characteristics (of its first cube) are those of its provider that can be fixed, with the dimension of
+"!   the cube on each and its fixed value; none if the provider is not found (a schema not on BW's tables);
 "! - POST check?catalog=X: the body is the edited schema XML. The checks of accept, nothing is changed: the schema
 "!   parses, and the server's catalogs with this one load in ZZXXMLA1_CL_SCHEMA as the XMLA endpoint will load them.
 "!   The schema file of an existing catalog is its Definition (it is replaced), of a new one
@@ -123,6 +133,24 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
       IMPORTING request       TYPE ty_request
       RETURNING VALUE(result) TYPE string
       RAISING   zzxxmla1_cx_api_refused.
+    METHODS values
+      IMPORTING request       TYPE ty_request
+      RETURNING VALUE(result) TYPE string
+      RAISING   zzxxmla1_cx_api_refused.
+    METHODS fix
+      IMPORTING request       TYPE ty_request
+      RETURNING VALUE(result) TYPE string
+      RAISING   zzxxmla1_cx_api_refused.
+    "! The provider and the characteristics of the schema's first cube as JSON members (without braces): the
+    "! provider read for the cube's selection, or initial to read it (null and none if it is not found).
+    METHODS characteristics_json
+      IMPORTING !schema       TYPE zzxxmla1_cl_schema_def=>ty_schema
+                provider      TYPE zzxxmla1_cl_bw_provider=>ty_provider OPTIONAL
+      RETURNING VALUE(result) TYPE string.
+    "! The parameters fixed.CHARACTERISTIC=value of a request.
+    METHODS fixed_parameters
+      IMPORTING request       TYPE ty_request
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_view_gen=>ty_t_fixed.
     METHODS schemas
       RETURNING VALUE(result) TYPE string
       RAISING   zzxxmla1_cx_api_refused.
@@ -242,10 +270,6 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
     METHODS characteristic_of
       IMPORTING table         TYPE string
       RETURNING VALUE(result) TYPE string.
-    "! The characteristics a cube fixes: its annotations olap4abap.fixed.CHARACTERISTIC.
-    METHODS fixed_of
-      IMPORTING cube          TYPE zzxxmla1_cl_schema_def=>ty_cube
-      RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_view_gen=>ty_t_fixed.
     "! The tables of the schema whose views the API knows, with the selection each view needs for the cubes that use
     "! it: a cube's fact table that of its fixed characteristics, a dimension's table that of the fixed compounding of
     "! its characteristic (none for a dimension no cube uses). Refused if two cubes need two different ones of a table,
@@ -321,8 +345,9 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
   METHOD handle.
     DATA(resource) = COND string( WHEN is_api( request-path )
                                   THEN substring( val = request-path off = strlen( c_path ) ) ).
-    DATA(allow) = SWITCH string( resource WHEN `providers` OR `proposal` OR `schemas` OR `schema` OR `time` THEN `GET`
-                                          WHEN `check` OR `accept` OR `remove` OR `time/fill` THEN `POST` ).
+    DATA(allow) = SWITCH string( resource WHEN `providers` OR `proposal` OR `values` OR `schemas` OR `schema` OR `time`
+                                          THEN `GET`
+                                          WHEN `check` OR `accept` OR `remove` OR `fix` OR `time/fill` THEN `POST` ).
     IF allow IS INITIAL.
       result = error_result( status = 404 message = |No resource { request-path }| ).
       RETURN.
@@ -335,10 +360,12 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     TRY.
         result-body = SWITCH #( resource WHEN `providers` THEN providers( )
                                          WHEN `proposal`  THEN proposal( request )
+                                         WHEN `values`    THEN values( request )
                                          WHEN `schemas`   THEN schemas( )
                                          WHEN `schema`    THEN schema( request )
                                          WHEN `check`     THEN check( request )
                                          WHEN `accept`    THEN accept( request )
+                                         WHEN `fix`       THEN fix( request )
                                          WHEN `time`      THEN time_status( request )
                                          WHEN `time/fill` THEN fill_time( request )
                                          ELSE                  remove( request ) ).
@@ -366,23 +393,11 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     IF name IS INITIAL.
       RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400 message = `Parameter provider is missing`.
     ENDIF.
-    " the fixed characteristics: fixed.<characteristic>=<value>
-    DATA fixed TYPE zzxxmla1_cl_bw_view_gen=>ty_t_fixed.
-    LOOP AT request-parameters INTO DATA(fixed_parameter) WHERE name CP 'fixed.*'.
-      INSERT VALUE #( iobjnm = to_upper( substring( val = fixed_parameter-name off = 6 ) )
-                      value  = fixed_parameter-value ) INTO TABLE fixed.
-    ENDLOOP.
     DATA provider TYPE zzxxmla1_cl_bw_provider=>ty_provider.
-    DATA(reader) = NEW zzxxmla1_cl_bw_provider( ).
     TRY.
-        provider = reader->read( name = name fixed = fixed ).
+        provider = NEW zzxxmla1_cl_bw_provider( )->read( name ).
       CATCH zzxxmla1_cx_bw_provider INTO DATA(error).
         RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 404 message = error->get_text( ).
-    ENDTRY.
-    TRY.
-        reader->check_fixed( provider ).
-      CATCH zzxxmla1_cx_bw_provider INTO DATA(fixed_error).
-        RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400 message = fixed_error->get_text( ).
     ENDTRY.
     DATA proposal TYPE zzxxmla1_cl_schema_proposal=>ty_proposal.
     TRY.
@@ -402,12 +417,93 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     ENDLOOP.
     result = |\{"provider":\{"name":{ json( provider-name ) },"kind":{ json( provider-kind ) },| &&
              |"text":{ json( provider-text ) },"infoarea":{ json( provider-infoarea ) },| &&
-             |"factTable":{ json( provider-fact_table ) },| &&
-             |"fixed":{ json_array( VALUE #( FOR f IN provider-fixed
-                                             ( |\{"characteristic":{ json( f-iobjnm ) },"value":{ json( f-value ) }\}| ) ) ) }\},| &&
+             |"factTable":{ json( provider-fact_table ) }\},| &&
              |"xml":{ json( proposal-xml ) },"outline":{ outline( proposal-schema ) },| &&
              |"notes":{ json_array( notes ) },"suggestions":{ json_array( suggestions ) },| &&
-             |"intColumns":{ int_columns_json( proposal-int_columns ) }\}|.
+             |"intColumns":{ int_columns_json( proposal-int_columns ) },| &&
+             |{ characteristics_json( schema = proposal-schema provider = provider ) }\}|.
+  ENDMETHOD.
+
+  METHOD fix.
+    DATA parsed TYPE zzxxmla1_cl_schema_def=>ty_schema.
+    TRY.
+        parsed = zzxxmla1_cl_schema_def=>parse( request-body ).
+      CATCH zzxxmla1_cx_xom INTO DATA(xom_error).
+        RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400 message = |Schema not readable: { xom_error->error_message }|.
+    ENDTRY.
+    DATA(cube) = parameter( request = request name = `cube` ).
+    IF cube IS INITIAL.
+      cube = VALUE #( parsed-cubes[ 1 ]-name OPTIONAL ).
+    ENDIF.
+    DATA changes TYPE zzxxmla1_cl_schema_fix=>ty_result.
+    TRY.
+        changes = NEW zzxxmla1_cl_schema_fix( )->fix( EXPORTING cube   = cube
+                                                                fixed  = fixed_parameters( request )
+                                                      CHANGING  schema = parsed ).
+      CATCH zzxxmla1_cx_bw_provider INTO DATA(error).
+        RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400 message = error->get_text( ).
+    ENDTRY.
+    DATA tables TYPE string_table.
+    LOOP AT changes-tables INTO DATA(replaced).
+      APPEND |\{"from":{ json( replaced-from ) },"to":{ json( replaced-to ) }\}| TO tables.
+    ENDLOOP.
+    result = |\{"xml":{ json( zzxxmla1_cl_schema_def=>to_xml( parsed ) ) },| &&
+             |"outline":{ outline( parsed ) },"tables":{ json_array( tables ) },| &&
+             |"intColumns":{ int_columns_json( changes-int_columns ) },| &&
+             |{ characteristics_json( schema = parsed provider = changes-provider ) }\}|.
+  ENDMETHOD.
+
+  METHOD characteristics_json.
+    READ TABLE schema-cubes INTO DATA(cube) INDEX 1.
+    DATA(read) = provider.
+    IF read IS INITIAL AND sy-subrc = 0.
+      TRY.
+          read = NEW zzxxmla1_cl_schema_fix( )->read_provider( cube ).
+        CATCH zzxxmla1_cx_bw_provider.
+          CLEAR read.
+      ENDTRY.
+    ENDIF.
+    DATA entries TYPE string_table.
+    IF read IS NOT INITIAL.
+      LOOP AT zzxxmla1_cl_schema_fix=>characteristics( cube = cube provider = read ) INTO DATA(characteristic).
+        APPEND |\{"name":{ json( characteristic-name ) },"text":{ json( characteristic-text ) },| &&
+               |"compounding":{ json_array( VALUE #( FOR c IN characteristic-compounding ( json( c ) ) ) ) },| &&
+               |"foreignKey":{ json( characteristic-foreign_key ) },| &&
+               |"dimension":{ json( characteristic-dimension ) },"shared":{ json_bool( characteristic-shared ) },| &&
+               |"fixed":{ json_bool( characteristic-fixed ) },"value":{ json( characteristic-value ) }\}| TO entries.
+      ENDLOOP.
+    ENDIF.
+    result = |"providerName":{ COND #( WHEN read IS INITIAL THEN `null` ELSE json( read-name ) ) },| &&
+             |"cube":{ json( cube-name ) },"characteristics":{ json_array( entries ) }|.
+  ENDMETHOD.
+
+  METHOD fixed_parameters.
+    LOOP AT request-parameters INTO DATA(fixed_parameter) WHERE name CP 'fixed.*'.
+      INSERT VALUE #( iobjnm = to_upper( substring( val = fixed_parameter-name off = 6 ) )
+                      value  = fixed_parameter-value ) INTO TABLE result.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD values.
+    CONSTANTS c_max_values TYPE i VALUE 500.
+    DATA(characteristic) = to_upper( parameter( request = request name = `characteristic` ) ).
+    IF characteristic IS INITIAL.
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400 message = `Parameter characteristic is missing`.
+    ENDIF.
+    DATA found TYPE string_table.
+    TRY.
+        found = NEW zzxxmla1_cl_bw_provider( )->values( characteristic = characteristic
+                                                         fixed          = fixed_parameters( request )
+                                                         max_values     = c_max_values ).
+      CATCH zzxxmla1_cx_bw_provider INTO DATA(error).
+        RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400 message = error->get_text( ).
+    ENDTRY.
+    DATA(more) = xsdbool( lines( found ) > c_max_values ).
+    IF more = abap_true.
+      DELETE found FROM lines( found ).
+    ENDIF.
+    result = |\{"characteristic":{ json( characteristic ) },| &&
+             |"values":{ json_array( VALUE #( FOR v IN found ( json( v ) ) ) ) },"more":{ json_bool( more ) }\}|.
   ENDMETHOD.
 
   METHOD schemas.
@@ -449,7 +545,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     result = |\{"catalog":{ json( entry-name ) },"dataSource":{ json( entry-data_source ) },| &&
              |"file":{ json( entry-definition ) },"changedAt":{ json_timestamp( file-changed_at ) },| &&
              |"changedBy":{ json( file-changed_by ) },"xml":{ json( file-content ) },"outline":{ outline },| &&
-             |"intColumns":{ int_columns_json( numbers ) }\}|.
+             |"intColumns":{ int_columns_json( numbers ) },{ characteristics_json( parsed ) }\}|.
   ENDMETHOD.
 
   METHOD check.
@@ -515,7 +611,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
               IF fact_view IS INITIAL.
                 RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400
                   message = |{ characteristic } needs no fact view (no compounded characteristic of an aDSO, | &&
-                            |nothing fixed): propose its schema again|.
+                            |nothing fixed): name its fact table, or fix a characteristic|.
               ENDIF.
               APPEND fact_view TO views.
             ELSE.
@@ -892,25 +988,11 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
-  METHOD fixed_of.
-    IF cube-annotations IS NOT BOUND.
-      RETURN.
-    ENDIF.
-    DATA(prefix) = zzxxmla1_cl_schema_proposal=>c_fixed_annotation.
-    LOOP AT cube-annotations->array INTO DATA(annotation).
-      IF strlen( annotation-name ) > strlen( prefix )
-          AND substring( val = annotation-name len = strlen( prefix ) ) = prefix.
-        INSERT VALUE #( iobjnm = to_upper( substring( val = annotation-name off = strlen( prefix ) ) )
-                        value  = annotation-cdata ) INTO TABLE result.
-      ENDIF.
-    ENDLOOP.
-  ENDMETHOD.
-
   METHOD table_selections.
     DATA(registered) = NEW zzxxmla1_cl_bw_view_gen( )->registered( ).
     DATA used TYPE string_table.
     LOOP AT schema-cubes INTO DATA(cube).
-      DATA(fixed) = fixed_of( cube ).
+      DATA(fixed) = zzxxmla1_cl_schema_fix=>fixed_of( cube ).
       IF cube-fact-name = `Table`.
         DATA(fact) = CAST zzxxmla1_cl_schema_def=>ty_table( cube-fact-def ).
         " the facts of a cube that fixes characteristics are filtered by its fact view only
@@ -919,7 +1001,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
                                              view_name = CONV viewname( fact->name ) ] ).
           RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400
             message = |Cube '{ cube-name }' fixes characteristics, so its facts must be its fact view, not { fact->name }: | &&
-                      |propose its schema again|.
+                      |fix them on a dimension's pane (the annotations alone do not filter)|.
         ENDIF.
         add_table_selection( EXPORTING table = fact->name fixed = fixed registered = registered
                              CHANGING  selections = result ).
@@ -985,7 +1067,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
       entry-selection = zzxxmla1_cl_bw_view_gen=>selection_text( fixed ).
     ELSE.
       entry-selection = zzxxmla1_cl_bw_view_gen=>selection_text(
-        NEW zzxxmla1_cl_bw_view_gen( )->fixed_compounding( characteristic = CONV #( entry-object ) fixed = fixed ) ).
+        NEW zzxxmla1_cl_bw_view_gen( )->view_selection( characteristic = CONV #( entry-object ) fixed = fixed ) ).
     ENDIF.
     READ TABLE selections INTO DATA(other) WITH KEY table = table.
     IF sy-subrc <> 0.
@@ -1008,7 +1090,8 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
           message = |{ entry-table } is the view of { view-characteristic } for | &&
                     |{ COND #( WHEN view-selection IS INITIAL THEN `nothing fixed` ELSE view-selection ) }, | &&
                     |but its cube fixes { COND #( WHEN entry-selection IS INITIAL THEN `nothing of it`
-                                                  ELSE entry-selection ) }: propose the schema again|.
+                                                  ELSE entry-selection ) }: fix the characteristics on a | &&
+                    |dimension's pane (the annotations alone do not change the tables)|.
       ENDIF.
     ENDLOOP.
   ENDMETHOD.

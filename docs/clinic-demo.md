@@ -34,10 +34,10 @@ on a test system: the visits are thinned evenly over the days, so every day keep
   the variant. Each visit is booked under one variant, by its number (K1, K2, K4 in turn); all three follow the
   calendar (the period is the month), so `2024001` exists under each, and without a fixed variant the periods are
   members `K1/2024001` ... `K4/2025012`. A cube that fixes `ZCLFISCVR = K4` (`docs/bw-schema-design-guide.md`,
-  section 3.8) has a third of the visits (11,318), its periods named `2024001` ... `2025012`
-  (`scripts/fixed_selection_test.py`). They are the demo's own characteristics, not BW's `0FISC*`: BW checks those
-  against the fiscal year variants of the source system's customizing (T009), which a warehouse does not maintain.
-  Their SIDs come with the loads (no master data). The demo's own schemas do not use them.
+  section 3.8) has a third of the visits (11,318), its periods named `2024001` ... `2025012`: the catalogs
+  `ZCLVISIT_K4` and `ZCLVISITA_K4` (below, `scripts/fixed_selection_test.py`). They are the demo's own
+  characteristics, not BW's `0FISC*`: BW checks those against the fiscal year variants of the source system's
+  customizing (T009), which a warehouse does not maintain. Their SIDs come with the loads (no master data).
 - The physician `ZCLDOC` is **authorization relevant** and has two hierarchies, `ZCLDOC_ORG` and `ZCLDOC_SITE`, and
   the diagnosis `ZCLDIAG` is authorization relevant too, with the hierarchy `ZCLDIAG_ICD` (see below), for working
   with BW's analysis authorizations, also in combination. BW's own queries on `ZCLVISIT`/`ZCLVISITA` (RSRT, BEx,
@@ -48,6 +48,11 @@ on a test system: the visits are thinned evenly over the days, so every day keep
 - The views of the characteristics (`ZZXXMLA1_CL_BW_VIEW_GEN`), the schema files `/WEB-INF/schema/ZCLVISIT.xml` and
   `/WEB-INF/schema/ZCLVISITA.xml` and a catalog for each in `/WEB-INF/datasources.xml` (added once; the setup writes the
   data sources file if there is none).
+- The same with the fiscal year variant fixed to K4 (`docs/bw-schema-design-guide.md`, section 3.8): the catalogs
+  `ZCLVISIT_K4` and `ZCLVISITA_K4` (cubes named as the catalogs, `/WEB-INF/schema/ZCLVISIT_K4.xml`, ...), on the views
+  filtered on K4 that the run generates with the others: a fact view per provider (on the InfoCube too, its fact table
+  joined to the variant's SID table) and the views of the variant (one row, K4), the fiscal year and period. A run deletes all of them with the
+  views of the characteristics and the providers' fact views.
 
 ## The hierarchies of the physicians
 
@@ -149,6 +154,8 @@ dimension is keyed by the SID of its view and named by the value, on the aDSO ke
 | Room | none (properties Room Key, Room Type) | keyed by the SID on both providers (the aDSO's fact view), named and ordered by `COMPOUND_KEY` (`NORTH/R01`) |
 | Time (cube) | Year > Quarter > Month (named by the month) > Day, without All member, default `[Time].[2025]`; `Weekly`: Year > Week > Day | `TimeDimension` |
 | Year, Quarter, Month, Week (aDSO) | none | one dimension per time characteristic, which have no attributes |
+| Fiscal Year Variant | none | `K1`, `K2`, `K4`; in the K4 catalogs the one member `K4` |
+| Fiscal Year, Fiscal Period | none | compounded with the variant: keyed by the SID, named and ordered by `COMPOUND_KEY` (`K4/2024`, `K4/2024001`); in the K4 catalogs not compounded, still keyed by the SID (on the aDSO too) and named by their own key (`2024`, `2024001`) |
 
 Every dimension but time is annotated `olap4abap.membersWithFacts` on the cube's `DimensionUsage`
 (`mvp-scope.md`, Members with facts decision): its members are only those with visits, so the registered patients,
@@ -171,3 +178,6 @@ Examples:
 
     SELECT [Patient.Demographics].[Age Group].Members ON 0, [Physician].[Department].Members ON 1
     FROM ZCLVISIT WHERE [Measures].[Visits]
+
+    SELECT [Measures].[Visits] ON 0, NON EMPTY [Fiscal Period].[Fiscal Period].Members ON 1
+    FROM ZCLVISITA_K4

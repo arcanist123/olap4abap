@@ -24,8 +24,9 @@
 "! section 3.7). An aDSO with one is read from its fact view (ZZXXMLA1_CL_BW_VIEW_GEN, a placeholder if it is not
 "! generated yet): its fields without namespace, and the compounded characteristic's SID as its fact column.
 "! Read for a cube that fixes characteristics (section 3.8, 0FISCVARNT = K4), the provider is read from its fact view
-"! for them, an InfoCube too, and a characteristic compounded with fixed ones from its view for them: one whose
-"! compounding is all fixed has no name column and, on an aDSO, its value as fact column.
+"! for them, an InfoCube too, a fixed characteristic from its view filtered on its value and a characteristic
+"! compounded with fixed ones from its view for them: one whose compounding is all fixed has no name column (on an
+"! aDSO it keeps its SID as fact column).
 CLASS zzxxmla1_cl_bw_provider DEFINITION
   PUBLIC
   FINAL
@@ -94,6 +95,8 @@ CLASS zzxxmla1_cl_bw_provider DEFINITION
         fact_sid    TYPE abap_bool,
         text_column TYPE string,     " the column of its text, initial if it has none
         attributes  TYPE ty_t_attribute,
+        "! the characteristics its basic one is compounded with, in BW's order (a cube fixes them with it)
+        compounding TYPE string_table,
       END OF ty_characteristic,
       ty_t_characteristic TYPE STANDARD TABLE OF ty_characteristic WITH EMPTY KEY.
     TYPES:
@@ -130,10 +133,25 @@ CLASS zzxxmla1_cl_bw_provider DEFINITION
       RETURNING VALUE(result) TYPE ty_provider
       RAISING   zzxxmla1_cx_bw_provider.
     "! Refuses the fixed characteristics of a provider read with them: each must be a characteristic of the provider,
-    "! fixed together with its compounding, to a value that has a SID and no quote; the selection fits table
-    "! ZZXXMLA1_VIEW (255 characters).
+    "! fixed together with its compounding, to a value that has a SID and no quote, and not referenced by another
+    "! characteristic of the provider (which shares its view); the selection fits table ZZXXMLA1_VIEW (255
+    "! characters).
     METHODS check_fixed
       IMPORTING provider TYPE ty_provider
+      RAISING   zzxxmla1_cx_bw_provider.
+    "! The InfoCube or aDSO whose fact table or reporting view the table is, initial if there is none. BW names them
+    "! after the provider (/BIC/FZCLVISIT, /BIC/AZCLVISITA7), so only the providers whose name is in the table's are
+    "! asked.
+    METHODS provider_of_fact_table
+      IMPORTING table         TYPE csequence
+      RETURNING VALUE(result) TYPE string.
+    "! The values a characteristic can be fixed to (its SID table without the initial value), sorted, at most
+    "! max_values + 1 (more than max_values: there are more); its compounding must be fixed.
+    METHODS values
+      IMPORTING characteristic TYPE csequence
+                fixed          TYPE zzxxmla1_cl_bw_view_gen=>ty_t_fixed OPTIONAL
+                max_values     TYPE i DEFAULT 500
+      RETURNING VALUE(result)  TYPE string_table
       RAISING   zzxxmla1_cx_bw_provider.
 
   PROTECTED SECTION.
@@ -148,6 +166,14 @@ CLASS zzxxmla1_cl_bw_provider DEFINITION
     "! an InfoCube's navigation attributes, CHARACTERISTIC__ATTRIBUTE
     DATA cube_navigation TYPE STANDARD TABLE OF rsiobjnm WITH EMPTY KEY.
 
+    "! An InfoCube's fact table, initial if BW gives none.
+    METHODS cube_fact_table
+      IMPORTING cube          TYPE rsinfocube
+      RETURNING VALUE(result) TYPE string.
+    "! An aDSO's reporting view, initial if BW gives none.
+    METHODS adso_reporting_view
+      IMPORTING adso          TYPE rsoadsonm
+      RETURNING VALUE(result) TYPE string.
     METHODS read_cube
       IMPORTING cube     TYPE rsinfocube
       CHANGING  provider TYPE ty_provider
@@ -188,6 +214,14 @@ CLASS zzxxmla1_cl_bw_provider DEFINITION
     METHODS text_of
       IMPORTING iobjnm        TYPE rsiobjnm
       RETURNING VALUE(result) TYPE string.
+    "! The condition on a characteristic's SID table for its compounding fixed to the given values (initial: none),
+    "! refused if one of its compounding is not fixed or a value has a quote.
+    METHODS compounding_condition
+      IMPORTING tables         TYPE zzxxmla1_cl_bw_view_gen=>ty_tables
+                characteristic TYPE csequence
+                fixed          TYPE zzxxmla1_cl_bw_view_gen=>ty_t_fixed
+      RETURNING VALUE(result)  TYPE string
+      RAISING   zzxxmla1_cx_bw_provider.
     METHODS fail
       IMPORTING text TYPE string
       RAISING   zzxxmla1_cx_bw_provider.
@@ -262,23 +296,21 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
       IF value-value CA `'`.
         fail( |{ value-iobjnm }: a fixed value cannot contain a quote| ).
       ENDIF.
+      " its view is filtered on its value, so no other characteristic may share it
+      LOOP AT provider-characteristics INTO DATA(referencing) WHERE basic = value-iobjnm AND iobjnm <> value-iobjnm.
+        fail( |{ value-iobjnm } cannot be fixed: { referencing-iobjnm } references it and shares its view| ).
+      ENDLOOP.
       " its compounding fixed too, and a SID for all its key fields
       DATA(tables) = views->tables( value-iobjnm ).
       IF tables-sids IS INITIAL.
         fail( |{ value-iobjnm } has no SID table| ).
       ENDIF.
       DATA(conditions) = |{ tables-key_field } = '{ value-value }'|.
-      SELECT c~iobjcmp, o~fieldnm FROM rsdiobjcmp AS c
-        INNER JOIN rsdiobj AS o ON o~iobjnm = c~iobjcmp AND o~objvers = 'A'
-        WHERE c~iobjnm = @tables-basic AND c~objvers = 'A'
-        INTO TABLE @DATA(compounding).
-      LOOP AT compounding INTO DATA(compounded_with).
-        READ TABLE provider-fixed INTO DATA(compounding_value) WITH TABLE KEY iobjnm = compounded_with-iobjcmp.
-        IF sy-subrc <> 0.
-          fail( |{ value-iobjnm } is compounded with { compounded_with-iobjcmp }, which must be fixed too| ).
-        ENDIF.
-        conditions = |{ conditions } AND { compounded_with-fieldnm } = '{ compounding_value-value }'|.
-      ENDLOOP.
+      DATA(compounding) = compounding_condition( tables = tables characteristic = value-iobjnm
+                                                 fixed = provider-fixed ).
+      IF compounding IS NOT INITIAL.
+        conditions = |{ conditions } AND { compounding }|.
+      ENDIF.
       SELECT COUNT(*) FROM (tables-sids) WHERE (conditions).
       IF sy-dbcnt = 0.
         fail( |{ value-iobjnm } has no value { value-value }| ).
@@ -286,7 +318,66 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
-  METHOD read_cube.
+  METHOD values.
+    IF views IS NOT BOUND.
+      views = NEW #( ).
+    ENDIF.
+    DATA(tables) = views->tables( CONV #( to_upper( characteristic ) ) ).
+    IF tables-sids IS INITIAL.
+      fail( |{ to_upper( characteristic ) } is no characteristic with a SID table| ).
+    ENDIF.
+    " BW's initial value has SID 0
+    DATA(conditions) = |SID > 0|.
+    DATA(compounding) = compounding_condition( tables = tables characteristic = to_upper( characteristic )
+                                               fixed = fixed ).
+    IF compounding IS NOT INITIAL.
+      conditions = |{ conditions } AND { compounding }|.
+    ENDIF.
+    DATA rows TYPE STANDARD TABLE OF rsd_chavl WITH EMPTY KEY.
+    DATA(order_by) = |{ tables-key_field } ASCENDING|.
+    DATA(limit) = max_values + 1.
+    SELECT DISTINCT (tables-key_field) FROM (tables-sids)
+      WHERE (conditions)
+      ORDER BY (order_by)
+      INTO TABLE @rows
+      UP TO @limit ROWS.
+    result = VALUE #( FOR row IN rows ( CONV string( row ) ) ).
+  ENDMETHOD.
+
+  METHOD compounding_condition.
+    SELECT c~iobjcmp, o~fieldnm FROM rsdiobjcmp AS c
+      INNER JOIN rsdiobj AS o ON o~iobjnm = c~iobjcmp AND o~objvers = 'A'
+      WHERE c~iobjnm = @tables-basic AND c~objvers = 'A'
+      ORDER BY c~posit ASCENDING
+      INTO TABLE @DATA(compounding).
+    LOOP AT compounding INTO DATA(compounded_with).
+      READ TABLE fixed INTO DATA(compounding_value) WITH TABLE KEY iobjnm = compounded_with-iobjcmp.
+      IF sy-subrc <> 0.
+        fail( |{ characteristic } is compounded with { compounded_with-iobjcmp }, which must be fixed too| ).
+      ENDIF.
+      IF compounding_value-value CA `'`.
+        fail( |{ compounded_with-iobjcmp }: a fixed value cannot contain a quote| ).
+      ENDIF.
+      result = |{ result }{ COND string( WHEN result IS NOT INITIAL THEN ` AND ` ) }| &&
+               |{ compounded_with-fieldnm } = '{ compounding_value-value }'|.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD provider_of_fact_table.
+    LOOP AT providers( ) INTO DATA(entry).
+      IF table NS entry-name.
+        CONTINUE.
+      ENDIF.
+      DATA(facts) = COND string( WHEN entry-kind = c_kind-cube THEN cube_fact_table( CONV #( entry-name ) )
+                                 ELSE adso_reporting_view( CONV #( entry-name ) ) ).
+      IF facts = table.
+        result = entry-name.
+        RETURN.
+      ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD cube_fact_table.
     DATA fact_table TYPE rsd_s_cube-facttab.
     CALL FUNCTION 'RSD_FACTTAB_GET_FOR_CUBE'
       EXPORTING
@@ -296,7 +387,23 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
       EXCEPTIONS
         name_error = 1
         OTHERS     = 2.
-    IF sy-subrc <> 0 OR fact_table IS INITIAL.
+    IF sy-subrc = 0.
+      result = fact_table.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD adso_reporting_view.
+    TRY.
+        DATA(tables) = cl_rso_adso=>get_tablnm( adso ).
+        result = VALUE #( tables[ dsotabtype = cl_rsdso_constants=>n_c_viewtype_reporting ]-name OPTIONAL ).
+      CATCH cx_rs_not_found.
+        CLEAR result.
+    ENDTRY.
+  ENDMETHOD.
+
+  METHOD read_cube.
+    DATA(fact_table) = cube_fact_table( cube ).
+    IF fact_table IS INITIAL.
       fail( |InfoCube { cube }: BW gives no fact table| ).
     ENDIF.
     provider-fact_table = fact_table.
@@ -416,12 +523,7 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
     provider-text = text.
     provider-infoarea = infoarea.
     " the reporting view: inbound and active table together
-    TRY.
-        DATA(tables) = cl_rso_adso=>get_tablnm( adso ).
-        provider-fact_table = VALUE #( tables[ dsotabtype = cl_rsdso_constants=>n_c_viewtype_reporting ]-name OPTIONAL ).
-      CATCH cx_rs_not_found.
-        CLEAR provider-fact_table.
-    ENDTRY.
+    provider-fact_table = adso_reporting_view( adso ).
     IF provider-fact_table IS INITIAL.
       fail( |aDSO { adso }: BW gives no reporting view| ).
     ENDIF.
@@ -487,6 +589,11 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
     result = VALUE #( iobjnm = iobjnm text = text_of( iobjnm ) iobjtp = iobjtp fact_column = fact_column ).
     DATA(layout) = views->layout( characteristic = iobjnm fixed = fixed ).
     result-basic = layout-tables-basic.
+    SELECT iobjcmp FROM rsdiobjcmp
+      WHERE iobjnm = @result-basic AND objvers = 'A'
+      ORDER BY posit ASCENDING
+      INTO TABLE @DATA(compounding).
+    result-compounding = VALUE #( FOR c IN compounding ( CONV string( c-iobjcmp ) ) ).
     READ TABLE layout-columns INTO DATA(key) WITH KEY iobjnm = result-basic text = abap_false.
     result-has_sids = xsdbool( sy-subrc = 0 ).
     IF result-has_sids = abap_false.

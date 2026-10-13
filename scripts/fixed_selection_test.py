@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
-"""Tests fixed selections (docs/bw-schema-design-guide.md, section 3.8) end to end on the clinic demo against SAP:
-for the cube ZCLVISIT and the aDSO ZCLVISITA, a schema proposed with the fiscal year variant fixed to K4
-(GET proposal?fixed.ZCLFISCVR=K4) is accepted into a test catalog, queried and removed again.
+"""Tests fixed selections (docs/bw-schema-design-guide.md, section 3.8) end to end on the clinic demo against SAP.
 
-The clinic demo (docs/clinic-demo.md) books each visit under one of K1, K2 and K4. The oracle is the plain proposal,
-accepted first: the variant a dimension, the periods compounded with it (K1/2024001, ..., K4/2025012), the visits
-under [ZCLFISCVR].[K4]. With K4 fixed
-- the proposal has no dimension ZCLFISCVR, annotates the cube olap4abap.fixed.ZCLFISCVR and names the periods of
-  ZCLFISCPR by their own key (no COMPOUND_KEY), on a fact view filtered on K4;
-- accept generates the filtered views (selection ZCLFISCVR=K4: the fact view, ZCLFISCPR, ZCLFISCYR);
-- the cube's visits are those under K4, its periods 2024001 to 2025012, no other;
-- remove deletes the catalog and the filtered views (deletedViews), the plain views stay.
-It changes the server: it writes and removes the catalogs ZZPLAIN_<provider> and ZZFIXTEST_<provider>, whose cubes
-are named as the catalogs (the demo's catalogs have the providers' names).
+The clinic demo (docs/clinic-demo.md) books each visit under one of the fiscal year variants K1, K2 and K4 and
+deploys, per provider (the cube ZCLVISIT, the aDSO ZCLVISITA), a plain catalog and one that fixes the variant to K4:
+- the plain catalog is the oracle: the variant a dimension, the years and periods compounded with it (K1/2024001,
+  ..., K4/2025012), the visits under [Fiscal Year Variant].[K4];
+- the K4 catalog (ZCLVISIT_K4, ZCLVISITA_K4) has the variant as a dimension with the one member K4, its visits are
+  those under K4, its years 2024 and 2025 and its periods 2024001 to 2025012 by their own key, and they add up to
+  its visits.
+Then the way of the schema builder's UI, the API: the plain proposal is fixed as an edit (POST fix, fixed.ZCLFISCVR=K4):
+the cube is annotated olap4abap.fixed.ZCLFISCVR, keeps the dimension ZCLFISCVR and names the periods by their own key
+(no COMPOUND_KEY), on the views filtered on K4 (the fact view, ZCLFISCVR, ZCLFISCYR and ZCLFISCPR: the demo's own,
+which the provider read finds and accept reuses); accepted into a test catalog it has the K4 visits and the one
+variant; fixing it again with nothing (un-fixing) gives the plain proposal's tables back; removing the catalog keeps
+the filtered views, as the demo's K4 catalog names them. It changes the server: it writes and removes the catalog
+ZZFIXTEST_<provider>, whose cube is named as the catalog (the demo's catalogs have the providers' names).
 
     python scripts/fixed_selection_test.py
     python scripts/fixed_selection_test.py --url http://localhost:50000/zzxxmla1 --client 001
@@ -32,7 +34,11 @@ EXECUTE = """<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/
 <Format>Multidimensional</Format><AxisFormat>TupleFormat</AxisFormat><Content>Data</Content></PropertyList></Properties>
 </Execute></SOAP-ENV:Body></SOAP-ENV:Envelope>"""
 
+YEARS = ["2024", "2025"]
 PERIODS = [f"{year}{month:03d}" for year in (2024, 2025) for month in range(1, 13)]
+VARIANTS = ("K1", "K2", "K4")
+# the demo cube's Time has no All member and defaults to 2025 (docs/clinic-demo.md); the aDSO's calendar has one
+ALL_YEARS = {"ZCLVISIT": "{[Time].[2024], [Time].[2025]}", "ZCLVISITA": ""}
 
 
 def api(base, client, method, resource, params=None, body=None):
@@ -80,78 +86,114 @@ def main():
         if not condition:
             failures.append(name)
 
-    def accept(provider, catalog, params):
-        """Proposes, accepts into the catalog with the cube named as the catalog (another catalog has the provider's
-        name); returns the proposal and the answer of accept, None if one failed."""
-        status, proposal = api(args.url, args.client, "GET", "proposal", {"provider": provider, **params})
-        check(f"{catalog}: proposal {params}", status == 200, proposal)
-        if status != 200:
-            return proposal, None
-        xml = proposal["xml"].replace(f'<Cube name="{provider}"', f'<Cube name="{catalog}"', 1)
-        status, accepted = api(args.url, args.client, "POST", "accept", {"catalog": catalog}, xml)
-        check(f"{catalog}: accepted", status == 200, accepted)
-        return proposal, accepted if status == 200 else None
-
-    def remove(catalog):
-        status, removed = api(args.url, args.client, "POST", "remove", {"catalog": catalog})
-        check(f"{catalog}: removed", status == 200, removed)
-        return [html.unescape(v) for v in removed.get("deletedViews", [])]
+    def run(catalog, statement):
+        return execute(args.url, args.client, catalog, statement)
 
     for provider in ("ZCLVISIT", "ZCLVISITA"):
-        # the oracle: the plain proposal, the variant a dimension and the periods compounded with it
-        plain = f"ZZPLAIN_{provider}"
-        _, accepted = accept(provider, plain, {})
-        expected = None
-        if accepted:
-            try:
-                _, values, error = execute(args.url, args.client, plain,
-                                           f"SELECT [Measures].[ZCLVISNO] ON 0 FROM {plain} WHERE [ZCLFISCVR].[K4]")
-                check(f"{plain}: the visits under K4", error is None and values, error)
-                expected = float(values[0]) if values else None
-                captions, _, error = execute(
-                    args.url, args.client, plain,
-                    f"SELECT [Measures].[ZCLVISNO] ON 0, NON EMPTY [ZCLFISCPR].[ZCLFISCPR].Members ON 1 FROM {plain}")
-                check(f"{plain}: the periods compounded, K1/2024001 to K4/2025012",
-                      error is None and captions == [f"{v}/{p}" for v in ("K1", "K2", "K4") for p in PERIODS],
-                      error or (captions or [])[:6])
-            finally:
-                remove(plain)
+        years = ALL_YEARS[provider]
+        where = f" WHERE {years}" if years else ""
+        # the demo's plain catalog: the oracle
+        _, values, error = run(provider, f"SELECT [Measures].[Visits] ON 0 FROM {provider} WHERE "
+                                         + (f"{years} * {{[Fiscal Year Variant].[K4]}}" if years
+                                            else "[Fiscal Year Variant].[K4]"))
+        check(f"{provider}: the visits under K4", error is None and values, error)
+        expected = float(values[0]) if values else None
+        captions, _, error = run(provider, f"SELECT [Measures].[Visits] ON 0, "
+                                           f"NON EMPTY [Fiscal Period].[Fiscal Period].Members ON 1 FROM {provider}{where}")
+        check(f"{provider}: the periods compounded, K1/2024001 to K4/2025012",
+              error is None and captions == [f"{v}/{p}" for v in VARIANTS for p in PERIODS],
+              error or (captions or [])[:6])
+        captions, _, error = run(provider, f"SELECT [Measures].[Visits] ON 0, "
+                                           f"NON EMPTY [Fiscal Year].[Fiscal Year].Members ON 1 FROM {provider}{where}")
+        check(f"{provider}: the years compounded, K1/2024 to K4/2025",
+              error is None and captions == [f"{v}/{y}" for v in VARIANTS for y in YEARS], error or captions)
         if expected is None:
             continue
 
-        catalog = f"ZZFIXTEST_{provider}"
-        proposal, accepted = accept(provider, catalog, {"fixed.ZCLFISCVR": "K4"})
-        xml = proposal.get("xml", "")
-        check(f"{catalog}: the cube is annotated, the variant has no dimension",
-              re.search(r'<Annotation name="olap4abap\.fixed\.ZCLFISCVR">\s*K4\s*</Annotation>', xml) is not None
-              and re.search(r'<Dimension [^>]*name="ZCLFISCVR"', xml) is None, xml[:400])
-        period = re.search(r'<Dimension [^>]*name="ZCLFISCPR".*?</Dimension>', xml, re.S)
-        check(f"{catalog}: ZCLFISCPR is not compounded", period is not None and "COMPOUND_KEY" not in period.group(0),
-              period.group(0)[:400] if period else "no dimension ZCLFISCPR")
-        check(f"{catalog}: the proposal lists the fixed characteristic",
-              proposal.get("provider", {}).get("fixed") == [{"characteristic": "ZCLFISCVR", "value": "K4"}],
-              proposal.get("provider", {}).get("fixed"))
-        if not accepted:
+        # the demo's K4 catalog
+        catalog = f"{provider}_K4"
+        _, values, error = run(catalog, f"SELECT [Measures].[Visits] ON 0 FROM {catalog}{where}")
+        check(f"{catalog}: the cube's visits are the K4 ones ({expected:.0f})",
+              error is None and values and abs(float(values[0]) - expected) < 0.5, error or values)
+        captions, values, error = run(catalog, f"SELECT [Measures].[Visits] ON 0, "
+                                               f"NON EMPTY [Fiscal Period].[Fiscal Period].Members ON 1 FROM {catalog}{where}")
+        check(f"{catalog}: periods by their own key, 2024001 to 2025012", error is None and captions == PERIODS,
+              error or captions)
+        check(f"{catalog}: the periods add up to the cube's visits",
+              error is None and values and abs(sum(float(v) for v in values) - expected) < 0.5, values)
+        captions, _, error = run(catalog, f"SELECT [Measures].[Visits] ON 0, "
+                                          f"NON EMPTY [Fiscal Year].[Fiscal Year].Members ON 1 FROM {catalog}{where}")
+        check(f"{catalog}: years by their own key", error is None and captions == YEARS, error or captions)
+        captions, _, error = run(catalog, f"SELECT [Measures].[Visits] ON 0, "
+                                          f"[Fiscal Year Variant].[Variant].Members ON 1 FROM {catalog}{where}")
+        check(f"{catalog}: the variant has one member, K4", error is None and captions == ["K4"], error or captions)
+
+        # the API, as the schema builder uses it: the plain proposal, fixed as an edit
+        test = f"ZZFIXTEST_{provider}"
+        status, proposal = api(args.url, args.client, "GET", "proposal", {"provider": provider})
+        check(f"{test}: plain proposal", status == 200 and "olap4abap.fixed" not in proposal.get("xml", ""), proposal)
+        if status != 200:
             continue
-        filtered = [v["viewName"] for v in accepted.get("views", []) if v.get("selection") == "ZCLFISCVR=K4"]
-        check(f"{catalog}: the views of the selection: the fact view, ZCLFISCPR and ZCLFISCYR",
-              len(filtered) == 3, accepted.get("views"))
+        plain = proposal["xml"]
+        status, fixed = api(args.url, args.client, "POST", "fix", {"fixed.ZCLFISCVR": "K4"}, plain)
+        check(f"{test}: fixed ZCLFISCVR=K4", status == 200, fixed)
+        if status != 200:
+            continue
+        xml = fixed["xml"]
+        check(f"{test}: the cube is annotated, the variant keeps its dimension",
+              re.search(r'<Annotation name="olap4abap\.fixed\.ZCLFISCVR">\s*K4\s*</Annotation>', xml) is not None
+              and re.search(r'<Dimension [^>]*name="ZCLFISCVR"', xml) is not None, xml[:400])
+        period = re.search(r'<Dimension [^>]*name="ZCLFISCPR".*?</Dimension>', xml, re.S)
+        check(f"{test}: ZCLFISCPR is not compounded", period is not None and "COMPOUND_KEY" not in period.group(0),
+              period.group(0)[:400] if period else "no dimension ZCLFISCPR")
+        listed = {c["name"]: c for c in fixed.get("characteristics", [])}
+        check(f"{test}: the answer lists ZCLFISCVR fixed to K4, on its dimension",
+              listed.get("ZCLFISCVR", {}).get("fixed") is True and listed["ZCLFISCVR"].get("value") == "K4"
+              and listed["ZCLFISCVR"].get("dimension") == "ZCLFISCVR", fixed.get("characteristics"))
+        # the views filtered on K4 exist (the demo's K4 catalog uses them), so the fixed schema names them
+        tables = {}
+        for name in (provider, catalog):
+            _, schema = api(args.url, args.client, "GET", "schema", {"catalog": name})
+            tables[name] = set(re.findall(r'(?:<Table name|table)="([^"]+)"', schema.get("xml", "")))
+        filtered = tables[catalog] - tables[provider]
+        named = set(re.findall(r'(?:<Table name|table)="([^"]+)"', xml))
+        check(f"{test}: the fixed schema names the demo's views filtered on K4 (facts, variant, year, period)",
+              len(filtered) == 4 and filtered <= named and "ZZXXMLA1_F_" not in xml and "ZZXXMLA1_C_" not in xml,
+              {"filtered": filtered, "named": named})
+        replaced = {(t["from"], t["to"]) for t in fixed.get("tables", [])}
+        check(f"{test}: the answer lists the tables replaced", {t for _, t in replaced} == filtered, replaced)
+        xml = xml.replace(f'<Cube name="{provider}"', f'<Cube name="{test}"', 1)
+        status, accepted = api(args.url, args.client, "POST", "accept", {"catalog": test}, xml)
+        check(f"{test}: accepted", status == 200, accepted)
+        if status != 200:
+            continue
         try:
-            _, values, error = execute(args.url, args.client, catalog,
-                                       f"SELECT [Measures].[ZCLVISNO] ON 0 FROM {catalog}")
-            check(f"{catalog}: the cube's visits are the K4 ones ({expected:.0f})",
+            # the proposal's date has an All member
+            _, values, error = run(test, f"SELECT [Measures].[ZCLVISNO] ON 0 FROM {test}")
+            check(f"{test}: the cube's visits are the K4 ones ({expected:.0f})",
                   error is None and values and abs(float(values[0]) - expected) < 0.5, error or values)
-            captions, values, error = execute(
-                args.url, args.client, catalog,
-                f"SELECT [Measures].[ZCLVISNO] ON 0, NON EMPTY [ZCLFISCPR].[ZCLFISCPR].Members ON 1 FROM {catalog}")
-            check(f"{catalog}: periods by their own key, 2024001 to 2025012", error is None and captions == PERIODS,
+            captions, _, error = run(test, f"SELECT [Measures].[ZCLVISNO] ON 0, "
+                                           f"NON EMPTY [ZCLFISCPR].[ZCLFISCPR].Members ON 1 FROM {test}")
+            check(f"{test}: periods by their own key, 2024001 to 2025012", error is None and captions == PERIODS,
                   error or captions)
-            check(f"{catalog}: the periods add up to the cube's visits",
-                  error is None and values and abs(sum(float(v) for v in values) - expected) < 0.5, values)
+            captions, _, error = run(test, f"SELECT [Measures].[ZCLVISNO] ON 0, "
+                                           f"[ZCLFISCVR].[ZCLFISCVR].Members ON 1 FROM {test}")
+            check(f"{test}: the variant has one member, K4", error is None and captions == ["K4"], error or captions)
+            # un-fixing the accepted schema: the plain proposal's tables, the period compounded again
+            status, unfixed = api(args.url, args.client, "POST", "fix", {}, accepted["xml"])
+            plain_tables = set(re.findall(r'(?:<Table name|table)="([^"]+)"', plain))
+            back = set(re.findall(r'(?:<Table name|table)="([^"]+)"', unfixed.get("xml", "")))
+            period = re.search(r'<Dimension [^>]*name="ZCLFISCPR".*?</Dimension>', unfixed.get("xml", ""), re.S)
+            check(f"{test}: un-fixed, the plain tables and the period compounded again",
+                  status == 200 and back == plain_tables and "olap4abap.fixed" not in unfixed["xml"]
+                  and period is not None and period.group(0).count("COMPOUND_KEY") == 2,
+                  unfixed if status != 200 else {"back": back, "plain": plain_tables})
         finally:
-            deleted = remove(catalog)
-            check(f"{catalog}: the views of the selection are deleted", set(filtered) <= set(deleted),
-                  {"deleted": deleted, "generated": filtered})
+            status, removed = api(args.url, args.client, "POST", "remove", {"catalog": test})
+            check(f"{test}: removed", status == 200, removed)
+            deleted = [html.unescape(v) for v in removed.get("deletedViews", [])]
+            check(f"{test}: the views of the selection stay, {catalog} names them",
+                  not set(filtered) & set(deleted), {"deleted": deleted, "filtered": filtered})
 
     print(f"\n{len(failures)} failure(s)" if failures else "\nall passed")
     sys.exit(1 if failures else 0)

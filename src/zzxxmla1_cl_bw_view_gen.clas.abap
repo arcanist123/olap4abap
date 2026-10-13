@@ -35,10 +35,13 @@
 "! (named without namespace) and SID_FIELD per compounded characteristic, from a left outer join to its SID table on
 "! all key fields, which schemas join its view on.
 "! A cube can fix characteristics to one value each (docs/bw-schema-design-guide.md, section 3.8, 0FISCVARNT = K4): a
-"! characteristic compounded with a fixed one gets a view of its own filtered on the fixed compounding (WHERE), its
-"! COMPOUND_KEY made of the other key fields only (none if all are fixed), and the provider a fact view filtered on the
-"! fixed characteristics, an InfoCube too (an inner join to the SID table of each on the SID and the fixed values), with
-"! SID_FIELD only for the compounded characteristics whose compounding is not all fixed.
+"! fixed characteristic gets a view of its own filtered on its value, so that it has one member, and a characteristic
+"! compounded with a fixed one a view filtered on the fixed compounding (WHERE), its COMPOUND_KEY made of the other key
+"! fields only (none if all are fixed); the provider gets a fact view filtered on the fixed characteristics, an
+"! InfoCube too (an inner join to the SID table of each on the SID and the fixed values). An aDSO's fact view has
+"! SID_FIELD for every compounded characteristic, also one whose compounding is all fixed, so that fixing changes no
+"! key of a schema's dimension. A reference characteristic is not filtered on its own value: its view is its basic
+"! one's.
 "! The views are DDIC-based CDS views, the kind NetWeaver 7.50 has, named by a number: database view ZZXXMLA1V and DDL
 "! source ZZXXMLA1_C followed by the same 7 digits (a characteristic does not fit: 16 and 30 characters at most, and a
 "! namespace has slashes). The database view is what the schema names. Each view is a row of table ZZXXMLA1_VIEW, by
@@ -266,8 +269,8 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
       IMPORTING cube          TYPE rsinfocube
       RETURNING VALUE(result) TYPE ty_t_view
       RAISING   cx_dd_ddl_exception.
-    "! The database view of the characteristic's DDL source for a cube's fixed characteristics (those of its
-    "! compounding filter it), if there is one; nothing is changed.
+    "! The database view of the characteristic's DDL source for a cube's fixed characteristics (view_selection), if
+    "! there is one; nothing is changed.
     METHODS existing_view
       IMPORTING characteristic TYPE rsiobjnm
                 fixed          TYPE ty_t_fixed OPTIONAL
@@ -305,7 +308,8 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
                 fixed          TYPE ty_t_fixed OPTIONAL
       RETURNING VALUE(result)  TYPE ty_layout.
     "! The view made of a characteristic's metadata; reads nothing. Of the fixed characteristics those of its
-    "! compounding filter it (WHERE) and leave COMPOUND_KEY, which is made of the key fields not fixed only.
+    "! compounding filter it (WHERE) and leave COMPOUND_KEY, which is made of the key fields not fixed only; the
+    "! characteristic itself, if fixed and not a reference characteristic, filters it on its value.
     CLASS-METHODS build_layout
       IMPORTING metadata      TYPE ty_metadata
                 fixed         TYPE ty_t_fixed OPTIONAL
@@ -384,9 +388,10 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
     CLASS-METHODS provider_of_fact_placeholder
       IMPORTING table         TYPE csequence
       RETURNING VALUE(result) TYPE string.
-    "! The fixed characteristics among the compounding of a characteristic's basic one: the selection of its view for
-    "! a cube that fixes them.
-    METHODS fixed_compounding
+    "! The selection of a characteristic's view for a cube that fixes the given characteristics: those among the
+    "! compounding of its basic one, and the characteristic itself if it is fixed and is the basic one (a reference
+    "! characteristic's view is its basic one's).
+    METHODS view_selection
       IMPORTING characteristic TYPE rsiobjnm
                 fixed          TYPE ty_t_fixed
       RETURNING VALUE(result)  TYPE ty_t_fixed.
@@ -901,23 +906,14 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
                       length     = field-length
                       iobjnm     = field-iobjnm ) TO result-columns.
     ENDLOOP.
-    " per compounded characteristic its SID: its SID table joined on all key fields; none if all its compounding is
-    " fixed, as it is then unique by its value
+    " per compounded characteristic its SID: its SID table joined on all key fields; also if all its compounding is
+    " fixed (it is then unique by its value), so that a schema keys its dimension the same way with and without
     DATA(sid_joins) = 0.
     LOOP AT metadata-compounded INTO DATA(compounded).
-      DATA(all_fixed) = abap_true.
-      LOOP AT compounded-compounding INTO DATA(compounding).
-        IF NOT line_exists( selection[ iobjnm = compounding-iobjnm ] ).
-          all_fixed = abap_false.
-        ENDIF.
-      ENDLOOP.
-      IF all_fixed = abap_true.
-        CONTINUE.
-      ENDIF.
       READ TABLE metadata-fields INTO DATA(own) WITH KEY iobjnm = compounded-iobjnm.
       DATA(join) = VALUE ty_join( table = compounded-sids alias = |s{ sid_joins + 1 }| ).
       DATA(reason) = ``.
-      LOOP AT compounded-compounding INTO compounding.
+      LOOP AT compounded-compounding INTO DATA(compounding).
         READ TABLE metadata-fields INTO DATA(value) WITH KEY iobjnm = compounding-iobjnm.
         IF sy-subrc <> 0.
           reason = |compounded with { compounding-iobjnm }, which is not a field of the aDSO|.
@@ -1096,6 +1092,12 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
         APPEND |s.{ to_lower( compounding-field ) } = { literal( value-value ) }| TO result-filters.
       ENDIF.
     ENDLOOP.
+    " fixed itself: its value, one member; not a reference characteristic, whose view others share
+    READ TABLE fixed INTO DATA(own) WITH TABLE KEY iobjnm = metadata-tables-basic.
+    IF sy-subrc = 0 AND metadata-characteristic = metadata-tables-basic.
+      INSERT own INTO TABLE selection.
+      APPEND |s.{ to_lower( key_field ) } = { literal( own-value ) }| TO result-filters.
+    ENDIF.
     result-selection = selection_text( selection ).
     " compounded: the name of a value by all key fields that are not fixed
     DATA key_columns TYPE ty_t_column.
@@ -1404,16 +1406,21 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
-  METHOD fixed_compounding.
+  METHOD view_selection.
     IF fixed IS INITIAL.
       RETURN.
     ENDIF.
-    LOOP AT compounding( tables( characteristic )-basic ) INTO DATA(compounding).
+    DATA(basic) = tables( characteristic )-basic.
+    LOOP AT compounding( basic ) INTO DATA(compounding).
       READ TABLE fixed INTO DATA(value) WITH TABLE KEY iobjnm = compounding-iobjnm.
       IF sy-subrc = 0.
         INSERT value INTO TABLE result.
       ENDIF.
     ENDLOOP.
+    READ TABLE fixed INTO value WITH TABLE KEY iobjnm = characteristic.
+    IF sy-subrc = 0 AND basic = characteristic.
+      INSERT value INTO TABLE result.
+    ENDIF.
   ENDMETHOD.
 
   METHOD compounding.
@@ -1504,7 +1511,7 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD existing_view.
-    DATA(selection) = selection_text( fixed_compounding( characteristic = characteristic fixed = fixed ) ).
+    DATA(selection) = selection_text( view_selection( characteristic = characteristic fixed = fixed ) ).
     result = view_of_ddl( existing_ddl_name( kind        = c_kind-characteristic
                                              object_name = characteristic
                                              selection   = selection

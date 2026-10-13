@@ -195,6 +195,80 @@ def main():
         check("a renamed dimension's column follows", loads and
               '<DrillThroughAttribute name="Store" dimension="ZFMSTORE_UI" sourceAttribute="ZFMSTORE Key"/>' in xml,
               [loads] + [line.strip() for line in xml.splitlines() if "DrillThroughAttribute name=\"Store\"" in line])
+
+        # fixed characteristics (docs/bw-schema-design-guide.md, section 3.8) on the clinic demo's aDSO, an edit on the
+        # dimension's pane (POST fix): the period waits for the variant it is compounded with; the variant fixed to K4
+        # keeps its dimension, the cube is annotated and shows it; undo takes it back; a value without SID is refused
+        # and the K4 stays; unfixing the variant gives the plain schema
+        page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(f"{args.url}/?sap-client={args.client}#proposal/ZCLVISITA")
+        status(page)
+
+        def xml_of():
+            page.click("role=tab[name='XML']")
+            text = page.input_value("textarea.xml")
+            page.click("role=tab[name='Outline']")
+            return text
+
+        def open_dimension(name):
+            page.click(f".tree .item:has-text('{name}') >> nth=0")
+            page.wait_for_selector(".form label:text('Fixed value')")
+
+        check("the proposal fixes nothing, its catalog is the provider's",
+              page.input_value(".topbar input[type=text]") == "ZCLVISITA" and page.url.endswith("#proposal/ZCLVISITA")
+              and "olap4abap.fixed" not in xml_of(), page.url)
+        open_dimension("ZCLFISCPR")
+        check("the period waits for the variant", "fix it first" in page.inner_text(".form")
+              and page.locator("input[aria-label='Fixed value of ZCLFISCPR']").count() == 0, page.inner_text(".form"))
+        open_dimension("ZCLFISCVR")
+        variant = page.locator("input[aria-label='Fixed value of ZCLFISCVR']")
+        variant.focus()
+        page.wait_for_function("document.querySelectorAll('#fixed-values-ZCLFISCVR option').length > 0", timeout=60000)
+        offered = [page.locator("#fixed-values-ZCLFISCVR option").nth(i).get_attribute("value")
+                   for i in range(page.locator("#fixed-values-ZCLFISCVR option").count())]
+        check("the variants are offered", offered == ["K1", "K2", "K4"], offered)
+        variant.fill("K4")
+        page.click(".form button:text-is('Fix')")
+        page.wait_for_selector(".form button:has-text('Unfix')", timeout=60000)
+        shot(page, "6-fixed")
+        loads = "Loads" in status(page)
+        xml = xml_of()
+        period = re.search(r'<Dimension [^>]*name="ZCLFISCPR".*?</Dimension>', xml, re.S)
+        check("fixed to K4: annotated, the variant's dimension stays, the period by its own key, the schema loads",
+              loads and '<Annotation name="olap4abap.fixed.ZCLFISCVR">K4</Annotation>' in xml
+              and page.locator(".tree .item:has-text('ZCLFISCVR')").count() > 0
+              and period is not None and "COMPOUND_KEY" not in period.group(0), xml[:300])
+        open_dimension("ZCLFISCPR")
+        page.locator("input[aria-label='Fixed value of ZCLFISCPR']").focus()
+        page.wait_for_function("document.querySelectorAll('#fixed-values-ZCLFISCPR option').length > 0", timeout=60000)
+        periods = page.locator("#fixed-values-ZCLFISCPR option").count()
+        check("the periods under K4 are offered", periods == 24, periods)
+        page.click(".tree .item:has-text('ZCLVISITA') >> nth=1")
+        check("the cube shows what it fixes", "ZCLFISCVR = K4" in page.inner_text(".form"), page.inner_text(".form"))
+        page.click(".form button.link:has-text('ZCLFISCVR = K4')")
+        page.wait_for_selector("input[aria-label='Fixed value of ZCLFISCVR']")
+        check("its link opens the variant's dimension",
+              page.input_value("input[aria-label='Fixed value of ZCLFISCVR']") == "K4")
+        page.click(".topbar button:has-text('Undo')")
+        check("undo takes the fix back", "olap4abap.fixed" not in xml_of()
+              and page.input_value("input[aria-label='Fixed value of ZCLFISCVR']") == "")
+        variant = page.locator("input[aria-label='Fixed value of ZCLFISCVR']")
+        variant.fill("K4")
+        page.click(".form button:text-is('Fix')")
+        page.wait_for_selector(".form button:has-text('Unfix')", timeout=60000)
+        variant.fill("ZZ")
+        page.click(".form button:has-text('Change')")
+        page.wait_for_selector(".form .field-error", timeout=60000)
+        check("a value without SID is refused, K4 stays", "has no value ZZ" in page.inner_text(".form")
+              and '<Annotation name="olap4abap.fixed.ZCLFISCVR">K4</Annotation>' in xml_of(), page.inner_text(".form"))
+        page.click(".form button:has-text('Unfix')")
+        page.wait_for_selector(".form button:text-is('Fix')", timeout=60000)
+        loads = "Loads" in status(page)
+        xml = xml_of()
+        period = re.search(r'<Dimension [^>]*name="ZCLFISCPR".*?</Dimension>', xml, re.S)
+        check("unfixed: no annotation, the period compounded again, the schema loads",
+              loads and "olap4abap.fixed" not in xml and period is not None and "COMPOUND_KEY" in period.group(0))
         browser.close()
 
     check("no script errors", not errors, errors)

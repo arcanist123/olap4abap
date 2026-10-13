@@ -28,8 +28,10 @@
 "! - the cube-type aDSO ZCLVISITA with the same visits and BW's standard time characteristics in place of the date,
 "!   read through its fact view (the SID of the room, ZZXXMLA1_CL_BW_VIEW_GEN),
 "! loads both, generates the CDS views of the characteristics (ZZXXMLA1_CL_BW_VIEW_GEN), writes a schema per provider
-"! (/WEB-INF/schema/ZCLVISIT.xml, /WEB-INF/schema/ZCLVISITA.xml) and adds a catalog for each to
-"! /WEB-INF/datasources.xml.
+"! (/WEB-INF/schema/ZCLVISIT.xml, /WEB-INF/schema/ZCLVISITA.xml) and one per provider that fixes the fiscal year
+"! variant to K4 (ZCLVISIT_K4, ZCLVISITA_K4: the variant a dimension with one member, the periods by their own key, on
+"! the views filtered on K4) and
+"! adds a catalog for each to /WEB-INF/datasources.xml.
 "! The data comes from a seeded pseudo-random generator: every run gives the same visits. BW's blank member (the initial
 "! key, SID 0) exists in every hierarchy; a few visits use it (no diagnosis recorded yet, no physician assigned at
 "! triage, a patient not identified, no visit type), so it has data.
@@ -50,6 +52,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     CONSTANTS c_hierarchy_org  TYPE rshienm VALUE 'ZCLDOC_ORG'.
     CONSTANTS c_hierarchy_site TYPE rshienm VALUE 'ZCLDOC_SITE'.
     CONSTANTS c_hierarchy_diag TYPE rshienm VALUE 'ZCLDIAG_ICD'.
+    "! the fiscal year variant the K4 schemas fix (docs/bw-schema-design-guide.md, section 3.8)
+    CONSTANTS c_fixed_variant TYPE string VALUE `K4`.
 
     "! Generates everything; the log of the run.
     "! @parameter max_visits | at most this many visits, spread evenly over the days; 0: all of them
@@ -312,10 +316,20 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     "! Counts the rows of a fact table or view and sums the duration.
     METHODS verify IMPORTING source TYPE csequence.
 
-    "! The schema of the cube (adso = false) or of the aDSO.
+    "! The schema of the cube (adso = false) or of the aDSO; fixed: the one that fixes the fiscal year variant to K4
+    "! (catalog and cube PROVIDER_K4).
     METHODS schema_xml
       IMPORTING adso          TYPE abap_bool
+                fixed         TYPE abap_bool DEFAULT abap_false
                 views         TYPE zzxxmla1_cl_bw_view_gen=>ty_t_view
+      RETURNING VALUE(result) TYPE string.
+    "! The fixed characteristics of the K4 schemas: ZCLFISCVR = K4.
+    METHODS k4
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_view_gen=>ty_t_fixed.
+    "! The schema's name and its catalog's: the provider, with _K4 for the one that fixes the variant.
+    METHODS catalog_name
+      IMPORTING adso          TYPE abap_bool
+                fixed         TYPE abap_bool
       RETURNING VALUE(result) TYPE string.
     "! The key attribute's columns: on the cube keyed by the SID and named by the value, on the aDSO keyed by the value;
     "! the value as BW holds it, NUMC with its zeros.
@@ -328,9 +342,11 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
                 column        TYPE csequence
                 level_type    TYPE csequence OPTIONAL
       RETURNING VALUE(result) TYPE string.
+    "! The view of a characteristic (or the fact view of a provider): the plain one, or fixed the one filtered on K4.
     METHODS view_of
       IMPORTING views         TYPE zzxxmla1_cl_bw_view_gen=>ty_t_view
                 iobjnm        TYPE rsiobjnm
+                fixed         TYPE abap_bool DEFAULT abap_false
       RETURNING VALUE(result) TYPE string.
     "! Writes the schema file and adds its catalog to the data sources file if it is not there.
     METHODS write_catalog
@@ -399,6 +415,10 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     DATA(views) = generate_views( ).
     write_catalog( catalog = c_cube xml = schema_xml( adso = abap_false views = views ) ).
     write_catalog( catalog = c_adso xml = schema_xml( adso = abap_true views = views ) ).
+    write_catalog( catalog = catalog_name( adso = abap_false fixed = abap_true )
+                   xml     = schema_xml( adso = abap_false fixed = abap_true views = views ) ).
+    write_catalog( catalog = catalog_name( adso = abap_true fixed = abap_true )
+                   xml     = schema_xml( adso = abap_true fixed = abap_true views = views ) ).
     result = log.
   ENDMETHOD.
 
@@ -1093,14 +1113,16 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD delete_all.
-    " the providers and the views use the characteristics, so they go first; the fact view selects from the aDSO
-    TRY.
-        IF NEW zzxxmla1_cl_bw_view_gen( )->delete_fact_view( c_adso ) = abap_true.
-          write( |delete fact view of { c_adso }: done| ).
-        ENDIF.
-      CATCH cx_dd_ddl_exception INTO DATA(error).
-        write( |delete fact view of { c_adso }: FAILED, { error->get_text( ) }| ).
-    ENDTRY.
+    " the providers and the views use the characteristics, so they go first; the fact views select from the providers
+    LOOP AT VALUE string_table( ( CONV #( c_adso ) ) ( CONV #( c_cube ) ) ) INTO DATA(provider).
+      TRY.
+          IF NEW zzxxmla1_cl_bw_view_gen( )->delete_fact_view( CONV #( provider ) ) = abap_true.
+            write( |delete fact views of { provider }: done| ).
+          ENDIF.
+        CATCH cx_dd_ddl_exception INTO DATA(error).
+          write( |delete fact views of { provider }: FAILED, { error->get_text( ) }| ).
+      ENDTRY.
+    ENDLOOP.
     delete_adso( ).
     delete_cube( ).
     delete_views( ).
@@ -1632,11 +1654,18 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
         ENDLOOP.
         " the aDSO's facts with the SID of the room (characteristic of the view: the aDSO)
         APPEND generator->generate_fact_view( c_adso ) TO result.
+        " the K4 schemas: the facts of both filtered on the variant, the variant, the year and the period filtered on it
+        APPEND generator->generate_fact_view( provider = c_cube fixed = k4( ) ) TO result.
+        APPEND generator->generate_fact_view( provider = c_adso fixed = k4( ) ) TO result.
+        APPEND generator->generate( characteristic = 'ZCLFISCVR' fixed = k4( ) ) TO result.
+        APPEND generator->generate( characteristic = 'ZCLFISCYR' fixed = k4( ) ) TO result.
+        APPEND generator->generate( characteristic = 'ZCLFISCPR' fixed = k4( ) ) TO result.
       CATCH cx_dd_ddl_exception INTO DATA(error).
         write( |views: FAILED, { error->get_text( ) }| ).
     ENDTRY.
     LOOP AT result INTO DATA(view).
-      write( |view of { view-characteristic }: { view-view_name }| ).
+      write( |view of { view-characteristic }{ COND string( WHEN view-selection IS NOT INITIAL
+                                                            THEN | ({ view-selection })| ) }: { view-view_name }| ).
     ENDLOOP.
   ENDMETHOD.
 
@@ -1810,17 +1839,35 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD view_of.
-    result = VALUE #( views[ characteristic = iobjnm ]-view_name OPTIONAL ).
+    DATA(selection) = COND string( WHEN fixed = abap_true THEN zzxxmla1_cl_bw_view_gen=>selection_text( k4( ) ) ).
+    result = VALUE #( views[ characteristic = iobjnm selection = selection ]-view_name OPTIONAL ).
     IF result IS INITIAL.
-      write( |schema: no view of { iobjnm }| ).
+      write( |schema: no view of { iobjnm }{ COND string( WHEN selection IS NOT INITIAL THEN | ({ selection })| ) }| ).
     ENDIF.
   ENDMETHOD.
 
+  METHOD k4.
+    result = VALUE #( ( iobjnm = 'ZCLFISCVR' value = c_fixed_variant ) ).
+  ENDMETHOD.
+
+  METHOD catalog_name.
+    result = |{ COND string( WHEN adso = abap_true THEN c_adso ELSE c_cube ) }| &&
+             |{ COND string( WHEN fixed = abap_true THEN |_{ c_fixed_variant }| ) }|.
+  ENDMETHOD.
+
   METHOD schema_xml.
-    DATA(name) = COND string( WHEN adso = abap_true THEN c_adso ELSE c_cube ).
-    " the aDSO's facts from its fact view, which has the SID of the room and its fields without namespace
-    DATA(fact_table) = COND string( WHEN adso = abap_true THEN view_of( views = views iobjnm = c_adso )
+    DATA(name) = catalog_name( adso = adso fixed = fixed ).
+    " the aDSO's facts from its fact view, which has the SIDs of the room, the fiscal year and period and its fields
+    " without namespace; fixed, the facts of both from the fact view filtered on K4, which has them too
+    DATA(fact_table) = COND string( WHEN adso = abap_true OR fixed = abap_true
+                                    THEN view_of( views = views iobjnm = COND #( WHEN adso = abap_true THEN c_adso
+                                                                                 ELSE c_cube ) fixed = fixed )
                                     ELSE |/BIC/F{ c_cube }| ).
+    DATA(without_namespace) = xsdbool( adso = abap_true OR fixed = abap_true ).
+    " Clinic Visits (aDSO, K4)
+    DATA(caption) = COND string( WHEN adso = abap_true AND fixed = abap_true THEN | (aDSO, { c_fixed_variant })|
+                                 WHEN adso = abap_true THEN ` (aDSO)`
+                                 WHEN fixed = abap_true THEN | ({ c_fixed_variant })| ).
     IF fact_table IS INITIAL.
       RETURN.
     ENDIF.
@@ -1915,6 +1962,34 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       |    </Hierarchy>\n| &&
       |  </Dimension>\n|.
 
+    " the fiscal time: the year and the period compounded with the variant (K4/2024001, keyed by the SID on both
+    " providers); with the variant fixed the variant has one member (its view filtered on K4), and the year and the
+    " period, on their views filtered on K4, are named by their own key (2024001), still keyed by the SID
+    result = result &&
+      |  <Dimension name="Fiscal Year Variant" table="{ view_of( views = views iobjnm = 'ZCLFISCVR' fixed = fixed ) }">\n| &&
+      |    <DimensionAttribute name="Variant" usage="Key">| &&
+      key_columns( adso = adso column = `ZCLFISCVR` ) && |</DimensionAttribute>\n| &&
+      |    <Hierarchy hasAll="true" allMemberName="All Variants">\n| &&
+      |      <Level name="Variant" uniqueMembers="true" sourceAttribute="Variant"/>\n| &&
+      |    </Hierarchy>\n| &&
+      |  </Dimension>\n|.
+    LOOP AT VALUE ty_t_group_weight( ( scope = `Fiscal Year` key = `ZCLFISCYR` )
+                                     ( scope = `Fiscal Period` key = `ZCLFISCPR` ) ) INTO DATA(fiscal).
+      DATA(fiscal_view) = view_of( views = views iobjnm = CONV #( fiscal-key ) fixed = fixed ).
+      result = result &&
+        |  <Dimension name="{ fiscal-scope }" table="{ fiscal_view }">\n| &&
+        |    <DimensionAttribute name="{ fiscal-scope } Id" usage="Key">| &&
+        COND string( WHEN fixed = abap_true THEN key_columns( adso = abap_false column = fiscal-key )
+                     ELSE |<KeyColumn dataType="Integer" columnName="SID"/>| &&
+                          |<OrderByColumn dataType="String" columnName="{ zzxxmla1_cl_bw_view_gen=>c_compound_key }"/>| &&
+                          |<NameColumn dataType="String" columnName="{ zzxxmla1_cl_bw_view_gen=>c_compound_key }"/>| ) &&
+        |</DimensionAttribute>\n| &&
+        |    <Hierarchy hasAll="true" allMemberName="All { fiscal-scope }s">\n| &&
+        |      <Level name="{ fiscal-scope }" uniqueMembers="true" sourceAttribute="{ fiscal-scope } Id"/>\n| &&
+        |    </Hierarchy>\n| &&
+        |  </Dimension>\n|.
+    ENDLOOP.
+
     DATA(usages) = VALUE string_table( ).
     IF adso = abap_false.
       " the date with its attributes: a time dimension; BW's blank member (year 0) would come first, so the default
@@ -1946,7 +2021,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
         |  </Dimension>\n|.
       usages = VALUE #( ( |Patient:SID_ZCLPAT| ) ( |Physician:SID_ZCLDOC| ) ( |Diagnosis:SID_ZCLDIAG| )
                         ( |Visit Type:SID_ZCLVTYPE| ) ( |Time:SID_ZCLDATE| ) ( |Site:SID_ZCLSITE| )
-                        ( |Room:SID_ZCLROOM| ) ).
+                        ( |Room:SID_ZCLROOM| ) ( |Fiscal Year Variant:SID_ZCLFISCVR| )
+                        ( |Fiscal Year:SID_ZCLFISCYR| ) ( |Fiscal Period:SID_ZCLFISCPR| ) ).
     ELSE.
       " BW's time characteristics have no attributes: one dimension each, keyed by the value as the fact column
       DATA(calendar) = VALUE ty_t_group_weight( ( scope = `Year` key = `0CALYEAR` )
@@ -1967,13 +2043,19 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
         APPEND |{ period-scope }:{ iobj_field( struct = fact iobjnm = CONV #( period-key ) without_namespace = adso ) }|
           TO usages.
       ENDLOOP.
-      " the room by its SID, which the fact view has
+      " the room by its SID, which the fact view has, the fiscal year and period too (with the variant fixed as well)
       APPEND |Room:SID_{ iobj_field( struct = fact iobjnm = 'ZCLROOM' without_namespace = adso ) }| TO usages.
+      APPEND |Fiscal Year Variant:{ iobj_field( struct = fact iobjnm = 'ZCLFISCVR' without_namespace = adso ) }|
+        TO usages.
+      APPEND |Fiscal Year:SID_ZCLFISCYR| TO usages.
+      APPEND |Fiscal Period:SID_ZCLFISCPR| TO usages.
     ENDIF.
 
     result = result &&
-      |  <Cube name="{ name }" caption="Clinic Visits{ COND string( WHEN adso = abap_true THEN ` (aDSO)` ) }" | &&
-      |defaultMeasure="Visits">\n| &&
+      |  <Cube name="{ name }" caption="Clinic Visits{ caption }" defaultMeasure="Visits">\n| &&
+      COND string( WHEN fixed = abap_true
+                   THEN |    <Annotations><Annotation name="{ zzxxmla1_cl_schema_proposal=>c_fixed_annotation }ZCLFISCVR">| &&
+                        |{ c_fixed_variant }</Annotation></Annotations>\n| ) &&
       |    <Table name="{ fact_table }"/>\n|.
     " the characteristics other than time show only their values with visits, so the patients registered without a
     " visit are no members (the time dimensions: to be decided, docs/mvp-scope.md, Members with facts)
@@ -1988,11 +2070,11 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
                            |true</Annotation></Annotations>\n    </DimensionUsage>\n|.
       ENDIF.
     ENDLOOP.
-    DATA(duration) = iobj_field( struct = fact iobjnm = 'ZCLDUR' without_namespace = adso ).
-    DATA(visit_number) = iobj_field( struct = fact iobjnm = 'ZCLVISNO' without_namespace = adso ).
-    DATA(wait) = iobj_field( struct = fact iobjnm = 'ZCLWAIT' without_namespace = adso ).
-    DATA(labs) = iobj_field( struct = fact iobjnm = 'ZCLLABS' without_namespace = adso ).
-    DATA(charges) = iobj_field( struct = fact iobjnm = 'ZCLCHRG' without_namespace = adso ).
+    DATA(duration) = iobj_field( struct = fact iobjnm = 'ZCLDUR' without_namespace = without_namespace ).
+    DATA(visit_number) = iobj_field( struct = fact iobjnm = 'ZCLVISNO' without_namespace = without_namespace ).
+    DATA(wait) = iobj_field( struct = fact iobjnm = 'ZCLWAIT' without_namespace = without_namespace ).
+    DATA(labs) = iobj_field( struct = fact iobjnm = 'ZCLLABS' without_namespace = without_namespace ).
+    DATA(charges) = iobj_field( struct = fact iobjnm = 'ZCLCHRG' without_namespace = without_namespace ).
     result = result &&
       |    <Measure name="Visits" column="{ visit_number }" aggregator="sum" | &&
       |formatString="#,##0"/>\n| &&

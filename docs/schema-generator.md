@@ -153,20 +153,33 @@ a refused request is `{"error": "..."}` with 400 (the request is wrong), 404 (no
 `Allow`) or 500.
 
 - `GET providers`: `{"providers": [{name, kind, text, infoarea}]}`.
-- `GET proposal?provider=X&fixed.<characteristic>=<value>`: `{provider: {name, kind, text, infoarea, factTable, fixed:
-  [{characteristic, value}]}, xml, outline, notes: [{iobjnm, reason}], suggestions: [{dimension, attribute,
-  levelType}]}`. A `fixed.` parameter per characteristic the cube fixes (`bw-schema-design-guide.md`, section 3.8);
-  400 if one cannot be fixed (not a characteristic of the provider, compounded with one not fixed, no SID of the
-  value, a quote in it). The outline is the schema as the UI lists it:
+- `GET proposal?provider=X`: `{provider: {name, kind, text, infoarea, factTable}, xml, outline, notes: [{iobjnm,
+  reason}], suggestions: [{dimension, attribute, levelType}], intColumns, providerName, cube, characteristics}`. The
+  proposal fixes nothing; fixing is an edit (`POST fix`). `characteristics` are those of the cube's provider that
+  can be fixed (a SID table): `{name, text, compounding: [characteristic], foreignKey, dimension, shared, fixed,
+  value}`, its column in the facts, the dimension of the cube on it (found by that foreign key; `shared`: a shared
+  dimension's name, else a private one's) and its fixed value. The outline is the schema as the UI lists it:
   `{name, dimensions: [dimension], cubes: [{name, caption, factTable, defaultMeasure, dimensions: [{name, source,
   foreignKey} | {name, foreignKey, dimension}], measures: [{name, column, aggregator, formatString}]}]}`, a dimension
   being `{name, type, table, attributes: [{name, usage, keyColumn, nameColumn, levelType}], hierarchies: [{name,
   hasAll, defaultMember, levels: [{name, sourceAttribute, levelType}]}]}`. The XML is what the UI edits and sends back.
+- `GET values?characteristic=C&fixed.<characteristic>=<value>`: `{characteristic, values: [value], more}`, the values
+  `C` can be fixed to: its SID table without the initial value, sorted, at most 500 (`more` if there are more). A
+  compounded `C` needs a `fixed.` parameter for each characteristic of its compounding (its values under them), else
+  400, as for a characteristic without SID table.
+- `POST fix?cube=X&fixed.<characteristic>=<value>...`: the body is the edited schema XML; the cube (without `cube`
+  the first) fixes the given characteristics, all it fixes, none to un-fix (Fixing). Answer `{xml, outline, tables:
+  [{from, to}], intColumns, providerName, cube, characteristics}`: the schema rewritten, the tables replaced (the UI
+  re-keys its suggestions and numbers by them), the NUMC numbers of the characteristics' tables and the
+  characteristics for the new selection. 400 if the selection is refused (not a characteristic of the provider,
+  compounded with one not fixed, no SID of the value, a quote in it, referenced by another characteristic of the
+  provider) or the cube does not read its provider's tables. Nothing is written.
 - `GET schemas`: `{"schemas": [{catalog, dataSource, file, exists, changedAt, changedBy}]}`, the catalogs of the data
   sources file, each name once with its first definition (the one the XMLA endpoint reads); `changedAt` is UTC ISO
   8601 or null.
-- `GET schema?catalog=X`: `{catalog, dataSource, file, changedAt, changedBy, xml, outline}`, an accepted schema to edit
-  again (404 if the catalog or its file is missing).
+- `GET schema?catalog=X`: `{catalog, dataSource, file, changedAt, changedBy, xml, outline, intColumns, providerName,
+  cube, characteristics}`, an accepted schema to edit again (404 if the catalog or its file is missing); no
+  characteristics if its first cube's provider is not found (`providerName` null).
 - `POST check?catalog=X`: the body is the edited schema XML; the checks of `accept` (Accepting, steps 1 to 3), nothing
   is written. Answer `{catalog, file, newCatalog, views: [characteristic]}`: the file `accept` would write, whether it
   adds the catalog, and the characteristics whose views it would generate. The UI calls it while the user edits, to
@@ -174,7 +187,7 @@ a refused request is `{"error": "..."}` with 400 (the request is wrong), 404 (no
 - `POST accept?catalog=X`: the body is the edited schema XML (no JSON to parse on the server); without `catalog` the
   schema's name is the catalog. Answer `{catalog, file, views: [{characteristic, ddlName, viewName, selection}],
   deletedViews: [view], xml}`, the XML as written. A placeholder's view is generated for the fixed characteristics of
-  the cube that uses it (its annotations `olap4abap.fixed.<characteristic>`); check and accept refuse a table that
+  the cube that uses it (its annotations `olap4abap.fixed.<characteristic>`, Fixing); check and accept refuse a table that
   cubes with different fixed characteristics use, a view of table `ZZXXMLA1_VIEW` generated for another selection,
   and a cube that fixes characteristics on facts that are not its fact view. Afterwards the views of a selection
   that no catalog's schema names are deleted (`deletedViews`).
@@ -216,6 +229,30 @@ The next XMLA request reads the new catalog. View generation runs as the anonymo
 Each cube is served from its own catalog for now (`mvp-scope.md`, Catalog decision): a proposal is one schema with one
 cube, accepted as one catalog; a cube is moved to another catalog by removing its catalog and accepting it again.
 
+## Fixing
+
+A cube fixes characteristics of its provider to one value each (`bw-schema-design-guide.md`, section 3.8; decided
+2026-10-13 as an edit, `next-steps.md`, fixed selections). `POST fix` (`ZZXXMLA1_CL_SCHEMA_FIX`) rewrites the schema
+for the new selection, with BW's metadata, so that the user's work stays:
+1. the provider is the one whose facts the cube reads: a fact placeholder's, a fact view of table `ZZXXMLA1_VIEW`, or
+   the InfoCube or aDSO whose fact table or reporting view it is (looked for among the providers whose name is in the
+   table's). It is read twice, for the cube's selection (its annotations) and for the new one, as the proposal reads
+   it, and the new selection is checked (`ZZXXMLA1_CL_BW_PROVIDER->check_fixed`);
+2. the cube's annotations are replaced, its fact table becomes the provider's facts for the new selection (refused if
+   it is no table of the provider), and the measures' columns follow (`/BIC/ZCLDUR` on the InfoCube's fact table,
+   `ZCLDUR` in a fact view);
+3. each dimension of the cube is matched to a characteristic by its foreign key in the old facts and gets the new
+   one; its tables (the dimension's and its hierarchies' `Table`s) are replaced where they are the characteristic's
+   view (for the old selection, its placeholder or a view of `ZZXXMLA1_VIEW` of its basic characteristic) by the view
+   for the new one, or a placeholder if that is not generated yet;
+4. a characteristic whose compounding becomes all fixed: every `NameColumn` on `COMPOUND_KEY` of its dimension becomes
+   the key column, an `OrderByColumn` on it goes; one that becomes compounded again gets `COMPOUND_KEY` as name and
+   order of its key attribute where that was named by its key (or its number).
+
+Names, captions, hierarchies, levels, properties, measures, double-click columns and members with facts are not
+touched; a fixed characteristic keeps its dimension (one member). Fixing and un-fixing give the same schema back
+(unit test `round_trip`). Accept generates the views of the placeholders for the cube's selection as before.
+
 ## Removing
 
 `remove` takes a catalog out of the server (decided 2026-10-06), checked before anything changes:
@@ -236,7 +273,9 @@ Removing `ZFOODMART` breaks the reference tests until `python scripts/sap-files.
 
 - `GET providers`: the InfoCubes and cube-type aDSOs;
 - `GET proposal?provider=X`: the proposed schema as XML (`ZZXXMLA1_CL_SCHEMA_DEF`) plus a JSON outline for the UI;
+- `GET values?characteristic=C`: the values a characteristic can be fixed to;
 - `GET schemas`, `GET schema?catalog=X`: the accepted schemas, to edit one again;
+- `POST fix`: the schema rewritten for a cube's new fixed characteristics, nothing written;
 - `POST check`: the checks of accept, nothing written;
 - `POST accept`: the edited schema; checks, generates the views, saves the file, registers the catalog;
 - `POST remove`: removes a catalog and its schema file.
@@ -278,6 +317,15 @@ Implemented (2026-10-06):
 - Every change is sent to `check` (debounced, the last request wins); its refusal is shown in full under the top bar
   and keeps Accept disabled. Accept shows what `check` answered (the file, new or replaced catalog, the views to
   generate) before it calls `accept`, then reopens the schema as written (DDL names replaced by views).
+- Fixed characteristics (`bw-schema-design-guide.md`, section 3.8; Fixing; 2026-10-13): the pane of a dimension on a
+  characteristic (matched by the foreign key of its usage, `characteristics` of the answers) has "Fixed value": a
+  value field offering the values of `GET values` (loaded on focus), Fix / Change and Unfix. A compounded
+  characteristic says which of its compounding to fix first; un-fixing one un-fixes those compounded with it. The
+  server's answer (`POST fix`) replaces the document as one edit (undo takes it back), the numbers and suggestions are
+  re-keyed by the tables replaced; a refusal is shown under the field and nothing changes. After an undo or an edit of
+  the annotations in the XML tab the characteristics are asked again (`POST fix` with the cube's own selection). The
+  cube's pane lists what it fixes, read only, each a link to its dimension. The catalog keeps the provider's name: a
+  selection never renames it.
 - Each accepted schema on the start page has Remove…: a dialog names the catalog, its data source and schema file
   and that the views are kept, then calls `remove` and lists the files deleted; the list is read again.
 - Only what the server evaluates is offered: aggregators `sum` and `count` (the engine sums every other measure), no

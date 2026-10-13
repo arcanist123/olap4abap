@@ -41,9 +41,11 @@
 "! which use few of its values; the UI switches it per dimension. The proposal is written as schema XML and read as the reference reads it (ZZXXMLA1_CL_SCHEMA_DEF), so the
 "! definition has the reference's defaults and the XML is toXML.
 "! A provider read for fixed characteristics (docs/bw-schema-design-guide.md, section 3.8, 0FISCVARNT = K4) gives a
-"! cube with an annotation olap4abap.fixed.CHARACTERISTIC per fixed one, whose value is the fixed value, and no
-"! dimension for it; a characteristic whose compounding is all fixed is proposed as one that is not compounded (the
-"! provider reads it so: no name column, on an aDSO keyed by its value).
+"! cube with an annotation olap4abap.fixed.CHARACTERISTIC per fixed one, whose value is the fixed value; the fixed one
+"! is a dimension with one member (on its view filtered on the value), and a characteristic whose compounding is all
+"! fixed is named as one that is not compounded (the provider reads it so: no name column). The schema builder
+"! proposes without fixing (ZZXXMLA1_CL_SCHEMA_FIX applies a selection to a schema as an edit); a selection here is
+"! for the generators of demo schemas.
 "! A NUMC value is proposed as BW holds it (0042, typed String; docs/mvp-scope.md, NUMC decision); where the view has
 "! its number too (COLUMN_INT) the proposal lists it, so the UI can switch a dimension to numbers (42).
 "! Run (F9): prints the proposals for the FoodMart providers ZFMSALESA and ZFMSALES.
@@ -105,6 +107,15 @@ CLASS zzxxmla1_cl_schema_proposal DEFINITION
     CLASS-METHODS format_string
       IMPORTING column        TYPE zzxxmla1_cl_bw_provider=>ty_column
       RETURNING VALUE(result) TYPE string.
+    "! The table of a characteristic's dimension: its view, or the placeholder of its basic characteristic's view if
+    "! that is not generated yet (accepting the schema generates it).
+    CLASS-METHODS table_of
+      IMPORTING characteristic TYPE zzxxmla1_cl_bw_provider=>ty_characteristic
+      RETURNING VALUE(result)  TYPE string.
+    "! The NUMC columns of a characteristic's table that have a number (its key and its attributes).
+    CLASS-METHODS int_columns_of
+      IMPORTING characteristic TYPE zzxxmla1_cl_bw_provider=>ty_characteristic
+      RETURNING VALUE(result)  TYPE ty_t_int_column.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -210,11 +221,6 @@ CLASS zzxxmla1_cl_schema_proposal DEFINITION
     METHODS note
       IMPORTING iobjnm TYPE csequence
                 reason TYPE string.
-    "! Lists the number of a NUMC column of a dimension's table, if it has one.
-    METHODS add_int_column
-      IMPORTING table      TYPE string
-                column     TYPE zzxxmla1_cl_bw_provider=>ty_column
-                int_column TYPE zzxxmla1_cl_bw_provider=>ty_column.
 ENDCLASS.
 
 
@@ -245,11 +251,8 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
     DATA usages TYPE ty_t_usage.
 
     open( name = `Schema` attributes = VALUE #( ( name = `name` value = provider-name ) ) ).
-    " the cube's dimensions in the provider's order; a fixed characteristic has none (it would have one member)
+    " the cube's dimensions in the provider's order; a fixed characteristic too, with one member
     LOOP AT provider-characteristics INTO DATA(characteristic).
-      IF line_exists( provider-fixed[ iobjnm = CONV rsiobjnm( characteristic-iobjnm ) ] ).
-        CONTINUE.
-      ENDIF.
       DATA(name) = write_dimension( kind = provider-kind characteristic = characteristic ).
       IF name IS NOT INITIAL.
         APPEND VALUE #( name = name caption = characteristic-text foreign_key = characteristic-fact_column-name )
@@ -279,14 +282,14 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
       RETURN.
     ENDIF.
     result = characteristic-iobjnm.
-    DATA(table) = COND string( WHEN characteristic-view IS NOT INITIAL THEN characteristic-view
-                               ELSE zzxxmla1_cl_bw_view_gen=>placeholder( characteristic-basic ) ).
+    DATA(table) = table_of( characteristic ).
     open( name = `Dimension` attributes = VALUE #( ( name = `name` value = result )
                                                    ( name = `caption` value = characteristic-text )
                                                    ( name = `table` value = table ) ) ).
-    add_int_column( table = table column = characteristic-key_column int_column = characteristic-key_int_column ).
-    LOOP AT characteristic-attributes INTO DATA(numeric) WHERE int_column IS NOT INITIAL.
-      add_int_column( table = table column = numeric-column int_column = numeric-int_column ).
+    LOOP AT int_columns_of( characteristic ) INTO DATA(numeric).
+      IF NOT line_exists( int_columns[ table = numeric-table column = numeric-column ] ).
+        APPEND numeric TO int_columns.
+      ENDIF.
     ENDLOOP.
 
     " the key attribute: keyed by the SID where the facts have it (an InfoCube's, an aDSO's compounded characteristic),
@@ -540,13 +543,24 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
     APPEND VALUE #( iobjnm = iobjnm reason = reason ) TO notes.
   ENDMETHOD.
 
-  METHOD add_int_column.
-    IF int_column IS NOT INITIAL AND NOT line_exists( int_columns[ table = table column = column-name ] ).
-      APPEND VALUE #( table      = table
-                      column     = column-name
-                      int_column = int_column-name
-                      data_type  = data_type( int_column ) ) TO int_columns.
-    ENDIF.
+  METHOD table_of.
+    result = COND #( WHEN characteristic-view IS NOT INITIAL THEN characteristic-view
+                     ELSE zzxxmla1_cl_bw_view_gen=>placeholder( characteristic-basic ) ).
+  ENDMETHOD.
+
+  METHOD int_columns_of.
+    DATA(table) = table_of( characteristic ).
+    DATA(columns) = VALUE zzxxmla1_cl_bw_provider=>ty_t_attribute(
+      ( column = characteristic-key_column int_column = characteristic-key_int_column )
+      ( LINES OF characteristic-attributes ) ).
+    LOOP AT columns INTO DATA(column) WHERE int_column IS NOT INITIAL.
+      IF NOT line_exists( result[ column = column-column-name ] ).
+        APPEND VALUE #( table      = table
+                        column     = column-column-name
+                        int_column = column-int_column-name
+                        data_type  = data_type( column-int_column ) ) TO result.
+      ENDIF.
+    ENDLOOP.
   ENDMETHOD.
 
 ENDCLASS.

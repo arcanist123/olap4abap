@@ -227,10 +227,11 @@ columns (not in the reference's schema format).
 
 ### 3.8 Fixed selections
 
-Decided 2026-10-13 (`next-steps.md`, fixed selections). A cube can fix characteristics of its provider to one value
-each, as a BW query's fixed filter does: `0FISCVARNT = K4`, `0VERSION = 000`. The selection is part of the cube, not
-a slicer: it holds for every cell, the totals and the members, and no MDX removes it. It is given with the proposal
-(`GET proposal?provider=X&fixed.0FISCVARNT=K4`; the UI comes later) and recorded on the cube, one annotation per
+Decided 2026-10-13 (`next-steps.md`, fixed selections; fixing as an edit the same day). A cube can fix
+characteristics of its provider to one value each, as a BW query's fixed filter does: `0FISCVARNT = K4`, `0VERSION =
+000`. The selection is part of the cube, not a slicer: it holds for every cell, the totals and the members, and no MDX
+removes it. It is an edit of the schema, made on a dimension's pane of the schema builder (`POST fix`,
+`schema-generator.md`, Fixing): the proposal fixes nothing. It is recorded on the cube, one annotation per
 characteristic:
 
 ```xml
@@ -240,21 +241,27 @@ characteristic:
 
 - **The value** is BW's internal one (NUMC with its zeros) and must have a SID. A compounded characteristic can be
   fixed only together with its compounding.
-- **A fixed characteristic has no dimension** (it would have one member) and no drill-through column.
+- **A fixed characteristic keeps its dimension, with one member**: its view is filtered on its value, so every
+  hierarchy of it has that member under All, and the user's hierarchies, properties and drill-through columns stay.
+  Removing the dimension from the cube is an ordinary edit. Not filtered: a reference characteristic (`0SOLD_TO`), whose
+  view is its basic one's; with members with facts it still shows its one value. A basic characteristic that another
+  characteristic of the provider references cannot be fixed (they share a view). Both are open questions for later
+  (`next-steps.md`, fixed selections).
 - **A characteristic whose compounding is all fixed is not compounded** in this cube: `0FISCPER` under `0FISCVARNT =
-  K4` is named by its own key (`2024001`, no `COMPOUND_KEY`, no member property `Key`, no `OrderByColumn`), and on an
-  aDSO it is keyed and joined by its value, without a SID column. With part of its compounding fixed it stays
-  compounded on the rest.
+  K4` is named by its own key (`2024001`, no `COMPOUND_KEY`, no `OrderByColumn`). It stays keyed by its SID, on an aDSO
+  too (its fact view keeps `SID_<field>`), so fixing changes no attribute of its dimension, only columns (an open question for later, `next-steps.md`). With part of
+  its compounding fixed it stays compounded on the rest.
 - **The engine knows nothing of it.** The selection is in the views, so the schema stays in the reference's format and
   the reference answers the same on copies of the views:
   - the cube's fact table is its fact view, on an InfoCube too: the aDSO's reporting view with `WHERE` on the fixed
     fields, the InfoCube's fact table inner-joined to the SID table of each fixed characteristic on the SID and the
-    fixed value. Every field without namespace, and `SID_<field>` for the characteristics that stay compounded (3.7);
-  - a characteristic compounded with a fixed one is on a filtered view of its own: its plain view (section 4) with
-    `WHERE` on the fixed compounding fields, one row per own key.
+    fixed value. Every field without namespace, and `SID_<field>` for every compounded characteristic of an aDSO (3.7);
+  - a fixed characteristic and a characteristic compounded with a fixed one are on a filtered view of their own: the
+    plain view (section 4) with `WHERE` on the fixed key fields, one row per own key.
 - **Shared dimensions:** a dimension is on one view, so cubes of a schema that use it must fix the same values of its
   compounding; `check` refuses a schema where they do not, and one whose views were generated for another selection
-  than the cube's annotations (an annotation edited by hand: propose again).
+  than the cube's annotations (an annotation edited by hand in the XML: fix on the dimension's pane instead). Schemas
+  of different catalogs fixing the same values share the views.
 
 Views are tracked in table `ZZXXMLA1_VIEW` (section 4, rule 8).
 

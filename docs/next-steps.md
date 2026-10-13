@@ -19,31 +19,101 @@ two minutes; #85 takes 1 s with the native `Order` (step 8, 105 s before), #46 2
 
 Decided 2026-10-13; the model is in `bw-schema-design-guide.md`, section 3.8. A cube fixes characteristics of its
 provider to one value each (`0FISCVARNT = K4`); a characteristic whose compounding is all fixed is then not
-compounded (`0FISCPER` named `2024001`, joined by its value on an aDSO), and the fixed characteristic has no
-dimension. The selection is in generated views, the engine is not changed. Backend only: the UI comes later, and so
-does a default selection in the proposal (the only variant with facts, ...).
+compounded (`0FISCPER` named `2024001`), and the fixed characteristic is a dimension with one member. The selection
+is in generated views, the engine is not changed. Since 2026-10-13 fixing is an edit of the schema (steps 9 to 12
+below), no longer a parameter of the proposal; a default selection in the proposal (the only variant with facts,
+...) is open.
 
-1. Table `ZZXXMLA1_VIEW` (kind, object, selection; view and DDL source), `src/zzxxmla1_view.tabl.xml`.
+1. Done: table `ZZXXMLA1_VIEW` (kind, object, selection; view and DDL source), `src/zzxxmla1_view.tabl.xml`.
    `ZZXXMLA1_CL_BW_VIEW_GEN` finds and registers views through it, a plain view of an older run by its description.
-2. Views with a selection: a characteristic's view filtered on its fixed compounding (no `COMPOUND_KEY` when all of
+2. Done: views with a selection: a characteristic's view filtered on its fixed compounding (no `COMPOUND_KEY` when all of
    it is fixed); a provider's fact view filtered on the fixed characteristics, on an InfoCube too (inner join to the
    SID tables), with `SID_<field>` only for the characteristics still compounded.
-3. Provider and proposal: `ZZXXMLA1_CL_BW_PROVIDER=>read` and the proposal take the selection; the proposal drops
+3. Done (replaced by steps 9 to 11): provider and proposal: `ZZXXMLA1_CL_BW_PROVIDER=>read` and the proposal take the selection; the proposal drops
    the fixed dimensions, treats the fully fixed compounded ones as plain and writes the annotations
    `olap4abap.fixed.<characteristic>` on the cube. A value without SID, or a compounded characteristic fixed without
    its compounding, is refused.
-4. API: `GET proposal?provider=X&fixed.<characteristic>=<value>`; accept generates the views of the cube's selection
+4. Done (the selection moved to `POST fix`, step 10): API: `GET proposal?provider=X&fixed.<characteristic>=<value>`; accept generates the views of the cube's selection
    for the placeholders; check refuses views of another selection than the cube's annotations and a dimension shared
    by cubes with different selections; accept and remove delete the views with a selection no schema file names.
 5. Done: test data. The clinic demo has its own fiscal time in `ZCLVISIT` and `ZCLVISITA` (`clinic-demo.md`): the
    variant `ZCLFISCVR` (K1, K2, K4, each visit under one), the period `ZCLFISCPR` and the year `ZCLFISCYR` compounded
    with it. Not BW's `0FISC*`: BW checks their values against the source system's fiscal year variants (T009), and
-   the warehouse's truth is its SID and fact tables. Its hand-written schemas stay as they are.
-   `scripts/fixed_selection_test.py` (2026-10-13, all passed): the plain proposal accepted as oracle (periods
-   `K1/2024001` ...), the proposal with K4 fixed accepted (11,318 visits, periods `2024001` ... `2025012`, three
-   filtered views), both removed and the filtered views deleted; `schema_api_test.py` checks the refusals.
-6. Later: the fiscal time master data for a fixed variant (`time-master-data.md`, open step 6 of compounded
-   characteristics); a fiscal year > period hierarchy on a fiscal period; the UI for fixed characteristics.
+   the warehouse's truth is its SID and fact tables. Its hand-written schemas have the fiscal time as dimensions
+   (variant, year and period compounded), and the setup deploys a second catalog per provider with the variant fixed
+   to K4 (`ZCLVISIT_K4`, `ZCLVISITA_K4`; 2026-10-13), so the demo shows both without a call of the API.
+   `scripts/fixed_selection_test.py` (2026-10-13, all passed): the plain catalogs as oracle (periods `K1/2024001`
+   ...), the K4 catalogs (11,318 visits, periods `2024001` ... `2025012`, no variant), then the proposal with K4
+   fixed accepted into a test catalog and removed, the filtered views kept as the K4 catalogs name them;
+   `schema_api_test.py` checks the refusals and `GET values`.
+6. Done (2026-10-13, replaced by step 11): the UI. A proposal's section "Fixed characteristics" picks characteristics (with their
+   compounding) and values (`GET values`, the SID table) and proposes again; an accepted cube shows its fixed
+   characteristics read only (`schema-generator.md`, UI; `scripts/schema_ui_test.py`).
+7. Open: a default selection in the proposal, e.g. the variant fixed when only one has facts.
+8. Later: the fiscal time master data for a fixed variant (`time-master-data.md`, open step 6 of compounded
+   characteristics); a fiscal year > period hierarchy on a fiscal period.
+
+### Fixing as an edit (decided 2026-10-13)
+
+Steps 3, 4 and 6 made the selection part of the proposal: it was chosen before the schema existed, and changing it
+proposed again and discarded the edits. Now a selection is an ordinary edit of the cube, made on the dimension's pane,
+which the server applies to the schema as it is. Decided with the user:
+
+- **A proposal is always the plain one** (no `fixed.` parameters, no "Propose again", no selection in the URL). The
+  catalog keeps its default name, the provider's: a selection never renames it (five fixed characteristics would make
+  an unusable name). Who wants the plain and a fixed cube side by side names one catalog differently.
+- **A fixed characteristic keeps its dimension, with one member**: its view is filtered on its value too, so every
+  hierarchy of it has that member under All, and the user's hierarchies, properties and double-click columns stay. The
+  facts are the filtered fact view, so totals hold whatever MDX asks. Removing the dimension from the cube stays an
+  ordinary edit. This replaces "a fixed characteristic has no dimension" (`bw-schema-design-guide.md`, section 3.8).
+- **The server rewrites the schema** (option c): `POST fix?cube=X&fixed.C=v...`, body the current XML and the whole
+  new selection, answer the new XML; the UI replaces the document, which is one edit (undo). It needs BW's metadata:
+  which views the cube reads, the compounding, the fact view's column names.
+- **Views are found or generated on accept** through table `ZZXXMLA1_VIEW` (kind, characteristic or provider,
+  selection), as now: schemas that fix the same values reuse one view, another selection gets its own. The cleanup of
+  unused views after accept and remove stays for now (its runtime is the thing to watch: it reads every schema file).
+
+Steps:
+
+9. Done: views: a fixed characteristic's own view is filtered on its value (`WHERE key = v`, selection `C=v` with the
+   fixed compounding); `fixed_compounding` becomes `view_selection` (the characteristic itself included). An aDSO's
+   compounded characteristic is keyed by its SID in the fact view also when all its compounding is fixed (until now by
+   its value), so fixing changes no attribute name, only columns. Not filtered: a reference characteristic (its view
+   is its basic one's, which other characteristics share); fixing a basic characteristic that another characteristic
+   of the provider references is refused.
+10. Done: proposal and API: the proposal keeps the fixed characteristics' dimensions; `GET proposal` takes no selection.
+    `POST fix?cube=X&fixed.C=v` (new class `ZZXXMLA1_CL_SCHEMA_FIX`): the provider found from the cube's fact table
+    (placeholder, registered fact view or BW's fact table), read for the old selection (the cube's annotations) and the
+    new one; then the annotations, the fact table, the measure columns, the foreign keys (a usage found by the old
+    one) and the tables of the dimensions found so are replaced, and a characteristic whose compounding becomes all
+    fixed is named by its own key (`COMPOUND_KEY` replaced by the key column, its `OrderByColumn` removed) or the
+    other way. The answer has the XML, the outline, the tables replaced and the new tables' NUMC numbers. `GET
+    proposal`, `GET schema` and `POST fix` list the cube's characteristics (name, text, compounding, the dimension
+    that is on it, the fixed value), which the UI needs to offer fixing on a dimension.
+11. Done: UI: the dimension pane of a characteristic has "Fixed value" (values from `GET values`, a compounded one only
+    once its compounding is fixed; un-fixing a characteristic un-fixes those compounded with it); the cube pane lists
+    the fixed characteristics, read only, with links to their dimensions. The proposal's section goes.
+12. Done: tests (2026-10-13, all passed): unit tests of the views and of `ZZXXMLA1_CL_SCHEMA_FIX` (fix, round trip,
+    refusal, the characteristics); `fixed_selection_test.py` (44 checks) fixes K4 on the plain proposal through
+    `POST fix`, accepts, queries (11,318 visits, periods by their own key, the variant with one member), un-fixes (the
+    plain tables back) and removes; `schema_api_test.py` checks the refusals of `POST fix`; `schema_ui_test.py` fixes,
+    undoes, refuses a value and un-fixes on the dimension's pane; `clinic_test.py` passes. The clinic demo's K4
+    catalogs have the variant as a dimension with one member (the demo regenerated). A fix takes about 0.4 s (two
+    provider reads).
+
+Open questions, to revisit after the current scope (2026-10-13: accepted for now, the user disagrees with both long
+term):
+
+- **aDSO keyed by SID when the compounding is all fixed.** An aDSO's compounded characteristic stays keyed by its SID
+  (`SID_<field>` in the fact view) even when all its compounding is fixed and its value alone would identify it.
+  Chosen so that fixing never renames the key attribute (`C SID` ↔ `C Key`), only columns. Costs a join to the SID
+  table per such characteristic in the fact view. Long term: key it by its value, and have `POST fix` rename the key
+  attribute and what refers to it (levels, properties, double-click columns).
+- **Reference characteristics and fixing.** A fixed reference characteristic (`0SOLD_TO` → `0CUSTOMER`) keeps its basic
+  characteristic's unfiltered view, because the view is per basic characteristic and other characteristics share it;
+  it shows one member only with members with facts on. Fixing a basic characteristic that another characteristic of
+  the provider references is refused for the same reason. Long term: views (and placeholders) per characteristic and
+  selection, so a reference characteristic gets its own filtered view and both cases work.
 
 ## Now: members pushed down to HANA
 
