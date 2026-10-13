@@ -16,7 +16,7 @@
 "! - on request the clinic demo (ZZXXMLA1_CL_BW_CLINIC_GEN): BW objects, data, schemas and catalogs, with at most
 "!   clinic_max_visits visits if that is given;
 "! - on request the wide demo (ZZXXMLA1_CL_BW_WIDE_GEN): BW objects with 100 characteristics and their data, with at
-"!   wide_records records if that is given (1,000 if not).
+"!   wide_records records if that is given (1,000,000 if not).
 "! It can run any number of times.
 CLASS zzxxmla1_cl_setup DEFINITION
   PUBLIC

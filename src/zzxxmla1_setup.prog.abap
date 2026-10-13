@@ -14,7 +14,7 @@
 * clinic demo (ZZXXMLA1_CL_BW_CLINIC_GEN), which deletes and creates InfoArea ZCLINIC's InfoCube ZCLVISIT and aDSO
 * ZCLVISITA with their InfoObjects, with at most p_maxvis visits if that is not 0; with the other checkbox the wide
 * demo (ZZXXMLA1_CL_BW_WIDE_GEN), which deletes and creates InfoArea ZXMLWIDE's InfoCube ZXMLWIDE and aDSO ZXMLWIDEA
-* with the characteristics ZXMLAD00 to ZXMLAD99, with p_wrecs records (0: 1,000). Many records take longer than a
+* with the characteristics ZXMLAD00 to ZXMLAD99, with p_wrecs records (0: 1,000,000). Many records take longer than a
 * dialog step may: then run it in the background (F9).
 REPORT zzxxmla1_setup.
 
@@ -39,7 +39,7 @@ INITIALIZATION.
   t_clinic = 'Also generate the clinic demo (BW objects, data, schemas, catalogs)'.
   t_maxvis = 'Clinic demo: max. visits (0: all)'.
   t_wide = 'Also generate the wide demo (100 characteristics, BW objects, data)'.
-  t_wrecs = 'Wide demo: records (0: 1,000)'.
+  t_wrecs = 'Wide demo: records (0: 1,000,000)'.
 
 START-OF-SELECTION.
   LOOP AT NEW zzxxmla1_cl_setup( )->run( clinic            = p_clinic

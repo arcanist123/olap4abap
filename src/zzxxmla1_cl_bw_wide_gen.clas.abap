@@ -15,7 +15,7 @@
 "!   members, for a level larger than eMondrian's bound on a native crossjoin operand, the others (NUMC 4) with 1,000,
 "! - the key figure ZXMLAKF,
 "! - the InfoCube ZXMLWIDE (ten BW dimensions of ten characteristics) and the cube-type aDSO ZXMLWIDEA, each loaded
-"!   with the same records, 1,000 unless another number is given,
+"!   with the same records, 1,000,000 unless another number is given,
 "! and no views, schema or catalog: the schema builder makes those.
 "! The records come from a seeded pseudo-random generator (every run gives the same ones): every characteristic takes
 "! one of its members, the key figure a whole number from 1 to 1,000. They are built and loaded in packages, so
@@ -34,7 +34,7 @@ CLASS zzxxmla1_cl_bw_wide_gen DEFINITION
     CONSTANTS c_infoarea TYPE rsinfoarea VALUE 'ZXMLWIDE'.
     CONSTANTS c_cube     TYPE rsinfocube VALUE 'ZXMLWIDE'.
     CONSTANTS c_adso     TYPE rsoadsonm VALUE 'ZXMLWIDEA'.
-    CONSTANTS c_records  TYPE i VALUE 1000.
+    CONSTANTS c_records  TYPE i VALUE 1000000.
 
     "! Generates everything; the log of the run.
     "! @parameter records | the records in each provider; 0: c_records
@@ -51,7 +51,7 @@ CLASS zzxxmla1_cl_bw_wide_gen DEFINITION
     CONSTANTS c_large_members   TYPE i VALUE 100000.
     CONSTANTS c_per_dimension   TYPE i VALUE 10.
     CONSTANTS c_max_amount      TYPE i VALUE 1000.
-    CONSTANTS c_package         TYPE i VALUE 100000.
+    CONSTANTS c_package         TYPE i VALUE 50000.
     CONSTANTS c_key_figure      TYPE rsiobjnm VALUE 'ZXMLAKF'.
 
     TYPES ty_t_iobjnm TYPE STANDARD TABLE OF rsiobjnm WITH EMPTY KEY.
@@ -110,6 +110,8 @@ CLASS zzxxmla1_cl_bw_wide_gen DEFINITION
     METHODS write_return IMPORTING return TYPE bapiret2_t.
     METHODS write_exception IMPORTING error TYPE REF TO cx_root.
     METHODS write_messages IMPORTING messages TYPE rs_t_msg.
+    "! The message a function module raised as ERROR_MESSAGE (sy-msg*), read before anything else sets sy-msg*.
+    METHODS sy_message RETURNING VALUE(result) TYPE string.
 ENDCLASS.
 
 
@@ -602,8 +604,10 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
           request_locked     = 5
           not_transactional  = 6
           inherited_error    = 7
-          OTHERS             = 8.
+          error_message      = 8
+          OTHERS             = 9.
       DATA(subrc) = sy-subrc.
+      DATA(message) = COND string( WHEN subrc <> 0 THEN sy_message( ) ).
       IF subrc = 0.
         COMMIT WORK AND WAIT.
       ELSE.
@@ -611,7 +615,11 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
       ENDIF.
       write( |load { c_cube } package { package }: { count } records sent, { written } written, | &&
              |{ COND string( WHEN subrc = 0 THEN |request { request }| ELSE |FAILED, subrc { subrc }| ) }| ).
+      FREE <table>.
       IF subrc <> 0.
+        IF message IS NOT INITIAL.
+          write( |  { message }| ).
+        ENDIF.
         RETURN.
       ENDIF.
       left = left - count.
@@ -700,8 +708,10 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
           write_failed        = 1
           activation_failed   = 2
           datastore_not_found = 3
-          OTHERS              = 4.
+          error_message       = 4
+          OTHERS              = 5.
       DATA(subrc) = sy-subrc.
+      DATA(message) = COND string( WHEN subrc <> 0 THEN sy_message( ) ).
       IF subrc = 0.
         COMMIT WORK AND WAIT.
       ELSE.
@@ -710,7 +720,11 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
       write( |load aDSO { c_adso } package { package }: { count } records sent, { inserted } written, | &&
              |{ lines( activation_requests ) } activated, | &&
              |{ COND string( WHEN subrc = 0 THEN `done` ELSE |FAILED, subrc { subrc }| ) }| ).
+      FREE <table>.
       IF subrc <> 0.
+        IF message IS NOT INITIAL.
+          write( |  { message }| ).
+        ENDIF.
         write_messages( messages ).
         RETURN.
       ENDIF.
@@ -767,6 +781,15 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
     LOOP AT return INTO DATA(line) WHERE message IS NOT INITIAL.
       write( |  [{ line-type }] { line-message }| ).
     ENDLOOP.
+  ENDMETHOD.
+
+  METHOD sy_message.
+    IF sy-msgid IS INITIAL.
+      RETURN.
+    ENDIF.
+    DATA(type) = sy-msgty.
+    MESSAGE ID sy-msgid TYPE 'S' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 INTO DATA(text).
+    result = |[{ type }] { text }|.
   ENDMETHOD.
 
   METHOD write_messages.

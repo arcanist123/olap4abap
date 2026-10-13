@@ -236,7 +236,7 @@ Read before designing anything:
   With another checkbox the wide demo (`docs/wide-demo.md`, `ZZXXMLA1_CL_BW_WIDE_GEN`): InfoCube
   `ZXMLWIDE` and aDSO `ZXMLWIDEA` with 100 characteristics `ZXMLAD00`-`ZXMLAD99` of 1,000 members each (`ZXMLAD00`
   100,000), one key figure
-  and 1,000 made-up records (more on request), without schema or catalog; the schema made for `ZXMLWIDE` with the
+  and 1,000,000 made-up records (another number on request), without schema or catalog; the schema made for `ZXMLWIDE` with the
   schema builder is `reference/schema/ZXMLWIDE.xml`, also served by the reference with copies of its tables and views.
 - Reference: eMondrian built from source and running in Docker; captured exchanges are in `reference/`.
 

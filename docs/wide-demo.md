@@ -1,15 +1,17 @@
 # Wide demo
 
 A demo data set for trying the schema builder and the engine on a wide model: one provider with 100 characteristics
-(one of 100,000 members, the others of 1,000) and 1,000 records. It is made up by `ZZXXMLA1_CL_BW_WIDE_GEN` (a seeded pseudo-random generator,
+(one of 100,000 members, the others of 1,000) and 1,000,000 records. It is made up by `ZZXXMLA1_CL_BW_WIDE_GEN` (a seeded pseudo-random generator,
 the same records on every run), so it carries no third-party data and is under the project's license.
 
 Run program `ZZXXMLA1_SETUP` with the checkbox "Also generate the wide demo". "Wide demo: records" (`run( records = ...
-)` of the class) sets the number of records in each provider; 0 (the default) is 1,000. A run with 1,000 records takes
+)` of the class) sets the number of records in each provider; 0 (the default) is 1,000,000. A run with 1,000 records takes
 about four minutes, most of it for creating and activating the objects. A run with many records takes longer than a
-dialog work process may: start the program in the background (F9). A run with 1,000,000 records (2026-10-06) was
-cancelled by the system during the aDSO load without a short dump, and kept only the cube's first package; that size
-is not supported yet.
+dialog work process may: start the program in the background (F9). A run with 1,000,000 records (2026-10-13, job
+`ZZXXMLA1_WIDE_1M`) took 13 minutes: 6 for the objects and the master data, 4 for the cube (20 requests of 50,000) and
+3.5 for the aDSO (20 requests, each activated). An earlier run with packages of 100,000 (2026-10-06) was cancelled
+during the aDSO load without a short dump; a BW message raised as `ERROR_MESSAGE` now fails the load with the
+message in the log instead of cancelling the job.
 
 A run **deletes and creates** InfoArea `ZXMLWIDE`'s objects: the aDSO, the cube, the views of the characteristics (if
 the schema builder generated any) and the InfoObjects `ZXMLAD00` to `ZXMLAD99` and `ZXMLAKF`. A catalog made for the
@@ -33,9 +35,10 @@ providers stays in `/WEB-INF/datasources.xml`.
 
 ## The data
 
-1,000 records. In every record each characteristic takes one of its members, uniformly at random, and the
-amount is a whole number from 1 to 1,000. So about a third of the members of a characteristic of 1,000 have no record
-and the others one or a few (of `ZXMLAD00`'s 100,000 at most 1,000 have one), every record is a different key (the aDSO keeps all of them), and nothing correlates. The records
-are built and loaded in packages of 100,000 (one at the default size): a request per package on the cube, a request
+1,000,000 records. In every record each characteristic takes one of its members, uniformly at random, and the
+amount is a whole number from 1 to 1,000. So each member of a characteristic of 1,000 has about 1,000 records
+and each of `ZXMLAD00`'s 100,000 about 10 (with 1,000 records: a third of the members of 1,000 have none, and at most
+1,000 of `ZXMLAD00`'s have one), every record is a different key (the aDSO keeps all of them), and nothing correlates. The records
+are built and loaded in packages of 50,000 (20 at the default size; each package's table is freed after its load): a request per package on the cube, a request
 activated per package on the aDSO. The run ends by counting the rows of
 the cube's fact table and the aDSO's reporting view and summing the amount, next to the generated totals.
