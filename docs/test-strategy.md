@@ -441,7 +441,7 @@ replace the first column names by position (`XmlaHandler.executeDrillThroughQuer
 `RETURN` the action is ignored. Both sides keep a query ordered only by columns that are unique per row: the rows of a
 tie come back in another order from HSQLDB and HANA. Reading a dimension's key from the fact table instead of joining
 its table gives the same rows on FoodMart (the cases above); on an aDSO it was checked by hand on `ZCLVISITA`
-(`NUMC` values cast to the view's number type).
+(when it was keyed by the views' numbers: `NUMC` values cast to the view's number type).
 
 ## Error cases (faults)
 

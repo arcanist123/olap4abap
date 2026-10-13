@@ -40,6 +40,8 @@
 "! on its DimensionUsage, docs/mvp-scope.md, Members with facts decision): a characteristic is shared by many providers,
 "! which use few of its values; the UI switches it per dimension. The proposal is written as schema XML and read as the reference reads it (ZZXXMLA1_CL_SCHEMA_DEF), so the
 "! definition has the reference's defaults and the XML is toXML.
+"! A NUMC value is proposed as BW holds it (0042, typed String; docs/mvp-scope.md, NUMC decision); where the view has
+"! its number too (COLUMN_INT) the proposal lists it, so the UI can switch a dimension to numbers (42).
 "! Run (F9): prints the proposals for the FoodMart providers ZFMSALESA and ZFMSALES.
 CLASS zzxxmla1_cl_schema_proposal DEFINITION
   PUBLIC
@@ -59,11 +61,22 @@ CLASS zzxxmla1_cl_schema_proposal DEFINITION
       END OF ty_suggestion,
       ty_t_suggestion TYPE STANDARD TABLE OF ty_suggestion WITH EMPTY KEY.
     TYPES:
+      "! a NUMC column of a dimension's table and its number, which the UI may name in its place, with the number's
+      "! data type
+      BEGIN OF ty_int_column,
+        table      TYPE string,
+        column     TYPE string,
+        int_column TYPE string,
+        data_type  TYPE string,
+      END OF ty_int_column,
+      ty_t_int_column TYPE STANDARD TABLE OF ty_int_column WITH EMPTY KEY.
+    TYPES:
       BEGIN OF ty_proposal,
         schema      TYPE zzxxmla1_cl_schema_def=>ty_schema,
         xml         TYPE string,
         notes       TYPE zzxxmla1_cl_bw_provider=>ty_t_note,
         suggestions TYPE ty_t_suggestion,
+        int_columns TYPE ty_t_int_column,
       END OF ty_proposal.
 
     "! The proposal for a provider's metadata.
@@ -75,8 +88,8 @@ CLASS zzxxmla1_cl_schema_proposal DEFINITION
     CLASS-METHODS time_level_type
       IMPORTING iobjnm        TYPE csequence
       RETURNING VALUE(result) TYPE string.
-    "! The reference's data type of a column of a view: Integer for the integer types and for NUMC up to 9 digits (the
-    "! views deliver NUMC as numbers), Numeric for the other numbers and longer NUMC, else String.
+    "! The reference's data type of a column of a view: Integer for the integer types, Numeric for the other numbers,
+    "! else String (NUMC too: the views deliver it as BW holds it).
     CLASS-METHODS data_type
       IMPORTING column        TYPE zzxxmla1_cl_bw_provider=>ty_column
       RETURNING VALUE(result) TYPE string.
@@ -124,6 +137,7 @@ CLASS zzxxmla1_cl_schema_proposal DEFINITION
     DATA depth TYPE i.
     DATA notes TYPE zzxxmla1_cl_bw_provider=>ty_t_note.
     DATA suggestions TYPE ty_t_suggestion.
+    DATA int_columns TYPE ty_t_int_column.
 
     "! Writes the shared dimension of a characteristic; returns its name, initial if there is none.
     METHODS write_dimension
@@ -188,6 +202,11 @@ CLASS zzxxmla1_cl_schema_proposal DEFINITION
     METHODS note
       IMPORTING iobjnm TYPE csequence
                 reason TYPE string.
+    "! Lists the number of a NUMC column of a dimension's table, if it has one.
+    METHODS add_int_column
+      IMPORTING table      TYPE string
+                column     TYPE zzxxmla1_cl_bw_provider=>ty_column
+                int_column TYPE zzxxmla1_cl_bw_provider=>ty_column.
 ENDCLASS.
 
 
@@ -213,7 +232,7 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD propose.
-    CLEAR: xml, depth, notes, suggestions, drill_columns.
+    CLEAR: xml, depth, notes, suggestions, drill_columns, int_columns.
     notes = provider-notes.
     DATA usages TYPE ty_t_usage.
 
@@ -233,6 +252,7 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
     result-xml = zzxxmla1_cl_schema_def=>to_xml( result-schema ).
     result-notes = notes.
     result-suggestions = suggestions.
+    result-int_columns = int_columns.
   ENDMETHOD.
 
   METHOD write_dimension.
@@ -253,6 +273,10 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
     open( name = `Dimension` attributes = VALUE #( ( name = `name` value = result )
                                                    ( name = `caption` value = characteristic-text )
                                                    ( name = `table` value = table ) ) ).
+    add_int_column( table = table column = characteristic-key_column int_column = characteristic-key_int_column ).
+    LOOP AT characteristic-attributes INTO DATA(numeric) WHERE int_column IS NOT INITIAL.
+      add_int_column( table = table column = numeric-column int_column = numeric-int_column ).
+    ENDLOOP.
 
     " the key attribute: keyed by the SID where the facts have it (an InfoCube's, an aDSO's compounded characteristic),
     " else by the value; named by the internal BW key, a compounded one by its compounding and its key
@@ -456,8 +480,6 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
     CASE column-datatype.
       WHEN `INT1` OR `INT2` OR `INT4` OR `INT8`.
         result = `Integer`.
-      WHEN `NUMC`.
-        result = COND #( WHEN column-length <= 9 THEN `Integer` ELSE `Numeric` ).
       WHEN `DEC` OR `CURR` OR `QUAN` OR `FLTP` OR `D16D` OR `D34D` OR `D16N` OR `D34N` OR `DF16_DEC` OR `DF34_DEC`.
         result = `Numeric`.
       WHEN OTHERS.
@@ -494,6 +516,15 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
 
   METHOD note.
     APPEND VALUE #( iobjnm = iobjnm reason = reason ) TO notes.
+  ENDMETHOD.
+
+  METHOD add_int_column.
+    IF int_column IS NOT INITIAL AND NOT line_exists( int_columns[ table = table column = column-name ] ).
+      APPEND VALUE #( table      = table
+                      column     = column-name
+                      int_column = int_column-name
+                      data_type  = data_type( int_column ) ) TO int_columns.
+    ENDIF.
   ENDMETHOD.
 
 ENDCLASS.

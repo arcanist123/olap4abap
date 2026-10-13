@@ -94,7 +94,10 @@ Read before designing anything:
   user hierarchies (the user makes them in the UI); a default drill-through action with each characteristic's value
   and text, which the UI's "Double-click columns" adjusts; every dimension of the cube annotated
   `olap4abap.membersWithFacts`, which the UI's "Members with facts" switches per dimension (not on time ones). The views (`ZZXXMLA1_CL_BW_VIEW_GEN`, one per basic
-  characteristic) carry the EN texts and the time-dependent attributes at 9999-12-31. A compounded characteristic
+  characteristic) carry the EN texts and the time-dependent attributes at 9999-12-31, and every column as BW holds it,
+  NUMC with its zeros, each NUMC column followed by its number `COLUMN_INT`: the proposal names BW's values (`0042`,
+  String), the UI's "As numbers" switches a dimension to the `_INT` columns (`intColumns` of the API; on an aDSO the
+  key too), FoodMart's schemas name the numbers (`docs/mvp-scope.md`, NUMC decision). A compounded characteristic
   (`0FISCPER` with `0FISCVARNT`) is named and ordered by `COMPOUND_KEY` of its view (`K4/2024001`, `#/#`; the key
   attribute's `NameColumn` and `OrderByColumn`), and an aDSO with one is read from its fact view
   (`ZZXXMLA1_CL_BW_VIEW_GEN=>generate_fact_view`: the reporting view with `SID_<field>` per compounded characteristic,
@@ -240,8 +243,7 @@ Read before designing anything:
   With another checkbox the wide demo (`docs/wide-demo.md`, `ZZXXMLA1_CL_BW_WIDE_GEN`): InfoCube
   `ZXMLWIDE` and aDSO `ZXMLWIDEA` with 100 characteristics `ZXMLAD00`-`ZXMLAD99` of 1,000 members each (`ZXMLAD00`
   100,000), one key figure
-  and 1,000,000 made-up records (another number on request), without schema or catalog; the schema made for `ZXMLWIDE` with the
-  schema builder is `reference/schema/ZXMLWIDE.xml`, also served by the reference with copies of its tables and views.
+  and 1,000,000 made-up records (another number on request), without schema or catalog; the reference has no copy of it.
 - Reference: eMondrian built from source and running in Docker; captured exchanges are in `reference/`.
 
 ## Syncing ABAP code with git

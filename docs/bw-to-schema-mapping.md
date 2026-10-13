@@ -67,7 +67,9 @@ FoodMart's `store` or `customer`, without snowflake handling. BW-specific parts 
   names come from BW (`RSD_CHKTAB_GET_FOR_CHA_BAS`), and a characteristic without attribute table gets a view of its
   SID table alone; a reference characteristic (`RSDCHA-CHABASNM` differs, `0SOLD_TO` -> `0CUSTOMER`) has no tables of
   its own: its view, under its own name, is on the basic characteristic's tables and key field (and attributes);
-- NUMC columns as numbers: `INT4` up to 9 digits, `INT8` up to 18, `DEC(31,0)` beyond; other columns as they are;
+- all columns as BW holds them, NUMC with its leading zeros; each NUMC column followed by its number `COLUMN_INT`
+  (`INT4` up to 9 digits, `INT8` up to 18, `DEC(31,0)` beyond; left out with a note where the name would be longer than
+  30 characters), for a schema that wants numbers (`docs/mvp-scope.md`, NUMC decision);
 - named by a number (decided 2026-10-06; a characteristic name does not fit, and one in a namespace such as
   `/1BW/D01` has slashes): database view `ZZXXMLA1V` + 7 digits, DDL source `ZZXXMLA1_C` + the same digits. The
   source's description (`BW characteristic <char>: SID with active attributes`) names the characteristic; the view

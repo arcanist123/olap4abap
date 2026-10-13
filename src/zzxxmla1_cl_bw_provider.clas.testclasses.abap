@@ -59,6 +59,10 @@ CLASS ltc_bw_provider IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = store-basic exp = `ZFMSTORE` ).
     cl_abap_unit_assert=>assert_equals( act = store-view exp = `ZZXXMLA1V0000003` ).
     cl_abap_unit_assert=>assert_equals( act = store-key_column-name exp = `ZFMSTORE` ).
+    cl_abap_unit_assert=>assert_equals( act = store-key_column-datatype exp = `NUMC` ).
+    " NUMC: the view has its number too
+    cl_abap_unit_assert=>assert_equals( act = store-key_int_column-name exp = `ZFMSTORE_INT` ).
+    cl_abap_unit_assert=>assert_equals( act = store-key_int_column-datatype exp = `INT8` ).
     cl_abap_unit_assert=>assert_initial( store-text_column ).
     cl_abap_unit_assert=>assert_equals( act = lines( store-attributes ) exp = 12 ).
     cl_abap_unit_assert=>assert_equals( act = store-attributes[ 1 ]

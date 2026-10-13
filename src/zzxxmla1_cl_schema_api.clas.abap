@@ -14,10 +14,12 @@
 "! a refused request is {"error": "..."} with a 4xx or 5xx status.
 "! - GET providers: the InfoCubes and cube-type aDSOs (ZZXXMLA1_CL_BW_PROVIDER);
 "! - GET proposal?provider=X: the proposed schema (ZZXXMLA1_CL_SCHEMA_PROPOSAL) as XML and as an outline for the UI,
-"!   with the notes and the time suggestions;
+"!   with the notes, the time suggestions and the NUMC columns of its views that have a number (COLUMN_INT), which the
+"!   UI names in their place when a dimension is switched to numbers;
 "! - GET schemas: the catalogs of /WEB-INF/datasources.xml, each name once (its first definition, as the XMLA endpoint
 "!   reads them), with their schema files;
-"! - GET schema?catalog=X: the catalog's schema as XML and as an outline, to edit an accepted schema again;
+"! - GET schema?catalog=X: the catalog's schema as XML and as an outline, to edit an accepted schema again, with the
+"!   columns of its tables that have a number (a column COLUMN_INT next to COLUMN, from the dictionary);
 "! - POST check?catalog=X: the body is the edited schema XML. The checks of accept, nothing is changed: the schema
 "!   parses, and the server's catalogs with this one load in ZZXXMLA1_CL_SCHEMA as the XMLA endpoint will load them.
 "!   The schema file of an existing catalog is its Definition (it is replaced), of a new one
@@ -221,6 +223,13 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
     METHODS characteristic_of
       IMPORTING table         TYPE string
       RETURNING VALUE(result) TYPE string.
+    "! The columns of the tables that have a number, a column COLUMN_INT next to COLUMN (DD03L), with its data type.
+    METHODS int_columns
+      IMPORTING tables        TYPE string_table
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_schema_proposal=>ty_t_int_column.
+    METHODS int_columns_json
+      IMPORTING int_columns   TYPE zzxxmla1_cl_schema_proposal=>ty_t_int_column
+      RETURNING VALUE(result) TYPE string.
     "! The schema as the UI shows it: dimensions with attributes and hierarchies, cubes with dimensions and measures.
     METHODS outline
       IMPORTING !schema       TYPE zzxxmla1_cl_schema_def=>ty_schema
@@ -334,7 +343,8 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
              |"text":{ json( provider-text ) },"infoarea":{ json( provider-infoarea ) },| &&
              |"factTable":{ json( provider-fact_table ) }\},| &&
              |"xml":{ json( proposal-xml ) },"outline":{ outline( proposal-schema ) },| &&
-             |"notes":{ json_array( notes ) },"suggestions":{ json_array( suggestions ) }\}|.
+             |"notes":{ json_array( notes ) },"suggestions":{ json_array( suggestions ) },| &&
+             |"intColumns":{ int_columns_json( proposal-int_columns ) }\}|.
   ENDMETHOD.
 
   METHOD schemas.
@@ -370,9 +380,13 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
         RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 500
           message = |Schema file { entry-definition } not readable: { xom_error->error_message }|.
     ENDTRY.
+    DATA(outline) = outline( parsed ).
+    " the tables as the schema names them: without views, nothing is replaced
+    DATA(numbers) = int_columns( map_tables( CHANGING schema = parsed ) ).
     result = |\{"catalog":{ json( entry-name ) },"dataSource":{ json( entry-data_source ) },| &&
              |"file":{ json( entry-definition ) },"changedAt":{ json_timestamp( file-changed_at ) },| &&
-             |"changedBy":{ json( file-changed_by ) },"xml":{ json( file-content ) },"outline":{ outline( parsed ) }\}|.
+             |"changedBy":{ json( file-changed_by ) },"xml":{ json( file-content ) },"outline":{ outline },| &&
+             |"intColumns":{ int_columns_json( numbers ) }\}|.
   ENDMETHOD.
 
   METHOD check.
@@ -462,8 +476,10 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
       APPEND |\{"characteristic":{ json( view-characteristic ) },"ddlName":{ json( view-ddl_name ) },| &&
              |"viewName":{ json( view-view_name ) }\}| TO view_list.
     ENDLOOP.
+    " the tables with the views put in, whose numbers the UI switches to
+    DATA(accepted_tables) = map_tables( CHANGING schema = schema ).
     result = |\{"catalog":{ json( catalog ) },"file":{ json( path ) },"views":{ json_array( view_list ) },| &&
-             |"xml":{ json( xml ) }\}|.
+             |"xml":{ json( xml ) },"intColumns":{ int_columns_json( int_columns( accepted_tables ) ) }\}|.
   ENDMETHOD.
 
   METHOD remove.
@@ -806,6 +822,38 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     IF result IS INITIAL.
       result = zzxxmla1_cl_bw_view_gen=>adso_of_fact_placeholder( table ).
     ENDIF.
+  ENDMETHOD.
+
+  METHOD int_columns.
+    IF tables IS INITIAL.
+      RETURN.
+    ENDIF.
+    DATA names TYPE RANGE OF tabname.
+    names = VALUE #( FOR t IN tables ( sign = 'I' option = 'EQ' low = t ) ).
+    SELECT tabname, fieldname, datatype, leng FROM dd03l
+      WHERE tabname IN @names AND as4local = 'A'
+      INTO TABLE @DATA(fields).
+    LOOP AT tables INTO DATA(table).
+      LOOP AT fields INTO DATA(field) WHERE tabname = table.
+        READ TABLE fields INTO DATA(number) WITH KEY tabname = table fieldname = |{ field-fieldname }_INT|.
+        IF sy-subrc = 0.
+          APPEND VALUE #( table      = table
+                          column     = field-fieldname
+                          int_column = number-fieldname
+                          data_type  = zzxxmla1_cl_schema_proposal=>data_type(
+                                         VALUE #( datatype = number-datatype length = number-leng ) ) ) TO result.
+        ENDIF.
+      ENDLOOP.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD int_columns_json.
+    DATA entries TYPE string_table.
+    LOOP AT int_columns INTO DATA(entry).
+      APPEND |\{"table":{ json( entry-table ) },"column":{ json( entry-column ) },| &&
+             |"intColumn":{ json( entry-int_column ) },"dataType":{ json( entry-data_type ) }\}| TO entries.
+    ENDLOOP.
+    result = json_array( entries ).
   ENDMETHOD.
 
   METHOD outline.

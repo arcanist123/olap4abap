@@ -20,9 +20,12 @@ CLASS ltc_bw_view_gen DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION 
     "! with texts in EN and DE, a time-dependent one
     METHODS product
       RETURNING VALUE(result) TYPE ty_metadata.
-    "! the DDL of a customer characteristic: SID, key and attributes, NUMC as numbers by length, OBJVERS and CHANGED
-    "! left out, the /BIC/ namespace dropped from the column names
+    "! the DDL of a customer characteristic: SID, key and attributes, each NUMC one as BW holds it followed by its
+    "! number by length, OBJVERS and CHANGED left out, the /BIC/ namespace dropped from the column names
     METHODS customer_characteristic FOR TESTING.
+    "! the number of a NUMC column whose name would be longer than 30 characters is left out with a note; the number
+    "! says which column it is the number of and is no value of an InfoObject
+    METHODS numc_numbers FOR TESTING.
     "! texts in EN at the key date with the key in their place where there is none, time-dependent attributes at the
     "! key date (docs/bw-schema-design-guide.md, section 4)
     METHODS texts_and_time_dependent FOR TESTING.
@@ -134,11 +137,34 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
             |                                        and p.objvers = 'A'| && nl &&
             |\{| && nl &&
             |  key s.sid as SID,| && nl &&
-            |      cast( s./bic/zfmstore as abap.int8 ) as ZFMSTORE,| && nl &&
+            |      s./bic/zfmstore as ZFMSTORE,| && nl &&
+            |      cast( s./bic/zfmstore as abap.int8 ) as ZFMSTORE_INT,| && nl &&
             |      p./bic/zfmsname as ZFMSNAME,| && nl &&
-            |      cast( p./bic/zfmyear as abap.int4 ) as ZFMYEAR,| && nl &&
-            |      cast( p./bic/zfmsqft as abap.dec(31,0) ) as ZFMSQFT| && nl &&
+            |      p./bic/zfmyear as ZFMYEAR,| && nl &&
+            |      cast( p./bic/zfmyear as abap.int4 ) as ZFMYEAR_INT,| && nl &&
+            |      p./bic/zfmsqft as ZFMSQFT,| && nl &&
+            |      cast( p./bic/zfmsqft as abap.dec(31,0) ) as ZFMSQFT_INT| && nl &&
             |\}| && nl ).
+  ENDMETHOD.
+
+  METHOD numc_numbers.
+    DATA(metadata) = store( ).
+    APPEND VALUE #( field = 'D_NW_LONGATTRIBUTENAME_12345' datatype = 'NUMC' length = 3 )
+      TO metadata-attribute_columns.
+    APPEND VALUE #( iobjnm = '0D_NW_LONG' field = 'D_NW_LONGATTRIBUTENAME_12345' ) TO metadata-attributes.
+    DATA(layout) = zzxxmla1_cl_bw_view_gen=>build_layout( metadata ).
+    cl_abap_unit_assert=>assert_equals(
+      act = layout-notes
+      exp = VALUE zzxxmla1_cl_bw_view_gen=>ty_t_note(
+        ( iobjnm = '0D_NW_LONG'
+          reason = `no number of D_NW_LONGATTRIBUTENAME_12345: ` &&
+                   `D_NW_LONGATTRIBUTENAME_12345_INT is longer than 30 characters` ) ) ).
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( layout-columns[ name = `D_NW_LONGATTRIBUTENAME_12345` ] ) ) ).
+    DATA(number) = layout-columns[ name = `ZFMYEAR_INT` ].
+    cl_abap_unit_assert=>assert_equals( act = number-int_of exp = `ZFMYEAR` ).
+    cl_abap_unit_assert=>assert_equals( act = number-datatype exp = `INT4` ).
+    cl_abap_unit_assert=>assert_initial( number-iobjnm ).
+    cl_abap_unit_assert=>assert_equals( act = layout-columns[ name = `ZFMYEAR` ]-datatype exp = `NUMC` ).
   ENDMETHOD.
 
   METHOD texts_and_time_dependent.

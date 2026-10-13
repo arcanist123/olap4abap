@@ -20,9 +20,10 @@
 "!   table is left out (a note) if it is client-dependent (the engine reads with native SQL, which filters no client,
 "!   so a client-dependent table counts every fact once per client) or if a key field of it is not in the view.
 "! The columns are SID, the key with its compounding (from the SID table), the characteristic's text (named like the
-"! text field, TXTMD), then each attribute followed by its text (ATTRIBUTE_TXT). NUMC columns are delivered as
-"! numbers (INT4 up to 9 digits, INT8 up to 18, else DEC 31), the other columns as they are, all named without their
-"! namespace (/BIC/ or another). The table and field names are BW's (RSD_CHKTAB_GET_FOR_CHA_BAS, RSDIOBJ-FIELDNM),
+"! text field, TXTMD), then each attribute followed by its text (ATTRIBUTE_TXT), all as BW holds them and named
+"! without their namespace (/BIC/ or another). A NUMC column is followed by its value as a number, COLUMN_INT (INT4 up
+"! to 9 digits, INT8 up to 18, else DEC 31), for a schema that wants the number as the member's key or name; BW's value
+"! is the NUMC one, the default (docs/mvp-scope.md, NUMC decision). The table and field names are BW's (RSD_CHKTAB_GET_FOR_CHA_BAS, RSDIOBJ-FIELDNM),
 "! never built: their prefix depends on the namespace.
 "! A reference characteristic (RSDCHA-CHABASNM, 0SOLD_TO -> 0CUSTOMER) has no tables of its own: its view is the one of
 "! the basic characteristic, which schemas name for both.
@@ -110,8 +111,9 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
       END OF ty_metadata.
     TYPES:
       "! A column of the view: its name, its expression in the DDL source, the DDIC type of the field it is made of
-      "! (the view delivers a NUMC field as a number), the InfoObject whose value it is or, with text, whose text it is
-      "! (initial for SID and compounding), and whether that is a navigation attribute in BW.
+      "! (INT4, INT8 or DEC for the number of a NUMC column), the InfoObject whose value it is or, with text, whose
+      "! text it is (initial for SID, compounding and numbers), whether that is a navigation attribute in BW, and for
+      "! the number of a NUMC column the column it is the number of.
       BEGIN OF ty_view_column,
         name       TYPE string,
         expression TYPE string,
@@ -120,6 +122,7 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
         iobjnm     TYPE string,
         text       TYPE abap_bool,
         navigation TYPE abap_bool,
+        int_of     TYPE string,
       END OF ty_view_column,
       ty_t_view_column TYPE STANDARD TABLE OF ty_view_column WITH EMPTY KEY.
     TYPES:
@@ -390,11 +393,15 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
     METHODS text_table
       IMPORTING tables        TYPE ty_tables
       RETURNING VALUE(result) TYPE ty_text_table.
-    "! The column expression: a NUMC field cast to a number, any other field as it is; source is the table's alias.
-    CLASS-METHODS column_expression
-      IMPORTING column        TYPE ty_column
-                source        TYPE string
-      RETURNING VALUE(result) TYPE string.
+    "! Adds a field of a table as a column of the view, a NUMC field followed by its number (COLUMN_INT, a note
+    "! instead if the name is too long or taken); source is the table's alias.
+    CLASS-METHODS add_column
+      IMPORTING column     TYPE ty_column
+                source     TYPE string
+                name       TYPE string
+                iobjnm     TYPE csequence OPTIONAL
+                navigation TYPE abap_bool OPTIONAL
+      CHANGING  layout     TYPE ty_layout.
     "! A field as text, for coalesce with a text: CHAR as it is, other character-like types cast; initial if the
     "! type cannot be cast.
     CLASS-METHODS as_text
@@ -760,12 +767,11 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
     " SID, the key with its compounding, the characteristic's text
     APPEND VALUE #( name = `SID` expression = `s.sid` datatype = `INT4` length = 10 ) TO result-columns.
     LOOP AT metadata-sid_columns INTO column WHERE key = abap_true.
-      APPEND VALUE #( name       = view_column( column-field )
-                      expression = column_expression( column = column source = `s` )
-                      datatype   = column-datatype
-                      length     = column-length
-                      iobjnm     = COND #( WHEN column-field = key_field THEN metadata-tables-basic ) )
-        TO result-columns.
+      add_column( EXPORTING column = column
+                            source = `s`
+                            name   = view_column( column-field )
+                            iobjnm = COND string( WHEN column-field = key_field THEN metadata-tables-basic )
+                  CHANGING  layout = result ).
     ENDLOOP.
     " compounded: the name of a value by all key fields
     DATA(key_columns) = VALUE ty_t_column( FOR c IN metadata-sid_columns WHERE ( key = abap_true ) ( c ) ).
@@ -793,12 +799,12 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
       column = columns[ field = source-field ].
       DATA(attribute) = VALUE ty_attribute( metadata-attributes[ field = column-field ] OPTIONAL ).
       DATA(name) = view_column( column-field ).
-      APPEND VALUE #( name       = name
-                      expression = column_expression( column = column source = source-alias )
-                      datatype   = column-datatype
-                      length     = column-length
-                      iobjnm     = attribute-iobjnm
-                      navigation = attribute-navigation ) TO result-columns.
+      add_column( EXPORTING column     = column
+                            source     = source-alias
+                            name       = name
+                            iobjnm     = attribute-iobjnm
+                            navigation = attribute-navigation
+                  CHANGING  layout     = result ).
       IF attribute-texts IS NOT INITIAL.
         add_text( EXPORTING texts   = attribute-texts
                             iobjnm  = attribute-iobjnm
@@ -922,16 +928,36 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
     result = result && nl && |\}| && nl.
   ENDMETHOD.
 
-  METHOD column_expression.
+  METHOD add_column.
     DATA(field) = |{ source }.{ to_lower( column-field ) }|.
+    APPEND VALUE #( name       = name
+                    expression = field
+                    datatype   = column-datatype
+                    length     = column-length
+                    iobjnm     = iobjnm
+                    navigation = navigation ) TO layout-columns.
     IF column-datatype <> 'NUMC'.
-      result = field.
-    ELSEIF column-length <= 9.
-      result = |cast( { field } as abap.int4 )|.
+      RETURN.
+    ENDIF.
+    DATA(int_name) = |{ name }_INT|.
+    IF strlen( int_name ) > 30.
+      APPEND VALUE #( iobjnm = iobjnm reason = |no number of { name }: { int_name } is longer than 30 characters| )
+        TO layout-notes.
+      RETURN.
+    ELSEIF line_exists( layout-columns[ name = int_name ] ).
+      APPEND VALUE #( iobjnm = iobjnm reason = |no number of { name }: { int_name } is the name of another column| )
+        TO layout-notes.
+      RETURN.
+    ENDIF.
+    IF column-length <= 9.
+      APPEND VALUE #( name = int_name expression = |cast( { field } as abap.int4 )| datatype = `INT4` length = 10
+                      int_of = name ) TO layout-columns.
     ELSEIF column-length <= 18.
-      result = |cast( { field } as abap.int8 )|.
+      APPEND VALUE #( name = int_name expression = |cast( { field } as abap.int8 )| datatype = `INT8` length = 19
+                      int_of = name ) TO layout-columns.
     ELSE.
-      result = |cast( { field } as abap.dec(31,0) )|.
+      APPEND VALUE #( name = int_name expression = |cast( { field } as abap.dec(31,0) )| datatype = `DEC` length = 31
+                      int_of = name ) TO layout-columns.
     ENDIF.
   ENDMETHOD.
 

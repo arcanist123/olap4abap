@@ -45,6 +45,11 @@ def main():
 
     status, body, _ = call(args.url, args.client, "GET", "proposal", {"provider": "ZFMSALES"})
     zfmsales_xml = body.get("xml", "")
+    numbers = {(c["column"], c["intColumn"], c["dataType"]) for c in body.get("intColumns", [])}
+    check("proposal: NUMC as BW holds it, its number listed for the UI",
+          '<NameColumn dataType="String" columnName="ZFMSTORE">' in zfmsales_xml
+          and ("ZFMSTORE", "ZFMSTORE_INT", "Integer") in numbers and ("ZFMYEAR", "ZFMYEAR_INT", "Numeric") in numbers,
+          body.get("intColumns"))
     outline = body.get("outline", {})
     cube = (outline.get("cubes") or [{}])[0]
     check("proposal of an InfoCube", status == 200 and body["xml"].startswith("<Schema name=\"ZFMSALES\"")
@@ -105,6 +110,10 @@ def main():
     for name, entry in schemas.items():
         status, body, _ = call(args.url, args.client, "GET", "schema", {"catalog": name})
         stored = body.get("xml", "")
+        if name == "ZFOODMART":
+            numbers = {(c["table"], c["column"], c["intColumn"]) for c in body.get("intColumns", [])}
+            check("schema of ZFOODMART: the numbers of its views' NUMC columns",
+                  ("ZZXXMLA1V0000003", "ZFMSQFT", "ZFMSQFT_INT") in numbers, body.get("intColumns"))
         check(f"schema of {name}", status == 200 and body.get("file") == entry["file"]
               and stored.lstrip().startswith(("<Schema", "<?xml")) and body.get("outline", {}).get("cubes"), body)
         status, body, _ = call(args.url, args.client, "POST", "check", {"catalog": name}, stored)

@@ -60,12 +60,14 @@ CLASS zzxxmla1_cl_bw_provider DEFINITION
       END OF ty_column.
     TYPES:
       "! an attribute of a characteristic, time-independent or time-dependent (at the key date); its column is the one
-      "! of the attribute table, which the characteristic's view delivers without namespace (and a NUMC column as a
-      "! number), its text column the view's column of its text, initial if it has none
+      "! of the attribute table, which the characteristic's view delivers without namespace, its int column the view's
+      "! number of a NUMC column (COLUMN_INT, initial for any other), its text column the view's column of its text,
+      "! initial if it has none
       BEGIN OF ty_attribute,
         iobjnm      TYPE string,
         text        TYPE string,
         column      TYPE ty_column,
+        int_column  TYPE ty_column,
         text_column TYPE string,
         navigation  TYPE abap_bool,  " a navigation attribute the provider switches on
       END OF ty_attribute,
@@ -81,6 +83,8 @@ CLASS zzxxmla1_cl_bw_provider DEFINITION
         view        TYPE string,     " the database view of the basic characteristic's DDL source, initial if it is
                                      " not generated yet or lacks a column it is generated with now
         key_column  TYPE ty_column,  " the characteristic's value as a column of the view
+        "! NUMC: the view's number of the key column (ZFMSTORE_INT); initial for any other
+        key_int_column TYPE ty_column,
         "! compounded: the view's column of the compounding and the value (K4/2024001), initial for any other
         name_column TYPE ty_column,
         "! the fact column is the SID: always on an InfoCube, on an aDSO for a compounded characteristic (its fact view's)
@@ -145,6 +149,11 @@ CLASS zzxxmla1_cl_bw_provider DEFINITION
                 fact_column     TYPE ty_column
                 adso_navigation TYPE abap_bool OPTIONAL
       RETURNING VALUE(result)   TYPE ty_characteristic.
+    "! The view's number of a NUMC column, initial if it has none.
+    CLASS-METHODS int_column
+      IMPORTING layout        TYPE zzxxmla1_cl_bw_view_gen=>ty_layout
+                column        TYPE string
+      RETURNING VALUE(result) TYPE ty_column.
     "! A key figure with its aggregation; aggregation is the aDSO's, initial for the InfoObject's.
     METHODS key_figure
       IMPORTING iobjnm        TYPE rsiobjnm
@@ -402,6 +411,7 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
       APPEND VALUE #( iobjnm = note-iobjnm reason = |{ note-reason } (of { iobjnm })| ) TO notes.
     ENDLOOP.
     result-key_column = VALUE #( name = key-name datatype = key-datatype length = key-length ).
+    result-key_int_column = int_column( layout = layout column = key-name ).
     READ TABLE layout-columns INTO DATA(compound_key) WITH KEY name = zzxxmla1_cl_bw_view_gen=>c_compound_key.
     IF sy-subrc = 0.
       result-name_column = VALUE #( name = compound_key-name datatype = compound_key-datatype
@@ -417,6 +427,7 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
       APPEND VALUE #( iobjnm      = column-iobjnm
                       text        = text_of( CONV #( column-iobjnm ) )
                       column      = VALUE #( name = column-name datatype = column-datatype length = column-length )
+                      int_column  = int_column( layout = layout column = column-name )
                       text_column = VALUE #( layout-columns[ iobjnm = column-iobjnm text = abap_true ]-name OPTIONAL )
                       navigation  = navigation ) TO result-attributes.
     ENDLOOP.
@@ -432,6 +443,13 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
           EXIT.
         ENDIF.
       ENDLOOP.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD int_column.
+    READ TABLE layout-columns INTO DATA(number) WITH KEY int_of = column.
+    IF sy-subrc = 0.
+      result = VALUE #( name = number-name datatype = number-datatype length = number-length ).
     ENDIF.
   ENDMETHOD.
 

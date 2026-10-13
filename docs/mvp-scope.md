@@ -49,8 +49,12 @@ Decisions taken by the project owner on 2026-10-02, with reasons.
   joined with the active attributes; `ZZXXMLA1_CL_BW_VIEW_GEN`, see `bw-to-schema-mapping.md`). The views are
   DDIC-based CDS views (7.50 has no view entities); database view `ZZXXMLA1V` + 7 digits, the name the
   schema uses (decided 2026-10-04: always a number, 16 characters do not fit the prefix and a characteristic), DDL
-  source `ZZXXMLA1_C` + the same digits (decided 2026-10-06: a namespace's slashes are not allowed in it). **All NUMC columns are delivered as numbers** (decided 2026-10-04), so members read
-  `1997`, not `000...1997`. The eMondrian reference database holds copies of the BW tables and the same views, with
+  source `ZZXXMLA1_C` + the same digits (decided 2026-10-06: a namespace's slashes are not allowed in it). **NUMC columns are delivered as BW holds them**, each followed
+  by its number `COLUMN_INT` (decided 2026-10-13, replacing "all NUMC columns as numbers" of 2026-10-04): BW's value
+  (`0042`) is the default, a number as the member's key or name is a choice of the schema, which names the `_INT`
+  column (the schema builder's "As numbers" per dimension). The reference's schema format names columns only, no
+  expressions, and a view is shared by every schema of its characteristic, so the view has both. FoodMart's schemas
+  name the numbers (`1997`, Store Sqft), the schema builder proposes BW's values. The eMondrian reference database holds copies of the BW tables and the same views, with
   HANA's view SQL (HSQLDB 2.3.2 accepts it and `/` in quoted names; checked 2026-10-04), so the data is identical.
 - **The engine reads data with native HANA SQL through ADBC** (Mondrian's `SqlQuery` with a dialect), not with
   ABAP SQL: `<SQL>` variants are raw SQL embedded in the statement. Compile-time checks of table and column names are

@@ -301,16 +301,15 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
       IMPORTING adso          TYPE abap_bool
                 views         TYPE zzxxmla1_cl_bw_view_gen=>ty_t_view
       RETURNING VALUE(result) TYPE string.
-    "! The key attribute's columns: on the cube keyed by the SID and named by the value, on the aDSO keyed by the value.
+    "! The key attribute's columns: on the cube keyed by the SID and named by the value, on the aDSO keyed by the value;
+    "! the value as BW holds it, NUMC with its zeros.
     METHODS key_columns
       IMPORTING adso          TYPE abap_bool
                 column        TYPE csequence
-                data_type     TYPE csequence
       RETURNING VALUE(result) TYPE string.
     METHODS attribute_xml
       IMPORTING name          TYPE csequence
                 column        TYPE csequence
-                data_type     TYPE csequence DEFAULT `String`
                 level_type    TYPE csequence OPTIONAL
       RETURNING VALUE(result) TYPE string.
     METHODS view_of
@@ -392,7 +391,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD characteristics.
-    " attributes first: the dimension characteristics reference them; NUMC attributes are delivered as numbers
+    " attributes first: the dimension characteristics reference them; NUMC values are named as BW holds them (2025, 01)
     result = VALUE #(
       ( name = 'ZCLPNAME' text = 'Patient Name'      leng = 60 )
       ( name = 'ZCLSEX'   text = 'Sex'               leng = 10 )
@@ -1750,14 +1749,14 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
 
   METHOD key_columns.
     result = COND #(
-      WHEN adso = abap_true THEN |<KeyColumn dataType="{ data_type }" columnName="{ column }"/>|
-      ELSE |<KeyColumn dataType="Integer" columnName="SID"/><NameColumn dataType="{ data_type }" columnName="{ column }"/>| ).
+      WHEN adso = abap_true THEN |<KeyColumn dataType="String" columnName="{ column }"/>|
+      ELSE |<KeyColumn dataType="Integer" columnName="SID"/><NameColumn dataType="String" columnName="{ column }"/>| ).
   ENDMETHOD.
 
   METHOD attribute_xml.
     result = |    <DimensionAttribute name="{ name }"| &&
              COND string( WHEN level_type IS NOT INITIAL THEN | levelType="{ level_type }"| ) &&
-             |><KeyColumn dataType="{ data_type }" columnName="{ column }"/></DimensionAttribute>\n|.
+             |><KeyColumn dataType="String" columnName="{ column }"/></DimensionAttribute>\n|.
   ENDMETHOD.
 
   METHOD view_of.
@@ -1783,10 +1782,10 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       |<Schema name="{ name }">\n| &&
       |  <Dimension name="Patient" table="{ view_of( views = views iobjnm = 'ZCLPAT' ) }">\n| &&
       |    <DimensionAttribute name="Patient Id" usage="Key">| &&
-      key_columns( adso = adso column = `ZCLPAT` data_type = `Integer` ) && |</DimensionAttribute>\n| &&
+      key_columns( adso = adso column = `ZCLPAT` ) && |</DimensionAttribute>\n| &&
       attribute_xml( name = `Patient Name` column = `ZCLPNAME` ) &&
       attribute_xml( name = `Sex` column = `ZCLSEX` ) &&
-      attribute_xml( name = `Birth Year` column = `ZCLBYEAR` data_type = `Integer` ) &&
+      attribute_xml( name = `Birth Year` column = `ZCLBYEAR` ) &&
       attribute_xml( name = `Age Group` column = `ZCLAGEGR` ) &&
       attribute_xml( name = `Blood Group` column = `ZCLBLOOD` ) &&
       attribute_xml( name = `Insurance` column = `ZCLINSUR` ) &&
@@ -1809,10 +1808,10 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       |  </Dimension>\n| &&
       |  <Dimension name="Physician" table="{ view_of( views = views iobjnm = 'ZCLDOC' ) }">\n| &&
       |    <DimensionAttribute name="Physician Id" usage="Key">| &&
-      key_columns( adso = adso column = `ZCLDOC` data_type = `Integer` ) && |</DimensionAttribute>\n| &&
+      key_columns( adso = adso column = `ZCLDOC` ) && |</DimensionAttribute>\n| &&
       attribute_xml( name = `Physician Name` column = `ZCLDNAME` ) &&
       attribute_xml( name = `Department` column = `ZCLDEPT` ) &&
-      attribute_xml( name = `Years in Practice` column = `ZCLEXPER` data_type = `Integer` ) &&
+      attribute_xml( name = `Years in Practice` column = `ZCLEXPER` ) &&
       |    <Hierarchy hasAll="true" allMemberName="All Physicians">\n| &&
       |      <Level name="Department" uniqueMembers="true" sourceAttribute="Department"/>\n| &&
       |      <Level name="Physician" uniqueMembers="true" nameColumn="ZCLDNAME" sourceAttribute="Physician Id">\n| &&
@@ -1822,7 +1821,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       |  </Dimension>\n| &&
       |  <Dimension name="Diagnosis" table="{ view_of( views = views iobjnm = 'ZCLDIAG' ) }">\n| &&
       |    <DimensionAttribute name="Diagnosis Code" usage="Key">| &&
-      key_columns( adso = adso column = `ZCLDIAG` data_type = `String` ) && |</DimensionAttribute>\n| &&
+      key_columns( adso = adso column = `ZCLDIAG` ) && |</DimensionAttribute>\n| &&
       attribute_xml( name = `Diagnosis Name` column = `ZCLDTEXT` ) &&
       attribute_xml( name = `Diagnosis Group` column = `ZCLDGRP` ) &&
       attribute_xml( name = `Chapter` column = `ZCLDCHAP` ) &&
@@ -1834,7 +1833,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       |  </Dimension>\n| &&
       |  <Dimension name="Visit Type" table="{ view_of( views = views iobjnm = 'ZCLVTYPE' ) }">\n| &&
       |    <DimensionAttribute name="Type" usage="Key">| &&
-      key_columns( adso = adso column = `ZCLVTYPE` data_type = `String` ) && |</DimensionAttribute>\n| &&
+      key_columns( adso = adso column = `ZCLVTYPE` ) && |</DimensionAttribute>\n| &&
       attribute_xml( name = `Care Setting` column = `ZCLSETNG` ) &&
       |    <Hierarchy hasAll="true" allMemberName="All Visit Types">\n| &&
       |      <Level name="Care Setting" uniqueMembers="true" sourceAttribute="Care Setting"/>\n| &&
@@ -1843,7 +1842,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       |  </Dimension>\n| &&
       |  <Dimension name="Site" table="{ view_of( views = views iobjnm = 'ZCLSITE' ) }">\n| &&
       |    <DimensionAttribute name="Site Id" usage="Key">| &&
-      key_columns( adso = adso column = `ZCLSITE` data_type = `String` ) && |</DimensionAttribute>\n| &&
+      key_columns( adso = adso column = `ZCLSITE` ) && |</DimensionAttribute>\n| &&
       attribute_xml( name = `City` column = `ZCLCITY` ) &&
       |    <Hierarchy hasAll="true" allMemberName="All Sites">\n| &&
       |      <Level name="Site" uniqueMembers="true" sourceAttribute="Site Id">\n| &&
@@ -1873,15 +1872,15 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       result = result &&
         |  <Dimension name="Time" type="TimeDimension" table="{ view_of( views = views iobjnm = 'ZCLDATE' ) }">\n| &&
         |    <DimensionAttribute name="Date Id" usage="Key" levelType="TimeDays">| &&
-        key_columns( adso = adso column = `ZCLDATE` data_type = `Integer` ) && |</DimensionAttribute>\n| &&
+        key_columns( adso = adso column = `ZCLDATE` ) && |</DimensionAttribute>\n| &&
         attribute_xml( name = `The Date` column = `ZCLTHEDT` level_type = `TimeDays` ) &&
         attribute_xml( name = `Day Name` column = `ZCLDAYNM` level_type = `TimeUndefined` ) &&
         attribute_xml( name = `Month Name` column = `ZCLMONNM` level_type = `TimeMonths` ) &&
-        attribute_xml( name = `Year` column = `ZCLYEAR` data_type = `Integer` level_type = `TimeYears` ) &&
+        attribute_xml( name = `Year` column = `ZCLYEAR` level_type = `TimeYears` ) &&
         attribute_xml( name = `Quarter` column = `ZCLQTR` level_type = `TimeQuarters` ) &&
-        attribute_xml( name = `Month of Year` column = `ZCLMONTH` data_type = `Integer` level_type = `TimeMonths` ) &&
-        attribute_xml( name = `Week of Year` column = `ZCLWEEK` data_type = `Integer` level_type = `TimeWeeks` ) &&
-        attribute_xml( name = `Day of Month` column = `ZCLDAYOM` data_type = `Integer` level_type = `TimeDays` ) &&
+        attribute_xml( name = `Month of Year` column = `ZCLMONTH` level_type = `TimeMonths` ) &&
+        attribute_xml( name = `Week of Year` column = `ZCLWEEK` level_type = `TimeWeeks` ) &&
+        attribute_xml( name = `Day of Month` column = `ZCLDAYOM` level_type = `TimeDays` ) &&
         |    <Hierarchy hasAll="false" defaultMember="[Time].[2025]">\n| &&
         |      <Level name="Year" uniqueMembers="true" sourceAttribute="Year" levelType="TimeYears"/>\n| &&
         |      <Level name="Quarter" uniqueMembers="false" sourceAttribute="Quarter" levelType="TimeQuarters"/>\n| &&
@@ -1909,7 +1908,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
         result = result &&
           |  <Dimension name="{ period-scope }" table="{ view_of( views = views iobjnm = CONV #( period-key ) ) }">\n| &&
           |    <DimensionAttribute name="{ period-scope }" usage="Key">| &&
-          key_columns( adso = adso column = column data_type = `Integer` ) && |</DimensionAttribute>\n| &&
+          key_columns( adso = adso column = column ) && |</DimensionAttribute>\n| &&
           |  </Dimension>\n|.
       ENDLOOP.
       LOOP AT VALUE ty_t_group_weight( ( scope = `Patient` key = `ZCLPAT` ) ( scope = `Physician` key = `ZCLDOC` )

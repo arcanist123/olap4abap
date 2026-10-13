@@ -125,6 +125,26 @@ def main():
         check("with the suggested level type", page.locator("tr:has(.kind) select").input_value() == "TimeMonths")
         shot(page, "4-adso-time")
 
+        # NUMC as numbers: the store's NUMC columns (the aDSO's key too) switch to the views' numbers, and back
+        page.click(".tree .item:has-text('ZFMSTORE')")
+        page.click("text=As numbers")
+        page.wait_for_selector(".status.busy", timeout=5000)
+        loads = "Loads" in status(page)
+        page.click("role=tab[name='XML']")
+        xml = page.input_value("textarea.xml")
+        check("NUMC as numbers loads", loads and re.search(
+            r'<DimensionAttribute name="ZFMSTORE Key"[^>]*>\s*<KeyColumn dataType="Integer" columnName="ZFMSTORE_INT"', xml)
+            is not None and 'columnName="ZFMSQFT_INT"' in xml,
+            [line.strip() for line in xml.splitlines() if "ZFMSTORE" in line and "Column" in line])
+        page.click("role=tab[name='Outline']")
+        page.click("text=As numbers")
+        page.click("role=tab[name='XML']")
+        xml = page.input_value("textarea.xml")
+        check("and back as BW holds them", "_INT" not in xml and re.search(
+            r'<DimensionAttribute name="ZFMSTORE Key"[^>]*>\s*<KeyColumn dataType="String" columnName="ZFMSTORE"', xml)
+            is not None)
+        page.click("role=tab[name='Outline']")
+
         # members with facts: proposed on every dimension of the cube, dropped from the one marked time (the server
         # refuses it there); switched off for the store, its annotation goes
         page.click(".tree .item:has-text('ZFMSALESA') >> nth=1")

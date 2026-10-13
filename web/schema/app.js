@@ -167,6 +167,31 @@ function suggestionKeys(doc, suggestions) {
 }
 const suggestionFor = (suggestions, dim, attribute) => suggestions.get(`${attr(dim, 'table')}|${keyColumn(attribute)}`);
 
+// The NUMC columns of the views that have a number too (COLUMN_INT, ZZXXMLA1_CL_BW_VIEW_GEN), keyed by the table and
+// column, both ways: a column as BW holds it (0042, String) to its number (42) and back.
+function numberKeys(intColumns) {
+  const keys = new Map();
+  for (const c of intColumns || []) {
+    keys.set(`${c.table}|${c.column}`, { column: c.intColumn, dataType: c.dataType, number: true });
+    keys.set(`${c.table}|${c.intColumn}`, { column: c.column, dataType: 'String', number: false });
+  }
+  return keys;
+}
+// the column elements of a dimension's attributes that name a NUMC column or its number
+const numberColumns = (dim, numbers) => attributesOf(dim)
+  .flatMap((a) => ['KeyColumn', 'NameColumn', 'OrderByColumn'].flatMap((tag) => kids(a, tag)))
+  .map((el) => ({ el, other: numbers.get(`${attr(dim, 'table')}|${attr(el, 'columnName')}`) }))
+  .filter(({ other }) => other);
+// whether the dimension names the numbers: some column is one
+const namesNumbers = (dim, numbers) => numberColumns(dim, numbers).some(({ other }) => !other.number);
+function setNumbers(dim, on, numbers) {
+  for (const { el, other } of numberColumns(dim, numbers)) {
+    if (other.number !== on) continue;
+    el.setAttribute('columnName', other.column);
+    el.setAttribute('dataType', other.dataType);
+  }
+}
+
 function setTimeDimension(dim, on, suggestions) {
   const attributes = attributesOf(dim);
   if (on) {
@@ -653,8 +678,9 @@ function DrillThroughSection({ doc, edit, cube }) {
   </section>`;
 }
 
-function DimensionPane({ doc, edit, dim, sel, select, suggestions }) {
+function DimensionPane({ doc, edit, dim, sel, select, suggestions, numbers }) {
   const time = isTime(dim);
+  const numeric = numberColumns(dim, numbers).length > 0;
   const attributes = attributesOf(dim);
   const hierarchies = hierarchiesOf(dim);
   const usages = isShared(dim) ? usagesOf(doc, dim) : [];
@@ -695,6 +721,11 @@ function DimensionPane({ doc, edit, dim, sel, select, suggestions }) {
         <${Check} checked=${time} label="Time dimension" onChange=${(on) => edit(() => setTimeDimension(dim, on, suggestions))} />
         <span class="muted small">enables the time functions (Ytd, ParallelPeriod, …); every level then needs a time level type</span>
       </span>
+      ${numeric && html`<label>NUMC values</label>
+      <span class="row">
+        <${Check} checked=${namesNumbers(dim, numbers)} label="As numbers" onChange=${(on) => edit(() => setNumbers(dim, on, numbers))} />
+        <span class="muted small">members named 42 instead of 0042, BW's value: the view's number of each NUMC column (COLUMN_INT); on an aDSO the key too</span>
+      </span>`}
       ${isShared(dim) && html`<label>Used by</label>
         <span>${usages.length ? usages.map(({ cube, usage }, i) => html`${i > 0 && ', '}<button class="link"
           onClick=${() => select({ kind: 'cube', ci: cubesOf(doc).indexOf(cube) })}>${attr(cube, 'name')}</button>
@@ -910,6 +941,8 @@ function Editor({ session, onClose, onAccepted }) {
   const [version, setVersion] = useState(0);
   const [source, setSource] = useState(session.source);
   const [catalog, setCatalog] = useState(session.catalog);
+  // accept puts the views in place of the placeholders the numbers were keyed by
+  const [numbers, setNumberKeys] = useState(session.numbers);
   const [dirty, setDirty] = useState(false);
   const [sel, setSel] = useState({ kind: 'schema' });
   const [tab, setTab] = useState('outline');
@@ -979,6 +1012,7 @@ function Editor({ session, onClose, onAccepted }) {
       const result = await api('POST', 'accept', { catalog }, xml);
       undoStack.current = [];
       setDoc(parseXml(result.xml));
+      setNumberKeys(numberKeys(result.intColumns));
       setVersion((v) => v + 1);
       setDirty(false);
       const reopened = { kind: 'schema', name: result.catalog, file: result.file, changedAt: new Date().toISOString(), changedBy: '' };
@@ -1025,7 +1059,7 @@ function Editor({ session, onClose, onAccepted }) {
         ${tab === 'xml' ? html`<${XmlPane} xml=${xml} replace=${replace} />`
           : shownSel.kind === 'cube' ? html`<${CubePane} key=${JSON.stringify(shownSel)} doc=${doc} edit=${edit} cube=${target} select=${setSel} />`
             : shownSel.kind === 'dim' ? html`<${DimensionPane} key=${JSON.stringify(shownSel)} doc=${doc} edit=${edit} dim=${target} sel=${shownSel}
-                select=${setSel} suggestions=${session.suggestions} />`
+                select=${setSel} suggestions=${session.suggestions} numbers=${numbers} />`
               : html`<${SchemaPane} doc=${doc} edit=${edit} source=${source} catalog=${catalog} notes=${session.notes} />`}
       </main>
     </div>
@@ -1097,6 +1131,7 @@ function App() {
           source: { kind: 'proposal', name: d.provider.name, providerKind: d.provider.kind, text: d.provider.text, factTable: d.provider.factTable },
           notes: d.notes || [],
           suggestions: suggestionKeys(doc, d.suggestions),
+          numbers: numberKeys(d.intColumns),
         };
       } else {
         const d = await api('GET', 'schema', { catalog: what.name });
@@ -1106,6 +1141,7 @@ function App() {
           source: { kind: 'schema', name: d.catalog, file: d.file, changedAt: d.changedAt, changedBy: d.changedBy },
           notes: [],
           suggestions: new Map(),
+          numbers: numberKeys(d.intColumns),
         };
       }
       next.id = ++counter.current;

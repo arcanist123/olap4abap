@@ -28,10 +28,8 @@ providers stays in `/WEB-INF/datasources.xml`.
   BW dimension (`ZXMLWIDE1` holds `ZXMLAD00` to `ZXMLAD09`, ..., `ZXMLWIDEA` holds `ZXMLAD90` to `ZXMLAD99`).
 - Cube-type aDSO `ZXMLWIDEA` with the same characteristics and records.
 - No views, schema or catalog: make them with the schema builder (`/zzxxmla1/schema`, `docs/schema-generator.md`).
-  The schema made so on SAP (catalog `ZXMLWIDE`, views `ZZXXMLA1V0000033` ... `132`) is
-  `reference/schema/ZXMLWIDE.xml`; the reference server has it with copies of the cube's tables and views
-  (`docs/environment.md`, the reference database holds the BW tables). A run of the generator deletes the views and
-  creates the tables again: make the schema again, then `build-bw-reference-db.py` and `deploy-reference-schema.sh`.
+  The reference server has no copy of the wide demo (its schema and tables were removed on 2026-10-13, when the views
+  got BW's NUMC values; the schemas made before named the numbers).
 
 ## The data
 

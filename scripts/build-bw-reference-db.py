@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""Copies the BW tables of the cubes ZFMSALES and ZXMLWIDE, as BW holds them, into the reference database of the
-eMondrian container.
+"""Copies the BW tables of the cube ZFMSALES, as BW holds them, into the reference database of the eMondrian container.
 
 Why: the reference schema (reference/schema/FoodmartBW.xml) names the BW tables themselves (/BIC/FZFMSALES,
 /BIC/SZFMSTORE, /BIC/PZFMSTORE, ...), so that the same schema runs in eMondrian and in SAP (docs/mvp-scope.md, schema
 decision). The reference database therefore needs tables of these names with BW's contents: the fact table and the SID
 and attribute tables of the characteristics of the cube, with BW's columns and values (NUMC zero-padded, blank
-instead of NULL, SIDs equal to the FoodMart ids). The same for the wide demo ZXMLWIDE (docs/wide-demo.md), whose schema
-reference/schema/ZXMLWIDE.xml the schema builder made on SAP: 100 characteristics, 201 tables.
+instead of NULL, SIDs equal to the FoodMart ids).
 
 1. Export (skipped with --no-export): the columns of the tables from DD03L and their rows, read with
    `sapcli datapreview osql` (logon data from .env.sap), into data/foodmart-bw/bw/<table>.json (git-ignored); and the
@@ -42,7 +40,6 @@ SCRIPT = "hsqldb-foodmart/foodmart.script"
 # the cubes and their characteristics; DD03L is read per cube with the LIKE pattern of its tables
 CUBES = {
     "ZFMSALES": (["ZFMPROD", "ZFMCUST", "ZFMSTORE", "ZFMPROMO", "ZFMDATE"], "/BIC/_ZFM%"),
-    "ZXMLWIDE": ([f"ZXMLAD{n:02}" for n in range(100)], "/BIC/_ZXML%"),
 }
 TABLES = [table for cube, (characteristics, _) in CUBES.items()
           for table in [f"/BIC/F{cube}"] + [f"/BIC/{t}{c}" for c in characteristics for t in "SP"]]

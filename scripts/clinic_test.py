@@ -49,9 +49,9 @@ SETS = [
 ]
 # the members that have no facts: not members at all
 UNKNOWN = ["[Patient].[Coastal]", "[Patient].[Coastal].[Kingsport]", "[Patient.Region].[Coastal]",
-           "[Patient.City].[Kingsport]", "[Patient.Patient Id].[2001]"]
+           "[Patient.City].[Kingsport]", "[Patient.Patient Id].[002001]"]
 # the members with facts next to them: found
-KNOWN = ["[Patient].[North]", "[Patient.City].[Ashford]", "[Patient.Patient Id].[2000]"]
+KNOWN = ["[Patient].[North]", "[Patient.City].[Ashford]", "[Patient.Patient Id].[002000]"]
 # the levels whose LEVEL_CARDINALITY is checked
 CARDINALITIES = {"[Patient].[Region]": "[Patient].[Region].Members", "[Patient].[City]": "[Patient].[City].Members",
                  "[Patient].[Patient]": "[Patient].[Patient].Members",

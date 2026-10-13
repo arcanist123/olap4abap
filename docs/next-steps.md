@@ -166,8 +166,7 @@ fact was counted once per compounding value, in cells and in the native crossjoi
    inner join.
 
 Not done, decided: no hierarchy with the compounding as a level above (`[0FISCPER.Fiscal].[K4].[2024001]`), the
-schemas are flat; no join on two generated string columns (HANA cannot use the columns, and the NUMC values are
-numbers in the views but text in the facts); no SID columns for the characteristics without compounding (a join each,
+schemas are flat; no join on two generated string columns (HANA cannot use the columns); no SID columns for the characteristics without compounding (a join each,
 up to 100 on the wide demo, and SID order); no keys of several columns in the engine (not in the reference's schema,
 which then could not serve these schemas).
 

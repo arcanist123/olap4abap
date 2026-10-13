@@ -97,9 +97,14 @@ BW has; no dimension is built on the fact table's own columns, and the proposal 
   (whose attribute table holds only the initial row, so the view is a left outer join, see Implementation), joined
   on the SID column (InfoCube) or the value column (aDSO). Their level type is a suggestion. `0CALDAY` has no SID
   table, so it has no view and is not proposed (a note): not supported, on either kind. Member names are BW's values
-  (`19971`, `199701`). The aDSO joins compare the view's key (NUMC cast to a number) with the fact column (NUMC
-  text); HANA converts, checked with queries on `ZFMSALESA` (quarters, months, weeks and stores give FoodMart's
-  numbers).
+  (`19971`, `199701`). The aDSO joins compare the view's key with the fact column, both NUMC as BW holds them; a
+  dimension switched to numbers compares the view's `_INT` column with the fact column (NUMC text), which HANA
+  converts, checked with queries on `ZFMSALESA` (quarters, months, weeks and stores give FoodMart's numbers).
+- **NUMC values** are proposed as BW holds them (`0042`, `dataType="String"`; `docs/mvp-scope.md`, NUMC decision). The
+  proposal lists the NUMC columns whose view has a number (`COLUMN_INT`), and so do a reopened schema (from the
+  dictionary) and an accept (`intColumns` of the API); the UI's "As numbers" of a dimension names the numbers in
+  their place in every `KeyColumn`, `NameColumn` and `OrderByColumn` of its attributes (`42`, `Integer` or
+  `Numeric`; on an aDSO the key too), and back.
 - **Any dimension can be marked as time** in the UI, like `ZFMDATE` of the reference schema: a switch writes
   `type="TimeDimension"`, every attribute gets a level type (pre-selected from the suggestions, else `TimeUndefined`,
   because Mondrian requires one on every level of a time dimension, the attribute hierarchies included), hierarchies

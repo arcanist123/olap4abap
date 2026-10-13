@@ -222,7 +222,7 @@ LEFT OUTER JOIN /bic/szclroom AS s1 ON s1./bic/zclsite = a./bic/zclsite AND s1./
 - An aDSO's fact whose value has no SID drops out (the engine inner-joins), as a value missing in the view does.
 
 Not used: a hierarchy with the compounding as a level above (the schemas are flat); a join on generated string
-columns (HANA cannot use them, and NUMC values are numbers in the views but text in the facts); keys of several
+columns (HANA cannot use them); keys of several
 columns (not in the reference's schema format).
 
 ## 4. Views
@@ -361,8 +361,9 @@ Current limits of olap4abap:
 
 - **The schema generator follows this guide** (since 2026-10-08; `schema-generator.md`, The proposal), with these
   differences:
-  - NUMC keys and attributes are delivered by the views as numbers (as for FoodMart, whose reference numbers depend on
-    it), so a NUMC member is named without its leading zeros (`1000`, not `0000001000`); CHAR keys are internal.
+  - NUMC keys and attributes are BW's values, with their leading zeros (`0000001000`); the views also have each as a
+    number (`COLUMN_INT`), which the UI's "As numbers" names per dimension (`1000`; on an aDSO the key too). No
+    conversion exit is applied: CHAR keys are internal (ALPHA's `0000001000`, not `1000`).
   - Captions are the InfoObject texts in the logon language of the request; member texts are EN.
   - An aDSO switches on the navigation attributes of a characteristic together (`navigational_attr_on`), so all of
     them become hierarchies; an InfoCube switches each on (`RSDDIMEIOBJ`).
