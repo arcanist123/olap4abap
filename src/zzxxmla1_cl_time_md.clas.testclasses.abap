@@ -26,6 +26,15 @@ CLASS ltc_time_md DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHOR
     METHODS periods FOR TESTING.
     "! a value that is no period has none
     METHODS no_period FOR TESTING.
+    "! the fiscal years and periods of an interval are its years and months under K4, as variant and key
+    METHODS fiscal_values FOR TESTING.
+    "! a regular period has its month's dates, the year and FISCPER3; a special period and 000 no dates; a fiscal
+    "! year the calendar year's dates
+    METHODS fiscal_periods FOR TESTING.
+    "! a value of another variant, or no year or period, is none
+    METHODS no_fiscal_period FOR TESTING.
+    "! a fiscal value is the variant and the key, shown with a /
+    METHODS fiscal_value_text FOR TESTING.
 ENDCLASS.
 
 CLASS zzxxmla1_cl_time_md DEFINITION LOCAL FRIENDS ltc_time_md.
@@ -119,6 +128,62 @@ CLASS ltc_time_md IMPLEMENTATION.
     cl_abap_unit_assert=>assert_initial( zzxxmla1_cl_time_md=>period( name = `0CALWEEK` value = '199753' ) ).
     cl_abap_unit_assert=>assert_initial( zzxxmla1_cl_time_md=>period( name = `0CALMONTH` value = '000000' ) ).
     cl_abap_unit_assert=>assert_initial( zzxxmla1_cl_time_md=>period( name = `0CALMONTH2` value = '01' ) ).
+  ENDMETHOD.
+
+  METHOD fiscal_values.
+    DATA(interval) = VALUE zzxxmla1_cl_time_md=>ty_interval( from = '20231215' to = '20240210' ).
+    DATA(periods) = zzxxmla1_cl_time_md=>values( name = `0FISCPER` interval = interval ).
+    cl_abap_unit_assert=>assert_equals( act = lines( periods ) exp = 3 ).
+    cl_abap_unit_assert=>assert_equals( act = periods[ 1 ] exp = 'K42023012' ).
+    cl_abap_unit_assert=>assert_equals( act = periods[ 3 ] exp = 'K42024002' ).
+    DATA(years) = zzxxmla1_cl_time_md=>values( name = `0FISCYEAR` interval = interval ).
+    cl_abap_unit_assert=>assert_equals( act = lines( years ) exp = 2 ).
+    cl_abap_unit_assert=>assert_equals( act = years[ 1 ] exp = 'K42023' ).
+    cl_abap_unit_assert=>assert_equals( act = years[ 2 ] exp = 'K42024' ).
+  ENDMETHOD.
+
+  METHOD fiscal_periods.
+    DATA(period) = zzxxmla1_cl_time_md=>period( name = `0FISCPER` value = 'K42024002' ).
+    cl_abap_unit_assert=>assert_true( period-known ).
+    cl_abap_unit_assert=>assert_equals( act = period-from exp = '20240201' ).
+    cl_abap_unit_assert=>assert_equals( act = period-to exp = '20240229' ).
+    cl_abap_unit_assert=>assert_equals( act = period-year exp = '2024' ).
+    cl_abap_unit_assert=>assert_equals( act = period-fiscper3 exp = '002' ).
+    period = zzxxmla1_cl_time_md=>period( name = `0FISCPER` value = 'K42024013' ).
+    cl_abap_unit_assert=>assert_true( period-known ).
+    cl_abap_unit_assert=>assert_initial( period-from ).
+    cl_abap_unit_assert=>assert_equals( act = period-fiscper3 exp = '013' ).
+    cl_abap_unit_assert=>assert_equals( act = period-year exp = '2024' ).
+    period = zzxxmla1_cl_time_md=>period( name = `0FISCPER` value = 'K42024000' ).
+    cl_abap_unit_assert=>assert_true( period-known ).
+    cl_abap_unit_assert=>assert_initial( period-from ).
+    period = zzxxmla1_cl_time_md=>period( name = `0FISCYEAR` value = 'K42024' ).
+    cl_abap_unit_assert=>assert_true( period-known ).
+    cl_abap_unit_assert=>assert_equals( act = period-from exp = '20240101' ).
+    cl_abap_unit_assert=>assert_equals( act = period-to exp = '20241231' ).
+    period = zzxxmla1_cl_time_md=>period( name = `0FISCPER` value = 'K42024012' ).
+    cl_abap_unit_assert=>assert_equals( act = period-to exp = '20241231' ).
+  ENDMETHOD.
+
+  METHOD no_fiscal_period.
+    " only K4 is filled: another variant's periods are not its months
+    cl_abap_unit_assert=>assert_false( zzxxmla1_cl_time_md=>period( name = `0FISCPER` value = 'V32024001' )-known ).
+    cl_abap_unit_assert=>assert_false( zzxxmla1_cl_time_md=>period( name = `0FISCPER` value = 'K42024' )-known ).
+    cl_abap_unit_assert=>assert_false( zzxxmla1_cl_time_md=>period( name = `0FISCYEAR` value = 'K42024001' )-known ).
+    cl_abap_unit_assert=>assert_false( zzxxmla1_cl_time_md=>period( name = `0FISCPER` value = 'K40000001' )-known ).
+    cl_abap_unit_assert=>assert_false( zzxxmla1_cl_time_md=>period( name = `0FISCPER` value = 'K42024017' )-known ).
+  ENDMETHOD.
+
+  METHOD fiscal_value_text.
+    DATA(value) = zzxxmla1_cl_time_md=>compound_value( VALUE #( compounding = 'K4' key = '2024001' ) ).
+    cl_abap_unit_assert=>assert_equals( act = value exp = 'K42024001' ).
+    DATA(characteristics) = zzxxmla1_cl_time_md=>characteristics( ).
+    DATA(fiscper) = characteristics[ name = `0FISCPER` ].
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_time_md=>display( characteristic = fiscper value = value )
+                                        exp = `K4/2024001` ).
+    DATA(calyear) = characteristics[ name = `0CALYEAR` ].
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_time_md=>display( characteristic = calyear value = '1997' )
+                                        exp = `1997` ).
   ENDMETHOD.
 
 ENDCLASS.

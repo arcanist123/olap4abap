@@ -24,6 +24,14 @@ CLASS ltc_schema_fix DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION S
     "! compounded
     METHODS k4_provider
       RETURNING VALUE(result) TYPE ty_provider.
+    "! ZCLVISIT read with the period's special periods excluded, restrict members: its facts as they are, the period
+    "! on its view for the selection, not generated yet, still compounded
+    METHODS regular_periods_provider
+      RETURNING VALUE(result) TYPE ty_provider.
+    "! the selection of the cube's annotations
+    METHODS annotations
+      IMPORTING cube          TYPE zzxxmla1_cl_schema_def=>ty_cube
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_schema_def=>ty_t_annotation.
     "! the dimension of the schema of that name
     METHODS dimension
       IMPORTING !schema       TYPE zzxxmla1_cl_schema_def=>ty_schema
@@ -37,8 +45,15 @@ CLASS ltc_schema_fix DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION S
     METHODS round_trip FOR TESTING RAISING cx_static_check.
     "! a cube on other facts than the provider's is refused
     METHODS other_facts FOR TESTING RAISING cx_static_check.
-    "! the characteristics with the dimensions on them and their fixed values
+    "! the characteristics with the dimensions on them and their selections
     METHODS characteristics FOR TESTING RAISING cx_static_check.
+    "! the annotation of fixing, olap4abap.fixed.C = v, is filter the cube with I EQ v, and written with the new name
+    METHODS fixed_annotation FOR TESTING RAISING cx_static_check.
+    "! restrict members: the annotation olap4abap.members.C with the rows, the facts and the measures as they are, the
+    "! period's own view replaced
+    METHODS members_mode FOR TESTING RAISING cx_static_check.
+    "! two selections of a characteristic are refused
+    METHODS two_selections FOR TESTING RAISING cx_static_check.
 ENDCLASS.
 
 
@@ -92,11 +107,28 @@ CLASS ltc_schema_fix IMPLEMENTATION.
   METHOD k4_provider.
     result = plain_provider( ).
     result-fact_table = `ZZXXMLA1_F_ZCLVISIT`.
-    result-fixed = VALUE #( ( iobjnm = 'ZCLFISCVR' value = `K4` ) ).
+    result-selection = VALUE #( ( iobjnm = 'ZCLFISCVR'
+                                  mode   = zzxxmla1_cl_bw_selection=>c_mode-filter
+                                  rows   = zzxxmla1_cl_bw_selection=>equals( `K4` ) ) ).
     LOOP AT result-characteristics ASSIGNING FIELD-SYMBOL(<characteristic>).
       CLEAR: <characteristic>-view, <characteristic>-name_column.
     ENDLOOP.
     result-key_figures[ 1 ]-fact_column-name = `ZCLVISNO`.
+  ENDMETHOD.
+
+  METHOD regular_periods_provider.
+    result = plain_provider( ).
+    result-selection = VALUE #( ( iobjnm = 'ZCLFISCPR'
+                                  mode   = zzxxmla1_cl_bw_selection=>c_mode-members
+                                  rows   = VALUE #( ( sign = 'E' option = 'CP' low = `*013` )
+                                                    ( sign = 'E' option = 'CP' low = `*014` ) ) ) ).
+    CLEAR result-characteristics[ 2 ]-view.
+  ENDMETHOD.
+
+  METHOD annotations.
+    IF cube-annotations IS BOUND.
+      result = cube-annotations->array.
+    ENDIF.
   ENDMETHOD.
 
   METHOD dimension.
@@ -112,8 +144,10 @@ CLASS ltc_schema_fix IMPLEMENTATION.
                                                   CHANGING  schema = schema ).
     DATA(cube) = schema-cubes[ 1 ].
     cl_abap_unit_assert=>assert_equals(
-      act = zzxxmla1_cl_schema_fix=>fixed_of( cube )
-      exp = VALUE zzxxmla1_cl_bw_view_gen=>ty_t_fixed( ( iobjnm = 'ZCLFISCVR' value = `K4` ) ) ).
+      act = annotations( cube )
+      exp = VALUE zzxxmla1_cl_schema_def=>ty_t_annotation( ( name = `olap4abap.filter.ZCLFISCVR` cdata = `I EQ 'K4'` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_schema_fix=>cube_selection( cube )
+                                        exp = k4_provider( )-selection ).
     DATA(fact) = CAST zzxxmla1_cl_schema_def=>ty_table( cube-fact-def ).
     cl_abap_unit_assert=>assert_equals( act = fact->name exp = `ZZXXMLA1_F_ZCLVISIT` ).
     cl_abap_unit_assert=>assert_equals( act = cube-measures[ 1 ]-column exp = `ZCLVISNO` ).
@@ -178,10 +212,68 @@ CLASS ltc_schema_fix IMPLEMENTATION.
       exp = VALUE zzxxmla1_cl_schema_fix=>ty_t_characteristic(
               ( name = `ZCLFISCVR` text = `Fiscal Year Variant` foreign_key = `SID_ZCLFISCVR`
                 dimension = `ZCLFISCVR` shared = abap_true
+                mode = zzxxmla1_cl_bw_selection=>c_mode-filter rows = zzxxmla1_cl_bw_selection=>equals( `K4` )
                 fixed = abap_true value = `K4` )
               ( name = `ZCLFISCPR` text = `Fiscal Period` compounding = VALUE #( ( `ZCLFISCVR` ) )
                 foreign_key = `SID_ZCLFISCPR`
                 dimension = `ZCLFISCPR` shared = abap_true ) ) ).
+  ENDMETHOD.
+
+  METHOD fixed_annotation.
+    " a schema fixed before selections: the K4 tables, the old annotation
+    DATA(schema) = plain_schema( ).
+    zzxxmla1_cl_schema_fix=>apply( EXPORTING cube   = `ZCLVISIT`
+                                             old    = plain_provider( )
+                                             new    = k4_provider( )
+                                   CHANGING  schema = schema ).
+    schema-cubes[ 1 ]-annotations = NEW #( array = VALUE zzxxmla1_cl_schema_def=>ty_t_annotation( ( name = `olap4abap.fixed.ZCLFISCVR` cdata = `K4` )
+                                                            ( name = `other` cdata = `stays` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_schema_fix=>cube_selection( schema-cubes[ 1 ] )
+                                        exp = k4_provider( )-selection ).
+    " the same selection again: only the annotation's name changes
+    zzxxmla1_cl_schema_fix=>apply( EXPORTING cube   = `ZCLVISIT`
+                                             old    = k4_provider( )
+                                             new    = k4_provider( )
+                                   CHANGING  schema = schema ).
+    cl_abap_unit_assert=>assert_equals(
+      act = annotations( schema-cubes[ 1 ] )
+      exp = VALUE zzxxmla1_cl_schema_def=>ty_t_annotation( ( name = `other` cdata = `stays` )
+                                                           ( name = `olap4abap.filter.ZCLFISCVR` cdata = `I EQ 'K4'` ) ) ).
+  ENDMETHOD.
+
+  METHOD members_mode.
+    DATA(schema) = plain_schema( ).
+    DATA(result) = zzxxmla1_cl_schema_fix=>apply( EXPORTING cube   = `ZCLVISIT`
+                                                            old    = plain_provider( )
+                                                            new    = regular_periods_provider( )
+                                                  CHANGING  schema = schema ).
+    DATA(cube) = schema-cubes[ 1 ].
+    cl_abap_unit_assert=>assert_equals(
+      act = annotations( cube )
+      exp = VALUE zzxxmla1_cl_schema_def=>ty_t_annotation( ( name  = `olap4abap.members.ZCLFISCPR`
+                                                             cdata = `E CP '*013';E CP '*014'` ) ) ).
+    DATA(fact) = CAST zzxxmla1_cl_schema_def=>ty_table( cube-fact-def ).
+    cl_abap_unit_assert=>assert_equals( act = fact->name exp = `/BIC/FZCLVISIT` ).
+    cl_abap_unit_assert=>assert_equals( act = cube-measures[ 1 ]-column exp = `/BIC/ZCLVISNO` ).
+    " the period still compounded, on its view for the selection
+    DATA(period) = dimension( schema = schema name = `ZCLFISCPR` ).
+    cl_abap_unit_assert=>assert_equals( act = period-attributes[ name = `ZCLFISCPR SID` ]-name_column->column_name
+                                        exp = `COMPOUND_KEY` ).
+    cl_abap_unit_assert=>assert_equals(
+      act = result-tables
+      exp = VALUE zzxxmla1_cl_schema_fix=>ty_t_replaced( ( from = `ZZXXMLA1V0000002` to = `ZZXXMLA1_C_ZCLFISCPR` ) ) ).
+  ENDMETHOD.
+
+  METHOD two_selections.
+    DATA(schema) = plain_schema( ).
+    schema-cubes[ 1 ]-annotations = NEW #( array = VALUE zzxxmla1_cl_schema_def=>ty_t_annotation( ( name = `olap4abap.fixed.ZCLFISCVR` cdata = `K4` )
+                                                            ( name = `olap4abap.members.ZCLFISCVR` cdata = `I EQ 'K1'` ) ) ).
+    TRY.
+        zzxxmla1_cl_schema_fix=>cube_selection( schema-cubes[ 1 ] ).
+        cl_abap_unit_assert=>fail( `two selections accepted` ).
+      CATCH zzxxmla1_cx_bw_provider INTO DATA(error).
+        cl_abap_unit_assert=>assert_char_cp( act = error->get_text( ) exp = `*two selections of ZCLFISCVR*` ).
+    ENDTRY.
   ENDMETHOD.
 
 ENDCLASS.

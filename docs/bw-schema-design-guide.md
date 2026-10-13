@@ -235,7 +235,8 @@ does. Values are BW's internal ones (NUMC with its zeros, compared as text, whic
 `CP`/`NP` take BW's pattern (`*` any string, `+` one character), written as `LIKE` with the SQL wildcards escaped.
 
 The selection is part of the cube, not a slicer: no MDX removes it. It is an edit of the schema, made on a dimension's
-pane of the schema builder (`POST fix`, `schema-generator.md`, Fixing): the proposal selects nothing. Each restricted
+pane of the schema builder (`POST fix`, `schema-generator.md`, Fixing): the proposal selects nothing but its fiscal
+defaults (below, Fiscal time). Each restricted
 characteristic has one of two modes, which says what the selection applies to:
 
 | Mode | Annotation | Members (the characteristic's view) | Facts | Checked |
@@ -266,10 +267,13 @@ as `olap4abap.filter.<characteristic>` = `I EQ 'v'`, and `POST fix` writes the n
   schema whose facts hold an excluded value is always refused, in either case: a fiscal period whose facts do have
   special periods is not a time characteristic in this cube; make `0CALMONTH`/`0CALYEAR` the time dimension, or filter
   the cube.
-- **The probe** asks the facts for the values of a restricted characteristic outside its selection: the distinct
-  values of the fact column (the SIDs of an InfoCube, the values of an aDSO's fact view), matched against the
-  characteristic's SID table with the negated selection, so the large table is only grouped on one column (HANA
-  answers it from the column's dictionary) and the condition runs on the small one. A refusal lists the values and
+- **The probe** (`ZZXXMLA1_CL_SCHEMA_PROBE`) asks the facts for the values of a restricted characteristic outside its
+  selection: the distinct values of the fact column in the cube's own facts (filtered on the characteristics that
+  filter the cube when it has some, as its fact view is: values outside the cube refuse nothing). They are read from
+  BW's tables as the fact view is made of them, so no generated view is needed: on an InfoCube the SIDs are grouped
+  and matched against the characteristic's SID table with the negated selection, so the large table is only grouped
+  on one column and the condition runs on the small one; on an aDSO the reporting view's values are grouped where the
+  negated selection holds. A refusal lists the values and
   their counts of facts (at most 20). It runs on `POST fix`, on accept, on the check before accept (`check?probe=true`;
   not on the check run while the user types) and on demand for all catalogs (`POST probe`, the start page's "Probe
   all catalogs"), because a load after the accept can bring an excluded value into the facts; that run is the remedy.
@@ -307,8 +311,28 @@ as `olap4abap.filter.<characteristic>` = `I EQ 'v'`, and `POST fix` writes the n
   views.
 - **Fiscal periods as time**: restricting members makes a fiscal period's members regular (twelve per year under a
   fixed variant), which the positional functions (`Lag`, `ParallelPeriod`, `ClosingPeriod`, ranges) need. They also
-  need every regular period of every year to be a member, which the SID table has only for the periods with data
-  somewhere: the fiscal time master data for a fixed variant (`next-steps.md`, selections, step 21) fills the gaps.
+  need every regular period of every year to be a member, which the SID table has only for the years with data
+  somewhere: the fiscal time master data (`time-master-data.md`) fills every year of BW's interval.
+
+**Fiscal time** (decided with the user 2026-10-13, `ZZXXMLA1_CL_SCHEMA_DEFAULTS`): a provider with BW's fiscal year
+`0FISCYEAR` or fiscal period `0FISCPER`, compounded with the fiscal year variant `0FISCVARNT`, is proposed with
+defaults, so that the common case needs no edit:
+
+| Characteristic | Proposed | Why |
+|---|---|---|
+| `0FISCVARNT` | filter the cube, `I EQ 'K4'`; not time, members with facts | the most common variant; the user changes it on the variant's dimension. Year and period are then named by their own keys (`2024001`) |
+| `0FISCPER` | restrict members, `I CP '*001'` ... `I CP '*012'` (the regular periods of K4, its months); a time dimension (`TimeMonths`) | BW's SID table has period 000 and the special periods 013 to 016 of every year (its SID conversion makes all periods of a year), which `Lag` and `ParallelPeriod` would count |
+| `0FISCYEAR` | a time dimension (`TimeYears`) | |
+
+- Time dimensions are marked as the UI marks one: `type="TimeDimension"`, every attribute and level a time level type
+  (the suggestion, else `TimeUndefined`), no `olap4abap.membersWithFacts` on the usage.
+- The period's restriction is probed on the facts under K4 when the proposal is made. If they hold period 000 or a
+  special period, the period is neither restricted nor time in that cube: the special periods are real postings, and
+  the cube's time is then `0CALMONTH`, derived from the period by the model (not part of the proposal yet). A note says
+  so, with the values found. K4 and the year stay.
+- Nothing is restricted if K4 cannot be fixed (no SID of K4, or a characteristic that references `0FISCVARNT`), with a
+  note. Only `0FISCPER` and `0FISCYEAR` get defaults; the clinic demo's own `ZCLFISC*` and `0FISCPER3` do not.
+- The notes of the proposal (the schema pane's Notes) say what was fixed and restricted.
 
 Views are tracked in table `ZZXXMLA1_VIEW` (section 4, rule 8).
 

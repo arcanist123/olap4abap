@@ -38,7 +38,7 @@ below), no longer a parameter of the proposal; a default selection in the propos
    by cubes with different selections; accept and remove delete the views with a selection no schema file names.
 5. Done: test data. The clinic demo has its own fiscal time in `ZCLVISIT` and `ZCLVISITA` (`clinic-demo.md`): the
    variant `ZCLFISCVR` (K1, K2, K4, each visit under one), the period `ZCLFISCPR` and the year `ZCLFISCYR` compounded
-   with it. Not BW's `0FISC*`: BW checks their values against the source system's fiscal year variants (T009), and
+   with it. Not BW's `0FISC*`: BW checks their values against the source system's fiscal year variants, and
    the warehouse's truth is its SID and fact tables. Its hand-written schemas have the fiscal time as dimensions
    (variant, year and period compounded), and the setup deploys a second catalog per provider with the variant fixed
    to K4 (`ZCLVISIT_K4`, `ZCLVISITA_K4`; 2026-10-13), so the demo shows both without a call of the API.
@@ -49,8 +49,9 @@ below), no longer a parameter of the proposal; a default selection in the propos
 6. Done (2026-10-13, replaced by step 11): the UI. A proposal's section "Fixed characteristics" picks characteristics (with their
    compounding) and values (`GET values`, the SID table) and proposes again; an accepted cube shows its fixed
    characteristics read only (`schema-generator.md`, UI; `scripts/schema_ui_test.py`).
-7. Open: a default selection in the proposal, e.g. the variant fixed when only one has facts.
-8. Later: the fiscal time master data for a fixed variant (`time-master-data.md`, open step 6 of compounded
+7. Done (2026-10-13, step 22 below): a default selection in the proposal: K4 fixed when the provider has `0FISCYEAR`
+   or `0FISCPER`.
+8. Done for `0FISCYEAR` and `0FISCPER` (2026-10-13, step 22); later: the rest of (`time-master-data.md`, open step 6 of compounded
    characteristics); a fiscal year > period hierarchy on a fiscal period.
 
 ### Fixing as an edit (decided 2026-10-13)
@@ -59,7 +60,7 @@ Steps 3, 4 and 6 made the selection part of the proposal: it was chosen before t
 proposed again and discarded the edits. Now a selection is an ordinary edit of the cube, made on the dimension's pane,
 which the server applies to the schema as it is. Decided with the user:
 
-- **A proposal is always the plain one** (no `fixed.` parameters, no "Propose again", no selection in the URL). The
+- **A proposal is always the plain one** (revised 2026-10-13: but for the fiscal defaults, step 22) (no `fixed.` parameters, no "Propose again", no selection in the URL). The
   catalog keeps its default name, the provider's: a selection never renames it (five fixed characteristics would make
   an unusable name). Who wants the plain and a fixed cube side by side names one catalog differently.
 - **A fixed characteristic keeps its dimension, with one member**: its view is filtered on its value too, so every
@@ -158,32 +159,93 @@ Steps:
     single `I EQ` value of the compounding leaves `COMPOUND_KEY`. An InfoCube's fact view joins the SID table of a
     filtered characteristic on the SID alone and has the condition in `WHERE` (a condition of several rows is no join
     condition; the demo's K4 view regenerated gives the same visits). The callers still speak fixed values until step
-    16 and pass `selection_of( fixed )` (filter the cube, one `I EQ` row each; same canonical text, so the existing
+    16 and passed `selection_of( fixed )` (filter the cube, one `I EQ` row each; same canonical text, so the existing
     rows of `ZZXXMLA1_VIEW` stay valid). Checked on SAP: views of the clinic demo for `ZCLFISCVR` in K1 or K4 with a
     period range in restrict members (`I BT`, `E EQ`), and for K4 with the period filtered (`I CP`, `E NB`), activate,
     the period views have the rows of their SID table under the same condition and the aDSO's fact views the aDSO's
     visits.
-16. Schema and API: annotations `olap4abap.filter.<characteristic>` and `olap4abap.members.<characteristic>`, the old
-    `olap4abap.fixed.` read as filter `I EQ` and rewritten by `POST fix`; `POST fix` takes `filter.C=<rows>` and
-    `members.C=<rows>` (`fixed.C=v` still as `filter.C=I EQ 'v'`); the uncompounding rule on one `I EQ` value in
-    either mode; `characteristics` of the answers carry the mode and the rows; check refuses different selections of
-    a shared dimension as for fixed values.
-17. The probe (`ZZXXMLA1_CL_SCHEMA_PROBE`): per cube and restrict-members characteristic, the excluded values in its
-    facts with their counts (at most 20). Run by `POST fix`, accept, `check?probe=true` and `POST probe[?catalog=X]`
-    (every catalog, or one: `{catalogs: [{catalog, cubes: [{cube, characteristics: [{name, ok, values: [{value,
-    facts}]}]}], runtime}]}`, nothing written). Measure it on `ZXMLWIDE` (1,000,000 facts) and a bigger load.
-18. UI: the dimension pane's "Fixed value" becomes "Selection": a table of rows (sign, option, low, high; values from
-    `GET values` for `EQ`/`BT`, free text for patterns) and the mode switch; a fixed value stays one click (`I EQ`).
-    Accept's dialog runs `check?probe=true` and shows a refusal's values. The start page gets "Probe all catalogs" with
-    a result per catalog (ok, or the cube, characteristic and values).
+16. Done (2026-10-13): schema and API: annotations `olap4abap.filter.<characteristic>` and
+    `olap4abap.members.<characteristic>` (the rows as `ZZXXMLA1_CL_BW_SELECTION=>rows_text` writes them), the old
+    `olap4abap.fixed.` read as filter `I EQ` and rewritten by `POST fix` (`ZZXXMLA1_CL_SCHEMA_FIX=>cube_selection`,
+    refused if a characteristic has two); `POST fix` and `GET values` take `filter.C=<rows>`, `members.C=<rows>` and
+    `fixed.C=v`; the uncompounding rule on one `I EQ` value in either mode (the view generator's, unchanged);
+    `characteristics` of the answers carry `mode` (`filter`, `members` or null), `rows`, `selection` (their text) and
+    still `fixed`/`value` for one `I EQ` value; check and accept work on selections (only filter-the-cube
+    characteristics need a fact view) and refuse different selections of a shared dimension as for fixed values.
+    `ZZXXMLA1_CL_BW_PROVIDER` reads for a selection (`read( selection = ... )`, `ty_provider-selection`) and
+    `check_selection` replaces `check_fixed`: the rows checked by the selection class, an `EQ` value needs a SID
+    under the selection of its compounding where that is restricted. A compounded characteristic no longer needs its
+    compounding restricted (section 3.8: its rows compare its own key under every value of its compounding), and
+    `GET values` of it answers under every value of its compounding without parameters. `selection_of`,
+    `selection_text( fixed )` and `ty_t_fixed` of the view generator are gone; the clinic generator writes the new
+    annotation (the demo's existing K4 catalogs keep the old one, which is read the same). The UI reads the new
+    annotations and passes selections other than fixed values through `POST fix` unchanged (its selection editor is
+    step 18). Tests: unit tests of `ZZXXMLA1_CL_SCHEMA_FIX` (old annotation, restrict members, two selections);
+    `schema_api_test.py` (refusals of rows, two selections, `EQ` without SID under the compounding, restrict members
+    through `POST fix`), `fixed_selection_test.py`, `schema_ui_test.py` and `clinic_test.py` pass.
+17. Done (2026-10-13): the probe (`ZZXXMLA1_CL_SCHEMA_PROBE`): per cube and restrict-members characteristic, the
+    excluded values in its facts with their counts (at most 20, by value; a compounded one as `K4/2024013`). Run by
+    `POST fix` (400 with the values), accept and `check?probe=true` (400 on a refusal, else the answer has `probe`),
+    and `POST probe[?catalog=X]` (every catalog, or one: `{catalogs: [{catalog, ok, cubes: [{cube, ok,
+    characteristics: [{name, ok, values: [{value, facts}]}]}]}], runtime}`, runtime in ms, nothing written).
+    Decided with the user (2026-10-13): the probe reads the cube's facts as the cube reads them, the facts filtered on
+    the filter-the-cube characteristics, so values outside the cube refuse nothing; a catalog `POST probe` cannot
+    probe (its schema file missing or unreadable, a cube that restricts members not on a BW provider's tables) is an
+    entry with `error` and no cubes, the other catalogs are probed. Built: the facts are read from BW's tables as the
+    fact view is made of them (`ZZXXMLA1_CL_BW_VIEW_GEN->fact_metadata`), not from the fact view, so the probe needs
+    no generated view and runs before accept (on `POST fix` the view of a new selection is only a placeholder): an
+    InfoCube's SIDs grouped, then joined to the SID table with the negated selection on the key field; an aDSO's
+    reporting view grouped on the values where the negated selection holds. A cube without restrict-members
+    characteristic is not looked at (FoodMart's catalogs probe as ok). Measured on the wide demo (1,000,000 facts):
+    the probe adds 0.2 to 0.4 s to a `POST fix` (which takes 1.4 to 1.8 s there, the provider of 100 characteristics
+    read twice); all ten catalogs of the server probe in 65 ms (none restricts members). A bigger load is still to
+    measure (`ZXMLWIDE` with more records, members with facts step 4). Tests: unit tests of the statements (InfoCube
+    with a filter, aDSO, no field) and the refusal; `schema_api_test.py` (refusals of `POST fix` on both providers,
+    also under a filter on K4, `POST probe` of all catalogs and of one, 404, 405); `fixed_selection_test.py`,
+    `clinic_test.py` and `schema_ui_test.py` pass.
+18. Done but for the probes (2026-10-13): UI: the dimension pane has "Selection" under "Fixed value": a table of rows
+    (sign, option, low, high; values from `GET values`, free text for patterns), the mode switch, presets (`0FISCPER`:
+    the regular periods) and Apply through `POST fix`; a fixed value stays one click (`I EQ`) (`schema-generator.md`,
+    UI; `schema_ui_test.py`: a members range the clinic's facts contradict is refused with the values, the same range
+    filtering the cube is applied and removed; the fiscal defaults of `0TSC0T001` are twelve rows, removed and brought
+    back by the preset). Open: Accept's dialog runs `check?probe=true` and shows a refusal's values (accept refuses
+    already, with the values); the start page gets "Probe all catalogs" with a result per catalog.
 19. Test data: the clinic demo's period `ZCLFISCPR` gets special periods (013 to 016) in its master data only, for a
     restrict-members catalog, and facts in period 013 under one variant only, so the probe refuses that variant and
     accepts the others.
 20. Tests: unit tests of 13 and 15; `fixed_selection_test.py` extended (ranges in both modes, the probe's refusal,
     the old annotation); `schema_api_test.py` (`POST probe`, refusals); `schema_ui_test.py` (the selection table, the
     probe on the start page).
-21. Then fiscal time: the fiscal time master data for a fixed variant from `T009B` (step 8 above), so every regular
-    period of every year is a member, and a fiscal year > period hierarchy on a fiscal period marked as time.
+21. Fiscal time: done in step 22 but for a fiscal year > period hierarchy on a fiscal period marked as time (open).
+22. Done (2026-10-13): fiscal defaults of the proposal and the fiscal time master data. Decided with the user:
+    - **K4 is proposed**: a provider with `0FISCYEAR` or `0FISCPER` (compounded with `0FISCVARNT`) is proposed with
+      `0FISCVARNT` filtering the cube on `I EQ 'K4'`, the most common variant; the user changes it on its dimension.
+    - **The period is restricted to the regular periods** (`olap4abap.members.0FISCPER`, `I CP '*001'` to
+      `I CP '*012'`, K4's months), and **year and period are marked as time**, less friction for the user.
+    - **A cube whose facts post to period 000 or 013 to 016 has no fiscal time dimension**: the probe refuses the
+      restriction, the period is neither restricted nor time there (a note with the values), and the model has to
+      make `0CALMONTH` the time, with its own logic of binding the fiscal period to the calendar month (open, below).
+    - **Only `0FISCPER` and `0FISCYEAR`** get defaults.
+    - **The time generator fills them as it fills `0CALYEAR` and `0CALMONTH`**.
+    Built: `ZZXXMLA1_CL_SCHEMA_DEFAULTS` (new; `propose` checks K4 through the provider read and probes the period;
+    `fiscal_defaults` and `regular_periods` unit-tested), called by `GET proposal` before the proposal, which reads the
+    provider for the selection; `ZZXXMLA1_CL_SCHEMA_PROPOSAL=>propose( time = ... )` writes the time dimensions as the
+    UI marks one (level types, no members with facts); its notes join the proposal's (the schema pane's "Not proposed"
+    is now "Notes"). `ZZXXMLA1_CL_TIME_MD` fills `0FISCYEAR` and `0FISCPER` as it fills `0CALYEAR` and `0CALMONTH`, for K4
+    only (its years are the calendar years, its periods 001 to 012 the months; `time-master-data.md`); filled on
+    the development system for 1995 to 2029: BW's SID conversion
+    made all 17 periods of every year (595 SIDs, 420 regular), which is why the restriction is needed.
+    Tests: unit tests of the defaults, the time dimension of the proposal and the fiscal master data;
+    `scripts/fiscal_default_test.py` (new, 19 checks: the proposal of BW's content cube `0TSC0T001`, accepted into
+    `ZZFISCTEST`, twelve periods per fiscal year, `Lag(1)` of `2025001` is `2024012`, removed); `schema_api_test.py`,
+    `fixed_selection_test.py`, `clinic_test.py` and `schema_ui_test.py` pass.
+    Open:
+    - the derived `0CALMONTH` time for a cube whose facts post to special periods (the binding of the fiscal period
+      to the calendar month);
+    - the probe's refusal path of the defaults is not tested live: no provider with `0FISCPER` has facts in special
+      periods (step 19's test data is the clinic demo's own `ZCLFISCPR`, which gets no defaults);
+    - a fiscal year > period hierarchy (`0FISCPER` has `0FISCYEAR` as an attribute), so `ParallelPeriod` and `Ytd`
+      work on the period's dimension.
 
 ## Now: members pushed down to HANA
 
@@ -331,7 +393,8 @@ fact was counted once per compounding value, in cells and in the native crossjoi
    ordered by it, then by the key, their order key is the ordinal's, then the key's, `order_condition` (`Lag`, `Lead`,
    ranges) compares the ordinal first, and the native `Order`/`TopCount` (`ordered_paths`) order by it. The clinic's
    south rooms get the lower SIDs and still come after the north ones.
-6. Open: the fiscal time characteristics in the time master data (`0FISCPER`, `0FISCYEAR`; not filled today,
+6. Done for `0FISCPER` and `0FISCYEAR` (2026-10-13, selections, step 22): the fiscal time characteristics in the
+   time master data (
    `time-master-data.md`): an aDSO's fact whose value has no SID has no `SID_<field>` and drops out of the engine's
    inner join.
 

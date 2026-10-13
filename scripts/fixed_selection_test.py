@@ -9,7 +9,7 @@ deploys, per provider (the cube ZCLVISIT, the aDSO ZCLVISITA), a plain catalog a
   those under K4, its years 2024 and 2025 and its periods 2024001 to 2025012 by their own key, and they add up to
   its visits.
 Then the way of the schema builder's UI, the API: the plain proposal is fixed as an edit (POST fix, fixed.ZCLFISCVR=K4):
-the cube is annotated olap4abap.fixed.ZCLFISCVR, keeps the dimension ZCLFISCVR and names the periods by their own key
+the cube is annotated olap4abap.filter.ZCLFISCVR (I EQ 'K4'), keeps the dimension ZCLFISCVR and names the periods by their own key
 (no COMPOUND_KEY), on the views filtered on K4 (the fact view, ZCLFISCVR, ZCLFISCYR and ZCLFISCPR: the demo's own,
 which the provider read finds and accept reuses); accepted into a test catalog it has the K4 visits and the one
 variant; fixing it again with nothing (un-fixing) gives the plain proposal's tables back; removing the catalog keeps
@@ -131,7 +131,7 @@ def main():
         # the API, as the schema builder uses it: the plain proposal, fixed as an edit
         test = f"ZZFIXTEST_{provider}"
         status, proposal = api(args.url, args.client, "GET", "proposal", {"provider": provider})
-        check(f"{test}: plain proposal", status == 200 and "olap4abap.fixed" not in proposal.get("xml", ""), proposal)
+        check(f"{test}: plain proposal", status == 200 and "olap4abap.filter" not in proposal.get("xml", ""), proposal)
         if status != 200:
             continue
         plain = proposal["xml"]
@@ -141,7 +141,7 @@ def main():
             continue
         xml = fixed["xml"]
         check(f"{test}: the cube is annotated, the variant keeps its dimension",
-              re.search(r'<Annotation name="olap4abap\.fixed\.ZCLFISCVR">\s*K4\s*</Annotation>', xml) is not None
+              re.search(r'<Annotation name="olap4abap\.filter\.ZCLFISCVR">\s*I EQ (?:\x27|&apos;|&#39;)K4(?:\x27|&apos;|&#39;)\s*</Annotation>', xml) is not None
               and re.search(r'<Dimension [^>]*name="ZCLFISCVR"', xml) is not None, xml[:400])
         period = re.search(r'<Dimension [^>]*name="ZCLFISCPR".*?</Dimension>', xml, re.S)
         check(f"{test}: ZCLFISCPR is not compounded", period is not None and "COMPOUND_KEY" not in period.group(0),
@@ -149,6 +149,7 @@ def main():
         listed = {c["name"]: c for c in fixed.get("characteristics", [])}
         check(f"{test}: the answer lists ZCLFISCVR fixed to K4, on its dimension",
               listed.get("ZCLFISCVR", {}).get("fixed") is True and listed["ZCLFISCVR"].get("value") == "K4"
+              and listed["ZCLFISCVR"].get("mode") == "filter" and listed["ZCLFISCVR"].get("selection") == "I EQ 'K4'"
               and listed["ZCLFISCVR"].get("dimension") == "ZCLFISCVR", fixed.get("characteristics"))
         # the views filtered on K4 exist (the demo's K4 catalog uses them), so the fixed schema names them
         tables = {}
@@ -185,7 +186,7 @@ def main():
             back = set(re.findall(r'(?:<Table name|table)="([^"]+)"', unfixed.get("xml", "")))
             period = re.search(r'<Dimension [^>]*name="ZCLFISCPR".*?</Dimension>', unfixed.get("xml", ""), re.S)
             check(f"{test}: un-fixed, the plain tables and the period compounded again",
-                  status == 200 and back == plain_tables and "olap4abap.fixed" not in unfixed["xml"]
+                  status == 200 and back == plain_tables and "olap4abap.filter" not in unfixed["xml"]
                   and period is not None and period.group(0).count("COMPOUND_KEY") == 2,
                   unfixed if status != 200 else {"back": back, "plain": plain_tables})
         finally:

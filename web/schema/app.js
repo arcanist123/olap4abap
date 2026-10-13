@@ -141,15 +141,51 @@ const annotatedTrue = (el) => {
   const a = annotationOf(el, MEMBERS_WITH_FACTS);
   return a ? a.textContent.trim().toLowerCase() === 'true' : null;
 };
-// The characteristics a cube fixes to one value each (docs/bw-schema-design-guide.md, section 3.8): annotations
-// olap4abap.fixed.<C>. The tables and columns of the cube depend on them, so they change only through the server
-// (POST fix, ZZXXMLA1_CL_SCHEMA_FIX), which rewrites the schema; the UI replaces the document with its answer.
+// The selections of a cube (docs/bw-schema-design-guide.md, section 3.8): annotations olap4abap.filter.<C> (filter
+// the cube) and olap4abap.members.<C> (restrict members), their rows as text (I EQ 'K4';E CP '*013'); the
+// olap4abap.fixed.<C> = v of a schema fixed before selections is filter the cube with I EQ v. The tables and columns of
+// the cube depend on them, so they change only through the server (POST fix, ZZXXMLA1_CL_SCHEMA_FIX), which rewrites
+// the schema; the UI replaces the document with its answer. A fixed value is one I EQ row in filter the cube, which the
+// dimension's pane sets; other selections are kept as they are.
+const FILTER = 'olap4abap.filter.';
+const MEMBERS = 'olap4abap.members.';
 const FIXED = 'olap4abap.fixed.';
-const fixedOf = (cube) => kids(kids(cube, 'Annotations')[0], 'Annotation').filter((a) => attr(a, 'name').startsWith(FIXED))
-  .map((a) => ({ characteristic: attr(a, 'name').slice(FIXED.length), value: a.textContent.trim() }));
+const SINGLE = /^\s*I\s+EQ\s+'([^']*)'\s*$/i;
+const selectionsOf = (cube) => kids(kids(cube, 'Annotations')[0], 'Annotation').flatMap((a) => {
+  const name = attr(a, 'name');
+  const prefix = [FILTER, MEMBERS, FIXED].find((p) => name.startsWith(p));
+  if (!prefix) return [];
+  const text = a.textContent.trim();
+  return [{ characteristic: name.slice(prefix.length), mode: prefix === MEMBERS ? 'members' : 'filter',
+    rows: prefix === FIXED ? `I EQ '${text}'` : text }];
+});
+const isFixed = (s) => s.mode === 'filter' && SINGLE.test(s.rows);
+const fixedOf = (cube) => selectionsOf(cube).filter(isFixed)
+  .map((s) => ({ characteristic: s.characteristic, value: s.rows.match(SINGLE)[1] }));
 const fixedParams = (fixed) => Object.fromEntries((fixed || []).map((f) => [`fixed.${f.characteristic}`, f.value]));
-// the selection without a characteristic and those compounded with it, which are fixed only together with it
-function unfix(fixed, name, characteristics) {
+// the parameters of POST fix: the cube's whole new selection, filter.<C> or members.<C> = its rows
+const selectionParams = (selections) => Object.fromEntries(selections.map((s) => [`${s.mode}.${s.characteristic}`, s.rows]));
+// the cube's selections with fixed values (filter the cube, I EQ v) in place of the selections of their
+// characteristics, without the dropped characteristics
+const withFixed = (cube, fixed, dropped = []) => [
+  ...selectionsOf(cube).filter((s) => !dropped.includes(s.characteristic) && !fixed.some((f) => f.characteristic === s.characteristic)),
+  ...fixed.map((f) => ({ characteristic: f.characteristic, mode: 'filter', rows: `I EQ '${f.value}'` }))];
+// The rows of a range table (ZZXXMLA1_CL_BW_SELECTION): sign, option, low and, for BT and NB, high; as text
+// SIGN OPTION 'low' ['high'] separated by ;. The server checks them (POST fix).
+const OPTIONS = ['EQ', 'NE', 'GT', 'GE', 'LT', 'LE', 'BT', 'NB', 'CP', 'NP'];
+const RANGE = ['BT', 'NB'];
+const ROW = /^\s*([IE])\s+([A-Z]{2})\s+'([^']*)'(?:\s+'([^']*)')?\s*$/i;
+const parseRows = (text) => text.split(';').map((r) => r.match(ROW)).filter(Boolean)
+  .map(([, sign, option, low, high]) => ({ sign: sign.toUpperCase(), option: option.toUpperCase(), low, high: high || '' }));
+const rowsText = (rows) => rows.map((r) => `${r.sign} ${r.option} '${r.low}'${RANGE.includes(r.option) ? ` '${r.high}'` : ''}`).join(';');
+// selections offered with a click, per characteristic: the regular fiscal periods of K4 (the proposal's default,
+// docs/bw-schema-design-guide.md, section 3.8, fiscal time)
+const PRESETS = {
+  '0FISCPER': [{ label: 'Regular periods 001–012', mode: 'members',
+    rows: Array.from({ length: 12 }, (_, i) => ({ sign: 'I', option: 'CP', low: `*${String(i + 1).padStart(3, '0')}`, high: '' })) }],
+};
+// a characteristic and those compounded with it, which are fixed only together with it
+function unfixed(name, characteristics) {
   const gone = new Set([name]);
   for (let grown = true; grown;) {
     grown = false;
@@ -157,7 +193,7 @@ function unfix(fixed, name, characteristics) {
       if (!gone.has(c.name) && c.compounding.some((n) => gone.has(n))) { gone.add(c.name); grown = true; }
     }
   }
-  return fixed.filter((f) => !gone.has(f.characteristic));
+  return [...gone];
 }
 // The characteristic of the provider a dimension is on: the one whose fact column a usage of it (or the private
 // dimension itself) has as foreign key.
@@ -522,7 +558,7 @@ function SchemaPane({ doc, edit, source, catalog, notes }) {
       writes the schema file and registers catalog <strong class="mono">${catalog || '?'}</strong>.
     </div>
     ${notes.length > 0 && html`<section class="section">
-      <header><h3>Not proposed</h3></header>
+      <header><h3>Notes</h3></header>
       <div class="body"><ul class="plain">${notes.map((n) => html`<li><span class="mono">${n.iobjnm}</span>: ${n.reason}</li>`)}</ul></div>
     </section>`}
   </div>`;
@@ -554,12 +590,13 @@ function CubePane({ doc, edit, cube, select, characteristics }) {
       <${TextField} value=${attr(cube, 'caption')} placeholder=${attr(cube, 'name')} onCommit=${(v) => edit(() => setAttr(cube, 'caption', v))} />
       <label>Fact table</label>
       <${TextField} readOnly mono value=${attr(kids(cube, 'Table')[0], 'name')} />
-      ${fixedOf(cube).length > 0 && html`<label>Fixed</label>
-        <span title="Each fixed to one value, as a query's fixed filter: change them on the dimension's pane">${fixedOf(cube).map((f, i) => {
-          const c = characteristics.find((x) => x.name === f.characteristic);
+      ${selectionsOf(cube).length > 0 && html`<label>Selection</label>
+        <span title="Fixed values filter the cube as a query's fixed filter; restrict members leaves the facts: change them on the dimension's pane">${selectionsOf(cube).map((s, i) => {
+          const c = characteristics.find((x) => x.name === s.characteristic);
           const di = c && c.shared ? sharedDims(doc).findIndex((d) => attr(d, 'name') === c.dimension) : -1;
           const pi = c && !c.shared ? kids(cube, 'Dimension').findIndex((d) => attr(d, 'name') === c.dimension) : -1;
-          const label = html`<span class="mono">${f.characteristic} = ${f.value}</span>`;
+          const label = html`<span class="mono">${isFixed(s) ? `${s.characteristic} = ${s.rows.match(SINGLE)[1]}`
+            : `${s.characteristic}: ${s.rows}${s.mode === 'members' ? ' (members)' : ''}`}</span>`;
           return html`${i > 0 && ', '}${di >= 0 ? html`<button class="link" onClick=${() => select({ kind: 'dim', ci: null, di })}>${label}</button>`
             : pi >= 0 ? html`<button class="link" onClick=${() => select({ kind: 'dim', ci: cubesOf(doc).indexOf(cube), di: pi })}>${label}</button>`
               : label}`;
@@ -725,6 +762,8 @@ function FixedField({ doc, dim, characteristics, onFix }) {
   const cube = isShared(dim) ? usagesOf(doc, dim)[0]?.cube : dim.parentNode;
   const fixed = cube ? fixedOf(cube) : [];
   const current = c && fixed.find((f) => f.characteristic === c.name);
+  // a selection other than a fixed value: shown, replaced by fixing or removed
+  const other = c && cube && !current ? selectionsOf(cube).find((s) => s.characteristic === c.name) : null;
   const [text, setText] = useState(current ? current.value : '');
   // the values it can be fixed to: { loading } | { values, more } | { error }
   const [values, setValues] = useState(null);
@@ -740,10 +779,14 @@ function FixedField({ doc, dim, characteristics, onFix }) {
     api('GET', 'values', { characteristic: c.name, ...fixedParams(fixed.filter((f) => c.compounding.includes(f.characteristic))) })
       .then((d) => setValues(d), (e) => setValues({ error: e.message }));
   };
-  const run = (selection) => {
+  const run = (selection, dropped = []) => {
     setBusy(true);
     setError('');
-    onFix(attr(cube, 'name'), selection).catch((e) => setError(e.message)).finally(() => setBusy(false));
+    onFix(attr(cube, 'name'), withFixed(cube, selection, dropped)).catch((e) => setError(e.message)).finally(() => setBusy(false));
+  };
+  const unfix = () => {
+    const gone = unfixed(c.name, characteristics);
+    run(fixed.filter((f) => !gone.includes(f.characteristic)), gone);
   };
   const value = text.trim();
   const id = `fixed-values-${c.name}`;
@@ -759,12 +802,93 @@ function FixedField({ doc, dim, characteristics, onFix }) {
             <button disabled=${busy || !value || value === (current && current.value)}
               onClick=${() => run([...fixed.filter((f) => f.characteristic !== c.name), { characteristic: c.name, value }])}>
               ${busy ? 'Fixing…' : current ? 'Change' : 'Fix'}</button>`}
-        ${current && html`<button disabled=${busy} onClick=${() => run(unfix(fixed, c.name, characteristics))}
+        ${current && html`<button disabled=${busy} onClick=${unfix}
           title=${dependents.length ? `Also un-fixes ${dependents.map((x) => x.name).join(', ')}` : 'The cube reads the facts of every value again'}>Unfix</button>`}
       </span>
       <div class="muted small"><span class="mono">${c.name}</span> ${c.text}: ${current
         ? `the cube reads only the facts of ${current.value}; this dimension has that one member`
+        : other ? 'restricted by the selection below; fixing a value replaces it'
         : 'fixed to a value, the cube reads only its facts and this dimension has one member'}${values && values.more ? ` (the first ${values.values.length} values are listed)` : ''}</div>
+      ${values && values.error && html`<div class="field-error">${values.error}</div>`}
+      ${error && html`<div class="field-error">${error}</div>`}
+    </span>`;
+}
+
+// The selection of the characteristic of a dimension (docs/bw-schema-design-guide.md, section 3.8): a BW range table
+// (rows of sign, option, low and high) in one of two modes, filter the cube (members and facts) or restrict members
+// (its members only; the server probes the facts and refuses the selection if they hold a value it excludes). Edited
+// as a draft and applied with POST fix, which rewrites the schema (one edit, undone as any other); a fixed value is the
+// one row I EQ v in filter the cube. Removing it removes the fixed values compounded with it too.
+function SelectionField({ doc, dim, characteristics, onFix }) {
+  const c = characteristicOf(doc, dim, characteristics);
+  const cube = isShared(dim) ? usagesOf(doc, dim)[0]?.cube : dim.parentNode;
+  const current = c && cube ? selectionsOf(cube).find((s) => s.characteristic === c.name) : null;
+  const key = current ? `${current.mode}:${current.rows}` : '';
+  const initial = () => (current ? { mode: current.mode, rows: parseRows(current.rows) } : { mode: 'members', rows: [] });
+  const [draft, setDraft] = useState(initial);
+  const [values, setValues] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => { setDraft(initial()); setError(''); }, [key, c && c.name]);
+  if (!c || !cube) return null;
+  const text = rowsText(draft.rows);
+  const changed = !current ? draft.rows.length > 0 : draft.mode !== current.mode || text !== rowsText(parseRows(current.rows));
+  const incomplete = draft.rows.some((r) => r.low === '' || (RANGE.includes(r.option) && r.high === ''));
+  const load = () => {
+    if (values) return;
+    setValues({ loading: true });
+    api('GET', 'values', { characteristic: c.name }).then((d) => setValues(d), (e) => setValues({ error: e.message }));
+  };
+  const run = (selections) => {
+    setBusy(true);
+    setError('');
+    onFix(attr(cube, 'name'), selections).catch((e) => setError(e.message)).finally(() => setBusy(false));
+  };
+  const apply = () => run([...selectionsOf(cube).filter((s) => s.characteristic !== c.name),
+    { characteristic: c.name, mode: draft.mode, rows: text }]);
+  const remove = () => {
+    const fixed = fixedOf(cube).map((f) => f.characteristic);
+    const gone = unfixed(c.name, characteristics).filter((n) => n === c.name || fixed.includes(n));
+    run(selectionsOf(cube).filter((s) => !gone.includes(s.characteristic)));
+  };
+  const setRow = (i, change) => setDraft((d) => ({ ...d, rows: d.rows.map((r, j) => (j === i ? { ...r, ...change } : r)) }));
+  const id = `selection-values-${c.name}`;
+  return html`<label>Selection</label>
+    <span>
+      <div class="row">
+        <label class="switch"><input type="radio" name=${`mode-${c.name}`} checked=${draft.mode === 'filter'}
+          onChange=${() => setDraft((d) => ({ ...d, mode: 'filter' }))} />Filter the cube</label>
+        <label class="switch"><input type="radio" name=${`mode-${c.name}`} checked=${draft.mode === 'members'}
+          onChange=${() => setDraft((d) => ({ ...d, mode: 'members' }))} />Restrict members</label>
+        ${(PRESETS[c.name] || []).map((p) => html`<button class="link small"
+          onClick=${() => setDraft({ mode: p.mode, rows: p.rows.map((r) => ({ ...r })) })}>${p.label}</button>`)}
+      </div>
+      ${draft.rows.length > 0 && html`<table class="selection" aria-label=${`Selection of ${c.name}`}>
+        <thead><tr><th>Sign</th><th>Option</th><th>Low</th><th>High</th><th></th></tr></thead>
+        <tbody>${draft.rows.map((r, i) => html`<tr key=${i}>
+          <td><${Select} value=${r.sign} options=${['I', 'E']} title="I include, E exclude" onChange=${(v) => setRow(i, { sign: v })} /></td>
+          <td><${Select} value=${r.option} options=${OPTIONS} title="CP and NP take BW's pattern: * any string, + one character"
+            onChange=${(v) => setRow(i, { option: v, high: RANGE.includes(v) ? r.high : '' })} /></td>
+          <td><input type="text" class="mono" size="12" value=${r.low} list=${id} aria-label=${`Low value of row ${i + 1}`}
+            onFocus=${load} onInput=${(e) => setRow(i, { low: e.target.value })} /></td>
+          <td>${RANGE.includes(r.option) && html`<input type="text" class="mono" size="12" value=${r.high} list=${id}
+            aria-label=${`High value of row ${i + 1}`} onFocus=${load} onInput=${(e) => setRow(i, { high: e.target.value })} />`}</td>
+          <td><button class="link small" title="Remove the row"
+            onClick=${() => setDraft((d) => ({ ...d, rows: d.rows.filter((_, j) => j !== i) }))}>✕</button></td>
+        </tr>`)}</tbody>
+      </table>`}
+      <datalist id=${id}>${((values && values.values) || []).map((v) => html`<option value=${v} />`)}</datalist>
+      <div class="row">
+        <button onClick=${() => setDraft((d) => ({ ...d, rows: [...d.rows, { sign: 'I', option: 'EQ', low: '', high: '' }] }))}>Add row</button>
+        <button class="primary" disabled=${busy || !changed || !draft.rows.length || incomplete} onClick=${apply}>${busy ? 'Applying…' : 'Apply'}</button>
+        ${changed && html`<button disabled=${busy} onClick=${() => { setDraft(initial()); setError(''); }}>Reset</button>`}
+        ${current && html`<button class="danger" disabled=${busy} onClick=${remove}
+          title="The cube reads every value again; fixed values compounded with it go too">Remove selection</button>`}
+      </div>
+      <div class="muted small">${draft.mode === 'filter'
+        ? 'filter the cube: the facts outside the selection are not in the cube, and this dimension has the selected members'
+        : 'restrict members: this dimension has the selected members, the facts are not filtered; refused while the facts hold a value it excludes'}${
+        current ? '' : '; no selection now'}${values && values.more ? ` (the first ${values.values.length} values are listed)` : ''}</div>
       ${values && values.error && html`<div class="field-error">${values.error}</div>`}
       ${error && html`<div class="field-error">${error}</div>`}
     </span>`;
@@ -808,8 +932,9 @@ function DimensionPane({ doc, edit, dim, sel, select, suggestions, numbers, char
       <${TextField} value=${attr(dim, 'caption')} placeholder=${attr(dim, 'name')} onCommit=${(v) => edit(() => setAttr(dim, 'caption', v))} />
       <label>Table</label>
       <${TextField} readOnly mono value=${attr(dim, 'table')} title="The view of the characteristic; a placeholder (ZZXXMLA1_C_...) is replaced by the view generated on accept" />
-      <${FixedField} key=${JSON.stringify(fixedOf(isShared(dim) ? usagesOf(doc, dim)[0]?.cube : dim.parentNode))}
+      <${FixedField} key=${JSON.stringify(selectionsOf(isShared(dim) ? usagesOf(doc, dim)[0]?.cube : dim.parentNode))}
         doc=${doc} dim=${dim} characteristics=${characteristics} onFix=${onFix} />
+      <${SelectionField} doc=${doc} dim=${dim} characteristics=${characteristics} onFix=${onFix} />
       <label>Time</label>
       <span class="row">
         <${Check} checked=${time} label="Time dimension" onChange=${(on) => edit(() => setTimeDimension(dim, on, suggestions))} />
@@ -1063,8 +1188,8 @@ function Editor({ session, onClose, onAccepted }) {
     setDirty(true);
   }, [doc]);
   // fixes the cube's characteristics on the server, which rewrites the schema: one edit, undone as any other
-  const fix = useCallback(async (cube, selection) => {
-    const d = await api('POST', 'fix', { cube, ...fixedParams(selection) }, serialize(doc));
+  const fix = useCallback(async (cube, selections) => {
+    const d = await api('POST', 'fix', { cube, ...selectionParams(selections) }, serialize(doc));
     const next = parseXml(d.xml);
     setCharacteristics(d.characteristics);
     setNumberKeys((old) => new Map([...old, ...numberKeys(d.intColumns)]));
@@ -1104,11 +1229,11 @@ function Editor({ session, onClose, onAccepted }) {
   // an undo or the XML tab can change the selection: the foreign keys of the characteristics are asked again (POST fix
   // with the cube's own selection, the schema is not replaced)
   const firstCube = cubesOf(doc)[0];
-  const docSelection = JSON.stringify(fixedOf(firstCube).map((f) => `${f.characteristic}=${f.value}`).sort());
-  const knownSelection = JSON.stringify(characteristics.filter((c) => c.fixed).map((c) => `${c.name}=${c.value}`).sort());
+  const docSelection = JSON.stringify(selectionsOf(firstCube).map((s) => `${s.mode}:${s.characteristic}=${s.rows}`).sort());
+  const knownSelection = JSON.stringify(characteristics.filter((c) => c.mode).map((c) => `${c.mode}:${c.name}=${c.selection}`).sort());
   useEffect(() => {
     if (!characteristics.length || !firstCube || docSelection === knownSelection) return;
-    api('POST', 'fix', { cube: attr(firstCube, 'name'), ...fixedParams(fixedOf(firstCube)) }, serialize(doc))
+    api('POST', 'fix', { cube: attr(firstCube, 'name'), ...selectionParams(selectionsOf(firstCube)) }, serialize(doc))
       .then((d) => setCharacteristics(d.characteristics), () => {});
   }, [docSelection, knownSelection]);
 

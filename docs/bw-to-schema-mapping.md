@@ -39,7 +39,7 @@ should use the customer namespace `/BIC/` instead of `/BI0/` (not yet checked on
 | `<Property sourceAttribute=...>` (member property of a level) | an attribute of the characteristic (a display attribute in BW terms); in `ZFMSALES` FoodMart's properties of Store Name and of the customer Name level, the attributes keep their attribute hierarchies |
 | `<Measure aggregator="sum">` | key figure with SUM / SUM |
 | Time levels | derived from `/BI0/SCALMONTH` etc. (`YYYYMM` -> year, quarter, month) |
-| `<Dimension type="TimeDimension">`, `levelType` | any dimension the user marks as time (the proposal marks none; the standard BW time characteristics `0CAL*`, `0FISC*` are dimensions on their views like any other characteristic and suggest their level type); every level and attribute gets a time level type (`TimeYears`, `TimeQuarters`, `TimeMonths`, `TimeWeeks`, `TimeDays`, else `TimeUndefined`), as Mondrian requires in a time dimension (`schema-generator.md`, Time) |
+| `<Dimension type="TimeDimension">`, `levelType` | any dimension the user marks as time (the proposal marks only `0FISCYEAR` and `0FISCPER` under its fiscal defaults, `bw-schema-design-guide.md`, section 3.8; the other standard BW time characteristics `0CAL*` are dimensions on their views like any other characteristic and suggest their level type); every level and attribute gets a time level type (`TimeYears`, `TimeQuarters`, `TimeMonths`, `TimeWeeks`, `TimeDays`, else `TimeUndefined`), as Mondrian requires in a time dimension (`schema-generator.md`, Time) |
 
 Mondrian only needs a foreign key in the fact table and a single-column primary key in the dimension table. BW SIDs are
 exactly such surrogate keys (FoodMart itself uses integer surrogate keys).

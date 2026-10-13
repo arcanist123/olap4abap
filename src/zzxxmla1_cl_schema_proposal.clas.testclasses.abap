@@ -28,6 +28,9 @@ CLASS ltc_proposal DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHO
     METHODS compounded_without_sid FOR TESTING RAISING cx_static_check.
     METHODS reference_characteristic FOR TESTING RAISING cx_static_check.
     METHODS time_characteristics FOR TESTING RAISING cx_static_check.
+    "! a characteristic the caller names is a TimeDimension: level types on its attributes and level, TimeUndefined
+    "! where none is suggested, its usage without members with facts; the others stay as they are
+    METHODS time_dimension FOR TESTING RAISING cx_static_check.
     METHODS measures_and_notes FOR TESTING RAISING cx_static_check.
     METHODS drill_through_action FOR TESTING RAISING cx_static_check.
     METHODS view_not_generated_yet FOR TESTING RAISING cx_static_check.
@@ -283,6 +286,32 @@ CLASS ltc_proposal IMPLEMENTATION.
     cl_abap_unit_assert=>assert_true( xsdbool( line_exists(
       adso_proposal-notes[ iobjnm = `0CALDAY` reason = `no SID table, so no view` ] ) ) ).
     cl_abap_unit_assert=>assert_true( xsdbool( line_exists( cube_proposal-notes[ iobjnm = `0CALDAY` ] ) ) ).
+  ENDMETHOD.
+
+  METHOD time_dimension.
+    DATA(adso) = adso( ).
+    adso-characteristics[ 4 ]-attributes = VALUE #(
+      ( iobjnm = `0CALMONTH2` text = `Calendar Month` column = VALUE #( name = `CALMONTH2` datatype = `NUMC` length = 2 ) )
+      ( iobjnm = `0CALYEAR` text = `Calendar Year` column = VALUE #( name = `CALYEAR` datatype = `NUMC` length = 4 ) )
+      ( iobjnm = `0DATEFROM` text = `Valid From` column = VALUE #( name = `DATEFROM` datatype = `DATS` length = 8 ) ) ).
+    DATA(proposal) = NEW zzxxmla1_cl_schema_proposal( )->propose( provider = adso
+                                                                  time     = VALUE #( ( `0CALMONTH` ) ) ).
+    DATA(month) = proposal-schema-dimensions[ 3 ].
+    cl_abap_unit_assert=>assert_equals( act = month-name exp = `0CALMONTH` ).
+    cl_abap_unit_assert=>assert_equals( act = month-type exp = `TimeDimension` ).
+    cl_abap_unit_assert=>assert_equals(
+      act = VALUE string_table( FOR a IN month-attributes ( |{ a-name }:{ a-level_type }| ) )
+      exp = VALUE string_table( ( `0CALMONTH Key:TimeMonths` ) ( `0CALMONTH Text:TimeUndefined` )
+                                ( `0CALMONTH2:TimeUndefined` ) ( `0CALYEAR:TimeYears` ) ( `0DATEFROM:TimeDays` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = month-hierarchies[ 1 ]-levels[ 1 ]-level_type exp = `TimeMonths` ).
+    " the other dimensions are no time dimensions and keep members with facts
+    cl_abap_unit_assert=>assert_initial( proposal-schema-dimensions[ 2 ]-type ).
+    cl_abap_unit_assert=>assert_equals( act = proposal-schema-dimensions[ 2 ]-attributes[ 1 ]-level_type exp = `Regular` ).
+    DATA(month_usage) = CAST zzxxmla1_cl_schema_def=>ty_dimension_usage( proposal-schema-cubes[ 1 ]-dimensions[ 3 ]-def ).
+    cl_abap_unit_assert=>assert_not_bound( month_usage->annotations ).
+    DATA(week_usage) = CAST zzxxmla1_cl_schema_def=>ty_dimension_usage( proposal-schema-cubes[ 1 ]-dimensions[ 2 ]-def ).
+    cl_abap_unit_assert=>assert_equals( act = week_usage->annotations->array[ 1 ]-name
+                                        exp = zzxxmla1_cl_schema=>c_members_with_facts ).
   ENDMETHOD.
 
   METHOD measures_and_notes.

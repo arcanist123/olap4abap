@@ -47,6 +47,8 @@ the initial row. Their SID tables hold the values that FoodMart, the clinic demo
 | `0CALMONTH` | every month that overlaps it | the same and `CALYEAR`, `CALMONTH2` |
 | `0CALWEEK` | every ISO week that overlaps it | `DATEFROM` (Monday), `DATETO`, `NUMDAY`, `NUMWDAY` |
 | `0HALFYEAR1`, `0CALQUART1`, `0CALMONTH2`, `0WEEKDAY1` | all their values | no attribute table |
+| `0FISCYEAR` | under K4 (below), every year of the interval, as `0CALYEAR` | `DATEFROM`, `DATETO`, `NUMDAY`, `NUMWDAY` of the calendar year |
+| `0FISCPER` | under K4, every month of the interval as period 001 to 012, as `0CALMONTH` | the month's dates and days, `FISCYEAR`, `FISCPER3`; period 000 and the special periods only `FISCYEAR` and `FISCPER3` |
 
 - The interval is the one in `RSADMINS` (above) unless the request gives `from` and `to`. Nothing is written to
   `RSADMINS`; change BW's interval in RSRHIERARCHYVIRT.
@@ -57,8 +59,19 @@ the initial row. Their SID tables hold the values that FoodMart, the clinic demo
   of the first, plus one). It is 0 if the calendar does not cover the period.
 - Attribute rows are written for every value with a SID, also one loaded outside the interval. Existing rows are
   replaced. Each characteristic is committed on its own, and one that fails (its SIDs) is rolled back and reported.
-- Not filled: the fiscal characteristics (`0FISCPER`, `0FISCYEAR`, ...: compounded with the fiscal year variant, their
-  values depend on it) and `0CALDAY` (no SID table of its own that the views use, `docs/schema-generator.md`).
+- **Fiscal characteristics** (added 2026-10-13): `0FISCYEAR` and `0FISCPER` are compounded with the fiscal year
+  variant, so their values are the variant and the key (`K42024001`, shown `K4/2024001` on the page). They are filled
+  the way `0CALYEAR` and `0CALMONTH` are, for the variant K4 only (`ZZXXMLA1_CL_TIME_MD=>c_fiscal_variant`, the one
+  the schema builder proposes, `bw-schema-design-guide.md`, section 3.8): its fiscal year is the calendar year and
+  its periods 001 to 012 are the months, so the values and dates are computed in ABAP from the interval, nothing is
+  read from customizing, and the SIDs are made by the same `RRSI_VAL_SID_CONVERT`. Values of other variants that have
+  a SID get no attribute rows. Only the regular periods are expected, but **BW's SID conversion of a period makes all
+  periods of its fiscal year**, 000 and the special periods 013 to 016 included: K4 over the development system's
+  interval has 595 period SIDs (35 years of 17), of which 420 are regular. A cube restricts its members to the regular
+  periods (`olap4abap.members.0FISCPER`, the proposal's default). Period 000 and the special periods have no dates of
+  their own: their attribute rows have the year and `FISCPER3`, no dates, 0 days. `0FISCPER3` and the other fiscal
+  characteristics are not filled.
+- Not filled: `0CALDAY` (no SID table of its own that the views use, `docs/schema-generator.md`).
 
 **Filling changes the cubes' members.** Every view on these tables (the schemas of `ZFMSALESA`, the clinic demo,
 ...) then has every period of the interval as a member, with or without facts. The reference database holds copies of
@@ -79,3 +92,4 @@ differ in the time dimensions.
 The page `time.html` (`web/schema/time.js`, linked from the schema builder and the MDX console) shows the state for
 the interval, selects the incomplete characteristics and fills the selected ones after a confirmation.
 `scripts/schema_api_test.py` checks `GET time` and the refusals of `time/fill`; it does not fill.
+`scripts/fiscal_default_test.py` needs the fiscal ones filled (it checks twelve periods for every fiscal year).

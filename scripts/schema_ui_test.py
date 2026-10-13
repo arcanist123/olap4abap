@@ -217,7 +217,7 @@ def main():
 
         check("the proposal fixes nothing, its catalog is the provider's",
               page.input_value(".topbar input[type=text]") == "ZCLVISITA" and page.url.endswith("#proposal/ZCLVISITA")
-              and "olap4abap.fixed" not in xml_of(), page.url)
+              and "olap4abap.filter" not in xml_of(), page.url)
         open_dimension("ZCLFISCPR")
         check("the period waits for the variant", "fix it first" in page.inner_text(".form")
               and page.locator("input[aria-label='Fixed value of ZCLFISCPR']").count() == 0, page.inner_text(".form"))
@@ -236,7 +236,7 @@ def main():
         xml = xml_of()
         period = re.search(r'<Dimension [^>]*name="ZCLFISCPR".*?</Dimension>', xml, re.S)
         check("fixed to K4: annotated, the variant's dimension stays, the period by its own key, the schema loads",
-              loads and '<Annotation name="olap4abap.fixed.ZCLFISCVR">K4</Annotation>' in xml
+              loads and re.search(r'<Annotation name="olap4abap\.filter\.ZCLFISCVR">\s*I EQ (?:\x27|&apos;|&#39;)K4(?:\x27|&apos;|&#39;)\s*</Annotation>', xml) is not None
               and page.locator(".tree .item:has-text('ZCLFISCVR')").count() > 0
               and period is not None and "COMPOUND_KEY" not in period.group(0), xml[:300])
         open_dimension("ZCLFISCPR")
@@ -251,7 +251,7 @@ def main():
         check("its link opens the variant's dimension",
               page.input_value("input[aria-label='Fixed value of ZCLFISCVR']") == "K4")
         page.click(".topbar button:has-text('Undo')")
-        check("undo takes the fix back", "olap4abap.fixed" not in xml_of()
+        check("undo takes the fix back", "olap4abap.filter" not in xml_of()
               and page.input_value("input[aria-label='Fixed value of ZCLFISCVR']") == "")
         variant = page.locator("input[aria-label='Fixed value of ZCLFISCVR']")
         variant.fill("K4")
@@ -261,14 +261,64 @@ def main():
         page.click(".form button:has-text('Change')")
         page.wait_for_selector(".form .field-error", timeout=60000)
         check("a value without SID is refused, K4 stays", "has no value ZZ" in page.inner_text(".form")
-              and '<Annotation name="olap4abap.fixed.ZCLFISCVR">K4</Annotation>' in xml_of(), page.inner_text(".form"))
+              and re.search(r'<Annotation name="olap4abap\.filter\.ZCLFISCVR">\s*I EQ (?:\x27|&apos;|&#39;)K4(?:\x27|&apos;|&#39;)\s*</Annotation>', xml_of()) is not None, page.inner_text(".form"))
         page.click(".form button:has-text('Unfix')")
         page.wait_for_selector(".form button:text-is('Fix')", timeout=60000)
         loads = "Loads" in status(page)
         xml = xml_of()
         period = re.search(r'<Dimension [^>]*name="ZCLFISCPR".*?</Dimension>', xml, re.S)
         check("unfixed: no annotation, the period compounded again, the schema loads",
-              loads and "olap4abap.fixed" not in xml and period is not None and "COMPOUND_KEY" in period.group(0))
+              loads and "olap4abap.filter" not in xml and period is not None and "COMPOUND_KEY" in period.group(0))
+
+        # the selection editor on the same pane: a range in restrict members that the facts contradict is refused with
+        # the values (the probe), the same range filtering the cube is applied
+        open_dimension("ZCLFISCPR")
+        page.click(".form button:text-is('Add row')")
+        page.select_option("table.selection tr >> nth=1 >> select >> nth=1", "BT")
+        page.fill("input[aria-label='Low value of row 1']", "2024001")
+        page.fill("input[aria-label='High value of row 1']", "2024006")
+        page.check("input[name='mode-ZCLFISCPR'] >> nth=1")
+        page.click(".form button:text-is('Apply')")
+        page.wait_for_selector(".form .field-error", timeout=60000)
+        # the XML tab is looked at only after the next Apply: switching tabs drops a draft that is not applied
+        check("restricting members the facts hold is refused, with the values, the rows stay",
+              "2024007" in " ".join(page.locator(".form .field-error").all_inner_texts())
+              and page.locator("table.selection tbody tr").count() == 1,
+              [page.locator(".form .field-error").all_inner_texts(), page.locator("table.selection tbody tr").count()])
+        page.check("input[name='mode-ZCLFISCPR'] >> nth=0")
+        page.click(".form button:text-is('Apply')")
+        page.wait_for_selector(".form button:has-text('Remove selection')", timeout=60000)
+        shot(page, "7-selection")
+        check("the range filters the cube (not restricting members, which was refused)",
+              "olap4abap.members.ZCLFISCPR" not in xml_of() and re.search(r'<Annotation name="olap4abap\.filter\.ZCLFISCPR">\s*I BT (?:\x27|&apos;|&#39;)2024001'
+                        r'(?:\x27|&apos;|&#39;) (?:\x27|&apos;|&#39;)2024006(?:\x27|&apos;|&#39;)\s*</Annotation>',
+                        xml_of()) is not None and "Loads" in status(page))
+        page.click(".form button:has-text('Remove selection')")
+        page.wait_for_selector(".form button:has-text('Remove selection')", state="detached", timeout=60000)
+        check("the selection is removed", "olap4abap.filter" not in xml_of())
+
+        # the fiscal defaults of a proposal (0TSC0T001): the period's twelve regular periods in restrict members, shown
+        # as rows; removed, the preset brings them back
+        page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(f"{args.url}/?sap-client={args.client}#proposal/0TSC0T001")
+        status(page)
+        open_dimension("0FISCPER")
+        rows = page.locator("table.selection tbody tr")
+        check("the proposal's period selection is twelve rows in restrict members",
+              rows.count() == 12 and page.is_checked("input[name='mode-0FISCPER'] >> nth=1")
+              and page.input_value("input[aria-label='Low value of row 12']") == "*012", rows.count())
+        page.click(".form button:has-text('Remove selection')")
+        page.wait_for_selector(".form button:has-text('Remove selection')", state="detached", timeout=60000)
+        check("removed: no rows, no annotation", page.locator("table.selection").count() == 0
+              and "olap4abap.members.0FISCPER" not in xml_of())
+        page.click(".form button:has-text('Regular periods 001–012')")
+        page.click(".form button:text-is('Apply')")
+        page.wait_for_selector(".form button:has-text('Remove selection')", timeout=60000)
+        xml = xml_of()
+        check("the preset restricts the periods again, K4 stays",
+              "olap4abap.members.0FISCPER" in xml and xml.count("I CP") == 12 and "olap4abap.filter.0FISCVARNT" in xml
+              and "Loads" in status(page), xml[:600])
         browser.close()
 
     check("no script errors", not errors, errors)

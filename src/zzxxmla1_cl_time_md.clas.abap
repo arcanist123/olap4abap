@@ -18,13 +18,21 @@
 "! if they have a navigation attribute (in the standard all their attributes are display attributes).
 "! The interval is BW's, the one of the virtual time hierarchies (RSADMINS, RSRHIERARCHYVIRT), unless given; the
 "! working days are counted in its factory calendar. SIDs are made by BW (RRSI_VAL_SID_CONVERT), the attribute rows
-"! are written here. The fiscal characteristics (they depend on a fiscal year variant) and 0CALDAY are not filled.
+"! are written here. 0CALDAY is not filled.
+"! The fiscal characteristics 0FISCYEAR and 0FISCPER are compounded with the fiscal year variant: their values are the
+"! variant and the key (K42024001), shown with a / (K4/2024001). They are filled as 0CALYEAR and 0CALMONTH are, for the
+"! variant K4 (c_fiscal_variant), whose fiscal year is the calendar year and whose periods 001 to 012 are its months:
+"! every year and every period of the interval. BW's SID conversion of a period also makes period 000 and the special
+"! periods 013 to 016 of its year; their attribute rows have the year and FISCPER3, no dates.
 CLASS zzxxmla1_cl_time_md DEFINITION
   PUBLIC
   FINAL
   CREATE PUBLIC.
 
   PUBLIC SECTION.
+    "! the fiscal year variant 0FISCYEAR and 0FISCPER are filled for: the fiscal year is the calendar year, the
+    "! periods 001 to 012 are its months, 013 to 016 its special periods
+    CONSTANTS c_fiscal_variant TYPE c LENGTH 2 VALUE 'K4'.
     TYPES:
       BEGIN OF ty_interval,
         from     TYPE d,
@@ -39,6 +47,7 @@ CLASS zzxxmla1_cl_time_md DEFINITION
         attribute_table TYPE string,  " initial: no master data, SIDs only
         key_field       TYPE string,
         length          TYPE i,       " of the key (NUMC)
+        compounding     TYPE string,  " the variant's field of a fiscal characteristic (FISCVARNT), else initial
       END OF ty_characteristic,
       ty_t_characteristic TYPE STANDARD TABLE OF ty_characteristic WITH EMPTY KEY.
     TYPES:
@@ -50,7 +59,7 @@ CLASS zzxxmla1_cl_time_md DEFINITION
         expected           TYPE i,       " values of the interval
         missing_sids       TYPE i,       " values of the interval without SID
         missing_attributes TYPE i,       " values of the interval or with a SID, without attribute row
-        first              TYPE string,  " the smallest value with a SID
+        first              TYPE string,  " the smallest value with a SID (K4/2024001 for a fiscal one)
         last               TYPE string,  " the largest
       END OF ty_status,
       ty_t_status TYPE STANDARD TABLE OF ty_status WITH EMPTY KEY.
@@ -86,26 +95,46 @@ CLASS zzxxmla1_cl_time_md DEFINITION
     TYPES ty_value TYPE c LENGTH 10.
     TYPES ty_t_value TYPE SORTED TABLE OF ty_value WITH UNIQUE KEY table_line.
     TYPES:
-      "! the attributes of a value: its period and what it belongs to
+      "! the attributes of a value: its period and what it belongs to; a special period has no dates
       BEGIN OF ty_period,
+        known    TYPE abap_bool,  " the value is one of the characteristic
         from     TYPE d,
         to       TYPE d,
         year     TYPE n LENGTH 4,
         month2   TYPE n LENGTH 2,
         quarter1 TYPE n LENGTH 1,
+        fiscper3 TYPE n LENGTH 3,
       END OF ty_period.
+    TYPES:
+      "! a row of a fiscal characteristic's table: the variant and the key
+      BEGIN OF ty_compound,
+        compounding TYPE c LENGTH 2,
+        key         TYPE c LENGTH 8,
+      END OF ty_compound,
+      ty_t_compound TYPE STANDARD TABLE OF ty_compound WITH EMPTY KEY.
 
     "! The values of a characteristic in the interval: every period that overlaps it; the values of a characteristic
-    "! without year (0CALMONTH2, ...) all of them.
+    "! without year (0CALMONTH2, ...) all of them; a fiscal one as the variant K4 and the key (K42024001).
     CLASS-METHODS values
       IMPORTING !name         TYPE string
                 !interval     TYPE ty_interval
       RETURNING VALUE(result) TYPE ty_t_value.
-    "! The period of a value of 0CALYEAR, 0CALQUARTER, 0CALMONTH or 0CALWEEK; initial if the value is none.
+    "! The period of a value of 0CALYEAR, 0CALQUARTER, 0CALMONTH, 0CALWEEK, 0FISCYEAR or 0FISCPER (K42024001: a
+    "! regular period its month's dates, period 000 or a special one the year and FISCPER3 only); not known if the
+    "! value is none (another variant than K4 too).
     CLASS-METHODS period
       IMPORTING !name         TYPE string
                 !value        TYPE csequence
       RETURNING VALUE(result) TYPE ty_period.
+    "! The value of a fiscal characteristic's row: the variant in its two characters, then the key.
+    CLASS-METHODS compound_value
+      IMPORTING !row          TYPE ty_compound
+      RETURNING VALUE(result) TYPE ty_value.
+    "! A value as the page shows it: a fiscal one as K4/2024001.
+    CLASS-METHODS display
+      IMPORTING characteristic TYPE ty_characteristic
+                !value         TYPE ty_value
+      RETURNING VALUE(result)  TYPE string.
     "! The ISO week of a date as 0CALWEEK has it: YYYYWW, the year the week's Thursday is in.
     CLASS-METHODS iso_week
       IMPORTING !date         TYPE d
@@ -166,7 +195,11 @@ CLASS zzxxmla1_cl_time_md IMPLEMENTATION.
       ( name = `0HALFYEAR1`  sid_table = `/BI0/SHALFYEAR1`  key_field = `HALFYEAR1` length = 1 )
       ( name = `0CALQUART1`  sid_table = `/BI0/SCALQUART1`  key_field = `CALQUART1` length = 1 )
       ( name = `0CALMONTH2`  sid_table = `/BI0/SCALMONTH2`  key_field = `CALMONTH2` length = 2 )
-      ( name = `0WEEKDAY1`   sid_table = `/BI0/SWEEKDAY1`   key_field = `WEEKDAY1`  length = 1 ) ).
+      ( name = `0WEEKDAY1`   sid_table = `/BI0/SWEEKDAY1`   key_field = `WEEKDAY1`  length = 1 )
+      ( name = `0FISCYEAR`   sid_table = `/BI0/SFISCYEAR`   attribute_table = `/BI0/PFISCYEAR`
+        key_field = `FISCYEAR`   length = 4 compounding = `FISCVARNT` )
+      ( name = `0FISCPER`    sid_table = `/BI0/SFISCPER`    attribute_table = `/BI0/PFISCPER`
+        key_field = `FISCPER`    length = 7 compounding = `FISCVARNT` ) ).
   ENDMETHOD.
 
   METHOD interval.
@@ -198,8 +231,8 @@ CLASS zzxxmla1_cl_time_md IMPLEMENTATION.
         ENDIF.
       ENDLOOP.
       IF sids IS NOT INITIAL.
-        entry-first = condense( sids[ 1 ] ).
-        entry-last = condense( sids[ lines( sids ) ] ).
+        entry-first = display( characteristic = characteristic value = sids[ 1 ] ).
+        entry-last = display( characteristic = characteristic value = sids[ lines( sids ) ] ).
       ENDIF.
       IF characteristic-attribute_table IS NOT INITIAL.
         DATA(attributes) = attribute_values( characteristic ).
@@ -272,7 +305,12 @@ CLASS zzxxmla1_cl_time_md IMPLEMENTATION.
     ASSIGN line->* TO FIELD-SYMBOL(<line>).
     ASSIGN COMPONENT 'VALUE' OF STRUCTURE <line> TO FIELD-SYMBOL(<value>).
     LOOP AT values INTO DATA(value).
-      <value> = condense( value ).
+      " a fiscal value is the variant in its two characters and the key, as BW's compounded value
+      IF characteristic-compounding IS INITIAL.
+        <value> = condense( value ).
+      ELSE.
+        <value> = value.
+      ENDIF.
       INSERT <line> INTO TABLE <valsids>.
     ENDLOOP.
     DATA iobjnm TYPE c LENGTH 30.
@@ -318,34 +356,52 @@ CLASS zzxxmla1_cl_time_md IMPLEMENTATION.
     ASSIGN line->* TO FIELD-SYMBOL(<line>).
     LOOP AT values INTO DATA(value).
       DATA(period) = period( name = characteristic-name value = value ).
-      IF period-from IS INITIAL.
+      IF period-known = abap_false.
         CONTINUE.
       ENDIF.
       CLEAR <line>.
       ASSIGN COMPONENT characteristic-key_field OF STRUCTURE <line> TO FIELD-SYMBOL(<field>).
-      <field> = value.
+      IF characteristic-compounding IS INITIAL.
+        <field> = value.
+      ELSE.
+        <field> = value+2.
+        ASSIGN COMPONENT characteristic-compounding OF STRUCTURE <line> TO <field>.
+        <field> = value(2).
+      ENDIF.
       ASSIGN COMPONENT 'OBJVERS' OF STRUCTURE <line> TO <field>.
       <field> = 'A'.
-      ASSIGN COMPONENT 'DATEFROM' OF STRUCTURE <line> TO <field>.
-      IF sy-subrc = 0.
-        <field> = period-from.
+      " a special period has no days of its own: no dates, no days
+      IF period-from IS NOT INITIAL.
+        ASSIGN COMPONENT 'DATEFROM' OF STRUCTURE <line> TO <field>.
+        IF sy-subrc = 0.
+          <field> = period-from.
+        ENDIF.
+        ASSIGN COMPONENT 'DATETO' OF STRUCTURE <line> TO <field>.
+        IF sy-subrc = 0.
+          <field> = period-to.
+        ENDIF.
+        ASSIGN COMPONENT 'NUMDAY' OF STRUCTURE <line> TO <field>.
+        IF sy-subrc = 0.
+          <field> = period-to - period-from + 1.
+        ENDIF.
+        ASSIGN COMPONENT 'NUMWDAY' OF STRUCTURE <line> TO <field>.
+        IF sy-subrc = 0.
+          <field> = nmax( val1 = 0 val2 = working_days( from = period-from to = period-to calendar = calendar ) ).
+        ENDIF.
       ENDIF.
-      ASSIGN COMPONENT 'DATETO' OF STRUCTURE <line> TO <field>.
-      IF sy-subrc = 0.
-        <field> = period-to.
-      ENDIF.
-      ASSIGN COMPONENT 'NUMDAY' OF STRUCTURE <line> TO <field>.
-      IF sy-subrc = 0.
-        <field> = period-to - period-from + 1.
-      ENDIF.
-      ASSIGN COMPONENT 'NUMWDAY' OF STRUCTURE <line> TO <field>.
-      IF sy-subrc = 0.
-        <field> = nmax( val1 = 0 val2 = working_days( from = period-from to = period-to calendar = calendar ) ).
-      ENDIF.
-      " the year, month and quarter attributes only where the characteristic has them (0CALMONTH, 0CALQUARTER)
+      " the year, month and quarter attributes only where the characteristic has them (0CALMONTH, 0CALQUARTER,
+      " 0FISCPER)
       ASSIGN COMPONENT 'CALYEAR' OF STRUCTURE <line> TO <field>.
       IF sy-subrc = 0 AND characteristic-key_field <> `CALYEAR`.
         <field> = period-year.
+      ENDIF.
+      ASSIGN COMPONENT 'FISCYEAR' OF STRUCTURE <line> TO <field>.
+      IF sy-subrc = 0 AND characteristic-key_field <> `FISCYEAR`.
+        <field> = period-year.
+      ENDIF.
+      ASSIGN COMPONENT 'FISCPER3' OF STRUCTURE <line> TO <field>.
+      IF sy-subrc = 0.
+        <field> = period-fiscper3.
       ENDIF.
       ASSIGN COMPONENT 'CALMONTH2' OF STRUCTURE <line> TO <field>.
       IF sy-subrc = 0.
@@ -365,18 +421,52 @@ CLASS zzxxmla1_cl_time_md IMPLEMENTATION.
 
   METHOD sid_values.
     DATA(where) = `SID <> 0`.
-    SELECT (characteristic-key_field)
+    IF characteristic-compounding IS INITIAL.
+      SELECT (characteristic-key_field)
+        FROM (characteristic-sid_table)
+        WHERE (where)
+        INTO TABLE @result.
+      RETURN.
+    ENDIF.
+    DATA rows TYPE ty_t_compound.
+    DATA(fields) = |{ characteristic-compounding }, { characteristic-key_field }|.
+    SELECT (fields)
       FROM (characteristic-sid_table)
       WHERE (where)
-      INTO TABLE @result.
+      INTO TABLE @rows.
+    LOOP AT rows INTO DATA(row).
+      INSERT compound_value( row ) INTO TABLE result.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD attribute_values.
     DATA(where) = |OBJVERS = 'A' AND { characteristic-key_field } <> '{ repeat( val = `0` occ = characteristic-length ) }'|.
-    SELECT (characteristic-key_field)
+    IF characteristic-compounding IS INITIAL.
+      SELECT (characteristic-key_field)
+        FROM (characteristic-attribute_table)
+        WHERE (where)
+        INTO TABLE @result.
+      RETURN.
+    ENDIF.
+    DATA rows TYPE ty_t_compound.
+    DATA(fields) = |{ characteristic-compounding }, { characteristic-key_field }|.
+    SELECT (fields)
       FROM (characteristic-attribute_table)
       WHERE (where)
-      INTO TABLE @result.
+      INTO TABLE @rows.
+    LOOP AT rows INTO DATA(row).
+      INSERT compound_value( row ) INTO TABLE result.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD compound_value.
+    result = row-compounding.
+    result+2 = row-key.
+  ENDMETHOD.
+
+  METHOD display.
+    result = COND #( WHEN characteristic-compounding IS INITIAL THEN condense( value )
+                     ELSE |{ condense( CONV string( value(2) ) ) }/{ condense( CONV string( value+2 ) ) }| ).
   ENDMETHOD.
 
   METHOD values.
@@ -384,21 +474,27 @@ CLASS zzxxmla1_cl_time_md IMPLEMENTATION.
     DATA(first_year) = CONV i( interval-from(4) ).
     DATA(last_year) = CONV i( interval-to(4) ).
     CASE name.
-      WHEN `0CALYEAR`.
+      WHEN `0CALYEAR` OR `0FISCYEAR`.
         DO last_year - first_year + 1 TIMES.
           value = |{ first_year + sy-index - 1 WIDTH = 4 ALIGN = RIGHT PAD = '0' }|.
+          IF name = `0FISCYEAR`.
+            value = |{ c_fiscal_variant }{ value }|.
+          ENDIF.
           INSERT value INTO TABLE result.
         ENDDO.
-      WHEN `0CALQUARTER` OR `0CALMONTH`.
+      WHEN `0CALQUARTER` OR `0CALMONTH` OR `0FISCPER`.
         " the months from the first to the last, each as its month or quarter
         DATA(month) = first_year * 12 + CONV i( interval-from+4(2) ) - 1.
         DATA(last_month) = last_year * 12 + CONV i( interval-to+4(2) ) - 1.
         WHILE month <= last_month.
           DATA(year) = month DIV 12.
           DATA(month_of_year) = month MOD 12 + 1.
-          value = COND #( WHEN name = `0CALMONTH`
-                          THEN |{ year WIDTH = 4 ALIGN = RIGHT PAD = '0' }{ month_of_year WIDTH = 2 ALIGN = RIGHT PAD = '0' }|
-                          ELSE |{ year WIDTH = 4 ALIGN = RIGHT PAD = '0' }{ ( month_of_year + 2 ) DIV 3 }| ).
+          value = SWITCH #( name
+            WHEN `0CALMONTH`
+            THEN |{ year WIDTH = 4 ALIGN = RIGHT PAD = '0' }{ month_of_year WIDTH = 2 ALIGN = RIGHT PAD = '0' }|
+            WHEN `0FISCPER`
+            THEN |{ c_fiscal_variant }{ year WIDTH = 4 ALIGN = RIGHT PAD = '0' }{ month_of_year WIDTH = 3 ALIGN = RIGHT PAD = '0' }|
+            ELSE |{ year WIDTH = 4 ALIGN = RIGHT PAD = '0' }{ ( month_of_year + 2 ) DIV 3 }| ).
           INSERT value INTO TABLE result.
           month = month + 1.
         ENDWHILE.
@@ -432,6 +528,32 @@ CLASS zzxxmla1_cl_time_md IMPLEMENTATION.
 
   METHOD period.
     DATA(text) = condense( CONV string( value ) ).
+    IF name = `0FISCYEAR` OR name = `0FISCPER`.
+      " K4: the fiscal year is the calendar year, the periods 001 to 012 are its months
+      IF strlen( text ) < 2 OR text(2) <> c_fiscal_variant.
+        RETURN.
+      ENDIF.
+      DATA(key) = substring( val = text off = 2 ).
+      IF key CN '0123456789' OR strlen( key ) <> COND i( WHEN name = `0FISCYEAR` THEN 4 ELSE 7 ).
+        RETURN.
+      ENDIF.
+      IF name = `0FISCYEAR`.
+        result = period( name = `0CALYEAR` value = key ).
+        RETURN.
+      ENDIF.
+      DATA(number) = CONV i( key+4(3) ).
+      IF number > 16 OR CONV i( key(4) ) < 1000.
+        RETURN.
+      ENDIF.
+      " period 000 and the special periods have no dates of their own
+      IF number >= 1 AND number <= 12.
+        result = period( name = `0CALMONTH` value = |{ key(4) }{ key+5(2) }| ).
+      ENDIF.
+      result-year = key(4).
+      result-fiscper3 = key+4(3).
+      result-known = abap_true.
+      RETURN.
+    ENDIF.
     IF text CN '0123456789' OR strlen( text ) < 4.
       RETURN.
     ENDIF.
@@ -481,6 +603,7 @@ CLASS zzxxmla1_cl_time_md IMPLEMENTATION.
         result-from = monday.
         result-to = monday + 6.
     ENDCASE.
+    result-known = xsdbool( result-from IS NOT INITIAL ).
   ENDMETHOD.
 
   METHOD iso_week.

@@ -66,10 +66,11 @@ CLASS ltc_bw_view_gen DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION 
     METHODS compounding_two_values FOR TESTING.
     "! the facts are filtered on the characteristics of mode filter the cube only, by the condition of their rows
     METHODS fact_view_filter_mode FOR TESTING.
-    "! fixed values are a selection of mode filter the cube with one I EQ row each
-    METHODS selection_of_fixed FOR TESTING.
-    "! the selection as table ZZXXMLA1_VIEW keys it: sorted by characteristic
-    METHODS selection_text FOR TESTING.
+    "! a characteristic fixed to one value: mode filter the cube, one I EQ row
+    METHODS fixed
+      IMPORTING iobjnm        TYPE rsiobjnm
+                !value        TYPE string
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_selection=>ty_characteristic.
     "! a characteristic without attribute table: the SID table alone
     METHODS without_attributes FOR TESTING.
     "! no SID table, no view
@@ -380,11 +381,10 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
                                 ( field = 'FISCPER'   datatype = 'CHAR' length = 7 key = abap_true )
                                 ( field = 'SID'       datatype = 'INT4' length = 10 ) )
       compounding    = VALUE #( ( iobjnm = '0FISCVARNT' field = 'FISCVARNT' ) ) ).
-    DATA(fixed) = VALUE zzxxmla1_cl_bw_view_gen=>ty_t_fixed( ( iobjnm = '0FISCVARNT' value = `K4` )
-                                                              ( iobjnm = '0VERSION' value = `000` ) ).
     DATA(layout) = zzxxmla1_cl_bw_view_gen=>build_layout(
                      metadata  = metadata
-                     selection = zzxxmla1_cl_bw_view_gen=>selection_of( fixed ) ).
+                     selection = VALUE #( ( fixed( iobjnm = '0FISCVARNT' value = `K4` ) )
+                                          ( fixed( iobjnm = '0VERSION' value = `000` ) ) ) ).
     cl_abap_unit_assert=>assert_equals( act = layout-selection exp = `0FISCVARNT=K4` ).
     cl_abap_unit_assert=>assert_false( xsdbool( line_exists(
       layout-columns[ name = zzxxmla1_cl_bw_view_gen=>c_compound_key ] ) ) ).
@@ -407,7 +407,7 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
     " fixed, but not its compounding: the plain view, compounded
     layout = zzxxmla1_cl_bw_view_gen=>build_layout(
       metadata  = metadata
-      selection = zzxxmla1_cl_bw_view_gen=>selection_of( VALUE #( ( iobjnm = '0VERSION' value = `000` ) ) ) ).
+      selection = VALUE #( ( fixed( iobjnm = '0VERSION' value = `000` ) ) ) ).
     cl_abap_unit_assert=>assert_initial( layout-selection ).
     cl_abap_unit_assert=>assert_initial( layout-filters ).
     cl_abap_unit_assert=>assert_true( xsdbool( line_exists(
@@ -422,9 +422,9 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
                                 ( field = 'FISCPER'   datatype = 'CHAR' length = 7 key = abap_true )
                                 ( field = 'SID'       datatype = 'INT4' length = 10 ) )
       compounding    = VALUE #( ( iobjnm = '0FISCVARNT' field = 'FISCVARNT' ) ) ).
-    DATA(fixed) = zzxxmla1_cl_bw_view_gen=>selection_of( VALUE #( ( iobjnm = '0FISCVARNT' value = `K4` )
-                                                                  ( iobjnm = '0FISCPER' value = `2024001` ) ) ).
-    DATA(layout) = zzxxmla1_cl_bw_view_gen=>build_layout( metadata = metadata selection = fixed ).
+    DATA(selection) = VALUE zzxxmla1_cl_bw_view_gen=>ty_t_selection( ( fixed( iobjnm = '0FISCVARNT' value = `K4` ) )
+                                                                     ( fixed( iobjnm = '0FISCPER' value = `2024001` ) ) ).
+    DATA(layout) = zzxxmla1_cl_bw_view_gen=>build_layout( metadata = metadata selection = selection ).
     cl_abap_unit_assert=>assert_equals( act = layout-selection exp = `0FISCPER=2024001;0FISCVARNT=K4` ).
     cl_abap_unit_assert=>assert_equals(
       act = layout-filters
@@ -437,7 +437,7 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
                           tables         = VALUE #( basic = '0FISCVARNT' sids = '/BI0/SFISCVARNT' key_field = 'FISCVARNT' )
                           sid_columns    = VALUE #( ( field = 'FISCVARNT' datatype = 'CHAR' length = 2 key = abap_true )
                                                     ( field = 'SID'       datatype = 'INT4' length = 10 ) ) )
-      selection = fixed ).
+      selection = selection ).
     cl_abap_unit_assert=>assert_equals( act = layout-selection exp = `0FISCVARNT=K4` ).
     cl_abap_unit_assert=>assert_equals( act = layout-filters exp = VALUE string_table( ( `s.fiscvarnt = 'K4'` ) ) ).
     " a reference characteristic: its view is its basic one's, not filtered
@@ -446,7 +446,7 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
                           tables         = VALUE #( basic = '0CUSTOMER' sids = '/BI0/SCUSTOMER' key_field = 'CUSTOMER' )
                           sid_columns    = VALUE #( ( field = 'CUSTOMER' datatype = 'CHAR' length = 10 key = abap_true )
                                                     ( field = 'SID'      datatype = 'INT4' length = 10 ) ) )
-      selection = zzxxmla1_cl_bw_view_gen=>selection_of( VALUE #( ( iobjnm = '0SOLD_TO' value = `1000` ) ) ) ).
+      selection = VALUE #( ( fixed( iobjnm = '0SOLD_TO' value = `1000` ) ) ) ).
     cl_abap_unit_assert=>assert_initial( layout-selection ).
     cl_abap_unit_assert=>assert_initial( layout-filters ).
   ENDMETHOD.
@@ -577,20 +577,10 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
     cl_abap_unit_assert=>assert_initial( zzxxmla1_cl_bw_view_gen=>build_fact_layout( metadata )-columns ).
   ENDMETHOD.
 
-  METHOD selection_of_fixed.
-    cl_abap_unit_assert=>assert_equals(
-      act = zzxxmla1_cl_bw_view_gen=>selection_of( VALUE #( ( iobjnm = '0FISCVARNT' value = `K4` ) ) )
-      exp = VALUE zzxxmla1_cl_bw_view_gen=>ty_t_selection(
-              ( iobjnm = '0FISCVARNT' mode = zzxxmla1_cl_bw_selection=>c_mode-filter
-                rows   = VALUE #( ( sign = 'I' option = 'EQ' low = `K4` ) ) ) ) ).
-  ENDMETHOD.
-
-  METHOD selection_text.
-    cl_abap_unit_assert=>assert_equals(
-      act = zzxxmla1_cl_bw_view_gen=>selection_text( VALUE #( ( iobjnm = '0VERSION' value = `000` )
-                                                              ( iobjnm = '0FISCVARNT' value = `K4` ) ) )
-      exp = `0FISCVARNT=K4;0VERSION=000` ).
-    cl_abap_unit_assert=>assert_initial( zzxxmla1_cl_bw_view_gen=>selection_text( VALUE #( ) ) ).
+  METHOD fixed.
+    result = VALUE #( iobjnm = iobjnm
+                      mode   = zzxxmla1_cl_bw_selection=>c_mode-filter
+                      rows   = zzxxmla1_cl_bw_selection=>equals( value ) ).
   ENDMETHOD.
 
   METHOD without_attributes.

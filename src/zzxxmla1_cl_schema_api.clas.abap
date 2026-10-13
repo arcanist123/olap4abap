@@ -15,41 +15,55 @@
 "! - GET providers: the InfoCubes and cube-type aDSOs (ZZXXMLA1_CL_BW_PROVIDER);
 "! - GET proposal?provider=X: the proposed schema (ZZXXMLA1_CL_SCHEMA_PROPOSAL) as XML and as an outline for the UI,
 "!   with the notes, the time suggestions and the NUMC columns of its views that have a number (COLUMN_INT), which the
-"!   UI names in their place when a dimension is switched to numbers, and the cube's characteristics (below). Nothing
-"!   is fixed: fixing is an edit (fix);
-"! - GET values?characteristic=C: the values C can be fixed to (its SID table, at most 500, more: true if there are
-"!   more), with a parameter fixed.CHARACTERISTIC=value for each characteristic C is compounded with;
-"! - POST fix?cube=X&fixed.CHARACTERISTIC=value...: the body is the edited schema XML; the cube (without cube the
-"!   first one) fixes the given characteristics, all it fixes (docs/bw-schema-design-guide.md, section 3.8), its
-"!   tables and columns following (ZZXXMLA1_CL_SCHEMA_FIX); answers the new XML and outline, the tables replaced, the
-"!   NUMC numbers of the characteristics' tables and the cube's characteristics; 400 if the selection or the schema is
-"!   refused. Nothing is changed on the server;
+"!   UI names in their place when a dimension is switched to numbers, and the cube's characteristics (below). Only
+"!   the defaults are restricted (ZZXXMLA1_CL_SCHEMA_DEFAULTS: with 0FISCYEAR or 0FISCPER the variant fixed to K4, the
+"!   periods restricted to the regular ones, both time dimensions; its notes join the proposal's); any other
+"!   selection is an edit (fix);
+"! - A selection (docs/bw-schema-design-guide.md, section 3.8) is given by parameters, one per characteristic:
+"!   filter.CHARACTERISTIC=rows (filter the cube), members.CHARACTERISTIC=rows (restrict members), the rows as the
+"!   annotations write them (I EQ 'K4';E CP '*013'), and fixed.CHARACTERISTIC=value, filter the cube with I EQ value;
+"!   a characteristic given twice or rows that do not parse are refused (400);
+"! - GET values?characteristic=C: the values C can be restricted to (its SID table, at most 500, more: true if there
+"!   are more), under the selection of its compounding where the parameters give one;
+"! - POST fix?cube=X&filter.CHARACTERISTIC=rows...: the body is the edited schema XML; the cube (without cube the
+"!   first one) restricts characteristics by the given selection, all it restricts, its tables and columns following
+"!   (ZZXXMLA1_CL_SCHEMA_FIX); answers the new XML and outline, the tables replaced, the NUMC numbers of the
+"!   characteristics' tables and the cube's characteristics; 400 if the selection or the schema is refused, or if the
+"!   probe of the cube's facts refuses the selection (ZZXXMLA1_CL_SCHEMA_PROBE: its facts hold a value that a
+"!   selection in restrict members excludes). Nothing is changed on the server;
 "! - GET schemas: the catalogs of /WEB-INF/datasources.xml, each name once (its first definition, as the XMLA endpoint
 "!   reads them), with their schema files;
 "! - GET schema?catalog=X: the catalog's schema as XML and as an outline, to edit an accepted schema again, with the
 "!   columns of its tables that have a number (a column COLUMN_INT next to COLUMN, from the dictionary) and the
 "!   cube's characteristics;
-"!   The cube's characteristics (of its first cube) are those of its provider that can be fixed, with the dimension of
-"!   the cube on each and its fixed value; none if the provider is not found (a schema not on BW's tables);
+"!   The cube's characteristics (of its first cube) are those of its provider that can be restricted, with the
+"!   dimension of the cube on each and its selection (mode filter or members, rows, their text; fixed and value for
+"!   one I EQ value); none if the provider is not found (a schema not on BW's tables);
 "! - POST check?catalog=X: the body is the edited schema XML. The checks of accept, nothing is changed: the schema
 "!   parses, and the server's catalogs with this one load in ZZXXMLA1_CL_SCHEMA as the XMLA endpoint will load them.
 "!   The schema file of an existing catalog is its Definition (it is replaced), of a new one
 "!   /WEB-INF/schema/<catalog>.xml. Answers the file, whether the catalog is new and the characteristics (and aDSOs,
-"!   for their fact views) whose views accept generates;
-"!   Check also refuses views generated for other fixed characteristics than those of the cube that uses them (its
-"!   annotations olap4abap.fixed.CHARACTERISTIC, edited by hand), a cube that fixes characteristics on facts that are
-"!   not its fact view, and a table that cubes with different fixed characteristics use;
-"! - POST accept?catalog=X: the checks of check, then the views of the tables named by a placeholder
+"!   for their fact views) whose views accept generates. With probe=true (the check before accept, not the one run
+"!   while the user types) the cubes' facts are probed too, as accept probes them, and the answer has the probe;
+"!   Check also refuses views generated for another selection than the one of the cube that uses them (its
+"!   annotations olap4abap.filter.CHARACTERISTIC and olap4abap.members.CHARACTERISTIC, edited by hand), a cube that
+"!   filters on characteristics on facts that are not its fact view, and a table that cubes with different selections
+"!   of it use;
+"! - POST accept?catalog=X: the checks of check and the probe, then the views of the tables named by a placeholder
 "!   (ZZXXMLA1_C_<characteristic>, ZZXXMLA1_F_<provider> for the fact view of an aDSO with a compounded characteristic
-"!   or of a cube that fixes characteristics) are generated (ZZXXMLA1_CL_BW_VIEW_GEN) for the fixed characteristics of
-"!   the cube that uses them and replaced by their database views,
+"!   or of a cube that filters on characteristics) are generated (ZZXXMLA1_CL_BW_VIEW_GEN) for the selection of the
+"!   cube that uses them and replaced by their database views,
 "!   the schema file is written, a new catalog added to the first data source of /WEB-INF/datasources.xml, and the
-"!   work is committed. Without catalog the schema's name is the catalog. Then the views of fixed characteristics that
-"!   no catalog's schema names any more are deleted (answered as deletedViews);
+"!   work is committed. Without catalog the schema's name is the catalog. Then the views of selections that no
+"!   catalog's schema names any more are deleted (answered as deletedViews);
 "! - POST remove?catalog=X: the catalog is removed from every data source of /WEB-INF/datasources.xml and its schema
 "!   file deleted (unless another catalog still names it), and the work is committed. The plain views stay: they are
-"!   per characteristic, other schemas can use them; the views of fixed characteristics that no catalog's schema names
-"!   any more are deleted. Answers the deleted files and views;
+"!   per characteristic, other schemas can use them; the views of selections that no catalog's schema names any more
+"!   are deleted. Answers the deleted files and views;
+"! - POST probe[?catalog=X]: the probe of every catalog's cubes (or of one catalog's), nothing written:
+"!   {catalogs: [{catalog, ok, cubes: [{cube, ok, characteristics: [{name, ok, values: [{value, facts}]}]}]}],
+"!   runtime} (milliseconds); a catalog that cannot be probed (its schema file missing or unreadable, a cube that
+"!   restricts members not on a BW provider's facts) is an entry with error and no cubes, the others are probed;
 "! - GET time?from=YYYY-MM-DD&to=YYYY-MM-DD: the master data of the calendar time characteristics
 "!   (ZZXXMLA1_CL_TIME_MD): the interval (without from and to BW's, the one of RSRHIERARCHYVIRT) and, per
 "!   characteristic, its values with SID and with attributes and those of the interval that are missing;
@@ -106,16 +120,17 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
         path            TYPE string,  " of the schema file
         datasources     TYPE string,  " the data sources file as it is
         new_datasources TYPE string,  " with the catalog
+        probed          TYPE zzxxmla1_cl_schema_probe=>ty_t_cube,  " if probed
       END OF ty_checked.
     TYPES:
       "! a table of a schema whose view the API knows (a placeholder or a view of table ZZXXMLA1_VIEW): the
-      "! characteristic or provider (kind C or F) of its view, the fixed characteristics of the cube that uses it and the
-      "! selection of its view for them
+      "! characteristic or provider (kind C or F) of its view, the selection of the cube that uses it (cube) and the
+      "! selection of its view for that (view, as table ZZXXMLA1_VIEW keys it)
       BEGIN OF ty_table_selection,
         table     TYPE string,
         kind      TYPE c LENGTH 1,
         object    TYPE string,
-        fixed     TYPE zzxxmla1_cl_bw_view_gen=>ty_t_fixed,
+        cube      TYPE zzxxmla1_cl_bw_view_gen=>ty_t_selection,
         selection TYPE string,
       END OF ty_table_selection,
       ty_t_table_selection TYPE STANDARD TABLE OF ty_table_selection WITH EMPTY KEY.
@@ -147,10 +162,17 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
       IMPORTING !schema       TYPE zzxxmla1_cl_schema_def=>ty_schema
                 provider      TYPE zzxxmla1_cl_bw_provider=>ty_provider OPTIONAL
       RETURNING VALUE(result) TYPE string.
-    "! The parameters fixed.CHARACTERISTIC=value of a request.
-    METHODS fixed_parameters
+    "! The selection of a request's parameters filter.CHARACTERISTIC=rows, members.CHARACTERISTIC=rows and
+    "! fixed.CHARACTERISTIC=value; refused if rows do not parse or a characteristic is given twice.
+    METHODS selection_parameters
       IMPORTING request       TYPE ty_request
-      RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_view_gen=>ty_t_fixed.
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_view_gen=>ty_t_selection
+      RAISING   zzxxmla1_cx_api_refused.
+    "! The selection of a cube's annotations; refused (400) if it is none.
+    METHODS cube_selection
+      IMPORTING cube          TYPE zzxxmla1_cl_schema_def=>ty_cube
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_view_gen=>ty_t_selection
+      RAISING   zzxxmla1_cx_api_refused.
     METHODS schemas
       RETURNING VALUE(result) TYPE string
       RAISING   zzxxmla1_cx_api_refused.
@@ -170,6 +192,20 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
       IMPORTING request       TYPE ty_request
       RETURNING VALUE(result) TYPE string
       RAISING   zzxxmla1_cx_api_refused.
+    METHODS probe
+      IMPORTING request       TYPE ty_request
+      RETURNING VALUE(result) TYPE string
+      RAISING   zzxxmla1_cx_api_refused.
+    "! The probe of every cube of a schema; refused (400) if the probe refuses one, or if a cube that restricts members
+    "! is on no BW provider's facts.
+    METHODS probe_schema
+      IMPORTING !schema       TYPE zzxxmla1_cl_schema_def=>ty_schema
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_schema_probe=>ty_t_cube
+      RAISING   zzxxmla1_cx_api_refused.
+    "! Probed cubes as a JSON array.
+    METHODS cubes_json
+      IMPORTING cubes         TYPE zzxxmla1_cl_schema_probe=>ty_t_cube
+      RETURNING VALUE(result) TYPE string.
     METHODS time_status
       IMPORTING request       TYPE ty_request
       RETURNING VALUE(result) TYPE string
@@ -199,9 +235,10 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
     METHODS json_date
       IMPORTING !value        TYPE d
       RETURNING VALUE(result) TYPE string.
-    "! Everything accept checks before it changes anything.
+    "! Everything accept checks before it changes anything; probe: the probe of the cubes' facts too.
     METHODS check_request
       IMPORTING request       TYPE ty_request
+                probe         TYPE abap_bool
       RETURNING VALUE(result) TYPE ty_checked
       RAISING   zzxxmla1_cx_api_refused.
     "! The catalogs of a data sources file, in the order of the file.
@@ -271,18 +308,18 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
       IMPORTING table         TYPE string
       RETURNING VALUE(result) TYPE string.
     "! The tables of the schema whose views the API knows, with the selection each view needs for the cubes that use
-    "! it: a cube's fact table that of its fixed characteristics, a dimension's table that of the fixed compounding of
-    "! its characteristic (none for a dimension no cube uses). Refused if two cubes need two different ones of a table,
-    "! or if a cube that fixes characteristics is not on a fact view.
+    "! it: a cube's fact table that of the characteristics that filter the cube, a dimension's table that of its
+    "! characteristic and its compounding (none for a dimension no cube uses). Refused if two cubes need two different
+    "! ones of a table, or if a cube that filters on characteristics is not on a fact view.
     METHODS table_selections
       IMPORTING !schema       TYPE zzxxmla1_cl_schema_def=>ty_schema
       RETURNING VALUE(result) TYPE ty_t_table_selection
       RAISING   zzxxmla1_cx_api_refused.
-    "! Adds a table and the selection its view needs for the fixed characteristics of a cube; refused if it needs
-    "! another one already.
+    "! Adds a table and the selection its view needs for the selection of a cube; refused if it needs another one
+    "! already.
     METHODS add_table_selection
       IMPORTING table         TYPE string
-                fixed         TYPE zzxxmla1_cl_bw_view_gen=>ty_t_fixed
+                selection     TYPE zzxxmla1_cl_bw_view_gen=>ty_t_selection
                 registered    TYPE zzxxmla1_cl_bw_view_gen=>ty_t_view
       CHANGING  selections    TYPE ty_t_table_selection
       RAISING   zzxxmla1_cx_api_refused.
@@ -291,8 +328,8 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
     METHODS check_selections
       IMPORTING !schema TYPE zzxxmla1_cl_schema_def=>ty_schema
       RAISING   zzxxmla1_cx_api_refused.
-    "! Deletes the views of fixed characteristics that no schema of a catalog of the data sources names; nothing if a
-    "! schema cannot be read. Returns the deleted database views.
+    "! Deletes the views of selections that no schema of a catalog of the data sources names; nothing if a schema
+    "! cannot be read. Returns the deleted database views.
     METHODS delete_unused_views
       IMPORTING datasources   TYPE string
       RETURNING VALUE(result) TYPE string_table.
@@ -347,7 +384,8 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
                                   THEN substring( val = request-path off = strlen( c_path ) ) ).
     DATA(allow) = SWITCH string( resource WHEN `providers` OR `proposal` OR `values` OR `schemas` OR `schema` OR `time`
                                           THEN `GET`
-                                          WHEN `check` OR `accept` OR `remove` OR `fix` OR `time/fill` THEN `POST` ).
+                                          WHEN `check` OR `accept` OR `remove` OR `fix` OR `probe` OR `time/fill`
+                                          THEN `POST` ).
     IF allow IS INITIAL.
       result = error_result( status = 404 message = |No resource { request-path }| ).
       RETURN.
@@ -366,6 +404,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
                                          WHEN `check`     THEN check( request )
                                          WHEN `accept`    THEN accept( request )
                                          WHEN `fix`       THEN fix( request )
+                                         WHEN `probe`     THEN probe( request )
                                          WHEN `time`      THEN time_status( request )
                                          WHEN `time/fill` THEN fill_time( request )
                                          ELSE                  remove( request ) ).
@@ -394,17 +433,25 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
       RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400 message = `Parameter provider is missing`.
     ENDIF.
     DATA provider TYPE zzxxmla1_cl_bw_provider=>ty_provider.
+    DATA defaults TYPE zzxxmla1_cl_schema_defaults=>ty_defaults.
+    DATA(reader) = NEW zzxxmla1_cl_bw_provider( ).
     TRY.
-        provider = NEW zzxxmla1_cl_bw_provider( )->read( name ).
+        provider = reader->read( name ).
+        " the fiscal year variant fixed to K4, the periods restricted to the regular ones, both marked as time
+        defaults = NEW zzxxmla1_cl_schema_defaults( )->propose( provider ).
+        IF defaults-selection IS NOT INITIAL.
+          provider = reader->read( name = name selection = defaults-selection ).
+        ENDIF.
       CATCH zzxxmla1_cx_bw_provider INTO DATA(error).
         RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 404 message = error->get_text( ).
     ENDTRY.
     DATA proposal TYPE zzxxmla1_cl_schema_proposal=>ty_proposal.
     TRY.
-        proposal = NEW zzxxmla1_cl_schema_proposal( )->propose( provider ).
+        proposal = NEW zzxxmla1_cl_schema_proposal( )->propose( provider = provider time = defaults-time ).
       CATCH zzxxmla1_cx_xom INTO DATA(xom_error).
         RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 500 message = |Proposal not readable: { xom_error->error_message }|.
     ENDTRY.
+    APPEND LINES OF defaults-notes TO proposal-notes.
 
     DATA notes TYPE string_table.
     LOOP AT proposal-notes INTO DATA(note).
@@ -437,12 +484,20 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     ENDIF.
     DATA changes TYPE zzxxmla1_cl_schema_fix=>ty_result.
     TRY.
-        changes = NEW zzxxmla1_cl_schema_fix( )->fix( EXPORTING cube   = cube
-                                                                fixed  = fixed_parameters( request )
-                                                      CHANGING  schema = parsed ).
+        changes = NEW zzxxmla1_cl_schema_fix( )->fix( EXPORTING cube      = cube
+                                                                selection = selection_parameters( request )
+                                                      CHANGING  schema    = parsed ).
       CATCH zzxxmla1_cx_bw_provider INTO DATA(error).
         RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400 message = error->get_text( ).
     ENDTRY.
+    " the facts of the cube for the new selection
+    DATA(refusal) = zzxxmla1_cl_schema_probe=>refusal( VALUE #(
+      ( cube            = cube
+        characteristics = NEW zzxxmla1_cl_schema_probe( )->probe( provider  = changes-provider-name
+                                                                  selection = changes-provider-selection ) ) ) ).
+    IF refusal IS NOT INITIAL.
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400 message = refusal.
+    ENDIF.
     DATA tables TYPE string_table.
     LOOP AT changes-tables INTO DATA(replaced).
       APPEND |\{"from":{ json( replaced-from ) },"to":{ json( replaced-to ) }\}| TO tables.
@@ -466,10 +521,18 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     DATA entries TYPE string_table.
     IF read IS NOT INITIAL.
       LOOP AT zzxxmla1_cl_schema_fix=>characteristics( cube = cube provider = read ) INTO DATA(characteristic).
+        DATA(rows) = VALUE string_table( FOR r IN characteristic-rows
+                                         ( |\{"sign":{ json( r-sign ) },"option":{ json( r-option ) },| &&
+                                           |"low":{ json( r-low ) },"high":{ json( r-high ) }\}| ) ).
+        DATA(mode) = SWITCH string( characteristic-mode WHEN zzxxmla1_cl_bw_selection=>c_mode-filter THEN `filter`
+                                                        WHEN zzxxmla1_cl_bw_selection=>c_mode-members THEN `members` ).
         APPEND |\{"name":{ json( characteristic-name ) },"text":{ json( characteristic-text ) },| &&
                |"compounding":{ json_array( VALUE #( FOR c IN characteristic-compounding ( json( c ) ) ) ) },| &&
                |"foreignKey":{ json( characteristic-foreign_key ) },| &&
                |"dimension":{ json( characteristic-dimension ) },"shared":{ json_bool( characteristic-shared ) },| &&
+               |"mode":{ COND #( WHEN mode IS INITIAL THEN `null` ELSE json( mode ) ) },| &&
+               |"rows":{ json_array( rows ) },| &&
+               |"selection":{ json( zzxxmla1_cl_bw_selection=>rows_text( characteristic-rows ) ) },| &&
                |"fixed":{ json_bool( characteristic-fixed ) },"value":{ json( characteristic-value ) }\}| TO entries.
       ENDLOOP.
     ENDIF.
@@ -477,11 +540,35 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
              |"cube":{ json( cube-name ) },"characteristics":{ json_array( entries ) }|.
   ENDMETHOD.
 
-  METHOD fixed_parameters.
-    LOOP AT request-parameters INTO DATA(fixed_parameter) WHERE name CP 'fixed.*'.
-      INSERT VALUE #( iobjnm = to_upper( substring( val = fixed_parameter-name off = 6 ) )
-                      value  = fixed_parameter-value ) INTO TABLE result.
+  METHOD selection_parameters.
+    LOOP AT request-parameters INTO DATA(given).
+      DATA(restricted) = VALUE zzxxmla1_cl_bw_selection=>ty_characteristic( ).
+      TRY.
+          IF given-name CP 'filter.*' OR given-name CP 'members.*' OR given-name CP 'fixed.*'.
+            restricted = zzxxmla1_cl_bw_selection=>from_annotation( name  = |olap4abap.{ given-name }|
+                                                                     value = given-value ).
+          ENDIF.
+        CATCH zzxxmla1_cx_bw_provider INTO DATA(error).
+          RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400 message = error->get_text( ).
+      ENDTRY.
+      IF restricted IS INITIAL.
+        CONTINUE.
+      ENDIF.
+      restricted-iobjnm = to_upper( restricted-iobjnm ).
+      INSERT restricted INTO TABLE result.
+      IF sy-subrc <> 0.
+        RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400
+          message = |{ restricted-iobjnm } has two selections|.
+      ENDIF.
     ENDLOOP.
+  ENDMETHOD.
+
+  METHOD cube_selection.
+    TRY.
+        result = zzxxmla1_cl_schema_fix=>cube_selection( cube ).
+      CATCH zzxxmla1_cx_bw_provider INTO DATA(error).
+        RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400 message = error->get_text( ).
+    ENDTRY.
   ENDMETHOD.
 
   METHOD values.
@@ -493,7 +580,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     DATA found TYPE string_table.
     TRY.
         found = NEW zzxxmla1_cl_bw_provider( )->values( characteristic = characteristic
-                                                         fixed          = fixed_parameters( request )
+                                                         selection      = selection_parameters( request )
                                                          max_values     = c_max_values ).
       CATCH zzxxmla1_cx_bw_provider INTO DATA(error).
         RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400 message = error->get_text( ).
@@ -549,7 +636,8 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD check.
-    DATA(checked) = check_request( request ).
+    DATA(probed) = xsdbool( to_lower( parameter( request = request name = `probe` ) ) = `true` ).
+    DATA(checked) = check_request( request = request probe = probed ).
     DATA(tables) = map_tables( CHANGING schema = checked-schema ).
     DATA characteristics TYPE string_table.
     LOOP AT tables INTO DATA(table).
@@ -560,7 +648,8 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     ENDLOOP.
     result = |\{"catalog":{ json( checked-catalog ) },"file":{ json( checked-path ) },| &&
              |"newCatalog":{ json_bool( xsdbool( checked-new_datasources <> checked-datasources ) ) },| &&
-             |"views":{ json_array( characteristics ) }\}|.
+             |"views":{ json_array( characteristics ) }| &&
+             |{ COND #( WHEN probed = abap_true THEN |,"probe":{ cubes_json( checked-probed ) }| ) }\}|.
   ENDMETHOD.
 
   METHOD check_request.
@@ -586,15 +675,18 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     result-new_datasources = add_catalog( content = result-datasources catalog = result-catalog definition = result-path ).
     check_schema( datasources = result-new_datasources catalog = result-catalog schema_xml = request-body ).
     check_selections( result-schema ).
+    IF probe = abap_true.
+      result-probed = probe_schema( result-schema ).
+    ENDIF.
   ENDMETHOD.
 
   METHOD accept.
-    DATA(checked) = check_request( request ).
+    DATA(checked) = check_request( request = request probe = abap_true ).
     DATA(schema) = checked-schema.
     DATA(catalog) = checked-catalog.
     DATA(path) = checked-path.
 
-    " the fixed characteristics of the cubes that use each table
+    " the selections of the cubes that use each table
     DATA(selections) = table_selections( schema ).
 
     " nothing is changed before this point
@@ -604,21 +696,20 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     LOOP AT tables INTO DATA(table).
       DATA(characteristic) = characteristic_of( table ).
       IF characteristic IS NOT INITIAL.
-        DATA(fixed) = VALUE #( selections[ table = table ]-fixed OPTIONAL ).
+        DATA(selection) = VALUE #( selections[ table = table ]-cube OPTIONAL ).
         TRY.
             IF zzxxmla1_cl_bw_view_gen=>provider_of_fact_placeholder( table ) IS NOT INITIAL.
-              DATA(fact_view) = generator->generate_fact_view(
-                                  provider  = CONV #( characteristic )
-                                  selection = zzxxmla1_cl_bw_view_gen=>selection_of( fixed ) ).
+              DATA(fact_view) = generator->generate_fact_view( provider  = CONV #( characteristic )
+                                                               selection = selection ).
               IF fact_view IS INITIAL.
                 RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400
                   message = |{ characteristic } needs no fact view (no compounded characteristic of an aDSO, | &&
-                            |nothing fixed): name its fact table, or fix a characteristic|.
+                            |nothing filters the cube): name its fact table, or filter the cube on a characteristic|.
               ENDIF.
               APPEND fact_view TO views.
             ELSE.
               APPEND generator->generate( characteristic = CONV #( characteristic )
-                                          selection      = zzxxmla1_cl_bw_view_gen=>selection_of( fixed ) ) TO views.
+                                          selection      = selection ) TO views.
             ENDIF.
           CATCH cx_dd_ddl_exception INTO DATA(ddl_error).
             RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 500
@@ -681,6 +772,72 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     DATA(deleted_views) = delete_unused_views( new_datasources ).
     result = |\{"catalog":{ json( catalog ) },"removedFiles":{ json_array( removed ) },| &&
              |"deletedViews":{ json_array( deleted_views ) }\}|.
+  ENDMETHOD.
+
+  METHOD probe.
+    GET RUN TIME FIELD DATA(start).
+    DATA(catalog) = parameter( request = request name = `catalog` ).
+    DATA(entries) = first_catalogs( datasources_file( )-content ).
+    IF catalog IS NOT INITIAL.
+      DELETE entries WHERE name <> catalog.
+      IF entries IS INITIAL.
+        RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 404 message = |No catalog '{ catalog }'|.
+      ENDIF.
+    ENDIF.
+    DATA(prober) = NEW zzxxmla1_cl_schema_probe( ).
+    DATA catalogs TYPE string_table.
+    LOOP AT entries INTO DATA(entry).
+      DATA(error) = ``.
+      DATA cubes TYPE zzxxmla1_cl_schema_probe=>ty_t_cube.
+      CLEAR cubes.
+      DATA(file) = zzxxmla1_cl_files=>read( entry-definition ).
+      IF file-path IS INITIAL.
+        error = |The schema file { entry-definition } does not exist|.
+      ELSE.
+        TRY.
+            cubes = prober->probe_schema( zzxxmla1_cl_schema_def=>parse( file-content ) ).
+          CATCH zzxxmla1_cx_xom INTO DATA(xom_error).
+            error = |Schema file { entry-definition } not readable: { xom_error->error_message }|.
+          CATCH zzxxmla1_cx_bw_provider zzxxmla1_cx_sql INTO DATA(probe_error).
+            error = probe_error->get_text( ).
+        ENDTRY.
+      ENDIF.
+      DATA(ok) = xsdbool( error IS INITIAL AND NOT line_exists( cubes[ ok = abap_false ] ) ).
+      APPEND |\{"catalog":{ json( entry-name ) },"ok":{ json_bool( ok ) },| &&
+             COND string( WHEN error IS NOT INITIAL THEN |"error":{ json( error ) },| ) &&
+             |"cubes":{ cubes_json( cubes ) }\}| TO catalogs.
+    ENDLOOP.
+    GET RUN TIME FIELD DATA(stop).
+    result = |\{"catalogs":{ json_array( catalogs ) },"runtime":{ ( stop - start ) DIV 1000 }\}|.
+  ENDMETHOD.
+
+  METHOD probe_schema.
+    TRY.
+        result = NEW zzxxmla1_cl_schema_probe( )->probe_schema( schema ).
+      CATCH zzxxmla1_cx_bw_provider INTO DATA(error).
+        RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400 message = error->get_text( ).
+    ENDTRY.
+    DATA(refusal) = zzxxmla1_cl_schema_probe=>refusal( result ).
+    IF refusal IS NOT INITIAL.
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400 message = refusal.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD cubes_json.
+    DATA entries TYPE string_table.
+    LOOP AT cubes INTO DATA(cube).
+      DATA characteristics TYPE string_table.
+      CLEAR characteristics.
+      LOOP AT cube-characteristics INTO DATA(characteristic).
+        DATA(values) = VALUE string_table( FOR v IN characteristic-values
+                                           ( |\{"value":{ json( v-value ) },"facts":{ v-facts }\}| ) ).
+        APPEND |\{"name":{ json( characteristic-name ) },"ok":{ json_bool( characteristic-ok ) },| &&
+               |"values":{ json_array( values ) }\}| TO characteristics.
+      ENDLOOP.
+      APPEND |\{"cube":{ json( cube-cube ) },"ok":{ json_bool( cube-ok ) },| &&
+             |"characteristics":{ json_array( characteristics ) }\}| TO entries.
+    ENDLOOP.
+    result = json_array( entries ).
   ENDMETHOD.
 
   METHOD time_status.
@@ -995,18 +1152,19 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     DATA(registered) = NEW zzxxmla1_cl_bw_view_gen( )->registered( ).
     DATA used TYPE string_table.
     LOOP AT schema-cubes INTO DATA(cube).
-      DATA(fixed) = zzxxmla1_cl_schema_fix=>fixed_of( cube ).
+      DATA(selection) = cube_selection( cube ).
       IF cube-fact-name = `Table`.
         DATA(fact) = CAST zzxxmla1_cl_schema_def=>ty_table( cube-fact-def ).
-        " the facts of a cube that fixes characteristics are filtered by its fact view only
-        IF fixed IS NOT INITIAL AND zzxxmla1_cl_bw_view_gen=>provider_of_fact_placeholder( fact->name ) IS INITIAL
+        " the facts of a cube that filters on characteristics are filtered by its fact view only
+        IF zzxxmla1_cl_bw_view_gen=>filter_selection( selection ) IS NOT INITIAL
+            AND zzxxmla1_cl_bw_view_gen=>provider_of_fact_placeholder( fact->name ) IS INITIAL
             AND NOT line_exists( registered[ kind      = zzxxmla1_cl_bw_view_gen=>c_kind-fact
                                              view_name = CONV viewname( fact->name ) ] ).
           RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400
-            message = |Cube '{ cube-name }' fixes characteristics, so its facts must be its fact view, not { fact->name }: | &&
-                      |fix them on a dimension's pane (the annotations alone do not filter)|.
+            message = |Cube '{ cube-name }' filters on characteristics, so its facts must be its fact view, not | &&
+                      |{ fact->name }: restrict them on a dimension's pane (the annotations alone do not filter)|.
         ENDIF.
-        add_table_selection( EXPORTING table = fact->name fixed = fixed registered = registered
+        add_table_selection( EXPORTING table = fact->name selection = selection registered = registered
                              CHANGING  selections = result ).
       ENDIF.
       LOOP AT cube-dimensions INTO DATA(node).
@@ -1031,7 +1189,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
           APPEND relation->name TO tables.
         ENDLOOP.
         LOOP AT tables INTO DATA(table) WHERE table_line IS NOT INITIAL.
-          add_table_selection( EXPORTING table = table fixed = fixed registered = registered
+          add_table_selection( EXPORTING table = table selection = selection registered = registered
                                CHANGING  selections = result ).
         ENDLOOP.
       ENDLOOP.
@@ -1039,7 +1197,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     " a shared dimension no cube uses: the plain view
     LOOP AT schema-dimensions INTO DATA(shared) WHERE table IS NOT INITIAL.
       IF NOT line_exists( used[ table_line = shared-name ] ).
-        add_table_selection( EXPORTING table = shared-table fixed = VALUE #( ) registered = registered
+        add_table_selection( EXPORTING table = shared-table selection = VALUE #( ) registered = registered
                              CHANGING  selections = result ).
       ENDIF.
     ENDLOOP.
@@ -1048,7 +1206,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
   METHOD add_table_selection.
     DATA entry TYPE ty_table_selection.
     entry-table = table.
-    entry-fixed = fixed.
+    entry-cube = selection.
     " whose view the table is: a placeholder's, or one of table ZZXXMLA1_VIEW
     DATA(provider) = zzxxmla1_cl_bw_view_gen=>provider_of_fact_placeholder( table ).
     DATA(characteristic) = zzxxmla1_cl_bw_view_gen=>characteristic_of_placeholder( table ).
@@ -1067,18 +1225,19 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
       entry-object = view-characteristic.
     ENDIF.
     IF entry-kind = zzxxmla1_cl_bw_view_gen=>c_kind-fact.
-      entry-selection = zzxxmla1_cl_bw_view_gen=>selection_text( fixed ).
+      entry-selection = zzxxmla1_cl_bw_selection=>selection_text(
+                          zzxxmla1_cl_bw_view_gen=>filter_selection( selection ) ).
     ELSE.
       entry-selection = zzxxmla1_cl_bw_selection=>selection_text(
         NEW zzxxmla1_cl_bw_view_gen( )->view_selection( characteristic = CONV #( entry-object )
-                                                        selection      = zzxxmla1_cl_bw_view_gen=>selection_of( fixed ) ) ).
+                                                        selection      = selection ) ).
     ENDIF.
     READ TABLE selections INTO DATA(other) WITH KEY table = table.
     IF sy-subrc <> 0.
       APPEND entry TO selections.
     ELSEIF other-selection <> entry-selection.
       RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400
-        message = |{ table } is used by cubes that fix different characteristics of it | &&
+        message = |{ table } is used by cubes with different selections of it | &&
                   |({ COND #( WHEN other-selection IS INITIAL THEN `none` ELSE other-selection ) } and | &&
                   |{ COND #( WHEN entry-selection IS INITIAL THEN `none` ELSE entry-selection ) }): | &&
                   |give each cube a schema of its own|.
@@ -1092,9 +1251,9 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
       IF sy-subrc = 0 AND view-selection <> entry-selection.
         RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400
           message = |{ entry-table } is the view of { view-characteristic } for | &&
-                    |{ COND #( WHEN view-selection IS INITIAL THEN `nothing fixed` ELSE view-selection ) }, | &&
-                    |but its cube fixes { COND #( WHEN entry-selection IS INITIAL THEN `nothing of it`
-                                                  ELSE entry-selection ) }: fix the characteristics on a | &&
+                    |{ COND #( WHEN view-selection IS INITIAL THEN `no selection` ELSE view-selection ) }, | &&
+                    |but its cube restricts { COND #( WHEN entry-selection IS INITIAL THEN `nothing of it`
+                                                      ELSE entry-selection ) }: restrict the characteristics on a | &&
                     |dimension's pane (the annotations alone do not change the tables)|.
       ENDIF.
     ENDLOOP.

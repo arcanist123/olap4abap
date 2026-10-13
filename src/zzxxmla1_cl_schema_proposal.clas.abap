@@ -27,8 +27,11 @@
 "! - every navigation attribute the provider switches on is a flat Hierarchy CHARACTERISTIC__ATTRIBUTE of the
 "!   dimension, as BW names it, its level named by the attribute, with its text as property Text. Nothing is nested
 "!   that BW does not nest: no user hierarchies, no time hierarchy; BW's time characteristics (0CALMONTH, ...) are
-"!   characteristics like the others. No dimension is a TimeDimension: the user marks one (the suggestions give the
-"!   level types). A characteristic without SID table (0CALDAY) has no view and is not proposed;
+"!   characteristics like the others. No dimension is a TimeDimension but those the caller names (the fiscal defaults,
+"!   ZZXXMLA1_CL_SCHEMA_DEFAULTS): every attribute and level of one has its suggested level type, TimeUndefined where
+"!   there is none, as the UI marks one, and its usage is not restricted to members with facts. The user marks the
+"!   others (the suggestions give the level types). A characteristic without SID table (0CALDAY) has no view and is
+"!   not proposed;
 "! - one Measure per key figure that sums, takes the minimum or the maximum, without exception aggregation and not
 "!   non-cumulative, named by the key figure, captioned by its text, formatted by the decimals of its column; the
 "!   first one is the default measure;
@@ -40,12 +43,13 @@
 "! on its DimensionUsage, docs/mvp-scope.md, Members with facts decision): a characteristic is shared by many providers,
 "! which use few of its values; the UI switches it per dimension. The proposal is written as schema XML and read as the reference reads it (ZZXXMLA1_CL_SCHEMA_DEF), so the
 "! definition has the reference's defaults and the XML is toXML.
-"! A provider read for fixed characteristics (docs/bw-schema-design-guide.md, section 3.8, 0FISCVARNT = K4) gives a
-"! cube with an annotation olap4abap.fixed.CHARACTERISTIC per fixed one, whose value is the fixed value; the fixed one
-"! is a dimension with one member (on its view filtered on the value), and a characteristic whose compounding is all
-"! fixed is named as one that is not compounded (the provider reads it so: no name column). The schema builder
-"! proposes without fixing (ZZXXMLA1_CL_SCHEMA_FIX applies a selection to a schema as an edit); a selection here is
-"! for the generators of demo schemas.
+"! A provider read for a selection (docs/bw-schema-design-guide.md, section 3.8, ZZXXMLA1_CL_BW_SELECTION) gives a
+"! cube with an annotation olap4abap.filter.CHARACTERISTIC or olap4abap.members.CHARACTERISTIC per restricted one,
+"! whose value is its rows; the restricted one is a dimension with the members of its selection (on its view filtered
+"! on it), and a characteristic whose compounding is all fixed to one value is named as one that is not compounded
+"! (the provider reads it so: no name column). The schema builder proposes without a selection
+"! (ZZXXMLA1_CL_SCHEMA_FIX applies one to a schema as an edit) but its defaults: the API reads the provider for them
+"! (ZZXXMLA1_CL_SCHEMA_DEFAULTS, the fiscal year variant fixed to K4); the demo generators give their own.
 "! A NUMC value is proposed as BW holds it (0042, typed String; docs/mvp-scope.md, NUMC decision); where the view has
 "! its number too (COLUMN_INT) the proposal lists it, so the UI can switch a dimension to numbers (42).
 "! Run (F9): prints the proposals for the FoodMart providers ZFMSALESA and ZFMSALES.
@@ -56,10 +60,6 @@ CLASS zzxxmla1_cl_schema_proposal DEFINITION
 
   PUBLIC SECTION.
     INTERFACES if_oo_adt_classrun.
-
-    "! The name of a cube's annotation that fixes a characteristic, followed by the characteristic; its value is the
-    "! fixed value (docs/bw-schema-design-guide.md, section 3.8).
-    CONSTANTS c_fixed_annotation TYPE string VALUE `olap4abap.fixed.`.
 
     TYPES:
       "! the level type the UI pre-selects for an attribute when the user marks its dimension as time; the generator
@@ -89,9 +89,10 @@ CLASS zzxxmla1_cl_schema_proposal DEFINITION
         int_columns TYPE ty_t_int_column,
       END OF ty_proposal.
 
-    "! The proposal for a provider's metadata.
+    "! The proposal for a provider's metadata; time: the characteristics whose dimensions are time dimensions.
     METHODS propose
       IMPORTING provider      TYPE zzxxmla1_cl_bw_provider=>ty_provider
+                !time         TYPE string_table OPTIONAL
       RETURNING VALUE(result) TYPE ty_proposal
       RAISING   zzxxmla1_cx_xom.
     "! The level type of a standard BW time characteristic (0CALDAY TimeDays, ...), initial for any other.
@@ -126,11 +127,12 @@ CLASS zzxxmla1_cl_schema_proposal DEFINITION
       END OF ty_xml_attribute,
       ty_t_xml_attribute TYPE STANDARD TABLE OF ty_xml_attribute WITH EMPTY KEY.
     TYPES:
-      "! a dimension of the cube: a shared one with its foreign key
+      "! a dimension of the cube: a shared one with its foreign key; a time dimension shows all its members
       BEGIN OF ty_usage,
         name        TYPE string,
         caption     TYPE string,
         foreign_key TYPE string,
+        time        TYPE abap_bool,
       END OF ty_usage,
       ty_t_usage TYPE STANDARD TABLE OF ty_usage WITH EMPTY KEY.
     TYPES:
@@ -157,6 +159,10 @@ CLASS zzxxmla1_cl_schema_proposal DEFINITION
     DATA notes TYPE zzxxmla1_cl_bw_provider=>ty_t_note.
     DATA suggestions TYPE ty_t_suggestion.
     DATA int_columns TYPE ty_t_int_column.
+    "! the characteristics whose dimensions are time dimensions
+    DATA time_dimensions TYPE string_table.
+    "! the dimension being written is a time dimension: its attributes and levels have level types
+    DATA in_time TYPE abap_bool.
 
     "! Writes the shared dimension of a characteristic; returns its name, initial if there is none.
     METHODS write_dimension
@@ -171,20 +177,25 @@ CLASS zzxxmla1_cl_schema_proposal DEFINITION
                 text           TYPE string.
     "! Writes the default drill-through action: the columns double-clicking a cell shows, with the cell's measure.
     METHODS write_drill_through.
-    "! Writes a DimensionAttribute of one column, not an attribute hierarchy.
+    "! Writes a DimensionAttribute of one column, not an attribute hierarchy; in a time dimension with the level
+    "! type of the characteristic it shows (iobjnm), TimeUndefined if it has none.
     METHODS write_attribute
       IMPORTING name            TYPE string
                 key_column      TYPE zzxxmla1_cl_bw_provider=>ty_column
                 name_column     TYPE zzxxmla1_cl_bw_provider=>ty_column OPTIONAL
                 order_by_column TYPE zzxxmla1_cl_bw_provider=>ty_column OPTIONAL
-                usage           TYPE string OPTIONAL.
-    "! Writes a flat Hierarchy: All and one level, the level's text as property Text.
+                usage           TYPE string OPTIONAL
+                iobjnm          TYPE string OPTIONAL.
+    "! Writes a flat Hierarchy: All and one level, the level's text as property Text; in a time dimension the level
+    "! has the level type of its attribute's characteristic (iobjnm, column).
     METHODS open_hierarchy
       IMPORTING name           TYPE string OPTIONAL
                 caption        TYPE string
                 level          TYPE string
                 attribute      TYPE string
-                text_attribute TYPE string OPTIONAL.
+                text_attribute TYPE string OPTIONAL
+                iobjnm         TYPE string OPTIONAL
+                column         TYPE zzxxmla1_cl_bw_provider=>ty_column OPTIONAL.
     METHODS close_hierarchy.
     "! Writes a member property.
     METHODS property
@@ -198,6 +209,18 @@ CLASS zzxxmla1_cl_schema_proposal DEFINITION
     METHODS measures
       IMPORTING key_figures   TYPE zzxxmla1_cl_bw_provider=>ty_t_key_figure
       RETURNING VALUE(result) TYPE ty_t_measure.
+    "! The level type of a column of a characteristic: a standard time characteristic's, TimeDays for a date; initial
+    "! for any other.
+    CLASS-METHODS level_type
+      IMPORTING iobjnm        TYPE string
+                column        TYPE zzxxmla1_cl_bw_provider=>ty_column
+      RETURNING VALUE(result) TYPE string.
+    "! The level type of an attribute or level of the dimension being written: initial outside a time dimension, else
+    "! the column's, TimeUndefined if it has none.
+    METHODS time_level_type_of
+      IMPORTING iobjnm        TYPE string
+                column        TYPE zzxxmla1_cl_bw_provider=>ty_column
+      RETURNING VALUE(result) TYPE string.
     "! Suggests the level type of an attribute: a standard time characteristic's, or TimeDays for a date.
     METHODS suggest
       IMPORTING dimension TYPE string
@@ -246,8 +269,9 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD propose.
-    CLEAR: xml, depth, notes, suggestions, drill_columns, int_columns.
+    CLEAR: xml, depth, notes, suggestions, drill_columns, int_columns, in_time.
     notes = provider-notes.
+    time_dimensions = time.
     DATA usages TYPE ty_t_usage.
 
     open( name = `Schema` attributes = VALUE #( ( name = `name` value = provider-name ) ) ).
@@ -255,7 +279,10 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
     LOOP AT provider-characteristics INTO DATA(characteristic).
       DATA(name) = write_dimension( kind = provider-kind characteristic = characteristic ).
       IF name IS NOT INITIAL.
-        APPEND VALUE #( name = name caption = characteristic-text foreign_key = characteristic-fact_column-name )
+        APPEND VALUE #( name        = name
+                        caption     = characteristic-text
+                        foreign_key = characteristic-fact_column-name
+                        time        = xsdbool( line_exists( time_dimensions[ table_line = characteristic-iobjnm ] ) ) )
           TO usages.
       ENDIF.
     ENDLOOP.
@@ -283,9 +310,12 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
     ENDIF.
     result = characteristic-iobjnm.
     DATA(table) = table_of( characteristic ).
+    in_time = xsdbool( line_exists( time_dimensions[ table_line = characteristic-iobjnm ] ) ).
     open( name = `Dimension` attributes = VALUE #( ( name = `name` value = result )
                                                    ( name = `caption` value = characteristic-text )
-                                                   ( name = `table` value = table ) ) ).
+                                                   ( name = `table` value = table )
+                                                   ( name  = `type`
+                                                     value = COND #( WHEN in_time = abap_true THEN `TimeDimension` ) ) ) ).
     LOOP AT int_columns_of( characteristic ) INTO DATA(numeric).
       IF NOT line_exists( int_columns[ table = numeric-table column = numeric-column ] ).
         APPEND numeric TO int_columns.
@@ -300,6 +330,7 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
     IF by_sid = abap_true.
       write_attribute( name        = key
                        usage       = `Key`
+                       iobjnm      = characteristic-iobjnm
                        key_column  = VALUE #( name = `SID` datatype = `INT4` length = 10 )
                        name_column = COND #( WHEN compounded = abap_true THEN characteristic-name_column
                                              ELSE characteristic-key_column )
@@ -307,7 +338,7 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
                        order_by_column = COND #( WHEN compounded = abap_true THEN characteristic-name_column ) ).
       write_attribute( name = value key_column = characteristic-key_column ).
     ELSE.
-      write_attribute( name = key usage = `Key` key_column = characteristic-key_column ).
+      write_attribute( name = key usage = `Key` key_column = characteristic-key_column iobjnm = characteristic-iobjnm ).
     ENDIF.
     suggest( dimension = result attribute = key iobjnm = characteristic-iobjnm column = characteristic-key_column ).
     DATA(text) = COND string( WHEN characteristic-text_column IS NOT INITIAL THEN |{ result } Text| ).
@@ -320,7 +351,7 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
     LOOP AT characteristic-attributes INTO DATA(attribute).
       DATA(name) = COND string( WHEN attribute-navigation = abap_true THEN |{ result }__{ attribute-iobjnm }|
                                 ELSE attribute-iobjnm ).
-      write_attribute( name = name key_column = attribute-column ).
+      write_attribute( name = name key_column = attribute-column iobjnm = attribute-iobjnm ).
       suggest( dimension = result attribute = name iobjnm = attribute-iobjnm column = attribute-column ).
       IF attribute-text_column IS NOT INITIAL.
         write_attribute( name = |{ name } Text| key_column = VALUE #( name = attribute-text_column datatype = `CHAR` ) ).
@@ -328,7 +359,12 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
     ENDLOOP.
 
     " the characteristic: flat, the other attributes as properties
-    open_hierarchy( caption = characteristic-text level = result attribute = key text_attribute = text ).
+    open_hierarchy( caption        = characteristic-text
+                    level          = result
+                    attribute      = key
+                    text_attribute = text
+                    iobjnm         = characteristic-iobjnm
+                    column         = characteristic-key_column ).
     IF compounded = abap_true.
       property( name = `Key` caption = |{ characteristic-text } (Key)| attribute = value ).
     ENDIF.
@@ -348,15 +384,21 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
                       caption        = attribute-text
                       level          = attribute-iobjnm
                       attribute      = name
-                      text_attribute = COND #( WHEN attribute-text_column IS NOT INITIAL THEN |{ name } Text| ) ).
+                      text_attribute = COND #( WHEN attribute-text_column IS NOT INITIAL THEN |{ name } Text| )
+                      iobjnm         = attribute-iobjnm
+                      column         = attribute-column ).
       close_hierarchy( ).
     ENDLOOP.
     close( `Dimension` ).
+    in_time = abap_false.
   ENDMETHOD.
 
   METHOD write_attribute.
     open( name = `DimensionAttribute` attributes = VALUE #( ( name = `name` value = name )
                                                             ( name = `usage` value = usage )
+                                                            ( name  = `levelType`
+                                                              value = time_level_type_of( iobjnm = iobjnm
+                                                                                          column = key_column ) )
                                                             ( name = `attributeHierarchyEnabled` value = `false` ) ) ).
     leaf( name = `KeyColumn` attributes = VALUE #( ( name = `dataType` value = data_type( key_column ) )
                                                    ( name = `columnName` value = key_column-name ) ) ).
@@ -379,7 +421,9 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
     open( name = `Level` attributes = VALUE #( ( name = `name` value = level )
                                                ( name = `caption` value = caption )
                                                ( name = `uniqueMembers` value = `true` )
-                                               ( name = `sourceAttribute` value = attribute ) ) ).
+                                               ( name = `sourceAttribute` value = attribute )
+                                               ( name  = `levelType`
+                                                 value = time_level_type_of( iobjnm = iobjnm column = column ) ) ) ).
     IF text_attribute IS NOT INITIAL.
       property( name = `Text` caption = |{ caption } (Text)| attribute = text_attribute ).
     ENDIF.
@@ -396,11 +440,25 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
                                                   ( name = `sourceAttribute` value = attribute ) ) ).
   ENDMETHOD.
 
-  METHOD suggest.
-    DATA(level_type) = time_level_type( iobjnm ).
-    IF level_type IS INITIAL AND column-datatype = `DATS`.
-      level_type = `TimeDays`.
+  METHOD level_type.
+    result = time_level_type( iobjnm ).
+    IF result IS INITIAL AND column-datatype = `DATS`.
+      result = `TimeDays`.
     ENDIF.
+  ENDMETHOD.
+
+  METHOD time_level_type_of.
+    IF in_time = abap_false.
+      RETURN.
+    ENDIF.
+    result = level_type( iobjnm = iobjnm column = column ).
+    IF result IS INITIAL.
+      result = `TimeUndefined`.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD suggest.
+    DATA(level_type) = level_type( iobjnm = iobjnm column = column ).
     IF level_type IS NOT INITIAL.
       APPEND VALUE #( dimension = dimension attribute = attribute level_type = level_type ) TO suggestions.
     ENDIF.
@@ -411,13 +469,15 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
     open( name = `Cube` attributes = VALUE #( ( name = `name` value = provider-name )
                                               ( name = `caption` value = provider-text )
                                               ( name = `defaultMeasure` value = VALUE #( measures[ 1 ]-name OPTIONAL ) ) ) ).
-    IF provider-fixed IS NOT INITIAL.
+    IF provider-selection IS NOT INITIAL.
       open( `Annotations` ).
-      LOOP AT provider-fixed INTO DATA(fixed).
+      LOOP AT provider-selection INTO DATA(restricted).
+        DATA(name) = zzxxmla1_cl_bw_selection=>annotation_name( characteristic = restricted-iobjnm
+                                                                mode           = restricted-mode ).
         xml = xml && repeat( val = ` ` occ = 2 * depth )
-                  && |<Annotation name="{ escape( val = |{ c_fixed_annotation }{ fixed-iobjnm }|
-                                                  format = cl_abap_format=>e_xml_attr ) }">|
-                  && |{ escape( val = fixed-value format = cl_abap_format=>e_xml_text ) }</Annotation>|
+                  && |<Annotation name="{ escape( val = name format = cl_abap_format=>e_xml_attr ) }">|
+                  && |{ escape( val    = zzxxmla1_cl_bw_selection=>rows_text( restricted-rows )
+                                format = cl_abap_format=>e_xml_text ) }</Annotation>|
                   && cl_abap_char_utilities=>newline.
       ENDLOOP.
       close( `Annotations` ).
@@ -428,11 +488,14 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
                                                           ( name = `caption` value = usage-caption )
                                                           ( name = `source` value = usage-name )
                                                           ( name = `foreignKey` value = usage-foreign_key ) ) ).
-      open( `Annotations` ).
-      xml = xml && repeat( val = ` ` occ = 2 * depth )
-                && |<Annotation name="{ zzxxmla1_cl_schema=>c_members_with_facts }">true</Annotation>|
-                && cl_abap_char_utilities=>newline.
-      close( `Annotations` ).
+      " not on a time dimension: the server does not support it there
+      IF usage-time = abap_false.
+        open( `Annotations` ).
+        xml = xml && repeat( val = ` ` occ = 2 * depth )
+                  && |<Annotation name="{ zzxxmla1_cl_schema=>c_members_with_facts }">true</Annotation>|
+                  && cl_abap_char_utilities=>newline.
+        close( `Annotations` ).
+      ENDIF.
       close( `DimensionUsage` ).
     ENDLOOP.
     LOOP AT measures INTO DATA(measure).

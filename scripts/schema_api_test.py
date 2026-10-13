@@ -142,11 +142,11 @@ def main():
           status == 400 and any(text in body.get("error", "") for text in
                                 ["by an unnamed Hierarchy and by the attribute", "is defined twice"]), body)
 
-    # fixed selections (docs/bw-schema-design-guide.md, section 3.8), an edit of the schema (POST fix): the proposal
-    # lists the characteristics with their dimensions, what cannot be fixed is refused; fixing and accepting is tested
+    # selections (docs/bw-schema-design-guide.md, section 3.8), an edit of the schema (POST fix): the proposal lists
+    # the characteristics with their dimensions, what cannot be restricted is refused; fixing and accepting is tested
     # by scripts/fixed_selection_test.py, which writes catalogs
     proposals = {}
-    for provider in ("ZFMSALESA", "ZCLVISITA"):
+    for provider in ("ZFMSALESA", "ZCLVISIT", "ZCLVISITA"):
         status, body, _ = call(args.url, args.client, "GET", "proposal", {"provider": provider})
         proposals[provider] = body.get("xml", "")
         if provider == "ZCLVISITA":
@@ -158,22 +158,65 @@ def main():
                   and not any(c["fixed"] for c in listed.values()), body.get("characteristics"))
     for provider, fixed, text in (
             ("ZFMSALESA", {"fixed.0FISCVARNT": "K4"}, "is not a characteristic of"),
-            ("ZCLVISITA", {"fixed.ZCLFISCPR": "2024001"}, "which must be fixed too"),
+            ("ZCLVISITA", {"filter.ZCLFISCVR": "I BT 'K1'"}, "needs a high value"),
+            ("ZCLVISITA", {"filter.ZCLFISCVR": "I EQ 'K4"}, "without its closing quote"),
+            ("ZCLVISITA", {"fixed.ZCLFISCVR": "K4", "members.ZCLFISCVR": "I EQ 'K4'"}, "has two selections"),
+            ("ZCLVISITA", {"members.ZCLFISCPR": "I EQ '2024999'"}, "has no value 2024999"),
+            ("ZCLVISITA", {"fixed.ZCLFISCVR": "K4", "members.ZCLFISCPR": "I EQ '2024013'"},
+             "has no value 2024013 under the selection of its compounding"),
             ("ZCLVISITA", {"fixed.ZCLFISCVR": "ZZ"}, "has no value ZZ"),
             ("ZCLVISITA", {"fixed.ZCLFISCVR": "K'"}, "cannot contain a quote")):
         status, body, _ = call(args.url, args.client, "POST", "fix", fixed, proposals[provider])
         check(f"fix of {provider} refuses {fixed}", status == 400 and text in body.get("error", ""), body)
+    # restrict members: the annotation with the rows, the facts as they are, the period still compounded
+    status, body, _ = call(args.url, args.client, "POST", "fix", {"members.ZCLFISCPR": "E CP '*013';E CP '*014'"},
+                           proposals["ZCLVISITA"])
+    xml = body.get("xml", "")
+    listed = {c["name"]: c for c in body.get("characteristics", [])}
+    fact = re.findall(r'<Table name="([^"]+)"', xml)[-1:] == re.findall(r'<Table name="([^"]+)"', proposals["ZCLVISITA"])[-1:]
+    check("fix restricts the members of the period, the facts stay",
+          status == 200 and fact
+          and re.search(r'<Annotation name="olap4abap\.members\.ZCLFISCPR">\s*E CP (?:\'|&apos;|&#39;)\*013', xml) is not None
+          and listed.get("ZCLFISCPR", {}).get("mode") == "members"
+          and listed["ZCLFISCPR"].get("selection") == "E CP '*013';E CP '*014'"
+          and [r["option"] for r in listed["ZCLFISCPR"].get("rows", [])] == ["CP", "CP"]
+          and listed["ZCLFISCPR"].get("fixed") is False, body.get("error") or body.get("characteristics"))
     status, body, _ = call(args.url, args.client, "POST", "fix", {"cube": "NO_SUCH_CUBE"}, proposals["ZCLVISITA"])
     check("fix of an unknown cube", status == 400 and "no cube 'NO_SUCH_CUBE'" in body.get("error", ""), body)
     status, body, headers = call(args.url, args.client, "GET", "fix")
     check("fix needs POST", status == 405 and headers.get("allow", headers.get("Allow")) == "POST", body)
-    # the values the UI offers to fix: a compounded characteristic's only for its compounding fixed
+    # the probe (ZZXXMLA1_CL_SCHEMA_PROBE): restricting members refused while the facts hold excluded values, on the
+    # cube's own facts (filtered on K4 they hold no 2024 value of K1)
+    for provider in ("ZCLVISIT", "ZCLVISITA"):
+        status, body, _ = call(args.url, args.client, "POST", "fix", {"members.ZCLFISCPR": "I CP '2024*'"},
+                               proposals[provider])
+        check(f"probe of {provider} refuses periods of 2025 in the facts",
+              status == 400 and "restricts the members of ZCLFISCPR" in body.get("error", "")
+              and "K1/2025001 (" in body.get("error", ""), body)
+        status, body, _ = call(args.url, args.client, "POST", "fix",
+                               {"filter.ZCLFISCVR": "I EQ 'K4'", "members.ZCLFISCPR": "I CP '2024*'"},
+                               proposals[provider])
+        check(f"probe of {provider} reads the cube's facts, filtered on K4",
+              status == 400 and "K4/2025001 (" in body.get("error", "") and "K1/" not in body.get("error", ""), body)
+    status, body, _ = call(args.url, args.client, "POST", "probe")
+    catalogs = {c["catalog"]: c for c in body.get("catalogs", [])}
+    check("probe of all catalogs", status == 200 and isinstance(body.get("runtime"), int)
+          and catalogs.get("ZCLVISIT_K4", {}).get("ok") is True
+          and catalogs["ZCLVISIT_K4"].get("cubes", [{}])[0].get("cube") == "ZCLVISIT_K4", body)
+    status, body, _ = call(args.url, args.client, "POST", "probe", {"catalog": "ZCLVISITA"})
+    check("probe of one catalog", status == 200 and [c["catalog"] for c in body.get("catalogs", [])] == ["ZCLVISITA"],
+          body)
+    status, body, _ = call(args.url, args.client, "POST", "probe", {"catalog": "NO_SUCH_CATALOG"})
+    check("probe of an unknown catalog", status == 404, body)
+    status, body, headers = call(args.url, args.client, "GET", "probe")
+    check("probe needs POST", status == 405 and headers.get("allow", headers.get("Allow")) == "POST", body)
+    # the values the UI offers: a compounded characteristic's under the selection of its compounding, if it has one
     status, body, _ = call(args.url, args.client, "GET", "values", {"characteristic": "ZCLFISCVR"})
     check("values of the fiscal year variant", status == 200 and body.get("values") == ["K1", "K2", "K4"]
           and body.get("more") is False, body)
     status, body, _ = call(args.url, args.client, "GET", "values", {"characteristic": "ZCLFISCPR"})
-    check("values of the period refused without its variant",
-          status == 400 and "which must be fixed too" in body.get("error", ""), body)
+    check("values of the period under every variant", status == 200 and len(body.get("values", [])) >= 24
+          and body["values"][0] == "2024001", body)
     status, body, _ = call(args.url, args.client, "GET", "values",
                            {"characteristic": "ZCLFISCPR", "fixed.ZCLFISCVR": "K4"})
     check("values of the period under K4", status == 200 and len(body.get("values", [])) == 24

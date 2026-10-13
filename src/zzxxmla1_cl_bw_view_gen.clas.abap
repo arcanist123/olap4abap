@@ -88,14 +88,6 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
       "! the characteristics a cube restricts, with their modes and rows (docs/bw-schema-design-guide.md, section 3.8)
       ty_t_selection TYPE zzxxmla1_cl_bw_selection=>ty_t_characteristic.
     TYPES:
-      "! a characteristic a cube fixes to one value, BW's internal one, as fixing names it: a selection of mode filter
-      "! the cube with one I EQ row (selection_of)
-      BEGIN OF ty_fixed,
-        iobjnm TYPE rsiobjnm,
-        value  TYPE string,
-      END OF ty_fixed,
-      ty_t_fixed TYPE SORTED TABLE OF ty_fixed WITH UNIQUE KEY iobjnm.
-    TYPES:
       "! The tables of a characteristic and the field of its key in them; a table is initial if the characteristic
       "! has none, or if the key field is not a column of it.
       BEGIN OF ty_tables,
@@ -290,15 +282,6 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
     CLASS-METHODS view_column
       IMPORTING field         TYPE csequence
       RETURNING VALUE(result) TYPE string.
-    "! Fixed values as table ZZXXMLA1_VIEW keys them (ZZXXMLA1_CL_BW_SELECTION=>selection_text): CHARACTERISTIC=value,
-    "! sorted by characteristic, separated by ; (0FISCVARNT=K4); initial for none.
-    CLASS-METHODS selection_text
-      IMPORTING fixed         TYPE ty_t_fixed
-      RETURNING VALUE(result) TYPE string.
-    "! Fixed values as a selection: each characteristic filters the cube with one I EQ row.
-    CLASS-METHODS selection_of
-      IMPORTING fixed         TYPE ty_t_fixed
-      RETURNING VALUE(result) TYPE ty_t_selection.
     "! The characteristics of a selection that filter the facts (mode filter the cube).
     CLASS-METHODS filter_selection
       IMPORTING selection     TYPE ty_t_selection
@@ -1358,18 +1341,6 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
     ELSE.
       result = |BW provider { provider }: facts of { selection_label( selection ) }|.
     ENDIF.
-  ENDMETHOD.
-
-  METHOD selection_text.
-    result = zzxxmla1_cl_bw_selection=>selection_text( selection_of( fixed ) ).
-  ENDMETHOD.
-
-  METHOD selection_of.
-    LOOP AT fixed INTO DATA(value).
-      INSERT VALUE #( iobjnm = value-iobjnm
-                      mode   = zzxxmla1_cl_bw_selection=>c_mode-filter
-                      rows   = zzxxmla1_cl_bw_selection=>equals( value-value ) ) INTO TABLE result.
-    ENDLOOP.
   ENDMETHOD.
 
   METHOD filter_selection.

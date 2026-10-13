@@ -1,4 +1,4 @@
-// The master data of BW's calendar time characteristics (docs/time-master-data.md): how complete their SID and
+// The master data of BW's calendar and fiscal time characteristics (docs/time-master-data.md): how complete their SID and
 // attribute tables are for an interval (GET api/time), and a button that fills them (POST api/time/fill,
 // ZZXXMLA1_CL_TIME_MD). BW fills neither: SIDs exist only for loaded values, attribute rows not at all.
 // No build step: Preact with htm, vendored as one ES module; this file is what the server serves.
@@ -65,7 +65,7 @@ function App() {
 
   const changed = state && (from !== state.from || to !== state.to);
   return html`
-    <div class="topbar"><h1>Time Master Data</h1><span class="muted">SIDs and attributes of BW's calendar characteristics</span>
+    <div class="topbar"><h1>Time Master Data</h1><span class="muted">SIDs and attributes of BW's time characteristics</span>
       <span class="spacer"></span><a href=${`./${location.search}`}>Schema Builder</a><a href=${`console.html${location.search}`}>MDX Console</a></div>
     <div class="page"><div class="pane">
       ${error && html`<div class="notice err">${error}</div>`}
@@ -111,7 +111,9 @@ function App() {
           <span class="mono">${f.name}</span>: ${f.error || `${f.createdSids} SIDs created, ${f.attributeRows} attribute rows written`}</div>`)}
         </div>
       </section>`}
-      <p class="muted small">The fiscal characteristics (0FISC*, they depend on a fiscal year variant) and 0CALDAY are not filled here.
+      <p class="muted small">0FISCYEAR and 0FISCPER are filled for the fiscal year variant K4, as 0CALYEAR and 0CALMONTH: its
+        years and its periods 001 to 012 (the months); BW adds period 000 and the special periods of a year with its first
+        period. 0CALDAY is not filled here.
         Values with a SID outside the interval get their attribute rows too.</p>
     </div></div>`;
 }

@@ -37,7 +37,7 @@ on a test system: the visits are thinned evenly over the days, so every day keep
   section 3.8) has a third of the visits (11,318), its periods named `2024001` ... `2025012`: the catalogs
   `ZCLVISIT_K4` and `ZCLVISITA_K4` (below, `scripts/fixed_selection_test.py`). They are the demo's own
   characteristics, not BW's `0FISC*`: BW checks those against the fiscal year variants of the source system's
-  customizing (T009), which a warehouse does not maintain. Their SIDs come with the loads (no master data).
+  customizing, which a warehouse does not maintain. Their SIDs come with the loads (no master data).
 - The physician `ZCLDOC` is **authorization relevant** and has two hierarchies, `ZCLDOC_ORG` and `ZCLDOC_SITE`, and
   the diagnosis `ZCLDIAG` is authorization relevant too, with the hierarchy `ZCLDIAG_ICD` (see below), for working
   with BW's analysis authorizations, also in combination. BW's own queries on `ZCLVISIT`/`ZCLVISITA` (RSRT, BEx,

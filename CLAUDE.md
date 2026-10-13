@@ -87,7 +87,7 @@ Read before designing anything:
   `scripts/schema_api_test.py`). Each cube is served from its own catalog for the MVP (`docs/mvp-scope.md`, Catalog
   decision); an aDSO is proposed as an InfoCube is: every characteristic,
   the time ones too, a dimension on its CDS view (no dimensions on fact columns; `0CALDAY` has no SID table and is not
-  supported); a time dimension only if the user marks one. The proposal follows `docs/bw-schema-design-guide.md`
+  supported); a time dimension only if the user marks one, but for the fiscal defaults below. The proposal follows `docs/bw-schema-design-guide.md`
   (BW's model): technical names as identifiers, texts as captions; per characteristic a flat unnamed hierarchy
   (members keyed by SID, named by the key, the EN text and the display attributes as member properties) and a flat
   hierarchy `<char>__<attribute>` per navigation attribute the provider switches on; no attribute hierarchies, no
@@ -102,12 +102,22 @@ Read before designing anything:
   attribute's `NameColumn` and `OrderByColumn`), and an aDSO with one is read from its fact view
   (`ZZXXMLA1_CL_BW_VIEW_GEN=>generate_fact_view`: the reporting view with `SID_<field>` per compounded characteristic,
   placeholder `ZZXXMLA1_F_<aDSO>` until accept), so it is keyed by the SID as on an InfoCube
-  (`docs/bw-schema-design-guide.md`, section 3.7). A cube can fix characteristics to one value each (section 3.8), an
-  edit of the schema: "Fixed value" on a dimension's pane (values from `GET values`), `POST fix?fixed.0FISCVARNT=K4`
-  (`ZZXXMLA1_CL_SCHEMA_FIX`) rewrites the cube's tables and columns for the new selection and leaves the user's work;
-  the proposal fixes nothing. The cube is annotated `olap4abap.fixed.<characteristic>`, the fixed characteristic keeps
-  its dimension with one member (its view filtered on the value), the facts are a fact view filtered on it (an
-  InfoCube's too) and a characteristic compounded with it a view filtered on it, so `0FISCPER` is not compounded there
+  (`docs/bw-schema-design-guide.md`, section 3.7). A cube can restrict characteristics by a selection, a BW range
+  table each (section 3.8, `ZZXXMLA1_CL_BW_SELECTION`), in mode filter the cube or restrict members; a fixed value is
+  filter the cube with one `I EQ` row. It is an edit of the schema: "Fixed value" and "Selection" (the rows, the mode, presets) on a dimension's pane (values from
+  `GET values`), `POST fix?filter.0FISCVARNT=I EQ 'K4'` (also `members.C=<rows>`, `fixed.C=v`;
+  `ZZXXMLA1_CL_SCHEMA_FIX`) rewrites the cube's tables and columns for the new selection and leaves the user's work;
+  the proposal restricts nothing but its fiscal defaults (`ZZXXMLA1_CL_SCHEMA_DEFAULTS`, called by `GET proposal`): a
+  provider with `0FISCYEAR` or `0FISCPER` gets `0FISCVARNT` filtered on `I EQ 'K4'`, `0FISCPER` restricted to the
+  regular periods (`I CP '*001'` ... `'*012'`) and both as time dimensions; if the probe finds period 000 or special
+  periods in the facts, the period is neither restricted nor time (a note: `0CALMONTH` is the time there)
+  (`bw-schema-design-guide.md`, section 3.8, Fiscal time; `scripts/fiscal_default_test.py`). The cube is annotated `olap4abap.filter.<characteristic>` or
+  `olap4abap.members.<characteristic>` with the rows (`olap4abap.fixed.<characteristic>` = `v` of older schemas is
+  read as filter `I EQ 'v'`), the restricted characteristic keeps its dimension with the members of its selection (its
+  view filtered on it), the facts are a fact view filtered on the filter-the-cube ones (an InfoCube's too; restricting
+  members leaves the facts, and the probe `ZZXXMLA1_CL_SCHEMA_PROBE` refuses it on `POST fix`, accept and
+  `check?probe=true` while the facts hold a value the selection excludes; `POST probe` probes every catalog) and a characteristic
+  compounded with it a view filtered on it, so `0FISCPER` under one `I EQ` value of its variant is not compounded there
   (`2024001`, still keyed by its SID); the engine is not changed. Every generated view is a row of table `ZZXXMLA1_VIEW`
   (kind, characteristic or provider, selection), by which the generator finds it; accept and remove delete the
   filtered views no catalog's schema names (`scripts/fixed_selection_test.py`). The UI (`web/schema/`, Preact with htm, no build step) is served from
@@ -123,7 +133,9 @@ Read before designing anything:
   a row per cell) (`scripts/console_ui_test.py`).
 - Time master data: `/zzxxmla1/schema/time.html` (`web/schema/time.js`) and `GET time`, `POST time/fill` of the schema
   API fill the SID and attribute tables of the calendar characteristics (`0CALYEAR`, `0CALQUARTER`, `0CALMONTH`,
-  `0CALWEEK` and the ones without year) for BW's interval of RSRHIERARCHYVIRT (`RSADMINS`) or a given one
+  `0CALWEEK` and the ones without year) and of `0FISCYEAR` and `0FISCPER` (as `0CALYEAR` and
+  `0CALMONTH`, for K4: its periods 001 to 012 are the months; BW's SID conversion adds 000 and the special periods of
+  each year) for BW's interval of RSRHIERARCHYVIRT (`RSADMINS`) or a given one
   (`ZZXXMLA1_CL_TIME_MD`). BW fills neither: its Recreate button only fills characteristics that have navigation
   attributes. Filling adds members to every time view; see `docs/time-master-data.md`.
 - Execute: the MDX parser is a port of Mondrian's JavaCC grammar `MdxParser.jj` (`ZZXXMLA1_CL_MDX_TOKEN_MANAGER`,

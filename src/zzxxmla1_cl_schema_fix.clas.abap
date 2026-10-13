@@ -9,19 +9,23 @@
 * olap4abap contains code derived from Mondrian (Eclipse Public License 1.0): Copyright (C) 1998-2005 Julian Hyde,
 * Copyright (C) 2005-2021 Hitachi Vantara and others, Copyright (C) 2021-2025 Sergei Semenkov. See the NOTICE file.
 *----------------------------------------------------------------------------------------------------------------------*
-"! Fixes characteristics of a cube to one value each (docs/bw-schema-design-guide.md, section 3.8) as an edit of its
-"! schema (docs/schema-generator.md, Fixing): the cube gets the new selection, and only the parts of the schema that
-"! depend on it follow; names, captions, hierarchies, levels, properties, measures, double-click columns and members
-"! with facts stay as the user made them:
-"! - the cube's annotations olap4abap.fixed.CHARACTERISTIC, one per fixed characteristic;
-"! - its fact table, the provider's facts for the selection (BW's table, the fact view or its placeholder), and as
-"!   these name them the columns of its measures and the foreign keys of its dimensions;
+"! Restricts characteristics of a cube by a selection (docs/bw-schema-design-guide.md, section 3.8,
+"! ZZXXMLA1_CL_BW_SELECTION) as an edit of its schema (docs/schema-generator.md, Fixing): the cube gets the new
+"! selection, and only the parts of the schema that depend on it follow; names, captions, hierarchies, levels,
+"! properties, measures, double-click columns and members with facts stay as the user made them:
+"! - the cube's annotations olap4abap.filter.CHARACTERISTIC (filter the cube) and olap4abap.members.CHARACTERISTIC
+"!   (restrict members), one per restricted characteristic, its rows as text; olap4abap.fixed.CHARACTERISTIC = v of a
+"!   schema fixed before selections is read as filter the cube with I EQ v and written with the new name;
+"! - its fact table, the provider's facts for the selection (BW's table, the fact view or its placeholder; only the
+"!   characteristics that filter the cube filter them), and as these name them the columns of its measures and the
+"!   foreign keys of its dimensions;
 "! - the tables of each dimension on a characteristic, found by the foreign key of its usage: the characteristic's
-"!   view for the selection (or its placeholder, generated on accept), filtered on its value if it is fixed itself, so
-"!   it is a dimension with one member;
-"! - a characteristic whose compounding becomes all fixed is named by its own key (2024001): every NameColumn of its
-"!   dimension on COMPOUND_KEY becomes its key column, an OrderByColumn on COMPOUND_KEY goes; one that becomes
-"!   compounded again is named and ordered by COMPOUND_KEY on its key attribute, where that was named by its key.
+"!   view for the selection (or its placeholder, generated on accept), filtered on its own selection if it is
+"!   restricted itself, so it is a dimension with the members of its selection (a fixed one with one member);
+"! - a characteristic whose compounding becomes all fixed to one value (I EQ, either mode) is named by its own key
+"!   (2024001): every NameColumn of its dimension on COMPOUND_KEY becomes its key column, an OrderByColumn on
+"!   COMPOUND_KEY goes; one that becomes compounded again is named and ordered by COMPOUND_KEY on its key attribute,
+"!   where that was named by its key.
 "! The provider is the one whose facts the cube reads (a fact placeholder, a fact view of table ZZXXMLA1_VIEW or BW's
 "! table), read for the old selection (the cube's annotations) and for the new one, as the proposal reads it; a table
 "! of the schema is replaced only where it is the provider's or the characteristic's for the old one.
@@ -48,9 +52,10 @@ CLASS zzxxmla1_cl_schema_fix DEFINITION
         provider    TYPE zzxxmla1_cl_bw_provider=>ty_provider,
       END OF ty_result.
     TYPES:
-      "! a characteristic of the cube's provider that can be fixed (it has a SID table): what its basic one is
+      "! a characteristic of the cube's provider that can be restricted (it has a SID table): what its basic one is
       "! compounded with, its column in the facts, the dimension of the cube on it (a shared one by its name, else a
-      "! private one; initial if the cube has none) and its fixed value
+      "! private one; initial if the cube has none), its selection (mode and rows, initial if it has none) and whether
+      "! that is one I EQ value, the value
       BEGIN OF ty_characteristic,
         name        TYPE string,
         text        TYPE string,
@@ -58,15 +63,20 @@ CLASS zzxxmla1_cl_schema_fix DEFINITION
         foreign_key TYPE string,
         dimension   TYPE string,
         shared      TYPE abap_bool,
+        mode        TYPE c LENGTH 1,
+        rows        TYPE zzxxmla1_cl_bw_selection=>ty_t_row,
         fixed       TYPE abap_bool,
         value       TYPE string,
       END OF ty_characteristic,
       ty_t_characteristic TYPE STANDARD TABLE OF ty_characteristic WITH EMPTY KEY.
 
-    "! The characteristics a cube fixes: its annotations olap4abap.fixed.CHARACTERISTIC.
-    CLASS-METHODS fixed_of
+    "! The selection of a cube: its annotations olap4abap.filter.CHARACTERISTIC and olap4abap.members.CHARACTERISTIC,
+    "! and olap4abap.fixed.CHARACTERISTIC as filter the cube with I EQ; refused if an annotation is no selection or a
+    "! characteristic has two.
+    CLASS-METHODS cube_selection
       IMPORTING cube          TYPE zzxxmla1_cl_schema_def=>ty_cube
-      RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_view_gen=>ty_t_fixed.
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_view_gen=>ty_t_selection
+      RAISING   zzxxmla1_cx_bw_provider.
     "! The provider whose facts the cube reads: the one of a fact placeholder (ZZXXMLA1_F_...), of a fact view of table
     "! ZZXXMLA1_VIEW, or the InfoCube or aDSO whose fact table or reporting view it is; refused if there is none.
     METHODS provider_of
@@ -78,11 +88,12 @@ CLASS zzxxmla1_cl_schema_fix DEFINITION
       IMPORTING cube          TYPE zzxxmla1_cl_schema_def=>ty_cube
       RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_provider=>ty_provider
       RAISING   zzxxmla1_cx_bw_provider.
-    "! Makes the cube fix the given characteristics, all it fixes (none: nothing); refused if the provider refuses the
-    "! selection (zzxxmla1_cl_bw_provider->check_fixed) or the cube does not read the provider's tables.
+    "! Makes the cube restrict characteristics by the given selection, all it restricts (none: nothing); refused if
+    "! the provider refuses the selection (zzxxmla1_cl_bw_provider->check_selection) or the cube does not read the
+    "! provider's tables.
     METHODS fix
       IMPORTING cube          TYPE string
-                fixed         TYPE zzxxmla1_cl_bw_view_gen=>ty_t_fixed
+                selection     TYPE zzxxmla1_cl_bw_view_gen=>ty_t_selection
       CHANGING  !schema       TYPE zzxxmla1_cl_schema_def=>ty_schema
       RETURNING VALUE(result) TYPE ty_result
       RAISING   zzxxmla1_cx_bw_provider.
@@ -97,7 +108,7 @@ CLASS zzxxmla1_cl_schema_fix DEFINITION
       RETURNING VALUE(result) TYPE ty_result
       RAISING   zzxxmla1_cx_bw_provider.
     "! The characteristics of a provider read for the cube's selection, with the cube's dimensions on them (by the
-    "! foreign keys) and their fixed values.
+    "! foreign keys) and their selections.
     CLASS-METHODS characteristics
       IMPORTING cube          TYPE zzxxmla1_cl_schema_def=>ty_cube
                 provider      TYPE zzxxmla1_cl_bw_provider=>ty_provider
@@ -141,16 +152,19 @@ ENDCLASS.
 
 CLASS zzxxmla1_cl_schema_fix IMPLEMENTATION.
 
-  METHOD fixed_of.
+  METHOD cube_selection.
     IF cube-annotations IS NOT BOUND.
       RETURN.
     ENDIF.
-    DATA(prefix) = zzxxmla1_cl_schema_proposal=>c_fixed_annotation.
     LOOP AT cube-annotations->array INTO DATA(annotation).
-      IF strlen( annotation-name ) > strlen( prefix )
-          AND substring( val = annotation-name len = strlen( prefix ) ) = prefix.
-        INSERT VALUE #( iobjnm = to_upper( substring( val = annotation-name off = strlen( prefix ) ) )
-                        value  = annotation-cdata ) INTO TABLE result.
+      DATA(restricted) = zzxxmla1_cl_bw_selection=>from_annotation( name = annotation-name value = annotation-cdata ).
+      IF restricted IS INITIAL.
+        CONTINUE.
+      ENDIF.
+      restricted-iobjnm = to_upper( restricted-iobjnm ).
+      INSERT restricted INTO TABLE result.
+      IF sy-subrc <> 0.
+        fail( |Cube '{ cube-name }' has two selections of { restricted-iobjnm }| ).
       ENDIF.
     ENDLOOP.
   ENDMETHOD.
@@ -177,7 +191,7 @@ CLASS zzxxmla1_cl_schema_fix IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD read_provider.
-    result = NEW zzxxmla1_cl_bw_provider( )->read( name = provider_of( cube ) fixed = fixed_of( cube ) ).
+    result = NEW zzxxmla1_cl_bw_provider( )->read( name = provider_of( cube ) selection = cube_selection( cube ) ).
   ENDMETHOD.
 
   METHOD fix.
@@ -187,9 +201,9 @@ CLASS zzxxmla1_cl_schema_fix IMPLEMENTATION.
     ENDIF.
     DATA(name) = provider_of( target ).
     DATA(reader) = NEW zzxxmla1_cl_bw_provider( ).
-    DATA(old) = reader->read( name = name fixed = fixed_of( target ) ).
-    DATA(new) = reader->read( name = name fixed = fixed ).
-    reader->check_fixed( new ).
+    DATA(old) = reader->read( name = name selection = cube_selection( target ) ).
+    DATA(new) = reader->read( name = name selection = selection ).
+    reader->check_selection( new ).
     result = apply( EXPORTING cube   = cube
                               old    = old
                               new    = new
@@ -214,15 +228,20 @@ CLASS zzxxmla1_cl_schema_fix IMPLEMENTATION.
     ENDIF.
     replace_table( EXPORTING to = new-fact_table CHANGING table = fact->name replaced = result-tables ).
 
-    " the selection
-    DATA(prefix) = zzxxmla1_cl_schema_proposal=>c_fixed_annotation.
+    " the selection, the annotations of fixing too
     IF <cube>-annotations IS NOT BOUND.
       <cube>-annotations = NEW #( ).
     ENDIF.
-    DATA(pattern) = |{ prefix }*|.
-    DELETE <cube>-annotations->array WHERE name CP pattern.
-    LOOP AT new-fixed INTO DATA(value).
-      APPEND VALUE #( name = |{ prefix }{ value-iobjnm }| cdata = value-value ) TO <cube>-annotations->array.
+    LOOP AT <cube>-annotations->array INTO DATA(annotation).
+      DATA(index) = sy-tabix.
+      IF zzxxmla1_cl_bw_selection=>from_annotation( name = annotation-name value = annotation-cdata ) IS NOT INITIAL.
+        DELETE <cube>-annotations->array INDEX index.
+      ENDIF.
+    ENDLOOP.
+    LOOP AT new-selection INTO DATA(restricted).
+      APPEND VALUE #( name  = zzxxmla1_cl_bw_selection=>annotation_name( characteristic = restricted-iobjnm
+                                                                         mode           = restricted-mode )
+                      cdata = zzxxmla1_cl_bw_selection=>rows_text( restricted-rows ) ) TO <cube>-annotations->array.
     ENDLOOP.
     IF <cube>-annotations->array IS INITIAL.
       CLEAR <cube>-annotations.
@@ -369,10 +388,13 @@ CLASS zzxxmla1_cl_schema_fix IMPLEMENTATION.
                                              text        = characteristic-text
                                              compounding = characteristic-compounding
                                              foreign_key = characteristic-fact_column-name ).
-      READ TABLE provider-fixed INTO DATA(value) WITH TABLE KEY iobjnm = CONV rsiobjnm( characteristic-iobjnm ).
+      READ TABLE provider-selection INTO DATA(restricted)
+           WITH TABLE KEY iobjnm = CONV rsiobjnm( characteristic-iobjnm ).
       IF sy-subrc = 0.
-        entry-fixed = abap_true.
-        entry-value = value-value.
+        entry-mode = restricted-mode.
+        entry-rows = restricted-rows.
+        entry-fixed = zzxxmla1_cl_bw_selection=>is_single( restricted-rows ).
+        entry-value = zzxxmla1_cl_bw_selection=>single_value( restricted-rows ).
       ENDIF.
       LOOP AT cube-dimensions INTO DATA(node).
         IF node-name = `DimensionUsage`.

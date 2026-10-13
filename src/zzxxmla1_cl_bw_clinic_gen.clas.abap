@@ -323,9 +323,9 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
                 fixed         TYPE abap_bool DEFAULT abap_false
                 views         TYPE zzxxmla1_cl_bw_view_gen=>ty_t_view
       RETURNING VALUE(result) TYPE string.
-    "! The fixed characteristics of the K4 schemas: ZCLFISCVR = K4.
+    "! The selection of the K4 schemas: ZCLFISCVR fixed to K4, filter the cube with I EQ K4.
     METHODS k4
-      RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_view_gen=>ty_t_fixed.
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_view_gen=>ty_t_selection.
     "! The schema's name and its catalog's: the provider, with _K4 for the one that fixes the variant.
     METHODS catalog_name
       IMPORTING adso          TYPE abap_bool
@@ -1655,7 +1655,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
         " the aDSO's facts with the SID of the room (characteristic of the view: the aDSO)
         APPEND generator->generate_fact_view( c_adso ) TO result.
         " the K4 schemas: the facts of both filtered on the variant, the variant, the year and the period filtered on it
-        DATA(selection) = zzxxmla1_cl_bw_view_gen=>selection_of( k4( ) ).
+        DATA(selection) = k4( ).
         APPEND generator->generate_fact_view( provider = c_cube selection = selection ) TO result.
         APPEND generator->generate_fact_view( provider = c_adso selection = selection ) TO result.
         APPEND generator->generate( characteristic = 'ZCLFISCVR' selection = selection ) TO result.
@@ -1840,7 +1840,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD view_of.
-    DATA(selection) = COND string( WHEN fixed = abap_true THEN zzxxmla1_cl_bw_view_gen=>selection_text( k4( ) ) ).
+    DATA(selection) = COND string( WHEN fixed = abap_true THEN zzxxmla1_cl_bw_selection=>selection_text( k4( ) ) ).
     result = VALUE #( views[ characteristic = iobjnm selection = selection ]-view_name OPTIONAL ).
     IF result IS INITIAL.
       write( |schema: no view of { iobjnm }{ COND string( WHEN selection IS NOT INITIAL THEN | ({ selection })| ) }| ).
@@ -1848,7 +1848,9 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD k4.
-    result = VALUE #( ( iobjnm = 'ZCLFISCVR' value = c_fixed_variant ) ).
+    result = VALUE #( ( iobjnm = 'ZCLFISCVR'
+                        mode   = zzxxmla1_cl_bw_selection=>c_mode-filter
+                        rows   = zzxxmla1_cl_bw_selection=>equals( c_fixed_variant ) ) ).
   ENDMETHOD.
 
   METHOD catalog_name.
@@ -2052,11 +2054,15 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       APPEND |Fiscal Period:SID_ZCLFISCPR| TO usages.
     ENDIF.
 
+    " the K4 schemas: the variant filters the cube
+    DATA(k4_selection) = k4( ).
+    DATA(variant) = k4_selection[ 1 ].
+    DATA(annotation) = zzxxmla1_cl_bw_selection=>annotation_name( characteristic = variant-iobjnm mode = variant-mode ).
+    DATA(rows) = zzxxmla1_cl_bw_selection=>rows_text( variant-rows ).
     result = result &&
       |  <Cube name="{ name }" caption="Clinic Visits{ caption }" defaultMeasure="Visits">\n| &&
       COND string( WHEN fixed = abap_true
-                   THEN |    <Annotations><Annotation name="{ zzxxmla1_cl_schema_proposal=>c_fixed_annotation }ZCLFISCVR">| &&
-                        |{ c_fixed_variant }</Annotation></Annotations>\n| ) &&
+                   THEN |    <Annotations><Annotation name="{ annotation }">{ rows }</Annotation></Annotations>\n| ) &&
       |    <Table name="{ fact_table }"/>\n|.
     " the characteristics other than time show only their values with visits, so the patients registered without a
     " visit are no members (the time dimensions: to be decided, docs/mvp-scope.md, Members with facts)
