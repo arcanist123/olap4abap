@@ -53,6 +53,8 @@ CLASS ltc_engine DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT
     METHODS non_empty_function FOR TESTING RAISING zzxxmla1_cx_xmla.
     METHODS existing_and_exists FOR TESTING RAISING zzxxmla1_cx_xmla.
     METHODS scalar_functions FOR TESTING RAISING zzxxmla1_cx_xmla.
+    "! InStr in its three forms, ignoring case, and Excel's search in a filter list.
+    METHODS in_str FOR TESTING RAISING zzxxmla1_cx_xmla.
     METHODS set_functions_of_the_model FOR TESTING RAISING zzxxmla1_cx_xmla.
     METHODS visual_totals_and_dates FOR TESTING RAISING zzxxmla1_cx_xmla.
     "! The result limit (result.limit): a crossjoin larger than it fails before it is built.
@@ -754,6 +756,44 @@ CLASS ltc_engine IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = values( result )
                                         exp = VALUE string_table( ( `[Product].[All Products]` ) ( `1` ) ( `1` ) ( `3` )
                                                                   ( `null` ) ( `2` ) ( `0` ) ( `4` ) ) ).
+  ENDMETHOD.
+
+  METHOD in_str.
+    " answers of the reference server: the compare argument is not used, an empty match is found at the start (at most
+    " the end), a start of 0 is an error of the cell
+    DATA(result) = execute(
+      `with member [Measures].[a] as InStr(1, [Product].CurrentMember.Name, "r") `
+   && `member [Measures].[b] as InStr([Product].CurrentMember.Name, "D") `
+   && `member [Measures].[c] as InStr(3, "abcabc", "B") `
+   && `member [Measures].[d] as InStr(1, "abc", "") `
+   && `member [Measures].[e] as InStr(-1, "abc", "C") `
+   && `member [Measures].[f] as InStr(2, "abcabc", "c", 1) `
+   && `member [Measures].[g] as InStr(10, "abc", "c") `
+   && `member [Measures].[h] as InStr(10, "abc", "") `
+   && `member [Measures].[i] as InStr(0, "abc", "a") `
+   && `select {[Measures].[a], [Measures].[b], [Measures].[c], [Measures].[d], [Measures].[e], [Measures].[f], `
+   && `[Measures].[g], [Measures].[h], [Measures].[i]} on 0, {[Product].[Drink], [Product].[Food]} on 1 `
+   && `from [ZFMSALES]` ).
+    DATA(error) = `olap4abap.EvaluationException: olap4abap.InvalidArgumentException: olap4abap Error:`
+               && `start must be -1 or a location in the string to start`.
+    cl_abap_unit_assert=>assert_equals( act = values( result )
+                                        exp = VALUE string_table( ( `2` ) ( `1` ) ( `5` ) ( `1` ) ( `3` ) ( `3` )
+                                                                  ( `0` ) ( `4` ) ( error )
+                                                                  ( `0` ) ( `4` ) ( `5` ) ( `1` ) ( `3` ) ( `3` )
+                                                                  ( `0` ) ( `4` ) ( error ) ) ).
+    " Excel's search in the filter list of a field: the members whose caption has the text, with their ancestors
+    result = execute(
+      `WITH MEMBER [Measures].cChildren As 'AddCalculatedMembers([Product].currentmember.children).count' `
+   && `Set FilteredMembers As 'Head (Filter(AddCalculatedMembers([Product].[Product Family].Members), `
+   && `InStr(1, [Product].currentmember.member_caption, "d")>0),10001)' `
+   && `Select {[Measures].cChildren} on ROWS, `
+   && `Hierarchize(Generate(FilteredMembers, Ascendants([Product].currentmember))) `
+   && `DIMENSION PROPERTIES PARENT_UNIQUE_NAME, MEMBER_TYPE ON COLUMNS FROM [ZFMSALES]` ).
+    cl_abap_unit_assert=>assert_equals( act = tuples( result )
+                                        exp = VALUE string_table( ( `[Product].[All Products]` ) ( `[Product].[Drink]` )
+                                                                  ( `[Product].[Food]` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = values( result )
+                                        exp = VALUE string_table( ( `4` ) ( `3` ) ( `15` ) ) ).
   ENDMETHOD.
 
   METHOD set_functions_of_the_model.

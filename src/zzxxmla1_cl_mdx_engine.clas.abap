@@ -1397,6 +1397,14 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
                 node          TYPE ty_node
       RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_evaluator=>ty_value
       RAISING   zzxxmla1_cx_xmla.
+    "! InStr([start, ]check, match[, compare]) (Vba.inStr): the 1-based position of the first match from the start
+    "! (-1: from the beginning), 0 if there is none; ignoring case (CaseSensitiveMdxInstr is false), String.indexOf.
+    CLASS-METHODS java_in_str
+      IMPORTING start         TYPE i
+                check         TYPE string
+                match         TYPE string
+      RETURNING VALUE(result) TYPE i
+      RAISING   zzxxmla1_cx_mdx_evaluation.
     "! CInt(value) (Vba.cInt): a number rounded half to even, a text parsed; null if the value is null (JavaFunDef).
     CLASS-METHODS java_cint
       IMPORTING value         TYPE zzxxmla1_cl_mdx_evaluator=>ty_value
@@ -3554,10 +3562,23 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
           result-text = substring( val = text-text off = start - 1
                                    len = nmin( val1 = length val2 = strlen( text-text ) - start + 1 ) ).
         ENDIF.
+      WHEN `INSTR|Function|9,9` OR `INSTR|Function|15,9,9` OR `INSTR|Function|15,9,9,15`.
+        " the compare argument is not used (the reference's todo)
+        DATA(first_text) = COND i( WHEN lines( node->args ) = 2 THEN 1 ELSE 2 ).
+        start = COND i( WHEN first_text = 1 THEN 1
+                        ELSE trunc( evaluate_number( evaluator = evaluator node = node->args[ 1 ] ) ) ).
+        result = VALUE #( kind   = zzxxmla1_cl_mdx_evaluator=>c_value-integer
+                          number = java_in_str(
+                                       start = start
+                                       check = evaluate_string( evaluator = evaluator
+                                                                node      = node->args[ first_text ] )-text
+                                       match = evaluate_string( evaluator = evaluator
+                                                                node      = node->args[ first_text + 1 ] )-text ) ).
       WHEN `NAME|Property|6`.
         result = VALUE #( kind = zzxxmla1_cl_mdx_evaluator=>c_value-string
                           text = name_of( evaluate_member( evaluator = evaluator node = node->args[ 1 ] ) ) ).
-      WHEN `CAPTION|Property|6`.
+      WHEN `CAPTION|Property|6` OR `MEMBER_CAPTION|Property|6`.
+        " Member_Caption is the reference's synonym of <Member>.Caption (BuiltinFunTable)
         result = VALUE #( kind = zzxxmla1_cl_mdx_evaluator=>c_value-string
                           text = evaluate_member( evaluator = evaluator node = node->args[ 1 ] )-caption ).
       WHEN `UNIQUENAME|Property|6` OR `UNIQUE_NAME|Property|6`.
@@ -7168,6 +7189,22 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     " Vba.intNative: towards negative infinity
     result = VALUE #( kind = zzxxmla1_cl_mdx_evaluator=>c_value-numeric
                       number = first-number - second-number * floor( first-number / second-number ) ).
+  ENDMETHOD.
+
+  METHOD java_in_str.
+    IF start = 0 OR start < -1.
+      zzxxmla1_cx_mdx_evaluation=>raise_error( `olap4abap.InvalidArgumentException: olap4abap Error:`
+                                            && `start must be -1 or a location in the string to start` ).
+    ENDIF.
+    DATA(text) = to_lower( check ).
+    DATA(sub) = to_lower( match ).
+    DATA(from) = COND i( WHEN start = -1 THEN 0 ELSE start - 1 ).
+    " String.indexOf( sub, from ): the empty text is found at from, at most at the end
+    IF sub IS INITIAL.
+      result = nmin( val1 = from val2 = strlen( text ) ) + 1.
+    ELSEIF from < strlen( text ).
+      result = find( val = text sub = sub off = from ) + 1.
+    ENDIF.
   ENDMETHOD.
 
   METHOD java_cint.

@@ -9,6 +9,7 @@ import re
 _RULES = [
     (r"mondrian\.olap\.fun\.MondrianEvaluationException", "olap4abap.EvaluationException"),
     (r"mondrian\.olap\.MondrianDef\$", "olap4abap.SchemaDef$"),
+    (r"mondrian\.olap\.InvalidArgumentException", "olap4abap.InvalidArgumentException"),
     (r"mondrian\.xmla\.", "olap4abap."),
     (r"Mondrian Error:", "olap4abap Error:"),
     (r"<faultactor>Mondrian</faultactor>", "<faultactor>olap4abap</faultactor>"),
