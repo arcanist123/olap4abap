@@ -109,7 +109,10 @@ after a run (not tried yet).
 
 ## The data
 
-2,000 patients, 20 physicians in 7 departments, 36 diagnoses, 33,956 visits. Patterns, so that queries show something:
+2,000 patients, 20 physicians in 7 departments, 36 diagnoses, 33,956 visits. Another 300 patients are registered
+without a visit (made after the visits, so these stay as they were), some of them in the city Kingsport of the region
+Coastal, where nobody has visited: the master data has members the providers do not use, as a BW characteristic shared
+by many providers has. Patterns, so that queries show something:
 fewer visits at weekends (Sundays only the emergency department), about a fifth more in winter and a quarter fewer in
 August, 5% more in 2025; children go to pediatrics, cardiology and pulmonology see mostly older patients; respiratory
 diagnoses are three times as frequent in winter; duration, waiting time, lab tests and charges depend on the visit type
@@ -137,6 +140,11 @@ dimension is keyed by the SID of its view and named by the value, on the aDSO ke
 | Room | none (properties Room Key, Room Type) | keyed by the SID on both providers (the aDSO's fact view), named and ordered by `COMPOUND_KEY` (`NORTH/R01`) |
 | Time (cube) | Year > Quarter > Month (named by the month) > Day, without All member, default `[Time].[2025]`; `Weekly`: Year > Week > Day | `TimeDimension` |
 | Year, Quarter, Month, Week (aDSO) | none | one dimension per time characteristic, which have no attributes |
+
+Every dimension but time is annotated `olap4abap.membersWithFacts` on the cube's `DimensionUsage`
+(`mvp-scope.md`, Members with facts decision): its members are only those with visits, so the registered patients,
+Kingsport and Coastal are no members (`scripts/clinic_test.py` checks it on both providers). The time dimensions are
+not annotated (to be decided).
 
 Every attribute is also an attribute hierarchy (`[Patient.Age Group]`). Measures: Visits, Duration Min, Waiting Min, Lab
 Tests (format `#,##0`), Charges (`#,##0.00`). A hierarchy other than Time has an All member: BW's blank member sorts

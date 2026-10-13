@@ -95,6 +95,21 @@ cases and the applicable statements passing:
    statements with `TopCount`/`BottomCount` and 13 more edge cases (empty tuples, ties, an empty key, `Fact Count`,
    slicer, subselect, `NON EMPTY`) give eMondrian's answers.
 
+## Now: members with facts
+
+Decision in `mvp-scope.md` (Members with facts decision, 2026-10-13): a dimension of a cube can show only the members
+that have facts in it, by the annotation `olap4abap.membersWithFacts` on its `DimensionUsage`.
+
+1. Done (2026-10-13): the annotation (`ZZXXMLA1_CL_SCHEMA`, refused on a time dimension), member reads from
+   `ZZXXMLA1_CL_MODEL=>member_table`, the clinic demo's 300 patients without a visit (region Coastal without any) and
+   its schemas annotated on every dimension but time; `scripts/clinic_test.py` (71 checks on `ZCLVISIT` and
+   `ZCLVISITA`: every level, children and descendants equal to NON EMPTY over all facts, members without facts not
+   found, counts, ranges, native `TopCount`, `LEVEL_CARDINALITY`, time not restricted). FoodMart unchanged: the
+   `reference/` cases and the applicable statements give the same answers.
+2. Open: time dimensions (decide whether and how a period without facts is a member).
+3. Open: the schema generator proposes the annotation (per characteristic, on by default?) and the UI switches it.
+4. Open: measure the semi-join on a large provider (`ZXMLWIDE` with more records).
+
 ## Then: the schema generator
 
 Design in `schema-generator.md`. Order:

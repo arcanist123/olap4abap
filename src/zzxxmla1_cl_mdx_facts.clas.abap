@@ -748,7 +748,7 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
     result = |SELECT DISTINCT { concat_lines_of( table = columns sep = `, ` ) } | &&
-             |FROM { zzxxmla1_cl_sql=>quote( hierarchy-dim_table ) }| &&
+             |FROM { zzxxmla1_cl_model=>member_table( hierarchy ) }| &&
              COND #( WHEN operand-ancestor_level > 0
                      THEN | WHERE { zzxxmla1_cl_model=>path_condition( hierarchy = hierarchy
                                                                         level_no  = operand-ancestor_level

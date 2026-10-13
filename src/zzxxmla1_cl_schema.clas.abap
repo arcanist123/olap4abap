@@ -55,6 +55,8 @@ CLASS zzxxmla1_cl_schema DEFINITION
         dim_table  TYPE string,   " table (or view) of the dimension
         key_column TYPE string,   " column of the dimension table the foreign key refers to
         dim_type   TYPE string,   " Standard or Time
+        "! only the members with facts in the cube (the annotation c_members_with_facts)
+        members_with_facts TYPE abap_bool,
       END OF ty_dim,
       ty_t_dim TYPE STANDARD TABLE OF ty_dim WITH EMPTY KEY.
     TYPES:
@@ -124,6 +126,12 @@ CLASS zzxxmla1_cl_schema DEFINITION
         meas_name  TYPE string,   " a measure; then no dimension
       END OF ty_drill_column,
       ty_t_drill_column TYPE STANDARD TABLE OF ty_drill_column WITH EMPTY KEY.
+
+    "! The annotation of a Dimension or DimensionUsage (our extension, which the reference ignores) whose value true
+    "! makes the cube show only the members of the dimension that have facts in it (ZZXXMLA1_CL_MODEL=>member_table): a
+    "! BW characteristic is shared by many providers, which use few of its values. On a DimensionUsage it overrides the
+    "! shared Dimension's. Not on a time dimension yet (docs/mvp-scope.md, Members with facts).
+    CONSTANTS c_members_with_facts TYPE string VALUE `olap4abap.membersWithFacts`.
 
     "! The schemas of all catalogs of the server, read once per session.
     CLASS-METHODS get
@@ -203,11 +211,20 @@ CLASS zzxxmla1_cl_schema DEFINITION
                 updated   TYPE timestampl
       RAISING   zzxxmla1_cx_xmla.
     METHODS add_dimension
-      IMPORTING cube        TYPE string
-                name        TYPE string
-                caption     TYPE string
-                foreign_key TYPE string
-                dimension   TYPE zzxxmla1_cl_schema_def=>ty_dimension
+      IMPORTING cube               TYPE string
+                name               TYPE string
+                caption            TYPE string
+                foreign_key        TYPE string
+                dimension          TYPE zzxxmla1_cl_schema_def=>ty_dimension
+                members_with_facts TYPE abap_bool
+      RAISING   zzxxmla1_cx_xmla.
+    "! The value of c_members_with_facts: the usage's annotation if it has one, else the dimension's; false without
+    "! either. Fails on a value other than true or false.
+    CLASS-METHODS members_with_facts
+      IMPORTING usage         TYPE REF TO zzxxmla1_cl_schema_def=>ty_annotations OPTIONAL
+                dimension     TYPE REF TO zzxxmla1_cl_schema_def=>ty_annotations OPTIONAL
+                dim_name      TYPE string
+      RETURNING VALUE(result) TYPE abap_bool
       RAISING   zzxxmla1_cx_xmla.
     "! The drill-through actions of a cube (RolapCube.addActions), each column resolved as the reference resolves it
     "! when it loads the schema; the columns of the first default one are kept.
@@ -368,7 +385,10 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
                                                WHEN shared-caption IS NOT INITIAL THEN shared-caption
                                                ELSE usage->name )
                          foreign_key = usage->foreign_key
-                         dimension   = shared ).
+                         dimension   = shared
+                         members_with_facts = members_with_facts( usage     = usage->annotations
+                                                                  dimension = shared-annotations
+                                                                  dim_name  = usage->name ) ).
           APPEND VALUE #( name = usage->name def = shared ) TO dimensions.
         WHEN `Dimension`.
           DATA(private) = CAST zzxxmla1_cl_schema_def=>ty_dimension( node-def ).
@@ -377,7 +397,9 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
                          caption     = COND #( WHEN private->caption IS NOT INITIAL THEN private->caption
                                                ELSE private->name )
                          foreign_key = private->foreign_key
-                         dimension   = private->* ).
+                         dimension   = private->*
+                         members_with_facts = members_with_facts( dimension = private->annotations
+                                                                  dim_name  = private->name ) ).
           APPEND VALUE #( name = private->name def = private->* ) TO dimensions.
         WHEN OTHERS.
           fail( |Cube '{ cube-name }': { node-name } is not supported| ).
@@ -470,7 +492,8 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
                     caption    = caption
                     fk_column  = foreign_key
                     dim_table  = dimension-table
-                    key_column = key-key_column->column_name )
+                    key_column = key-key_column->column_name
+                    members_with_facts = members_with_facts )
            TO all_dims ASSIGNING FIELD-SYMBOL(<dim>).
 
     " RolapDimension: the hierarchies of the Hierarchy elements, then one per attribute
@@ -509,6 +532,31 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
                       level_type     = level_type( attribute-level_type ) ) TO all_levels.
     ENDLOOP.
     <dim>-dim_type = check_level_types( cube = cube dim_name = name dim_type = dimension-type ).
+    IF <dim>-dim_type = `Time` AND members_with_facts = abap_true.
+      fail( |Dimension '{ name }': { c_members_with_facts } is not supported on a time dimension| ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD members_with_facts.
+    DATA(value) = VALUE string( ).
+    DATA(found) = abap_false.
+    LOOP AT VALUE zzxxmla1_cl_schema_def=>ty_t_annotations( ( COND #( WHEN usage IS BOUND THEN usage->* ) )
+                                                             ( COND #( WHEN dimension IS BOUND THEN dimension->* ) ) )
+         INTO DATA(annotations).
+      READ TABLE annotations-array INTO DATA(annotation) WITH KEY name = c_members_with_facts.
+      IF sy-subrc = 0.
+        value = condense( to_lower( annotation-cdata ) ).
+        found = abap_true.
+        EXIT.
+      ENDIF.
+    ENDLOOP.
+    IF found = abap_false.
+      RETURN.
+    ENDIF.
+    IF value <> `true` AND value <> `false`.
+      fail( |Dimension '{ dim_name }': the annotation { c_members_with_facts } must be true or false| ).
+    ENDIF.
+    result = xsdbool( value = `true` ).
   ENDMETHOD.
 
   METHOD add_hierarchy.

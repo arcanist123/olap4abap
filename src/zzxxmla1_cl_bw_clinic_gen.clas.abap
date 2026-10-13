@@ -57,6 +57,9 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     CONSTANTS c_last_day  TYPE d VALUE '20251231'.
     CONSTANTS c_seed      TYPE int8 VALUE 20240101.
     CONSTANTS c_patients  TYPE i VALUE 2000.
+    "! patients registered without a visit (some in the new region Coastal, which has no visits at all): the master data
+    "! has members the providers do not use, as a shared BW characteristic has
+    CONSTANTS c_registered TYPE i VALUE 300.
     CONSTANTS c_lab_price TYPE p LENGTH 8 DECIMALS 2 VALUE '24.50'.
     CONSTANTS c_minute_price TYPE p LENGTH 8 DECIMALS 2 VALUE '1.20'.
 
@@ -222,7 +225,11 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     METHODS random IMPORTING n TYPE i RETURNING VALUE(result) TYPE i.
     "! A key chosen with the probability of its weight.
     METHODS pick IMPORTING weights TYPE ty_t_weight RETURNING VALUE(result) TYPE string.
-    METHODS build_patients.
+    "! Patients with the next ids; registered ones (made after the visits, so these stay as they are) may also live in
+    "! the city of a region where nobody has visited yet.
+    METHODS build_patients
+      IMPORTING !count     TYPE i
+                registered TYPE abap_bool DEFAULT abap_false.
     METHODS build_physicians.
     METHODS build_diagnoses.
     "! The time slices of the versions of ZCLDOC_ORG and ZCLDOC_SITE.
@@ -341,13 +348,15 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
   METHOD run.
     CLEAR log.
     seed = c_seed.
-    build_patients( ).
+    CLEAR patients.
+    build_patients( c_patients ).
     build_physicians( ).
     build_diagnoses( ).
     build_visits( ).
+    build_patients( count = c_registered registered = abap_true ).
     limit_visits( max_visits ).
-    write( |{ lines( patients ) } patients, { lines( physicians ) } physicians, { lines( diagnoses ) } diagnoses, | &&
-           |{ lines( visits ) } visits| ).
+    write( |{ lines( patients ) } patients ({ c_registered } without visits), { lines( physicians ) } physicians, | &&
+           |{ lines( diagnoses ) } diagnoses, { lines( visits ) } visits| ).
 
     delete_all( ).
     ensure_infoarea( ).
@@ -499,6 +508,9 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       ( scope = `East`    key = `Eastbrook` ) ( scope = `East`    key = `Fairhaven` )
       ( scope = `West`    key = `Glenwood` )  ( scope = `West`    key = `Harrowgate` )
       ( scope = `Central` key = `Ironbridge` ) ( scope = `Central` key = `Juniper Hills` ) ).
+    IF registered = abap_true.
+      APPEND VALUE #( scope = `Coastal` key = `Kingsport` ) TO cities.
+    ENDIF.
     DATA(age_groups) = VALUE ty_t_weight( ( key = `0-17` weight = 20 ) ( key = `18-39` weight = 27 )
                                           ( key = `40-64` weight = 30 ) ( key = `65+` weight = 23 ) ).
     DATA(blood_groups) = VALUE ty_t_weight( ( key = `O+` weight = 37 ) ( key = `A+` weight = 34 )
@@ -507,9 +519,9 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
                                             ( key = `B-` weight = 2 ) ( key = `AB-` weight = 1 ) ).
     DATA(insurances) = VALUE ty_t_weight( ( key = `Statutory` weight = 75 ) ( key = `Private` weight = 20 )
                                           ( key = `Self-pay` weight = 5 ) ).
-    CLEAR patients.
-    DO c_patients TIMES.
-      DATA(patient) = VALUE ty_patient( id = sy-index ).
+    DATA(first_id) = lines( patients ) + 1.
+    DO count TIMES.
+      DATA(patient) = VALUE ty_patient( id = first_id + sy-index - 1 ).
       patient-sex = COND #( WHEN random( 2 ) = 1 THEN `Female` ELSE `Male` ).
       DATA(first) = COND string( WHEN patient-sex = `Female` THEN female[ random( lines( female ) ) ]
                                  ELSE male[ random( lines( male ) ) ] ).
@@ -1914,9 +1926,18 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       |  <Cube name="{ name }" caption="Clinic Visits{ COND string( WHEN adso = abap_true THEN ` (aDSO)` ) }" | &&
       |defaultMeasure="Visits">\n| &&
       |    <Table name="{ fact_table }"/>\n|.
+    " the characteristics other than time show only their values with visits, so the patients registered without a
+    " visit are no members (the time dimensions: to be decided, docs/mvp-scope.md, Members with facts)
+    DATA(time_dimensions) = VALUE string_table( ( `Time` ) ( `Year` ) ( `Quarter` ) ( `Month` ) ( `Week` ) ).
     LOOP AT usages INTO DATA(usage).
       SPLIT usage AT `:` INTO DATA(dimension) DATA(foreign_key).
-      result = result && |    <DimensionUsage name="{ dimension }" source="{ dimension }" foreignKey="{ foreign_key }"/>\n|.
+      result = result && |    <DimensionUsage name="{ dimension }" source="{ dimension }" foreignKey="{ foreign_key }"|.
+      IF line_exists( time_dimensions[ table_line = dimension ] ).
+        result = result && |/>\n|.
+      ELSE.
+        result = result && |>\n      <Annotations><Annotation name="{ zzxxmla1_cl_schema=>c_members_with_facts }">| &&
+                           |true</Annotation></Annotations>\n    </DimensionUsage>\n|.
+      ENDIF.
     ENDLOOP.
     DATA(duration) = iobj_field( struct = fact iobjnm = 'ZCLDUR' without_namespace = adso ).
     DATA(visit_number) = iobj_field( struct = fact iobjnm = 'ZCLVISNO' without_namespace = adso ).

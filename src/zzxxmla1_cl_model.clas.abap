@@ -33,6 +33,9 @@ CLASS zzxxmla1_cl_model DEFINITION
         dim_table       TYPE string,   " table (or view) of the dimension
         key_column      TYPE string,   " column of the dimension table the foreign key refers to
         dim_type        TYPE string,   " of the dimension: Standard or Time
+        fact_table      TYPE string,   " the cube's fact table
+        "! the members are only the rows of the dimension table whose key is in the fact table (member_table)
+        members_with_facts TYPE abap_bool,
         "! the columns' types were read from the database's catalog (key_types); else data_type tells them
         typed           TYPE abap_bool,
         "! the columns of the dimension table that are numbers in the database, which orders and compares them as such
@@ -86,6 +89,13 @@ CLASS zzxxmla1_cl_model DEFINITION
       IMPORTING cube          TYPE csequence
       RETURNING VALUE(result) TYPE ty_t_hierarchy
       RAISING   zzxxmla1_cx_xmla.
+    "! The table the members of a hierarchy are read from: its dimension table, or, if the cube shows only the members
+    "! with facts (the dimension's annotation olap4abap.membersWithFacts, our extension: a BW characteristic is shared by
+    "! many providers and has many more values than one of them uses), the rows of the dimension table whose key is in
+    "! the fact table, as a derived table. Fact queries join the dimension table itself: the facts restrict it anyway.
+    CLASS-METHODS member_table
+      IMPORTING hierarchy     TYPE ty_hierarchy
+      RETURNING VALUE(result) TYPE string.
     "! The measures of a cube in the order of the schema, plus the count of the fact rows that the reference adds to every
     "! cube as a measure of its own.
     CLASS-METHODS measures
@@ -162,11 +172,6 @@ CLASS zzxxmla1_cl_model DEFINITION
       IMPORTING hierarchy     TYPE ty_hierarchy
                 level_no      TYPE i
       RETURNING VALUE(result) TYPE i.
-    "! The number of rows of a dimension table, or of the distinct values of one of its columns.
-    CLASS-METHODS row_count
-      IMPORTING table         TYPE csequence
-                column        TYPE csequence OPTIONAL
-      RETURNING VALUE(result) TYPE i.
     "! A value of a level column as the reference writes the member name: the key's text (Object.toString). Numbers come
     "! from the database as numbers (the characteristic views cast NUMC), so nothing is changed.
     CLASS-METHODS member_name
@@ -225,6 +230,8 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
 
   METHOD hierarchies.
     DATA(schema) = zzxxmla1_cl_schema=>get( ).
+    DATA(cubes) = schema->cubes( ).
+    READ TABLE cubes INTO DATA(the_cube) WITH KEY cube_name = cube.
     LOOP AT schema->dimensions( cube ) INTO DATA(dim).
       LOOP AT schema->hierarchies( cube = cube dim = dim-dim_name ) INTO DATA(hier).
         APPEND VALUE #( dim_name        = dim-dim_name
@@ -238,10 +245,21 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
                         fk_column       = dim-fk_column
                         dim_table       = dim-dim_table
                         key_column      = dim-key_column
-                        dim_type        = dim-dim_type ) TO result.
+                        dim_type        = dim-dim_type
+                        fact_table      = the_cube-fact_table
+                        members_with_facts = dim-members_with_facts ) TO result.
       ENDLOOP.
     ENDLOOP.
     key_types( CHANGING hierarchies = result ).
+  ENDMETHOD.
+
+  METHOD member_table.
+    result = zzxxmla1_cl_sql=>quote( hierarchy-dim_table ).
+    IF hierarchy-members_with_facts = abap_true.
+      result = |( SELECT * FROM { result } WHERE { zzxxmla1_cl_sql=>quote( hierarchy-key_column ) } IN | &&
+               |( SELECT { zzxxmla1_cl_sql=>quote( hierarchy-fk_column ) } | &&
+               |FROM { zzxxmla1_cl_sql=>quote( hierarchy-fact_table ) } ) ) AS mf|.
+    ENDIF.
   ENDMETHOD.
 
   METHOD measures.
@@ -256,7 +274,7 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
     level_columns( EXPORTING hierarchy = hierarchy IMPORTING columns = DATA(columns) order_by = DATA(order_by) ).
     DATA(rows) = zzxxmla1_cl_sql=>query(
       sql     = |SELECT DISTINCT { concat_lines_of( table = columns sep = `, ` ) } | &&
-                |FROM { zzxxmla1_cl_sql=>quote( hierarchy-dim_table ) } | &&
+                |FROM { member_table( hierarchy ) } | &&
                 |ORDER BY { concat_lines_of( table = order_by sep = `, ` ) }|
       columns = lines( columns ) ).
     result = members_of_rows( hierarchy = hierarchy rows = rows ).
@@ -291,7 +309,7 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
     level_columns( EXPORTING hierarchy = down IMPORTING columns = DATA(columns) order_by = DATA(order_by) ).
     DATA(direction) = COND string( WHEN descending = abap_true THEN ` DESC` ELSE ` ASC` ).
     DATA(sql) = |SELECT DISTINCT { concat_lines_of( table = columns sep = `, ` ) } | &&
-                |FROM { zzxxmla1_cl_sql=>quote( hierarchy-dim_table ) }| &&
+                |FROM { member_table( hierarchy ) }| &&
                 COND #( WHEN condition IS NOT INITIAL THEN | WHERE { condition }| ) &&
                 | ORDER BY { concat_lines_of( table = order_by sep = |{ direction }, | ) }{ direction }|.
     IF limit > 0.
@@ -365,7 +383,7 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
       ELSE.
         " ordered by the ordinal, then by the key: the path's ordinal from the table (one per key)
         DATA(ordinal) = zzxxmla1_cl_sql=>quote( level-ordinal_column ).
-        DATA(of_path) = |( SELECT MAX( { ordinal } ) FROM { zzxxmla1_cl_sql=>quote( hierarchy-dim_table ) } WHERE | &&
+        DATA(of_path) = |( SELECT MAX( { ordinal } ) FROM { member_table( hierarchy ) } WHERE | &&
                         |{ concat_lines_of( table = VALUE string_table( ( LINES OF equal )
                                                                          ( zzxxmla1_cl_sql=>key_condition( column = column
                                                                                                           key    = key ) ) )
@@ -410,7 +428,7 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD children_counts.
-    DATA(table) = zzxxmla1_cl_sql=>quote( hierarchy-dim_table ).
+    DATA(table) = member_table( hierarchy ).
     IF level_no = 0.
       " the All member: the members of the first level
       DATA(first) = zzxxmla1_cl_sql=>quote( hierarchy-levels[ 1 ]-key_column ).
@@ -534,9 +552,12 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
 
   METHOD level_cardinality.
     DATA(level) = hierarchy-levels[ level_no ].
-    DATA(table) = zzxxmla1_cl_sql=>quote( hierarchy-dim_table ).
+    DATA(table) = member_table( hierarchy ).
     IF level-unique_members = abap_true OR level_no = 1.
-      result = row_count( table = hierarchy-dim_table column = level-key_column ).
+      DATA(counted) = zzxxmla1_cl_sql=>query(
+        sql     = |SELECT COUNT( DISTINCT { zzxxmla1_cl_sql=>quote( level-key_column ) } ) FROM { table }|
+        columns = 1 ).
+      result = counted[ 1 ][ 1 ].
       RETURN.
     ENDIF.
     DATA(columns) = VALUE string_table( ).
@@ -547,13 +568,6 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
       sql     = |SELECT COUNT( * ) FROM ( SELECT DISTINCT { concat_lines_of( table = columns sep = `, ` ) } | &&
                 |FROM { table } ) AS init|
       columns = 1 ).
-    result = rows[ 1 ][ 1 ].
-  ENDMETHOD.
-
-  METHOD row_count.
-    DATA(counted) = COND string( WHEN column IS INITIAL THEN `*` ELSE |DISTINCT { zzxxmla1_cl_sql=>quote( column ) }| ).
-    DATA(rows) = zzxxmla1_cl_sql=>query( sql     = |SELECT COUNT( { counted } ) FROM { zzxxmla1_cl_sql=>quote( table ) }|
-                                         columns = 1 ).
     result = rows[ 1 ][ 1 ].
   ENDMETHOD.
 

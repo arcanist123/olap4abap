@@ -29,6 +29,9 @@ CLASS ltc_schema DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT
     "! the members' order: an attribute's OrderByColumn (on its hierarchy and on a level over it), a level's
     "! ordinalColumn, orderBy="Name"; none where it is the key
     METHODS ordinal_column FOR TESTING RAISING cx_static_check.
+    "! the annotation olap4abap.membersWithFacts: on the shared dimension, overridden by a usage; refused on a time
+    "! dimension and with a value other than true or false
+    METHODS members_with_facts FOR TESTING RAISING cx_static_check.
     METHODS read
       IMPORTING xml           TYPE string
       RETURNING VALUE(result) TYPE REF TO zzxxmla1_cl_schema
@@ -275,7 +278,8 @@ CLASS ltc_schema IMPLEMENTATION.
     " the catalog as the server has it: datasources.xml and the schema file among the server's files
     DATA(schema) = zzxxmla1_cl_schema=>get( ).
     DATA(cubes) = schema->cubes( ).
-    cl_abap_unit_assert=>assert_equals( act = cubes[ 1 ]-cube_name exp = `ZFMSALES` ).
+    " other catalogs (the clinic demo's) may come first
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( cubes[ cube_name = `ZFMSALES` catalog_name = `ZFOODMART` ] ) ) ).
     DATA(dims) = schema->dimensions( `ZFMSALES` ).
     cl_abap_unit_assert=>assert_equals( act = lines( dims ) exp = 5 ).
     cl_abap_unit_assert=>assert_equals( act = dims[ 3 ]-dim_table exp = `ZZXXMLA1V0000003` ).
@@ -332,6 +336,58 @@ CLASS ltc_schema IMPLEMENTATION.
       CATCH zzxxmla1_cx_xmla INTO fault.
         cl_abap_unit_assert=>assert_equals( act = fault->description
                                             exp = `olap4abap Error:sourceAttribute 'X' not found for property 'P' of level 'L'` ).
+    ENDTRY.
+  ENDMETHOD.
+
+  METHOD members_with_facts.
+    DATA(annotated) = `<Annotations><Annotation name="olap4abap.membersWithFacts">true</Annotation></Annotations>`.
+    DATA(schema) = read(
+      |<Schema name="S">| &&
+      |<Dimension name="Patient" table="V_PAT">{ annotated }| &&
+      |<DimensionAttribute name="Id" usage="Key"><KeyColumn dataType="Integer" columnName="SID"/></DimensionAttribute>| &&
+      |</Dimension>| &&
+      |<Dimension name="Physician" table="V_DOC">| &&
+      |<DimensionAttribute name="Id" usage="Key"><KeyColumn dataType="Integer" columnName="SID"/></DimensionAttribute>| &&
+      |</Dimension>| &&
+      |<Cube name="A"><Table name="FA"/>| &&
+      |<DimensionUsage name="Patient" source="Patient" foreignKey="SID_PAT"/>| &&
+      |<DimensionUsage name="Physician" source="Physician" foreignKey="SID_DOC">{ annotated }</DimensionUsage>| &&
+      |<Measure name="M" column="M" aggregator="sum"/></Cube>| &&
+      |<Cube name="B"><Table name="FB"/>| &&
+      |<DimensionUsage name="Patient" source="Patient" foreignKey="SID_PAT">| &&
+      |<Annotations><Annotation name="olap4abap.membersWithFacts"> False </Annotation></Annotations></DimensionUsage>| &&
+      |<Measure name="M" column="M" aggregator="sum"/></Cube>| &&
+      |</Schema>| ).
+    cl_abap_unit_assert=>assert_equals(
+      act = VALUE string_table( FOR d IN schema->dimensions( `A` ) ( |{ d-dim_name } { d-members_with_facts }| ) )
+      exp = VALUE string_table( ( `Patient X` ) ( `Physician X` ) ) ).
+    DATA(of_b) = schema->dimensions( `B` ).
+    cl_abap_unit_assert=>assert_equals( act = of_b[ 1 ]-members_with_facts exp = abap_false ).
+
+    DATA(cube) = `<Cube name="C"><Table name="F"/><DimensionUsage name="D" source="D" foreignKey="X">` &&
+                 `<Annotations><Annotation name="olap4abap.membersWithFacts">yes</Annotation></Annotations>` &&
+                 `</DimensionUsage><Measure name="M" column="M" aggregator="sum"/></Cube>`.
+    TRY.
+        read( |<Schema name="S"><Dimension name="D" table="T">| &&
+              |<DimensionAttribute name="K" usage="Key"><KeyColumn dataType="Integer" columnName="SID"/>| &&
+              |</DimensionAttribute></Dimension>{ cube }</Schema>| ).
+        cl_abap_unit_assert=>fail( `no fault` ).
+      CATCH zzxxmla1_cx_xmla INTO DATA(fault).
+        cl_abap_unit_assert=>assert_equals(
+          act = fault->description
+          exp = `olap4abap Error:Dimension 'D': the annotation olap4abap.membersWithFacts must be true or false` ).
+    ENDTRY.
+    TRY.
+        read( |<Schema name="S"><Dimension name="D" type="TimeDimension" table="T">{ annotated }| &&
+              |<DimensionAttribute name="K" usage="Key" levelType="TimeYears">| &&
+              |<KeyColumn dataType="Integer" columnName="SID"/></DimensionAttribute></Dimension>| &&
+              |<Cube name="C"><Table name="F"/><DimensionUsage name="D" source="D" foreignKey="X"/>| &&
+              |<Measure name="M" column="M" aggregator="sum"/></Cube></Schema>| ).
+        cl_abap_unit_assert=>fail( `no fault` ).
+      CATCH zzxxmla1_cx_xmla INTO fault.
+        cl_abap_unit_assert=>assert_equals(
+          act = fault->description
+          exp = `olap4abap Error:Dimension 'D': olap4abap.membersWithFacts is not supported on a time dimension` ).
     ENDTRY.
   ENDMETHOD.
 

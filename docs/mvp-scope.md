@@ -79,6 +79,35 @@ Decisions taken by the project owner on 2026-10-02, with reasons.
   cells (its result is thrown away; the values are still asked for); a cell whose evaluation missed none is kept
   instead of being evaluated again in the next pass.
 
+## Members with facts decision (2026-10-13)
+
+- **A BW characteristic is shared by many providers**, and its master data (the SID table, the view) has many more
+  values than one InfoCube or aDSO uses: customers, materials, cost centres of the whole company. Without NON EMPTY,
+  MDX lists every member of a level, so Excel's filter lists and member browsers show all of them.
+- The reference schema has nothing for this: a level's members are the rows of its dimension table. The views must
+  stay as they are: they are shared by every provider of the characteristic (one view per basic characteristic) and
+  joined in every fact query, which must stay a cheap 1:1 join (`bw-schema-design-guide.md`); a filter against the
+  facts in the view would cost a fact scan per query and a view per provider.
+- **Our extension, per dimension of a cube:** the annotation `olap4abap.membersWithFacts` (`true`) on a
+  `DimensionUsage` (or on the `Dimension`; the usage's overrides it) makes the cube's members of that dimension only
+  the rows of the dimension table whose key (the column the foreign key refers to) is in the fact table
+  (`ZZXXMLA1_CL_SCHEMA=>c_members_with_facts`, `ZZXXMLA1_CL_MODEL=>member_table`): every member read (levels,
+  children, by name, ranges, `Lag`/`Lead`, children counts, `LEVEL_CARDINALITY`, the operands of native
+  `TopCount`/`Order`) reads from `( SELECT * FROM <view> WHERE <key> IN ( SELECT <foreign key> FROM <fact table> ) )`.
+  Fact queries still join the view itself; the facts restrict it anyway. The reference ignores annotations, so the
+  schema stays valid for it, but its answers differ: a member without facts is not a member at all (it cannot be
+  named, `MDX object ... not found`), also where a calculated member would give it a value.
+- The restriction is against all facts of the cube, not the query's context: a member with facts only in 2024 is a
+  member in a query on 2025 (that is what NON EMPTY is for).
+- **Time dimensions: to be decided later.** A period without facts (a month without sales, a future month) should
+  probably stay a member: `ParallelPeriod`, `Lag`, `PeriodsToDate` and ranges count positions along a level, and a
+  gap changes their answers. Until then the annotation is refused on a `TimeDimension`; the aDSO's calendar
+  dimensions (standard dimensions over `0CALYEAR`, ...) are not annotated in the clinic demo either.
+- Tested on the clinic demo (`clinic-demo.md`, `scripts/clinic_test.py`), whose patients include 300 registered
+  without a visit; FoodMart (`ZFMSALES`) stays without the annotation, so the reference's answers still apply.
+- Open: the schema generator does not propose the annotation yet (the XML tab can add it); HANA's plan for the
+  semi-join on a large provider (a fact scan per member read, kept for the request by the member cache) not measured.
+
 ## Catalog decision (2026-10-06, may be revisited)
 
 - Mondrian's levels are **data source → catalog → schema → cube**: `/WEB-INF/datasources.xml` lists data sources, each

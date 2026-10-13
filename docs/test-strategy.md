@@ -124,6 +124,21 @@ through the server's `check`; nothing is written. `--shots <folder>` keeps a scr
 cube browser inserting a unique name, a grid of two axes (Product and Store crossjoined on the rows, the slicer shown)
 and the same answer as a table, a flat table of three axes, a statement without axes and an evaluation error.
 
+## Clinic demo: members with facts
+
+The annotation `olap4abap.membersWithFacts` (`mvp-scope.md`, Members with facts decision) is our extension; the
+reference cannot answer with it, so it is tested on the clinic demo (`clinic-demo.md`), not on FoodMart:
+
+    python scripts/clinic_test.py
+
+The oracle is the engine's own NON EMPTY, which reads the members with facts from the fact table, while a level's
+members come from the restricted dimension table: on `ZCLVISIT` and `ZCLVISITA` every level of the annotated dimensions
+(user and attribute hierarchies), `Children` and `Descendants` must list exactly the members of NON EMPTY over all facts
+(the cube's time without All member sliced by both years), in the same order; the members without facts (Coastal,
+Kingsport, the registered patient 2001) must not be found, their neighbours must; `Count`, a range and `Lead` along
+the patients, native `TopCount` and `MDSCHEMA_LEVELS`' `LEVEL_CARDINALITY` must agree; the aDSO's years without facts
+must stay members (time is not restricted). 71 checks, about 30 s.
+
 ## Mondrian's own tests against our schema
 
 The eMondrian container serves only our reference catalog `ZFOODMART` (`scripts/deploy-reference-schema.sh`, installs

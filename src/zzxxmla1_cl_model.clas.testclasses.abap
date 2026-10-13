@@ -24,6 +24,8 @@ CLASS ltc_model DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
     "! a level with an ordinal column (a room by its compound key, keyed by the SID): its order key has the
     "! ordinal's, then the key's; the conditions of Lag/Lead and ranges compare the ordinal first
     METHODS ordinal_column FOR TESTING.
+    "! a dimension that shows only its members with facts is read from the rows whose key is in the fact table
+    METHODS member_table FOR TESTING.
     METHODS hierarchy
       IMPORTING name_column   TYPE string OPTIONAL
       RETURNING VALUE(result) TYPE zzxxmla1_cl_model=>ty_hierarchy.
@@ -160,6 +162,16 @@ CLASS ltc_model IMPLEMENTATION.
     " texts as they are, also texts of digits
     cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_model=>order_key( key = `10` numeric = abap_false ) exp = `10` ).
     cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_model=>order_key( key = `1E3` numeric = abap_true ) exp = `1E3` ).
+  ENDMETHOD.
+
+  METHOD member_table.
+    DATA(rooms) = VALUE zzxxmla1_cl_model=>ty_hierarchy( dim_table = `V_ROOM` key_column = `SID` fk_column = `SID_ROOM`
+                                                        fact_table = `/BIC/FCLINIC` ).
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_model=>member_table( rooms ) exp = `"V_ROOM"` ).
+    rooms-members_with_facts = abap_true.
+    cl_abap_unit_assert=>assert_equals(
+      act = zzxxmla1_cl_model=>member_table( rooms )
+      exp = `( SELECT * FROM "V_ROOM" WHERE "SID" IN ( SELECT "SID_ROOM" FROM "/BIC/FCLINIC" ) ) AS mf` ).
   ENDMETHOD.
 
 ENDCLASS.

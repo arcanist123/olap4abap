@@ -130,7 +130,10 @@ Read before designing anything:
   as a whole hierarchy (a characteristic can have millions; `docs/mvp-scope.md`, Member decision): the schema reader
   reads them by SQL as needed (`SqlMemberSource` in `ZZXXMLA1_CL_MODEL=>read_members`: children of a member, a member
   by name, key or path, a parent, `Lag`/`Lead` and ranges along a level, children counts grouped) and keeps them for
-  the request (`MemberCache`); a level is read whole only where the query asks for all of its members. Cells are read
+  the request (`MemberCache`); a level is read whole only where the query asks for all of its members. A dimension annotated `olap4abap.membersWithFacts` on its
+  `DimensionUsage` (our extension, not on time dimensions yet; `docs/mvp-scope.md`, Members with facts decision) has
+  only the members whose key is in the cube's fact table (`ZZXXMLA1_CL_MODEL=>member_table`, every member read goes
+  through it); tested on the clinic demo with `scripts/clinic_test.py`, FoodMart is not annotated. Cells are read
   as the reference reads them (`FastBatchingCellReader`, `CellRequest`): each phase (slicer, axes, named sets, cells) is
   evaluated with a batching reader that records the cells it misses (0 for the pass), they are read with one query per
   pattern of hierarchies and levels constrained to the keys asked for (`ZZXXMLA1_CL_MDX_FACTS=>load_aggregations`,
@@ -222,7 +225,8 @@ Read before designing anything:
   the schema builder's old copies below `/schema/` and, if there is none, writes a
   `/WEB-INF/datasources.xml` without catalogs; with its checkbox also the clinic demo (`docs/clinic-demo.md`): InfoCube
   `ZCLVISIT` and aDSO `ZCLVISITA` with made-up visits of patients to a clinic, their schemas and catalogs
-  (`ZZXXMLA1_CL_BW_CLINIC_GEN`); its room `ZCLROOM` is compounded with the site `ZCLSITE`. The clinic demo is the
+  (`ZZXXMLA1_CL_BW_CLINIC_GEN`); its room `ZCLROOM` is compounded with the site `ZCLSITE`. 300 of its patients are registered without a visit, and its schemas annotate every
+  dimension but time `olap4abap.membersWithFacts`. The clinic demo is the
   project's own demo data; FoodMart stays the test source.
   For looking into BW's analysis authorizations its physician `ZCLDOC` is authorization relevant and has two
   hierarchies, `ZCLDOC_ORG` and `ZCLDOC_SITE` (two names are needed for authorization tests): version dependent,
