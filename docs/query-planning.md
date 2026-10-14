@@ -308,7 +308,6 @@ plain `GROUP BY`. Not to be revisited before a real provider shows it matters.
 ## Open
 
 - Mixed plans and the batching passes: how much of `phase` remains once the relational inputs are read first.
-- The grid's ABAP (groups to values, placement, writing the answer) is now its cost, not SQL.
-- `fast_cells` formats every value although the query may not ask for `FORMATTED_VALUE`: Excel's grid asks for
-  `VALUE, FORMAT_STRING, LANGUAGE, BACK_COLOR, FORE_COLOR, FONT_FLAGS` only. Format only when the cell properties
-  show the formatted value.
+- The grid's ABAP (groups to values, placement, writing the answer) is now its cost, not SQL. A cell's value is formatted
+  only when the query asks for `FORMATTED_VALUE` (`want_formatted`; Excel's grid asks for `VALUE, FORMAT_STRING,
+  LANGUAGE, BACK_COLOR, FORE_COLOR, FONT_FLAGS`): 17 to 16.7 s, as each amount was formatted once per query already.

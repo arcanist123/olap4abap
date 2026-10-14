@@ -1475,6 +1475,9 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       RAISING   zzxxmla1_cx_xmla.
     "! the query asks for the cell property FORMAT_STRING
     DATA want_format_string TYPE abap_bool.
+    "! the query asks for the cell property FORMATTED_VALUE: else the cells' values are not formatted (our shortcut,
+    "! Excel's grid asks for VALUE only)
+    DATA want_formatted TYPE abap_bool.
     "! DrilldownMember(set1, set2 [, RECURSIVE]) (DrilldownMemberFunDef): each tuple of set1, then for its first member
     "! that is in set2 the tuple with each child of it in that place (and with RECURSIVE their drill-downs). Excel
     "! expands a member so; its INCLUDE_CALC_MEMBERS (the fifth argument) is ignored, as the reference does.
@@ -1810,6 +1813,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       result-cell_properties = VALUE #( ( `VALUE` ) ( `FORMATTED_VALUE` ) ).
     ENDIF.
     want_format_string = xsdbool( line_exists( result-cell_properties[ table_line = `FORMAT_STRING` ] ) ).
+    want_formatted = xsdbool( line_exists( result-cell_properties[ table_line = `FORMATTED_VALUE` ] ) ).
 
     " one cell per combination of the axes' tuples; no axis is one cell, an empty axis none (executeBody); again until
     " no cell is missed, the final cells kept
@@ -3325,7 +3329,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
 
     " each combination of a pattern of each axis: its groups with facts are the cells that are not empty
     DATA(choice) = VALUE ty_t_index( FOR a = 1 WHILE a <= lines( fast_axes ) ( 1 ) ).
-    " each amount of a measure written and formatted once (a grid repeats its values)
+    " each amount of a measure written and formatted once (a grid repeats its values); formatted only if asked for
     TYPES:
       BEGIN OF ty_written,
         measure   TYPE i,
@@ -3479,8 +3483,10 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
             INSERT VALUE #( measure   = measure_index
                             amount    = value-amounts[ measure_index ]
                             value     = zzxxmla1_cl_mdx_format=>xmla_double( number-number )
-                            formatted = zzxxmla1_cl_mdx_format=>format_number(
-                                          value = number-number format_string = stored_measures[ measure_index ]-format ) )
+                            formatted = COND #( WHEN want_formatted = abap_true
+                                                THEN zzxxmla1_cl_mdx_format=>format_number(
+                                                       value = number-number
+                                                       format_string = stored_measures[ measure_index ]-format ) ) )
                    INTO TABLE written ASSIGNING <written>.
           ENDIF.
           ASSIGN cells[ ordinal + 1 ] TO FIELD-SYMBOL(<cell>).
@@ -8316,8 +8322,11 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
                                WHEN value-special IS NOT INITIAL THEN zzxxmla1_cl_mdx_evaluator=>to_text( value )
                                ELSE zzxxmla1_cl_mdx_format=>xmla_double( value-number ) ).
     ENDCASE.
-    " Format.format of the value with the cell's format string
+    " Format.format of the value with the cell's format string, if the query asks for it
     " an evaluation error of the format expression is ignored: no format string
+    IF want_formatted = abap_false.
+      RETURN.
+    ENDIF.
     TRY.
         DATA(format_string) = evaluator->get_format_string( ).
       CATCH zzxxmla1_cx_mdx_evaluation.

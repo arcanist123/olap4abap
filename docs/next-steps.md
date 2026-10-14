@@ -66,8 +66,8 @@ keeps the answers: both test suites give the same answers with planning on and o
    (the two datasources cases), `compare-applicable.py` 394 of 395 (#64; #35 differed once in a parallel run, the same alone, with its
    neighbours and after a restart of eMondrian), SAP 196 to 216 s in total (271 s).
    Left over (`query-planning.md`, Open): the grid's 17 s are ABAP (rows to groups and values about 7 s, placing
-   them 5 s, writing 633,830 cells, 119 MB); `fast_cells` formats every value although Excel's grid does not ask for
-   `FORMATTED_VALUE`; a calculated measure in a NON EMPTY query still filters its axis with the evaluator (step 4).
+   them 5 s, writing 633,830 cells, 119 MB; values are formatted only for `FORMATTED_VALUE` now, 16.7 s); a
+   calculated measure in a NON EMPTY query still filters its axis with the evaluator (step 4).
 4. Mixed queries: the relational inputs of computed nodes read as one batch before the first pass.
 5. More set nodes relational: `Filter` on a stored measure (`RolapNativeFilter`), `NonEmpty` with a second set.
 
