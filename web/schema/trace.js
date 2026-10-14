@@ -1,0 +1,231 @@
+// The trace of the XMLA endpoint (ZZXXMLA1_CL_TRACE): switched on per SAP user for two hours (GET api/trace, POST
+// api/trace/on, trace/off; switching on deletes the calls older than seven days), every call of a user with the trace on is listed with its SOAP request, the MDX statement of an Execute
+// and the SOAP response (GET api/trace/entry, the whole response as sent from api/trace/response).
+// No build step: Preact with htm, vendored as one ES module; this file is what the server serves.
+import { html, render, useState, useEffect, useRef } from './vendor/htm-preact-standalone.mjs';
+
+const client = new URLSearchParams(location.search).get('sap-client');
+const REFRESH_MS = 5000;
+
+const apiUrl = (resource, params = {}) => {
+  const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v));
+  if (client) query.set('sap-client', client);
+  return `api/${resource}?${query}`;
+};
+
+async function api(method, resource, params = {}) {
+  const response = await fetch(apiUrl(resource, params), { method });
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error(`${response.status} ${response.statusText}`);
+  }
+  if (!response.ok) throw new Error(data.error || `${response.status} ${response.statusText}`);
+  return data;
+}
+
+const time = (iso) => iso ? new Date(iso).toLocaleString() : '';
+const size = (n) => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : n >= 1024 ? `${(n / 1024).toFixed(1)} KB` : `${n} B`;
+const what = (c) => c.method === 'EXECUTE' ? 'Execute' : c.method === 'DISCOVER' ? 'Discover' : '(no XMLA)';
+const firstLine = (s) => s.replace(/\s+/g, ' ').trim();
+
+// XML indented for reading; the text as it is if it does not parse (or is too large to do it quickly)
+function prettyXml(text) {
+  if (!text || text.length > 5000000) return text;
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  if (doc.getElementsByTagName('parsererror').length) return text;
+  const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const out = [];
+  const walk = (node, depth) => {
+    const pad = '  '.repeat(depth);
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const attrs = [...node.attributes].map((a) => ` ${a.name}="${esc(a.value).replace(/"/g, '&quot;')}"`).join('');
+      const kids = [...node.childNodes].filter((c) => c.nodeType !== Node.TEXT_NODE || c.nodeValue.trim());
+      if (!kids.length) out.push(`${pad}<${node.nodeName}${attrs}/>`);
+      else if (kids.length === 1 && kids[0].nodeType === Node.TEXT_NODE) {
+        out.push(`${pad}<${node.nodeName}${attrs}>${esc(kids[0].nodeValue)}</${node.nodeName}>`);
+      } else {
+        out.push(`${pad}<${node.nodeName}${attrs}>`);
+        kids.forEach((c) => walk(c, depth + 1));
+        out.push(`${pad}</${node.nodeName}>`);
+      }
+    } else if (node.nodeType === Node.TEXT_NODE) out.push(pad + esc(node.nodeValue.trim()));
+    else if (node.nodeType === Node.CDATA_SECTION_NODE) out.push(`${pad}<![CDATA[${node.nodeValue}]]>`);
+    else if (node.nodeType === Node.COMMENT_NODE) out.push(`${pad}<!--${node.nodeValue}-->`);
+  };
+  [...doc.childNodes].forEach((n) => walk(n, 0));
+  return out.join('\n');
+}
+
+const download = (text, name) => {
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/xml' }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: name });
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+function Users({ state, onSwitch, busy }) {
+  const [user, setUser] = useState('');
+  const name = (user || state.user).trim().toUpperCase();
+  const on = state.users.some((u) => u.user === name);
+  return html`<section class="section">
+    <header><h2>Traced users</h2><span class="spacer"></span>
+      <span class="muted small">a trace switches itself off after ${state.activeHours} hours; calls are kept ${state.retentionDays} days</span></header>
+    <div class="body">
+      <div class="row">
+        <label class="muted" for="user">User</label>
+        <input id="user" type="text" maxlength="12" placeholder=${state.user} value=${user}
+          onInput=${(e) => setUser(e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && onSwitch('on', name)} />
+        <button class="primary" disabled=${busy || !name} onClick=${() => onSwitch('on', name)}
+          title=${`On for ${state.activeHours} hours from now`}>${on ? `Switch on again for ${state.activeHours} hours` : 'Switch trace on'}</button>
+        ${on && html`<span class="status ok">on</span>`}
+      </div>
+      ${state.users.length ? html`<table>
+        <thead><tr><th>User</th><th>Since</th><th>On until</th><th>Switched on by</th><th></th></tr></thead>
+        <tbody>${state.users.map((u) => html`<tr>
+          <td><strong class="mono">${u.user}</strong>${u.user === state.user && html` <span class="muted small">(this page's user)</span>`}</td>
+          <td>${time(u.since)}</td><td>${time(u.until)}</td><td class="mono">${u.by}</td>
+          <td class="actions"><button disabled=${busy} onClick=${() => onSwitch('off', u.user)}>Switch off</button></td>
+        </tr>`)}</tbody>
+      </table>` : html`<div class="muted">The trace is off for every user.</div>`}
+      <div class="notice info small">A call is traced under the SAP user it runs as. This page runs as
+        <span class="mono">${state.user}</span>; while the ICF node <span class="mono">/zzxxmla1</span> logs on anonymously,
+        every XMLA call runs as that user too. The client's address and User-Agent tell the callers apart.</div>
+    </div>
+  </section>`;
+}
+
+function Detail({ id, onClose }) {
+  const [entry, setEntry] = useState(null);
+  const [error, setError] = useState('');
+  const [tab, setTab] = useState('');
+  const [pretty, setPretty] = useState(true);
+  useEffect(() => {
+    setEntry(null);
+    setError('');
+    api('GET', 'trace/entry', { id }).then((e) => {
+      setEntry(e);
+      setTab((t) => (t === 'mdx' && !e.mdx) || !t ? (e.mdx ? 'mdx' : 'request') : t);
+    }, (e) => setError(e.message));
+  }, [id]);
+  if (error) return html`<div class="notice err">${error}</div>`;
+  if (!entry) return html`<section class="section"><div class="body muted">Reading the call…</div></section>`;
+
+  const raw = tab === 'mdx' ? entry.mdx : tab === 'request' ? entry.request : entry.response;
+  const shown = tab === 'mdx' || !pretty ? raw : prettyXml(raw);
+  const copy = () => navigator.clipboard?.writeText(raw);
+  const save = () => tab === 'response' && entry.responseTruncated
+    ? window.open(apiUrl('trace/response', { id }), '_blank')
+    : download(raw, `${entry.id}-${tab}.${tab === 'mdx' ? 'mdx' : 'xml'}`);
+  return html`<section class="section">
+    <header><h2>${what(entry)}${entry.type && html` <span class="mono">${entry.type}</span>`}</h2>
+      <span class="muted small">${time(entry.at)} · ${entry.user} · ${entry.client}${entry.status ? ` · ${entry.runtimeMs} ms` : ''}</span>
+      <span class="spacer"></span><button class="link" onClick=${onClose}>Close</button></header>
+    <div class="tabs" role="tablist">
+      ${entry.mdx && html`<button role="tab" class=${tab === 'mdx' ? 'active' : ''} onClick=${() => setTab('mdx')}>MDX statement</button>`}
+      <button role="tab" class=${tab === 'request' ? 'active' : ''} onClick=${() => setTab('request')}>SOAP request <span class="muted small">${size(entry.requestLength)}</span></button>
+      <button role="tab" class=${tab === 'response' ? 'active' : ''} onClick=${() => setTab('response')}>SOAP response <span class="muted small">${entry.status ? size(entry.responseLength) : 'none'}</span></button>
+    </div>
+    <div class="body">
+      <div class="row">
+        ${tab !== 'mdx' && html`<label class="inline"><input type="checkbox" checked=${pretty} onChange=${(e) => setPretty(e.target.checked)} /> Indent XML</label>`}
+        <span class="spacer"></span>
+        <button onClick=${copy} disabled=${!raw}>Copy</button>
+        <button onClick=${save} disabled=${!raw}>Download</button>
+      </div>
+      ${tab === 'response' && !entry.status && html`<div class="notice warn">No response: the call is still running, or it was aborted (a short dump, ST22).</div>`}
+      ${tab === 'response' && entry.responseTruncated && html`<div class="notice warn">The response has ${size(entry.responseLength)}; the first million characters are shown, Download gives all of it.</div>`}
+      ${tab === 'response' && entry.fault && html`<div class="notice err">The answer is a SOAP fault.</div>`}
+      <textarea class="trace" readonly spellcheck="false" value=${shown} aria-label=${tab}></textarea>
+      ${entry.userAgent && html`<div class="muted small">User-Agent: <span class="mono">${entry.userAgent}</span></div>`}
+    </div>
+  </section>`;
+}
+
+function App() {
+  const [state, setState] = useState(null);       // the answer of GET trace
+  const [filter, setFilter] = useState('');
+  const [selected, setSelected] = useState('');
+  const [auto, setAuto] = useState(false);
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+  const filterRef = useRef(filter);
+  filterRef.current = filter;
+
+  const load = (quiet) => {
+    if (!quiet) setBusy('Reading the trace…');
+    return api('GET', 'trace', { filter: filterRef.current })
+      .then((data) => { setState(data); setError(''); }, (e) => setError(e.message))
+      .finally(() => quiet || setBusy(''));
+  };
+  useEffect(() => { load(); }, [filter]);
+  useEffect(() => {
+    if (!auto) return undefined;
+    const timer = setInterval(() => load(true), REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [auto]);
+
+  const post = (resource, params, message) => {
+    if (message && !confirm(message)) return;
+    setBusy('Saving…');
+    api('POST', resource, { ...params, filter })
+      .then((data) => { setState(data); setError(''); }, (e) => setError(e.message))
+      .finally(() => setBusy(''));
+  };
+  const onSwitch = (how, user) => post(`trace/${how}`, { user });
+  const clear = (user) => {
+    post('trace/clear', { user }, user ? `Delete the traced calls of ${user}?` : 'Delete all traced calls of every user?');
+    setSelected('');
+  };
+
+  const userNames = state ? [...new Set([...state.users.map((u) => u.user), ...state.calls.map((c) => c.user), filter].filter(Boolean))].sort() : [];
+  return html`
+    <div class="topbar"><h1>XMLA Trace</h1><span class="muted">the calls of the XMLA endpoint, per user</span>
+      <span class="spacer"></span><a href=${`./${location.search}`}>Schema Builder</a><a href=${`console.html${location.search}`}>MDX Console</a>
+      <a href=${`time.html${location.search}`}>Time Master Data</a></div>
+    <div class="page"><div class="pane">
+      ${error && html`<div class="notice err">${error}</div>`}
+      ${state && html`<${Users} state=${state} onSwitch=${onSwitch} busy=${!!busy} />`}
+      <section class="section">
+        <header><h2>Calls</h2>
+          <select value=${filter} onChange=${(e) => { setFilter(e.target.value); setSelected(''); }} aria-label="User">
+            <option value="">All users</option>
+            ${userNames.map((u) => html`<option value=${u}>${u}</option>`)}
+          </select>
+          <span class="spacer"></span>
+          ${busy && html`<span class="status busy">${busy}</span>`}
+          <label class="inline"><input type="checkbox" checked=${auto} onChange=${(e) => setAuto(e.target.checked)} /> Refresh every 5 s</label>
+          <button onClick=${() => load()} disabled=${!!busy}>Refresh</button>
+          ${filter && html`<button class="danger" onClick=${() => clear(filter)} disabled=${!!busy || !state?.calls.length}>Delete ${filter}'s calls</button>`}
+          <button class="danger" onClick=${() => clear('')} disabled=${!!busy}>Delete all</button></header>
+        <div class="scroll-x">${!state ? html`<div class="body muted">${busy || 'No data.'}</div>`
+          : !state.calls.length ? html`<div class="body muted">No traced calls${filter ? ` of ${filter}` : ''}.</div>` : html`
+          <table>
+            <thead><tr><th>Time</th><th>User</th><th>Call</th><th>Statement or rowset</th><th>Status</th>
+              <th class="num">ms</th><th class="num">Response</th><th>Client</th></tr></thead>
+            <tbody>${state.calls.map((c) => html`
+              <tr class=${`clickable${c.id === selected ? ' selected' : ''}`} onClick=${() => setSelected(c.id === selected ? '' : c.id)}>
+                <td class="small">${time(c.at)}</td>
+                <td class="mono">${c.user}</td>
+                <td>${what(c)}</td>
+                <td class="mono small statement" title=${c.mdx}>${c.mdx ? firstLine(c.mdx) : c.type}</td>
+                <td>${!c.status ? html`<span class="status warn">no answer</span>`
+                  : c.fault ? html`<span class="status err">fault</span>`
+                  : c.status === 200 ? html`<span class="status ok">ok</span>` : html`<span class="status err">${c.status}</span>`}</td>
+                <td class="num">${c.status ? c.runtimeMs : ''}</td>
+                <td class="num">${c.status ? size(c.responseLength) : ''}</td>
+                <td class="mono small">${c.client}</td>
+              </tr>`)}
+            </tbody>
+          </table>`}
+        </div>
+        ${state && state.calls.length >= 200 && html`<div class="body muted small">The newest 200 calls are shown.</div>`}
+      </section>
+      ${selected && html`<${Detail} id=${selected} onClose=${() => setSelected('')} />`}
+    </div></div>`;
+}
+
+const root = document.getElementById('app');
+root.textContent = '';
+render(html`<${App} />`, root);

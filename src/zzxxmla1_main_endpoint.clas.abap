@@ -72,7 +72,15 @@ CLASS zzxxmla1_main_endpoint IMPLEMENTATION.
       WHEN 'POST'.
         " the handler works on strings only; this method just moves them between HTTP and the handler
         DATA(url) = get_endpoint_url( server ).
-        DATA(result) = NEW zzxxmla1_cl_xmla_handler( )->handle( request = server->request->get_cdata( ) url = url ).
+        DATA(body) = server->request->get_cdata( ).
+        " the call is traced if the trace is on for the user (ZZXXMLA1_CL_TRACE; switched on the trace page)
+        DATA(trace) = zzxxmla1_cl_trace=>start( request        = body
+                                                client_address = server->request->get_header_field( '~remote_addr' )
+                                                user_agent     = server->request->get_header_field( 'user-agent' ) ).
+        DATA(result) = NEW zzxxmla1_cl_xmla_handler( )->handle( request = body url = url ).
+        IF trace IS BOUND.
+          trace->finish( status = result-status response = result-body ).
+        ENDIF.
         server->response->set_status( code = result-status reason = COND #( WHEN result-status = 200 THEN 'OK' ELSE 'Internal Server Error' ) ).
         server->response->set_content_type( 'text/xml; charset=utf-8' ).
         server->response->set_cdata( result-body ).
@@ -169,6 +177,8 @@ CLASS zzxxmla1_main_endpoint IMPLEMENTATION.
       `<span>Browse a catalog's cubes and run MDX queries against this endpoint.</span></a></li>` &&
       |<li><a href="{ apps }time.html{ args }"><b>Time Master Data</b>| &&
       `<span>Fill the SID and attribute tables of BW's calendar characteristics.</span></a></li>` &&
+      |<li><a href="{ apps }trace.html{ args }"><b>Trace</b>| &&
+      `<span>Switch the trace of XMLA calls on per user; see each call's SOAP request and response and its MDX.</span></a></li>` &&
       `</ul>` &&
       `<h2>XMLA clients</h2>` &&
       `<p>Excel and other XMLA clients connect to this URL; requests are SOAP envelopes sent with POST:</p>` &&

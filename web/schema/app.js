@@ -445,7 +445,7 @@ function Start({ onOpen, opening, error }) {
 
   return html`
     <div class="topbar"><h1>Schema Builder</h1><span class="muted">Mondrian schemas for BW InfoProviders</span>
-      <span class="spacer"></span><a href=${`console.html${location.search}`}>MDX Console</a><a href=${`time.html${location.search}`}>Time Master Data</a></div>
+      <span class="spacer"></span><a href=${`console.html${location.search}`}>MDX Console</a><a href=${`time.html${location.search}`}>Time Master Data</a><a href=${`trace.html${location.search}`}>Trace</a></div>
     <div class="page">
     ${(error || loadError) && html`<div style="padding: 16px 16px 0"><div class="notice err">${error || loadError}</div></div>`}
     ${opening && html`<div style="padding: 16px 16px 0"><div class="notice info">${opening}</div></div>`}

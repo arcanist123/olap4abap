@@ -298,6 +298,8 @@ Removing `ZFOODMART` breaks the reference tests until `python scripts/sap-files.
 - `POST probe[?catalog=X]`: the probe of every catalog's cubes (or one catalog's), nothing written;
 - `POST accept`: the edited schema; checks, generates the views, saves the file, registers the catalog;
 - `POST remove`: removes a catalog and its schema file.
+- `GET trace`, `GET trace/entry?id=X`, `GET trace/response?id=X`, `POST trace/on|off|clear?user=U`: the trace of the
+  XMLA endpoint (`ZZXXMLA1_CL_TRACE`, the trace page `trace.html`).
 
 The UI edits the schema XML in the browser (DOMParser/XMLSerializer) and shows the outline; the server never parses
 JSON.

@@ -70,6 +70,13 @@
 "! - POST time/fill?from=...&to=...&characteristics=0CALMONTH,0CALYEAR: makes the SIDs of the interval's values and
 "!   writes the attribute rows (without characteristics all of them), committed per characteristic. Answers what was
 "!   done and the state afterwards.
+"! - GET trace[?filter=U]: the trace of the XMLA endpoint (ZZXXMLA1_CL_TRACE): the current user, the users with the
+"!   trace on and the traced calls (of user U), newest first, without request and response;
+"! - GET trace/entry?id=X: a traced call with its SOAP request, its MDX and its SOAP response (unzipped, the first
+"!   million characters; responseTruncated if there are more); GET trace/response?id=X: all of the response, text/xml;
+"! - POST trace/on?user=U (for ZZXXMLA1_CL_TRACE=>C_ACTIVE_HOURS from now, deleting the calls older than its
+"!   C_RETENTION_DAYS), trace/off?user=U (without user the current one), trace/clear[?user=U] (without user everyone's
+"!   calls): committed, answered as GET trace.
 "! It runs as the XMLA endpoint does (the anonymous logon of the node), accept included, for now.
 CLASS zzxxmla1_cl_schema_api DEFINITION
   PUBLIC
@@ -112,6 +119,8 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
   PROTECTED SECTION.
   PRIVATE SECTION.
     CONSTANTS c_json TYPE string VALUE `application/json; charset=utf-8`.
+    "! how much of a traced response GET trace/entry gives (characters); GET trace/response gives all of it
+    CONSTANTS c_trace_shown TYPE i VALUE 1000000.
     TYPES:
       "! a request of check or accept that passed the checks
       BEGIN OF ty_checked,
@@ -214,6 +223,45 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
       IMPORTING request       TYPE ty_request
       RETURNING VALUE(result) TYPE string
       RAISING   zzxxmla1_cx_api_refused.
+    "! GET trace[?filter=U]: the current user, the users with the trace on and the traced calls (of U), newest first.
+    METHODS trace_status
+      IMPORTING request       TYPE ty_request
+      RETURNING VALUE(result) TYPE string
+      RAISING   zzxxmla1_cx_api_refused.
+    "! GET trace/entry?id=X: a traced call with its SOAP request and its SOAP response, unzipped (the first
+    "! c_trace_shown characters of it); refused (404) if there is none.
+    METHODS trace_entry
+      IMPORTING request       TYPE ty_request
+      RETURNING VALUE(result) TYPE string
+      RAISING   zzxxmla1_cx_api_refused.
+    "! GET trace/response?id=X: the SOAP response of a traced call as it was sent (text/xml).
+    METHODS trace_response
+      IMPORTING request       TYPE ty_request
+      RETURNING VALUE(result) TYPE string
+      RAISING   zzxxmla1_cx_api_refused.
+    "! POST trace/on?user=U, trace/off?user=U (without user the current one) and trace/clear[?user=U] (without user
+    "! everyone's calls); committed, answered as GET trace.
+    METHODS switch_trace
+      IMPORTING request       TYPE ty_request
+                resource      TYPE string
+      RETURNING VALUE(result) TYPE string
+      RAISING   zzxxmla1_cx_api_refused.
+    "! A user name parameter in upper case; the fallback if it is not given, refused (400) if it is no user name.
+    METHODS user_parameter
+      IMPORTING request       TYPE ty_request
+                !name         TYPE string
+                fallback      TYPE syuname OPTIONAL
+      RETURNING VALUE(result) TYPE syuname
+      RAISING   zzxxmla1_cx_api_refused.
+    "! The traced call of the parameter id; refused (400 without id, 404 if there is none).
+    METHODS traced_call
+      IMPORTING request       TYPE ty_request
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_trace=>ty_detail
+      RAISING   zzxxmla1_cx_api_refused.
+    "! A traced call as JSON members (without braces).
+    METHODS trace_entry_json
+      IMPORTING entry         TYPE zzxxmla1_cl_trace=>ty_entry
+      RETURNING VALUE(result) TYPE string.
     "! The interval of the parameters from and to (YYYY-MM-DD or YYYYMMDD), each BW's if it is not given; refused if
     "! a date is none, from is after to, or the interval is longer than 100 years.
     METHODS time_interval
@@ -383,8 +431,10 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     DATA(resource) = COND string( WHEN is_api( request-path )
                                   THEN substring( val = request-path off = strlen( c_path ) ) ).
     DATA(allow) = SWITCH string( resource WHEN `providers` OR `proposal` OR `values` OR `schemas` OR `schema` OR `time`
+                                            OR `trace` OR `trace/entry` OR `trace/response`
                                           THEN `GET`
                                           WHEN `check` OR `accept` OR `remove` OR `fix` OR `probe` OR `time/fill`
+                                            OR `trace/on` OR `trace/off` OR `trace/clear`
                                           THEN `POST` ).
     IF allow IS INITIAL.
       result = error_result( status = 404 message = |No resource { request-path }| ).
@@ -407,9 +457,14 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
                                          WHEN `probe`     THEN probe( request )
                                          WHEN `time`      THEN time_status( request )
                                          WHEN `time/fill` THEN fill_time( request )
+                                         WHEN `trace`     THEN trace_status( request )
+                                         WHEN `trace/entry` THEN trace_entry( request )
+                                         WHEN `trace/response` THEN trace_response( request )
+                                         WHEN `trace/on` OR `trace/off` OR `trace/clear`
+                                                          THEN switch_trace( request = request resource = resource )
                                          ELSE                  remove( request ) ).
         result-status = 200.
-        result-content_type = c_json.
+        result-content_type = COND #( WHEN resource = `trace/response` THEN `text/xml; charset=utf-8` ELSE c_json ).
       CATCH zzxxmla1_cx_api_refused INTO DATA(refused).
         result = error_result( status = refused->status message = refused->message ).
       CATCH cx_root INTO DATA(error) ##CATCH_ALL.
@@ -859,6 +914,88 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
              |"error":{ COND string( WHEN entry-error IS INITIAL THEN `null` ELSE json( entry-error ) ) }\}| TO filled.
     ENDLOOP.
     result = |\{"filled":{ json_array( filled ) },{ time_status_json( time_md = time_md interval = interval ) }\}|.
+  ENDMETHOD.
+
+  METHOD trace_status.
+    DATA(filter) = user_parameter( request = request name = `filter` ).
+    DATA users TYPE string_table.
+    LOOP AT zzxxmla1_cl_trace=>users( ) INTO DATA(user).
+      APPEND |\{"user":{ json( |{ user-user_name }| ) },"since":{ json_timestamp( user-changed_at ) },| &&
+             |"by":{ json( |{ user-changed_by }| ) },"until":{ json_timestamp( user-active_until ) }\}| TO users.
+    ENDLOOP.
+    DATA calls TYPE string_table.
+    LOOP AT zzxxmla1_cl_trace=>list( user_name = filter ) INTO DATA(entry).
+      APPEND |\{{ trace_entry_json( entry ) }\}| TO calls.
+    ENDLOOP.
+    result = |\{"user":{ json( |{ sy-uname }| ) },"retentionDays":{ zzxxmla1_cl_trace=>c_retention_days },| &&
+             |"activeHours":{ zzxxmla1_cl_trace=>c_active_hours },| &&
+             |"users":{ json_array( users ) },"calls":{ json_array( calls ) }\}|.
+  ENDMETHOD.
+
+  METHOD trace_entry.
+    DATA(call) = traced_call( request ).
+    DATA(truncated) = xsdbool( strlen( call-response ) > c_trace_shown ).
+    DATA(shown) = COND string( WHEN truncated = abap_true THEN substring( val = call-response len = c_trace_shown )
+                               ELSE call-response ).
+    result = |\{{ trace_entry_json( call-entry ) },"request":{ json( call-request ) },| &&
+             |"response":{ json( shown ) },"responseTruncated":{ json_bool( truncated ) }\}|.
+  ENDMETHOD.
+
+  METHOD trace_response.
+    result = traced_call( request )-response.
+  ENDMETHOD.
+
+  METHOD switch_trace.
+    CASE resource.
+      WHEN `trace/on`.
+        zzxxmla1_cl_trace=>activate( user_parameter( request = request name = `user` fallback = sy-uname ) ).
+      WHEN `trace/off`.
+        zzxxmla1_cl_trace=>deactivate( user_parameter( request = request name = `user` fallback = sy-uname ) ).
+      WHEN OTHERS.
+        zzxxmla1_cl_trace=>clear( user_name = user_parameter( request = request name = `user` ) ).
+    ENDCASE.
+    COMMIT WORK.
+    result = trace_status( request ).
+  ENDMETHOD.
+
+  METHOD user_parameter.
+    DATA(text) = to_upper( condense( parameter( request = request name = name ) ) ).
+    IF text IS INITIAL.
+      result = fallback.
+      RETURN.
+    ENDIF.
+    IF strlen( text ) > 12 OR text CA ` *`.
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused
+        EXPORTING status  = 400
+                  message = |{ name } is not a user name: { text }|.
+    ENDIF.
+    result = text.
+  ENDMETHOD.
+
+  METHOD traced_call.
+    DATA(id) = to_upper( condense( parameter( request = request name = `id` ) ) ).
+    IF id IS INITIAL.
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused
+        EXPORTING status  = 400
+                  message = `id is missing`.
+    ENDIF.
+    IF strlen( id ) <= 32.
+      result = zzxxmla1_cl_trace=>read( CONV #( id ) ).
+    ENDIF.
+    IF result-entry-trace_id IS INITIAL.
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused
+        EXPORTING status  = 404
+                  message = |No traced call { id }|.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD trace_entry_json.
+    result = |"id":{ json( |{ entry-trace_id }| ) },"user":{ json( |{ entry-user_name }| ) },| &&
+             |"at":{ json_timestamp( entry-created_at ) },"method":{ json( entry-xmla_method ) },| &&
+             |"type":{ json( entry-request_type ) },"mdx":{ json( entry-mdx ) },"status":{ entry-status },| &&
+             |"fault":{ json_bool( entry-fault ) },"runtimeMs":{ entry-runtime_ms },| &&
+             |"client":{ json( entry-client_address ) },"userAgent":{ json( entry-user_agent ) },| &&
+             |"requestLength":{ entry-request_length },"responseLength":{ entry-response_length }|.
   ENDMETHOD.
 
   METHOD time_interval.

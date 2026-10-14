@@ -66,7 +66,7 @@ function App() {
   const changed = state && (from !== state.from || to !== state.to);
   return html`
     <div class="topbar"><h1>Time Master Data</h1><span class="muted">SIDs and attributes of BW's time characteristics</span>
-      <span class="spacer"></span><a href=${`./${location.search}`}>Schema Builder</a><a href=${`console.html${location.search}`}>MDX Console</a></div>
+      <span class="spacer"></span><a href=${`./${location.search}`}>Schema Builder</a><a href=${`console.html${location.search}`}>MDX Console</a><a href=${`trace.html${location.search}`}>Trace</a></div>
     <div class="page"><div class="pane">
       ${error && html`<div class="notice err">${error}</div>`}
       <section class="section">

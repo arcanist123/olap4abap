@@ -47,6 +47,8 @@ CLASS ltc_api DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
     METHODS catalog_removed_inline FOR TESTING RAISING cx_static_check.
     METHODS remove_unknown_catalog FOR TESTING.
     METHODS remove_errors FOR TESTING.
+    METHODS trace_methods FOR TESTING.
+    METHODS trace_parameters FOR TESTING RAISING cx_static_check.
 ENDCLASS.
 
 CLASS zzxxmla1_cl_schema_api DEFINITION LOCAL FRIENDS ltc_api.
@@ -343,6 +345,44 @@ CLASS ltc_api IMPLEMENTATION.
                                    parameters = VALUE #( ( name = `catalog` value = `NO_SUCH_CATALOG` ) ) ) ).
     cl_abap_unit_assert=>assert_equals( act = result-status exp = 404 ).
     cl_abap_unit_assert=>assert_equals( act = result-body exp = `{"error":"No catalog 'NO_SUCH_CATALOG'"}` ).
+  ENDMETHOD.
+
+  METHOD trace_methods.
+    " switching changes the trace, reading does not: nothing is written by these
+    DATA(result) = api->handle( VALUE #( method = `GET` path = `/schema/api/trace/on` ) ).
+    cl_abap_unit_assert=>assert_equals( act = result-status exp = 405 ).
+    cl_abap_unit_assert=>assert_equals( act = result-allow exp = `POST` ).
+    result = api->handle( VALUE #( method = `POST` path = `/schema/api/trace/entry` ) ).
+    cl_abap_unit_assert=>assert_equals( act = result-status exp = 405 ).
+    cl_abap_unit_assert=>assert_equals( act = result-allow exp = `GET` ).
+    result = api->handle( VALUE #( method = `GET` path = `/schema/api/trace/entry` ) ).
+    cl_abap_unit_assert=>assert_equals( act = result-status exp = 400 ).
+    result = api->handle( VALUE #( method = `GET` path = `/schema/api/trace/response`
+                                   parameters = VALUE #( ( name = `id` value = repeat( val = `F` occ = 33 ) ) ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = result-status exp = 404 ).
+    cl_abap_unit_assert=>assert_equals( act = result-content_type exp = `application/json; charset=utf-8` ).
+  ENDMETHOD.
+
+  METHOD trace_parameters.
+    DATA(request) = VALUE zzxxmla1_cl_schema_api=>ty_request( parameters = VALUE #( ( name = `user` value = ` developer ` )
+                                                                                    ( name = `long` value = `ABCDEFGHIJKLM` )
+                                                                                    ( name = `pattern` value = `DEV*` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = api->user_parameter( request = request name = `user` ) exp = `DEVELOPER` ).
+    cl_abap_unit_assert=>assert_equals( act = api->user_parameter( request = request name = `none` fallback = `X` )
+                                        exp = `X` ).
+    cl_abap_unit_assert=>assert_initial( api->user_parameter( request = request name = `none` ) ).
+    TRY.
+        api->user_parameter( request = request name = `long` ).
+        cl_abap_unit_assert=>fail( `a name longer than 12 characters` ).
+      CATCH zzxxmla1_cx_api_refused INTO DATA(refused).
+        cl_abap_unit_assert=>assert_equals( act = refused->status exp = 400 ).
+    ENDTRY.
+    TRY.
+        api->user_parameter( request = request name = `pattern` ).
+        cl_abap_unit_assert=>fail( `a pattern` ).
+      CATCH zzxxmla1_cx_api_refused INTO refused.
+        cl_abap_unit_assert=>assert_equals( act = refused->status exp = 400 ).
+    ENDTRY.
   ENDMETHOD.
 
 ENDCLASS.

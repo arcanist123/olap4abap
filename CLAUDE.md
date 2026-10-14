@@ -59,7 +59,7 @@ Read before designing anything:
 - `ZZXXMLA1_CL_HTTP_HELLOWORLD` - hello world HTTP handler with a passing unit test (a leftover `ZCL_HTTP_HELLOWORLD`
   still exists in `$TMP` and can be deleted).
 - `ZZXXMLA1_MAIN_ENDPOINT` - `IF_HTTP_EXTENSION` handler behind ICF service `/zzxxmla1`: `/schema/api/...` goes to
-  `ZZXXMLA1_CL_SCHEMA_API`, the rest of `/schema/...` to `ZZXXMLA1_CL_WEB_APP` (the schema builder's files, from the code); otherwise GET returns the start page (links to the schema builder, MDX console and time master data, and the XMLA URL
+  `ZZXXMLA1_CL_SCHEMA_API`, the rest of `/schema/...` to `ZZXXMLA1_CL_WEB_APP` (the schema builder's files, from the code); otherwise GET returns the start page (links to the schema builder, MDX console, time master data and trace, and the XMLA URL
   with `sap-client` for clients), POST hands the SOAP body to `ZZXXMLA1_CL_XMLA_HANDLER` (string in, string out; so far only
   DISCOVER_DATASOURCES, anything else is a SOAP fault), other methods 405.
 - XMLA tests: `python scripts/xmla_test.py` replays `reference/<case>/` against SAP (see `docs/test-strategy.md`);
@@ -139,6 +139,14 @@ Read before designing anything:
   each year) for BW's interval of RSRHIERARCHYVIRT (`RSADMINS`) or a given one
   (`ZZXXMLA1_CL_TIME_MD`). BW fills neither: its Recreate button only fills characteristics that have navigation
   attributes. Filling adds members to every time view; see `docs/time-master-data.md`.
+- Trace: `/zzxxmla1/schema/trace.html` (`web/schema/trace.js`) switches the trace of XMLA calls on and off per SAP
+  user (table `ZZXXMLA1_TRCUSR`) and lists the traced calls (table `ZZXXMLA1_TRACE`, `ZZXXMLA1_CL_TRACE`): per call
+  the SOAP request, Discover with its rowset or Execute with its MDX statement, status, fault, runtime, client address
+  and User-Agent, and the SOAP response gzipped (`cl_abap_gzip`). `ZZXXMLA1_MAIN_ENDPOINT` writes and commits the row
+  before the handler runs (a call that dumps is traced without response) and adds the answer after it. A trace is
+  on for 2 hours after it is switched on (`c_active_hours`); switching one on deletes the calls older than 7 days
+  (`c_retention_days`) and the expired users' rows. "Delete all" on the page deletes every traced call. The user is sy-uname: while the node logs on anonymously every caller is its service user. API: `GET trace`,
+  `trace/entry`, `trace/response`, `POST trace/on`, `trace/off`, `trace/clear` (`scripts/trace_test.py`).
 - Execute: the MDX parser is a port of Mondrian's JavaCC grammar `MdxParser.jj` (`ZZXXMLA1_CL_MDX_TOKEN_MANAGER`,
   `ZZXXMLA1_CL_MDX_PARSER`, tree `ZZXXMLA1_CL_MDX_NODE`). It parses the whole grammar, with Mondrian's error texts, and its
   unit tests carry Mondrian's `ParserTest`. Keep it in step with `MdxParser.jj`: change the grammar there first, then port.
@@ -255,8 +263,8 @@ Read before designing anything:
   reference database holds copies of the BW tables and the same views (`docs/environment.md`, the reference database
   holds the BW tables).
 - Setup: program `ZZXXMLA1_SETUP` (`ZZXXMLA1_CL_SETUP`) makes a system ready after the package is imported (the table
-  `ZZXXMLA1_FILE` comes with it, `src/zzxxmla1_file.tabl.xml`, and so does `ZZXXMLA1_VIEW`, which sapcli neither
-  exports nor imports): it deletes
+  `ZZXXMLA1_FILE` comes with it, `src/zzxxmla1_file.tabl.xml`, and so do `ZZXXMLA1_VIEW`, `ZZXXMLA1_TRACE` and
+  `ZZXXMLA1_TRCUSR`, which sapcli neither exports nor imports): it deletes
   the schema builder's old copies below `/schema/` and, if there is none, writes a
   `/WEB-INF/datasources.xml` without catalogs; with its checkbox also the clinic demo (`docs/clinic-demo.md`): InfoCube
   `ZCLVISIT` and aDSO `ZCLVISITA` with made-up visits of patients to a clinic, their schemas and catalogs
