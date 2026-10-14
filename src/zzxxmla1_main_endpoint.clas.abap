@@ -73,13 +73,17 @@ CLASS zzxxmla1_main_endpoint IMPLEMENTATION.
         " the handler works on strings only; this method just moves them between HTTP and the handler
         DATA(url) = get_endpoint_url( server ).
         DATA(body) = server->request->get_cdata( ).
-        " the call is traced if the trace is on for the user (ZZXXMLA1_CL_TRACE; switched on the trace page)
-        DATA(trace) = zzxxmla1_cl_trace=>start( request        = body
-                                                client_address = server->request->get_header_field( '~remote_addr' )
-                                                user_agent     = server->request->get_header_field( 'user-agent' ) ).
+        " the call is traced if the trace is on for the user (ZZXXMLA1_CL_TRACE; switched on the trace page) or the
+        " request asks for it (the MDX console, header X-olap4abap-Trace: true); the answer names the traced call
+        DATA(trace) = zzxxmla1_cl_trace=>start(
+            request        = body
+            client_address = server->request->get_header_field( '~remote_addr' )
+            user_agent     = server->request->get_header_field( 'user-agent' )
+            forced         = xsdbool( to_lower( server->request->get_header_field( 'x-olap4abap-trace' ) ) = `true` ) ).
         DATA(result) = NEW zzxxmla1_cl_xmla_handler( )->handle( request = body url = url ).
         IF trace IS BOUND.
           trace->finish( status = result-status response = result-body ).
+          server->response->set_header_field( name = 'X-olap4abap-Trace-Id' value = |{ trace->trace_id }| ).
         ENDIF.
         server->response->set_status( code = result-status reason = COND #( WHEN result-status = 200 THEN 'OK' ELSE 'Internal Server Error' ) ).
         server->response->set_content_type( 'text/xml; charset=utf-8' ).

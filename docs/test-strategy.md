@@ -139,7 +139,10 @@ through the server's `check`; nothing is written. `--shots <folder>` keeps a scr
 
 `python scripts/console_ui_test.py` drives `/zzxxmla1/schema/console.html` the same way, on catalog `ZFOODMART`: the
 cube browser inserting a unique name, a grid of two axes (Product and Store crossjoined on the rows, the slicer shown)
-and the same answer as a table, a flat table of three axes, a statement without axes and an evaluation error.
+and the same answer as a table, its SOAP response and request, the SQL statements its trace recorded, its query plan (a statement's element shown
+in the tree with its statements, a phase's statements) (and none
+with Trace SQL off), a flat table of three axes, a statement without axes and an evaluation error. Its runs are
+traced calls of the logged-on user (`scripts/trace_test.py` checks the header `X-olap4abap-Trace` they are sent with).
 
 ## Clinic demo: members with facts
 

@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Drives the MDX console (/zzxxmla1/schema/console.html, web/schema/console.js) in a headless browser against SAP:
-the cube browser, a grid of two axes, Format, a flat table of three, a statement without axes and an error. Reads
-only.
+the cube browser, a grid of two axes with its SOAP response, SQL statements (Trace SQL) and SOAP request, Format, a
+flat table of three, a statement without axes and an error. Reads only (but for the console's traced calls).
 
     pip install playwright && playwright install chromium-headless-shell
     python scripts/console_ui_test.py
     python scripts/console_ui_test.py --shots out/       # with a screenshot per step
 """
 import argparse
+import json
 import pathlib
 import sys
 
@@ -37,7 +38,7 @@ def main():
     def run(page, mdx):
         page.fill("textarea.mdx", mdx)
         page.click("button:has-text('Run')")
-        page.wait_for_selector(".result, .result-msg .notice", timeout=RUN)
+        page.wait_for_selector(".result", timeout=RUN)
 
     def table(page):
         return page.eval_on_selector_all("table.grid tr", "rows => rows.map(r => [...r.children].map(c => c.textContent.trim()))")
@@ -76,6 +77,54 @@ def main():
         check("two axes as a table", ["Drink", "USA", "Store Sales", "48,836.21"] in rows, rows)
         page.click(".segmented button:has-text('Grid')")
 
+        # the exchange: the SOAP response and request as sent, the SQL statements from the call's trace
+        page.click(".result-tabs button:has-text('SOAP response')")
+        response = page.input_value(".result textarea.trace")
+        check("SOAP response tab", "ExecuteResponse" in response and "<Axis name=\"Axis0\">" in response, response[:300])
+        page.click(".result-tabs button:has-text('SOAP request')")
+        request = page.input_value(".result textarea.trace")
+        check("SOAP request tab", "<Statement>" in request and "Product Family" in request, request[:300])
+        page.click(".result-tabs button:has-text('SQL statements')")
+        page.wait_for_selector("table.sql-list, .result .notice.err", timeout=RUN)
+        statements = page.eval_on_selector_all("table.sql-list pre.sql", "e => e.map(x => x.textContent)")
+        check("SQL statements tab", statements and all("SELECT" in x.upper() for x in statements), statements[:2])
+        summary = page.inner_text(".result-bar")
+        check("SQL summary: statements and server time", "on the server" in summary, summary)
+        shot(page, "2-sql")
+
+        # the query plan: the resolved tree with marks; a statement's element is shown in it with its statements
+        page.click(".sql-list button.mono >> nth=0")
+        page.wait_for_selector(".plan .plan-node.selected", timeout=RUN)
+        tree = page.inner_text(".plan-tree")
+        check("query plan: parts, elements and marks", "ROWS (AXIS1)" in tree.upper() and "crossjoin" in tree.lower()
+              and "[Measures].[Unit Sales]" in tree and "static" in tree, tree[:500])
+        selected = page.inner_text(".plan .plan-node.selected")
+        listed = page.eval_on_selector_all(".plan-sql table.sql-list tbody tr", "rows => rows.length")
+        check("a statement's element selected in the plan, its statements listed", "SQL" in selected and listed > 0,
+              f"{selected!r}, {listed} rows")
+        page.click(".plan-node:has-text('Cells'), .plan-node:has-text('Axes') >> nth=0")
+        phase = page.inner_text(".plan-sql .result-bar")
+        check("a phase lists its statements", "Phase" in phase, phase)
+        shot(page, "2-plan")
+        with page.expect_download() as download:
+            page.click("[aria-label='Download the query plan'] button:has-text('Text')")
+        text = pathlib.Path(download.value.path()).read_text(encoding="utf-8")
+        check("query plan as text: statement, plan, tree and statements", "Query plan of ZFMSALES" in text
+              and "crossjoin" in text and "Plan: query" in text and "#1 " in text and "\n-- 1: " in text, text[:400])
+        with page.expect_download() as download:
+            page.click("[aria-label='Download the query plan'] button:has-text('JSON')")
+        data = json.loads(pathlib.Path(download.value.path()).read_text(encoding="utf-8"))
+        check("query plan as JSON", "crossjoin" in data["mdx"] and data["explain"]["parts"] and data["sql"]
+              and "node" in data["sql"][0], str(data)[:300])
+        page.click(".result-tabs button:has-text('Result')")
+        page.uncheck("label:has-text('Trace SQL') input")
+        run(page, "select from [ZFMSALES]")
+        page.click(".result-tabs button:has-text('SQL statements')")
+        message = page.inner_text(".result .result-msg")
+        check("Trace SQL off: no statements", "Trace is off" in message, message)
+        page.check("label:has-text('Trace SQL') input")
+        page.click(".result-tabs button:has-text('Result')")
+
         # Format lays the statement out, Ctrl+Z takes it back; three axes: a flat table, the highest axis first
         three = ("select {[Measures].[Unit Sales]} on 0, {[Product].[Product Family].Members} on 1,"
                  " {[Store].[Store Country].Members} on 2 from [ZFMSALES]")
@@ -89,7 +138,7 @@ def main():
         page.keyboard.press("Shift+Alt+f")
         check("format by key", page.input_value("textarea.mdx") == formatted, page.input_value("textarea.mdx"))
         page.click("button:has-text('Run')")
-        page.wait_for_selector(".result, .result-msg .notice", timeout=RUN)
+        page.wait_for_selector(".result", timeout=RUN)
         rows = table(page)
         check("flat header", rows[0] == ["Store", "Product", "Measures", "Value"], rows[:1])
         check("flat rows", len(rows) == 13 and ["USA", "Food", "Unit Sales", "191,940"] in rows, rows)
@@ -100,9 +149,24 @@ def main():
         check("no axes: one cell", table(page) == [["266,773"]], table(page))
 
         run(page, "select {[Measures].[Nope]} on 0 from [ZFMSALES]")
-        message = page.inner_text(".result-msg .notice.err")
+        message = page.inner_text(".result .notice.err")
         check("error shown", "[Measures].[Nope]" in message, message)
         shot(page, "4-error")
+
+        # the trace page shows a traced call as the console does: the console's last Execute with its query plan
+        run(page, "select {[Measures].[Unit Sales]} on 0, {[Product].[Product Family].Members} on 1 from [ZFMSALES]")
+        page.goto(args.url.replace("console.html", "trace.html") + f"?sap-client={args.client}")
+        page.wait_for_selector("tr.clickable", timeout=60000)
+        page.click("tr.clickable:has-text('Execute') >> nth=0")
+        page.wait_for_selector(".detail .plan-tree", timeout=60000)
+        tree = page.inner_text(".detail .plan-tree")
+        check("trace page: the Execute's query plan", "[Product].[Product Family]" in tree and "Members" in tree, tree[:300])
+        page.click(".detail .tabs button:has-text('SQL statements')")
+        page.click(".detail .sql-list button.mono >> nth=0")
+        page.wait_for_selector(".detail .plan .plan-node.selected", timeout=60000)
+        check("trace page: a statement's element shown in the plan", "Members" in page.inner_text(".detail .plan-node.selected"),
+              page.inner_text(".detail .plan-node.selected"))
+        shot(page, "5-trace")
         browser.close()
 
     check("no script errors", not errors, errors)

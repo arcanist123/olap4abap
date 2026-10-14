@@ -131,7 +131,16 @@ Read before designing anything:
   sends Execute and Discover requests to the endpoint itself. A catalog's cubes, measures, hierarchies and levels are
   listed from the schema rowsets (a click inserts the unique name); an answer of up to two axes is a grid (Axis0 the
   columns, Axis1 the rows, spanning headers), one of more axes a flat table (a column per hierarchy, highest axis first,
-  a row per cell) (`scripts/console_ui_test.py`). Format (Shift+Alt+F, `web/schema/mdx-format.js`) lays out the
+  a row per cell) (`scripts/console_ui_test.py`). Tabs next to the result show the SOAP response and request and,
+  with "Trace SQL" on, the query plan and the SQL statements the Execute ran (rows, time, error, phase and element;
+  as they ran or slowest first): the console sends the header `X-olap4abap-Trace: true`, the endpoint traces the call
+  whatever the user's trace and answers `X-olap4abap-Trace-Id`, and the console reads
+  `GET trace/entry?id=...&response=false`. The query plan is the resolved tree (formulas, subselects, slicer, axes)
+  with each element's type, its planner mark and the statements it and its arguments read, and the engine's phases
+  (Resolve, Slicer, AxisN, Axes, NON EMPTY, Cells, Finish) with theirs, downloadable as text or JSON: while statements are logged the engine
+  explains the query (`ZZXXMLA1_CL_MDX_EXPLAIN`, JSON kept with the trace's statements) and sets
+  `ZZXXMLA1_CL_SQL=>log_phase` and `log_node` (the node `evaluate_set`, `evaluate_member`, ... evaluate: wrappers of
+  the `*_node` methods), which every logged statement keeps. A batch of missed cells belongs to its phase, no node. Format (Shift+Alt+F, `web/schema/mdx-format.js`) lays out the
   statement or the selection: a line per clause and axis, bracket groups broken where they exceed 100 characters,
   keywords upper case, quoted formulas too; only white space and keyword case change.
 - Time master data: `/zzxxmla1/schema/time.html` (`web/schema/time.js`) and `GET time`, `POST time/fill` of the schema
@@ -146,8 +155,11 @@ Read before designing anything:
   the SOAP request, Discover with its rowset or Execute with its MDX statement, status, fault, runtime, the SQL
   statements it ran and their time (`ZZXXMLA1_CL_SQL`'s statistics), client address and User-Agent, the SOAP
   response gzipped (`cl_abap_gzip`) and the statements themselves with their rows, time and error (`statement_log`,
-  gzipped XML, the first 10,000; the call's tab "SQL statements"). `ZZXXMLA1_MAIN_ENDPOINT` writes and commits the row
-  before the handler runs (a call that dumps is traced without response) and adds the answer after it. A trace is
+  gzipped XML, the first 10,000, each with its phase and element) and an Execute's query plan
+  (`ZZXXMLA1_CL_MDX_EXPLAIN`, in the same XML); the call's tabs "Query plan" and "SQL statements" are the MDX
+  console's views (`web/schema/query-plan.js`), whether the user's trace or the console's header traced the call. `ZZXXMLA1_MAIN_ENDPOINT` writes and commits the row
+  before the handler runs (a call that dumps is traced without response) and adds the answer after it; a request with
+  the header `X-olap4abap-Trace: true` (the MDX console's) is traced while the user's trace is off too. A trace is
   on for 2 hours after it is switched on (`c_active_hours`); switching one on deletes the calls older than 7 days
   (`c_retention_days`) and the expired users' rows. "Delete all" on the page deletes every traced call. The list is the newest calls, filtered on the server by user,
   by toggles Discover/Execute (`method`) and limited by "Show N newest" (`max`, 200 by default, at most 10,000). The user is sy-uname: while the node logs on anonymously every caller is its service user. API: `GET trace`,

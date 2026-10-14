@@ -310,4 +310,6 @@ plain `GROUP BY`. Not to be revisited before a real provider shows it matters.
 - Mixed plans and the batching passes: how much of `phase` remains once the relational inputs are read first.
 - The grid's ABAP (groups to values, placement, writing the answer) is now its cost, not SQL. A cell's value is formatted
   only when the query asks for `FORMATTED_VALUE` (`want_formatted`; Excel's grid asks for `VALUE, FORMAT_STRING,
+- The MDX console's Query plan tab (Trace SQL on) shows a statement's marks and which element read which SQL
+  (`ZZXXMLA1_CL_MDX_EXPLAIN`); the same is in the trace (`GET trace/entry`, `explain` and each statement's `node`).
   LANGUAGE, BACK_COLOR, FORE_COLOR, FONT_FLAGS`): 17 to 16.7 s, as each amount was formatted once per query already.

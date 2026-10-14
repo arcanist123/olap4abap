@@ -1,9 +1,12 @@
 // The trace of the XMLA endpoint (ZZXXMLA1_CL_TRACE): switched on per SAP user for two hours (GET api/trace, POST
 // api/trace/on, trace/off; switching on deletes the calls older than seven days), every call of a user with the trace on is listed with its SOAP request, the MDX statement of an Execute
-// and the SOAP response (GET api/trace/entry, the whole response as sent from api/trace/response), and the SQL
-// statements the call ran with their rows, time and error.
+// and the SOAP response (GET api/trace/entry, the whole response as sent from api/trace/response), the SQL
+// statements the call ran with their rows, time, error, phase and element, and the query plan of an Execute: the same
+// views as the MDX console's (query-plan.js).
 // No build step: Preact with htm, vendored as one ES module; this file is what the server serves.
 import { html, render, useState, useEffect, useRef } from './vendor/htm-preact-standalone.mjs';
+import { prettyXml, copyText, download } from './trace-text.js';
+import { SqlView, PlanView } from './query-plan.js';
 
 const client = new URLSearchParams(location.search).get('sap-client');
 const REFRESH_MS = 5000;
@@ -41,58 +44,6 @@ const time = (iso) => iso ? new Date(iso).toLocaleString() : '';
 const size = (n) => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : n >= 1024 ? `${(n / 1024).toFixed(1)} KB` : `${n} B`;
 const what = (c) => c.method === 'EXECUTE' ? 'Execute' : c.method === 'DISCOVER' ? 'Discover' : '(no XMLA)';
 const firstLine = (s) => s.replace(/\s+/g, ' ').trim();
-const ms = (us) => (us / 1000).toFixed(1);
-
-// the SQL statements of a call as one script: each statement after a comment with its number, rows and time
-const sqlScript = (statements) => statements.map((s, i) => `-- ${i + 1}: ${s.error ? `failed: ${s.error.replace(/\s+/g, ' ')}`
-  : `${s.rows} ${s.rows === 1 ? 'row' : 'rows'}`}, ${ms(s.us)} ms\n${s.sql.trim()};`).join('\n\n');
-
-// XML indented for reading; the text as it is if it does not parse (or is too large to do it quickly)
-function prettyXml(text) {
-  if (!text || text.length > 5000000) return text;
-  const doc = new DOMParser().parseFromString(text, 'application/xml');
-  if (doc.getElementsByTagName('parsererror').length) return text;
-  const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const out = [];
-  const walk = (node, depth) => {
-    const pad = '  '.repeat(depth);
-    if (node.nodeType === Node.ELEMENT_NODE) {
-      const attrs = [...node.attributes].map((a) => ` ${a.name}="${esc(a.value).replace(/"/g, '&quot;')}"`).join('');
-      const kids = [...node.childNodes].filter((c) => c.nodeType !== Node.TEXT_NODE || c.nodeValue.trim());
-      if (!kids.length) out.push(`${pad}<${node.nodeName}${attrs}/>`);
-      else if (kids.length === 1 && kids[0].nodeType === Node.TEXT_NODE) {
-        out.push(`${pad}<${node.nodeName}${attrs}>${esc(kids[0].nodeValue)}</${node.nodeName}>`);
-      } else {
-        out.push(`${pad}<${node.nodeName}${attrs}>`);
-        kids.forEach((c) => walk(c, depth + 1));
-        out.push(`${pad}</${node.nodeName}>`);
-      }
-    } else if (node.nodeType === Node.TEXT_NODE) out.push(pad + esc(node.nodeValue.trim()));
-    else if (node.nodeType === Node.CDATA_SECTION_NODE) out.push(`${pad}<![CDATA[${node.nodeValue}]]>`);
-    else if (node.nodeType === Node.COMMENT_NODE) out.push(`${pad}<!--${node.nodeValue}-->`);
-  };
-  [...doc.childNodes].forEach((n) => walk(n, 0));
-  return out.join('\n');
-}
-
-// navigator.clipboard exists only on HTTPS and localhost; the endpoint is often plain HTTP, so a hidden textarea and
-// execCommand('copy') are the fallback
-async function copyText(text) {
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch { /* the fallback below */ }
-  const area = Object.assign(document.createElement('textarea'), { value: text, readOnly: true });
-  area.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
-  document.body.appendChild(area);
-  area.select();
-  let copied = false;
-  try { copied = document.execCommand('copy'); } catch { copied = false; }
-  area.remove();
-  return copied;
-}
 
 // the Catalog property of an Execute request, initial if it names none
 function requestCatalog(xml) {
@@ -107,13 +58,6 @@ const consoleUrl = (entry) => {
   const catalog = requestCatalog(entry.request);
   if (catalog) fragment.set('catalog', catalog);
   return `console.html${location.search}#${fragment}`;
-};
-
-const download = (text, name) => {
-  const url = URL.createObjectURL(new Blob([text], { type: 'text/xml' }));
-  const a = Object.assign(document.createElement('a'), { href: url, download: name });
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
 function Users({ state, onSwitch, busy }) {
@@ -151,6 +95,7 @@ function Detail({ id, onClose }) {
   const [entry, setEntry] = useState(null);
   const [error, setError] = useState('');
   const [tab, setTab] = useState('');
+  const [selection, setSelection] = useState(null);  // the element ({node}) or phase ({phase}) of the query plan
   const [pretty, setPretty] = useState(true);
   const [copied, setCopied] = useState('');  // the feedback of Copy, for a moment
   useEffect(() => {
@@ -161,16 +106,25 @@ function Detail({ id, onClose }) {
   useEffect(() => {
     setEntry(null);
     setError('');
+    setSelection(null);
     api('GET', 'trace/entry', { id }).then((e) => {
       setEntry(e);
-      setTab((t) => (t === 'mdx' && !e.mdx) || !t ? (e.mdx ? 'mdx' : 'request') : t);
+      // the tab chosen before, where the call has it; an Execute starts with its query plan
+      setTab((t) => (!t || (t === 'mdx' && !e.mdx) || (t === 'plan' && e.method !== 'EXECUTE')
+        ? (e.method === 'EXECUTE' ? 'plan' : e.mdx ? 'mdx' : 'request') : t));
     }, (e) => setError(e.message));
   }, [id]);
   if (error) return html`<section class="section detail"><div class="body"><div class="notice err">${error}</div></div></section>`;
   if (!entry) return html`<section class="section detail"><div class="body muted">Reading the call…</div></section>`;
 
-  const sql = entry.sql || [];
-  const raw = tab === 'mdx' ? entry.mdx : tab === 'request' ? entry.request : tab === 'sql' ? sqlScript(sql) : entry.response;
+  // the query plan and the SQL statements as the MDX console shows them (query-plan.js); a statement's element or
+  // phase is shown in the plan
+  const show = (target) => {
+    setSelection(target);
+    setTab('plan');
+  };
+  const view = tab === 'plan' || tab === 'sql';
+  const raw = tab === 'mdx' ? entry.mdx : tab === 'request' ? entry.request : tab === 'response' ? entry.response : '';
   const xml = tab === 'request' || tab === 'response';
   const shown = !xml || !pretty ? raw : prettyXml(raw);
   // what is shown (indented or not) is what is copied
@@ -187,11 +141,18 @@ function Detail({ id, onClose }) {
       <button class="link" onClick=${onClose}>Close</button></header>
     <div class="tabs" role="tablist">
       ${entry.mdx && html`<button role="tab" class=${tab === 'mdx' ? 'active' : ''} onClick=${() => setTab('mdx')}>MDX statement</button>`}
+      ${entry.method === 'EXECUTE' && html`<button role="tab" class=${tab === 'plan' ? 'active' : ''} onClick=${() => setTab('plan')}>Query plan
+        <span class="muted small">${!entry.status ? 'none' : entry.explain ? '' : 'none'}</span></button>`}
       <button role="tab" class=${tab === 'request' ? 'active' : ''} onClick=${() => setTab('request')}>SOAP request <span class="muted small">${size(entry.requestLength)}</span></button>
       <button role="tab" class=${tab === 'response' ? 'active' : ''} onClick=${() => setTab('response')}>SOAP response <span class="muted small">${entry.status ? size(entry.responseLength) : 'none'}</span></button>
       <button role="tab" class=${tab === 'sql' ? 'active' : ''} onClick=${() => setTab('sql')}>SQL statements <span class="muted small">${entry.status ? entry.sqlCount : 'none'}</span></button>
     </div>
-    <div class="body">
+    ${view ? html`<div class="body trace-view">
+      ${!entry.status ? html`<div class="notice warn">No ${tab === 'plan' ? 'query plan' : 'statements'}: the call is still running, or it
+        was aborted (a short dump, ST22).</div>`
+        : tab === 'plan' ? html`<${PlanView} call=${entry} selection=${selection} setSelection=${setSelection} />`
+        : html`<${SqlView} call=${entry} onNode=${(node) => show({ node })} onPhase=${(phase) => show({ phase })} />`}
+    </div>` : html`<div class="body">
       <div class="row">
         ${xml && html`<label class="inline"><input type="checkbox" checked=${pretty} onChange=${(e) => setPretty(e.target.checked)} /> Indent XML</label>`}
         <span class="spacer"></span>
@@ -202,14 +163,9 @@ function Detail({ id, onClose }) {
       ${tab === 'response' && !entry.status && html`<div class="notice warn">No response: the call is still running, or it was aborted (a short dump, ST22).</div>`}
       ${tab === 'response' && entry.responseTruncated && html`<div class="notice warn">The response has ${size(entry.responseLength)}; the first million characters are shown, Download gives all of it.</div>`}
       ${tab === 'response' && entry.fault && html`<div class="notice err">The answer is a SOAP fault.</div>`}
-      ${tab === 'sql' && !entry.status && html`<div class="notice warn">No statements: the call is still running, or it was aborted (a short dump, ST22).</div>`}
-      ${tab === 'sql' && entry.status > 0 && sql.length < entry.sqlCount && html`<div class="notice warn">${sql.length
-        ? `The first ${sql.length.toLocaleString()} of ${entry.sqlCount.toLocaleString()} statements are kept.`
-        : 'The statements were not recorded: the call was traced before the trace kept them.'}</div>`}
-      ${tab === 'sql' && sql.some((s) => s.error) && html`<div class="notice err">A statement failed; its error is in the comment above it.</div>`}
       <textarea class="trace" readonly spellcheck="false" value=${shown} aria-label=${tab}></textarea>
       ${entry.userAgent && html`<div class="muted small">User-Agent: <span class="mono">${entry.userAgent}</span></div>`}
-    </div>
+    </div>`}
   </section>`;
 }
 

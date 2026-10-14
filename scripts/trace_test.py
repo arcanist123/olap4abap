@@ -2,8 +2,10 @@
 """Checks the trace of the XMLA endpoint on SAP (ZZXXMLA1_CL_TRACE, GET/POST /zzxxmla1/schema/api/trace...) over
 HTTP, as the trace page (web/schema/trace.js) calls it: switches the trace on for the endpoint's user, sends a
 Discover and an Execute, finds both in the trace with request, MDX and response (gzipped in the table, unzipped by
-the API), then switches it off (and on again if it was on); the traced calls stay (trace/clear would delete the
-user's other calls too).
+the API, the query plan of the Execute and the phase and element of its statements), then switches it off (and on
+again if it was on); while it is off, an Execute with the header
+X-olap4abap-Trace (the MDX console's) is traced all the same and its answer names the call. The traced calls stay
+(trace/clear would delete the user's other calls too).
 
     python scripts/trace_test.py
     python scripts/trace_test.py --url http://localhost:50000/zzxxmla1 --client 001 --catalog ZFOODMART
@@ -27,9 +29,10 @@ EXECUTE = SOAP.format('<Execute xmlns="urn:schemas-microsoft-com:xml-analysis"><
                       '</PropertyList></Properties></Execute>')
 
 
-def http(method, url, body=None, content_type="text/xml; charset=utf-8"):
+def http(method, url, body=None, content_type="text/xml; charset=utf-8", headers=None):
     request = urllib.request.Request(url, method=method, data=body.encode("utf-8") if body is not None else None,
-                                     headers={"Content-Type": content_type, "User-Agent": "olap4abap trace_test"})
+                                     headers={"Content-Type": content_type, "User-Agent": "olap4abap trace_test",
+                                              **(headers or {})})
     try:
         with urllib.request.urlopen(request) as response:
             return response.status, response.read().decode("utf-8"), {k.lower(): v for k, v in response.headers.items()}
@@ -94,6 +97,14 @@ def main():
         check("trace/entry: the SQL statements, as many as counted", len(sql) == execute["sqlCount"] > 0
               and all(s["sql"] and s["rows"] >= 0 and s["us"] >= 0 and s["error"] == "" for s in sql),
               f"{execute['sqlCount']} counted, {sql[:2]}")
+        explain = entry.get("explain") or {}
+        check("trace/entry: the query plan of a call traced by the user's trace", explain.get("cube") == "ZFMSALES"
+              and [p["part"] for p in explain.get("parts", [])] == ["axis"] and explain["parts"][0]["node"]["id"] == 1
+              and explain.get("plan", {}).get("query"), str(explain)[:300])
+        check("trace/entry: each statement's phase and element", all("phase" in s and "node" in s for s in sql)
+              and any(s["phase"] for s in sql), sql[:2])
+        status, entry = api("GET", "trace/entry", id=discover["id"])
+        check("trace/entry: no query plan for a Discover", status == 200 and entry.get("explain") is None, entry.get("explain"))
         status, raw = api("GET", "trace/response", id=execute["id"])
         check("trace/response: the response as XML", status == 200 and raw == execute_response, str(raw)[:300])
 
@@ -114,6 +125,15 @@ def main():
     http("POST", xmla, DISCOVER)
     status, state = api("GET", "trace", filter=user)
     check("nothing traced while off", len(state["calls"]) == calls, state["calls"][:1])
+    status, forced_response, headers = http("POST", xmla, EXECUTE.format(escaped, args.catalog),
+                                            headers={"X-olap4abap-Trace": "true"})
+    forced = headers.get("x-olap4abap-trace-id", "")
+    check("X-olap4abap-Trace: traced while off, the answer names the call", status == 200 and len(forced) == 32, headers)
+    if forced:
+        status, entry = api("GET", "trace/entry", id=forced, response="false")
+        check("trace/entry?response=false: the SQL statements without the response", status == 200
+              and entry.get("response") == "" and entry["responseLength"] == len(forced_response)
+              and len(entry.get("sql") or []) == entry["sqlCount"] > 0, str(entry)[:300])
     if was_on:
         api("POST", "trace/on", user=user)
     check("trace/entry of an unknown id", api("GET", "trace/entry", id="0" * 32)[0] == 404)

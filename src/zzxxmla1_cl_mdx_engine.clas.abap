@@ -372,6 +372,17 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       CHANGING  attempt       TYPE i
       RETURNING VALUE(result) TYPE abap_bool
       RAISING   zzxxmla1_cx_xmla.
+    "! the numbers of the nodes of the executed query while it is explained (ZZXXMLA1_CL_MDX_EXPLAIN: only while
+    "! ZZXXMLA1_CL_SQL logs statements); empty otherwise
+    DATA node_ids TYPE zzxxmla1_cl_mdx_explain=>ty_t_node_id.
+    "! Sets ZZXXMLA1_CL_SQL=>log_node to the node's number (if it has one).
+    "! @parameter result | the node before, to restore
+    METHODS enter
+      IMPORTING node          TYPE ty_node
+      RETURNING VALUE(result) TYPE i.
+    "! Sets ZZXXMLA1_CL_SQL=>log_phase (an explained query): what the engine does, and no node.
+    METHODS set_phase
+      IMPORTING !phase TYPE string.
     "! MaxEvalDepth: the most passes of a phase
     CONSTANTS c_max_eval_depth TYPE i VALUE 10.
     "! the cells of executeBody whose evaluation missed no cell, by ordinal: their value is final, a later pass keeps it
@@ -486,18 +497,36 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
                 keep     TYPE ty_t_flag
       CHANGING  result   TYPE ty_result.
     "! A set expression (compileList): the tuples of a resolved expression of set type, or of a member or tuple.
+    METHODS evaluate_set_node
+      IMPORTING evaluator     TYPE ty_evaluator
+                node          TYPE ty_node
+      RETURNING VALUE(result) TYPE ty_t_tuple
+      RAISING   zzxxmla1_cx_xmla.
+    "! evaluate_set_node with the node as ZZXXMLA1_CL_SQL=>log_node while it runs (an explained query, node_ids).
     METHODS evaluate_set
       IMPORTING evaluator     TYPE ty_evaluator
                 node          TYPE ty_node
       RETURNING VALUE(result) TYPE ty_t_tuple
       RAISING   zzxxmla1_cx_xmla.
     "! A member expression (compileMember): a member, a hierarchy's or dimension's current member, a call.
+    METHODS evaluate_member_node
+      IMPORTING evaluator     TYPE ty_evaluator
+                node          TYPE ty_node
+      RETURNING VALUE(result) TYPE ty_member
+      RAISING   zzxxmla1_cx_xmla.
+    "! evaluate_member_node with the node as ZZXXMLA1_CL_SQL=>log_node while it runs (an explained query, node_ids).
     METHODS evaluate_member
       IMPORTING evaluator     TYPE ty_evaluator
                 node          TYPE ty_node
       RETURNING VALUE(result) TYPE ty_member
       RAISING   zzxxmla1_cx_xmla.
     "! A tuple expression (compileTuple): a tuple of members, or one member.
+    METHODS evaluate_tuple_node
+      IMPORTING evaluator     TYPE ty_evaluator
+                node          TYPE ty_node
+      RETURNING VALUE(result) TYPE ty_tuple
+      RAISING   zzxxmla1_cx_xmla.
+    "! evaluate_tuple_node with the node as ZZXXMLA1_CL_SQL=>log_node while it runs (an explained query, node_ids).
     METHODS evaluate_tuple
       IMPORTING evaluator     TYPE ty_evaluator
                 node          TYPE ty_node
@@ -505,12 +534,24 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       RAISING   zzxxmla1_cx_xmla.
     "! A hierarchy expression (compileHierarchy): a hierarchy, the default hierarchy of a dimension, the hierarchy of a
     "! member or level.
+    METHODS evaluate_hierarchy_node
+      IMPORTING evaluator     TYPE ty_evaluator
+                node          TYPE ty_node
+      RETURNING VALUE(result) TYPE i
+      RAISING   zzxxmla1_cx_xmla.
+    "! evaluate_hierarchy_node with the node as ZZXXMLA1_CL_SQL=>log_node while it runs (an explained query, node_ids).
     METHODS evaluate_hierarchy
       IMPORTING evaluator     TYPE ty_evaluator
                 node          TYPE ty_node
       RETURNING VALUE(result) TYPE i
       RAISING   zzxxmla1_cx_xmla.
     "! A level expression (compileLevel): a level, or &lt;Hierarchy&gt;.Levels(ordinal or name).
+    METHODS evaluate_level_node
+      IMPORTING evaluator     TYPE ty_evaluator
+                node          TYPE ty_node
+      RETURNING VALUE(result) TYPE i
+      RAISING   zzxxmla1_cx_xmla.
+    "! evaluate_level_node with the node as ZZXXMLA1_CL_SQL=>log_node while it runs (an explained query, node_ids).
     METHODS evaluate_level
       IMPORTING evaluator     TYPE ty_evaluator
                 node          TYPE ty_node
@@ -518,6 +559,12 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       RAISING   zzxxmla1_cx_xmla.
     "! A scalar expression (compileScalar): a literal, the cell of the context with a member or tuple set
     "! (MemberValueCalc, TupleValueCalc), or a call of a scalar function.
+    METHODS evaluate_value_node
+      IMPORTING evaluator     TYPE ty_evaluator
+                node          TYPE ty_node
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_evaluator=>ty_value
+      RAISING   zzxxmla1_cx_xmla.
+    "! evaluate_value_node with the node as ZZXXMLA1_CL_SQL=>log_node while it runs (an explained query, node_ids).
     METHODS evaluate_value
       IMPORTING evaluator     TYPE ty_evaluator
                 node          TYPE ty_node
@@ -1155,6 +1202,12 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       RETURNING VALUE(result) TYPE ty_t_tuple
       RAISING   zzxxmla1_cx_xmla.
     "! A dimension expression: a dimension, or &lt;x&gt;.Dimension.
+    METHODS evaluate_dimension_node
+      IMPORTING evaluator     TYPE ty_evaluator
+                node          TYPE ty_node
+      RETURNING VALUE(result) TYPE i
+      RAISING   zzxxmla1_cx_xmla.
+    "! evaluate_dimension_node with the node as ZZXXMLA1_CL_SQL=>log_node while it runs (an explained query, node_ids).
     METHODS evaluate_dimension
       IMPORTING evaluator     TYPE ty_evaluator
                 node          TYPE ty_node
@@ -1641,6 +1694,11 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD execute.
+    CLEAR node_ids.
+    IF zzxxmla1_cl_sql=>log_statements = abap_true.
+      zzxxmla1_cl_sql=>log_phase = `Resolve`.
+      zzxxmla1_cl_sql=>log_node = 0.
+    ENDIF.
     schema_reader = zzxxmla1_cl_mdx_schema_reader=>for_cube( catalog = catalog name = query-cube ).
     DATA(cube) = schema_reader->cube.
     fact_reader = NEW zzxxmla1_cl_mdx_facts( cube = cube hierarchies = schema_reader->get_model_hierarchies( )
@@ -1651,10 +1709,19 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     query_measures = validator->get_measures_members( ).
     " the plan: an all-relational query's NON EMPTY filter and cells come from one grouped read of the facts
     DATA(relational) = abap_false.
-    IF planning = abap_true.
-      relational = xsdbool( NEW zzxxmla1_cl_mdx_planner( schema_reader )->plan( resolved )-query
-                            = zzxxmla1_cl_mdx_planner=>c_mark-relational ).
+    DATA(planner) = NEW zzxxmla1_cl_mdx_planner( schema_reader ).
+    DATA plan TYPE zzxxmla1_cl_mdx_planner=>ty_plan.
+    IF planning = abap_true OR zzxxmla1_cl_sql=>log_statements = abap_true.
+      plan = planner->plan( resolved ).
     ENDIF.
+    IF planning = abap_true.
+      relational = xsdbool( plan-query = zzxxmla1_cl_mdx_planner=>c_mark-relational ).
+    ENDIF.
+    " while statements are logged (a traced call): the resolved tree, and each statement names its phase and node
+    IF zzxxmla1_cl_sql=>log_statements = abap_true.
+      node_ids = zzxxmla1_cl_mdx_explain=>explain( query = resolved cube = query-cube planner = planner plan = plan ).
+    ENDIF.
+    set_phase( `Prepare` ).
     CLEAR: context_paths_cache, skip_axis_filter.
     read_defaults = xsdbool( relational = abap_true AND lines( resolved-axes ) = 1 ).
     " the subcube of a subselect restricts every read of facts
@@ -1672,6 +1739,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     " the slicer, in the default context; its members are then the context of the axes and of the cells. Its members
     " replace the root members of their hierarchies (Determine Slicer), then it is executed (Execute Slicer).
     IF resolved-slicer IS BOUND.
+      set_phase( `Slicer` ).
       DATA(slicer_members) = VALUE ty_t_member( ).
       attempt = 0.
       DO.
@@ -1715,6 +1783,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     IF non_all_members IS NOT INITIAL.
       DATA(axis_members) = VALUE ty_t_member( ).
       LOOP AT query_axes INTO DATA(query_axis).
+        set_phase( |Axis{ query_axis-ordinal }| ).
         attempt = 0.
         DO.
           DATA(axis_tuples) = execute_axis( evaluator = evaluator expression = query_axis-expression
@@ -1742,6 +1811,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         DATA(redo) = abap_false.
         CLEAR result-axes.
         LOOP AT query_axes INTO query_axis.
+          set_phase( |Axis{ query_axis-ordinal }| ).
           DATA(tuples) = eval_execute( evaluator = evaluator lists = non_all_members index = lines( non_all_members )
                                        expression = query_axis-expression non_empty = query_axis-non_empty ).
           IF non_all_members IS NOT INITIAL AND tuples IS NOT INITIAL.
@@ -1765,12 +1835,14 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
           EXIT.
         ENDIF.
       ENDDO.
+      set_phase( `Axes` ).
       IF phase( CHANGING attempt = attempt ) = abap_false.
         EXIT.
       ENDIF.
     ENDDO.
     " planning: a NON EMPTY axis whose cells do not keep the positions NonEmpty keeps is filtered by it after all
     IF skip_axis_filter = abap_true.
+      set_phase( `NON EMPTY` ).
       skip_axis_filter = abap_false.
       DATA(to_filter) = VALUE zzxxmla1_cl_mdx_facts=>ty_t_index( ).
       LOOP AT query_axes INTO query_axis WHERE non_empty = abap_true.
@@ -1824,6 +1896,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     " no cell is missed, the final cells kept
     IF cells_needed( result = result non_empty = xsdbool( line_exists( query_axes[ non_empty = abap_true ] ) ) )
        = abap_true.
+      set_phase( `Cells` ).
       " planning: all patterns with one statement, a compound slicer as a predicate
       DATA(slicer_predicate) = COND zzxxmla1_cl_mdx_facts=>ty_t_predicate(
         WHEN relational = abap_true AND lines( result-slicer ) > 1 THEN compound_predicate( result-slicer ) ).
@@ -1863,6 +1936,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     ENDIF.
     fact_reader->set_batching( abap_false ).
     CLEAR final_cells.
+    set_phase( `Finish` ).
 
     LOOP AT query_axes INTO query_axis WHERE non_empty = abap_true.
       remove_empty_positions( EXPORTING position = query_axis-ordinal + 1 CHANGING result = result ).
@@ -1881,6 +1955,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
 
   METHOD drill_through.
     DATA(executed) = execute( statement-query ).
+    set_phase( `Drillthrough` ).
     DATA(items) = drill_through_items( statement-return_list ).
     " without a RETURN clause the cube's default drill-through action gives the items and the names of the first
     " columns (MondrianOlap4jStatement.executeQuery2, XmlaHandler.executeDrillThroughQuery)
@@ -3139,8 +3214,126 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     ENDCASE.
   ENDMETHOD.
 
+  METHOD evaluate_set.
+    IF node_ids IS INITIAL.
+      result = evaluate_set_node( evaluator = evaluator node = node ).
+      RETURN.
+    ENDIF.
+    DATA(outer) = enter( node ).
+    TRY.
+        result = evaluate_set_node( evaluator = evaluator node = node ).
+      CLEANUP.
+        zzxxmla1_cl_sql=>log_node = outer.
+    ENDTRY.
+    zzxxmla1_cl_sql=>log_node = outer.
+  ENDMETHOD.
+
+  METHOD evaluate_member.
+    IF node_ids IS INITIAL.
+      result = evaluate_member_node( evaluator = evaluator node = node ).
+      RETURN.
+    ENDIF.
+    DATA(outer) = enter( node ).
+    TRY.
+        result = evaluate_member_node( evaluator = evaluator node = node ).
+      CLEANUP.
+        zzxxmla1_cl_sql=>log_node = outer.
+    ENDTRY.
+    zzxxmla1_cl_sql=>log_node = outer.
+  ENDMETHOD.
+
+  METHOD evaluate_tuple.
+    IF node_ids IS INITIAL.
+      result = evaluate_tuple_node( evaluator = evaluator node = node ).
+      RETURN.
+    ENDIF.
+    DATA(outer) = enter( node ).
+    TRY.
+        result = evaluate_tuple_node( evaluator = evaluator node = node ).
+      CLEANUP.
+        zzxxmla1_cl_sql=>log_node = outer.
+    ENDTRY.
+    zzxxmla1_cl_sql=>log_node = outer.
+  ENDMETHOD.
+
+  METHOD evaluate_hierarchy.
+    IF node_ids IS INITIAL.
+      result = evaluate_hierarchy_node( evaluator = evaluator node = node ).
+      RETURN.
+    ENDIF.
+    DATA(outer) = enter( node ).
+    TRY.
+        result = evaluate_hierarchy_node( evaluator = evaluator node = node ).
+      CLEANUP.
+        zzxxmla1_cl_sql=>log_node = outer.
+    ENDTRY.
+    zzxxmla1_cl_sql=>log_node = outer.
+  ENDMETHOD.
+
+  METHOD evaluate_level.
+    IF node_ids IS INITIAL.
+      result = evaluate_level_node( evaluator = evaluator node = node ).
+      RETURN.
+    ENDIF.
+    DATA(outer) = enter( node ).
+    TRY.
+        result = evaluate_level_node( evaluator = evaluator node = node ).
+      CLEANUP.
+        zzxxmla1_cl_sql=>log_node = outer.
+    ENDTRY.
+    zzxxmla1_cl_sql=>log_node = outer.
+  ENDMETHOD.
+
+  METHOD evaluate_value.
+    IF node_ids IS INITIAL.
+      result = evaluate_value_node( evaluator = evaluator node = node ).
+      RETURN.
+    ENDIF.
+    DATA(outer) = enter( node ).
+    TRY.
+        result = evaluate_value_node( evaluator = evaluator node = node ).
+      CLEANUP.
+        zzxxmla1_cl_sql=>log_node = outer.
+    ENDTRY.
+    zzxxmla1_cl_sql=>log_node = outer.
+  ENDMETHOD.
+
+  METHOD evaluate_dimension.
+    IF node_ids IS INITIAL.
+      result = evaluate_dimension_node( evaluator = evaluator node = node ).
+      RETURN.
+    ENDIF.
+    DATA(outer) = enter( node ).
+    TRY.
+        result = evaluate_dimension_node( evaluator = evaluator node = node ).
+      CLEANUP.
+        zzxxmla1_cl_sql=>log_node = outer.
+    ENDTRY.
+    zzxxmla1_cl_sql=>log_node = outer.
+  ENDMETHOD.
+
+  METHOD enter.
+    result = zzxxmla1_cl_sql=>log_node.
+    READ TABLE node_ids INTO DATA(entry) WITH TABLE KEY node = node.
+    IF sy-subrc = 0.
+      zzxxmla1_cl_sql=>log_node = entry-id.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD set_phase.
+    IF node_ids IS NOT INITIAL.
+      zzxxmla1_cl_sql=>log_phase = phase.
+      zzxxmla1_cl_sql=>log_node = 0.
+    ENDIF.
+  ENDMETHOD.
+
   METHOD phase.
-    IF fact_reader->load_aggregations( ) = abap_false.
+    " the cells the pass missed, read for the phase as a whole (an explained query: no node read them)
+    DATA(outer_node) = zzxxmla1_cl_sql=>log_node.
+    zzxxmla1_cl_sql=>log_node = 0.
+    DATA(loaded) = fact_reader->load_aggregations( ).
+    zzxxmla1_cl_sql=>log_node = outer_node.
+    IF loaded = abap_false.
       RETURN.
     ENDIF.
     attempt = attempt + 1.
@@ -3454,7 +3647,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     DATA key TYPE string.
     DATA ordinals TYPE ty_t_index.
     " a measure that counts: its amount is the group's fact count
-    DATA(counting) = VALUE abap_bool_tab( FOR m IN stored_measures ( xsdbool( m-aggregator = `count` ) ) ).
+    DATA(counting) = VALUE ty_t_flag( FOR m IN stored_measures ( xsdbool( m-aggregator = `count` ) ) ).
     DATA group_paths TYPE string_table.
     DATA amount TYPE decfloat34.
     DO reads TIMES.
@@ -3792,7 +3985,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
                                        THEN node->fun_def-signature ELSE node->unparse( ) ) } is not implemented yet| ).
   ENDMETHOD.
 
-  METHOD evaluate_set.
+  METHOD evaluate_set_node.
     IF node->kind = zzxxmla1_cl_mdx_node=>c_kind-named_set.
       result = named_set_tuples( evaluator = evaluator node = node ).
       RETURN.
@@ -3988,7 +4181,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     result = COND #( WHEN evaluate_boolean( evaluator = evaluator node = node->args[ 1 ] ) = abap_true THEN 2 ELSE 3 ).
   ENDMETHOD.
 
-  METHOD evaluate_tuple.
+  METHOD evaluate_tuple_node.
     IF node->kind = zzxxmla1_cl_mdx_node=>c_kind-resolved_call AND node->fun_def-implementation = `TupleFunDef`.
       LOOP AT node->args INTO DATA(arg).
         APPEND evaluate_member( evaluator = evaluator node = arg ) TO result.
@@ -4009,7 +4202,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
-  METHOD evaluate_member.
+  METHOD evaluate_member_node.
     CASE node->kind.
       WHEN zzxxmla1_cl_mdx_node=>c_kind-member.
         result = node->element-member.
@@ -4088,7 +4281,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     ENDCASE.
   ENDMETHOD.
 
-  METHOD evaluate_hierarchy.
+  METHOD evaluate_hierarchy_node.
     CASE node->kind.
       WHEN zzxxmla1_cl_mdx_node=>c_kind-hierarchy.
         result = node->element-id.
@@ -4116,7 +4309,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     ENDCASE.
   ENDMETHOD.
 
-  METHOD evaluate_level.
+  METHOD evaluate_level_node.
     IF node->kind = zzxxmla1_cl_mdx_node=>c_kind-level.
       result = node->element-id.
       RETURN.
@@ -4160,7 +4353,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     result = evaluate_value( evaluator = evaluator node = node ).
   ENDMETHOD.
 
-  METHOD evaluate_value.
+  METHOD evaluate_value_node.
     IF node->kind = zzxxmla1_cl_mdx_node=>c_kind-literal.
       CASE node->category.
         WHEN zzxxmla1_cl_mdx_node=>c_category-numeric.
@@ -6861,7 +7054,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
-  METHOD evaluate_dimension.
+  METHOD evaluate_dimension_node.
     IF node->kind = zzxxmla1_cl_mdx_node=>c_kind-dimension.
       result = node->element-id.
       RETURN.

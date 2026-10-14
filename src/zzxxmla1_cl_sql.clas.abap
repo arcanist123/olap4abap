@@ -28,12 +28,19 @@ CLASS zzxxmla1_cl_sql DEFINITION
     "! Set: query keeps each statement with its rows and microseconds in statement_log (for measurements and the
     "! trace of a call), a statement that fails with its error and no rows.
     CLASS-DATA log_statements TYPE abap_bool.
+    "! What the caller is doing while statements are logged, kept with each statement: a phase (the MDX engine: the
+    "! slicer, an axis, the cells; ZZXXMLA1_CL_MDX_EXPLAIN) and a node of what it evaluates (0: none). The caller sets
+    "! and restores them; reset_statistics clears them.
+    CLASS-DATA log_phase TYPE string.
+    CLASS-DATA log_node TYPE i.
     TYPES:
       BEGIN OF ty_logged,
         sql   TYPE string,
         rows  TYPE i,
         time  TYPE int8,
         error TYPE string,
+        phase TYPE string,
+        node  TYPE i,
       END OF ty_logged.
     CLASS-DATA statement_log TYPE STANDARD TABLE OF ty_logged WITH EMPTY KEY READ-ONLY.
 
@@ -43,7 +50,7 @@ CLASS zzxxmla1_cl_sql DEFINITION
       IMPORTING !sql          TYPE string
                 !columns      TYPE i
       RETURNING VALUE(result) TYPE ty_t_row.
-    "! Sets statement_count and statement_time to 0.
+    "! Sets statement_count and statement_time to 0, empties statement_log and clears log_phase and log_node.
     CLASS-METHODS reset_statistics.
     "! An identifier as a quoted SQL identifier, e.g. "/BIC/FZFMSALES".
     CLASS-METHODS quote
@@ -96,7 +103,8 @@ CLASS zzxxmla1_cl_sql IMPLEMENTATION.
       CATCH cx_sql_exception INTO DATA(error).
         IF log_statements = abap_true.
           GET RUN TIME FIELD DATA(failed).
-          APPEND VALUE #( sql = sql time = failed - started error = error->get_text( ) ) TO statement_log.
+          APPEND VALUE #( sql = sql time = failed - started error = error->get_text( ) phase = log_phase node = log_node )
+                 TO statement_log.
         ENDIF.
         RAISE EXCEPTION TYPE zzxxmla1_cx_sql
           EXPORTING
@@ -108,7 +116,8 @@ CLASS zzxxmla1_cl_sql IMPLEMENTATION.
     statement_count = statement_count + 1.
     statement_time = statement_time + stopped - started.
     IF log_statements = abap_true.
-      APPEND VALUE #( sql = sql rows = lines( <rows> ) time = stopped - started ) TO statement_log.
+      APPEND VALUE #( sql = sql rows = lines( <rows> ) time = stopped - started phase = log_phase node = log_node )
+             TO statement_log.
     ENDIF.
 
     " each row's values appended to its line of the result in place, not to a table of its own copied there
@@ -123,7 +132,7 @@ CLASS zzxxmla1_cl_sql IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD reset_statistics.
-    CLEAR: statement_count, statement_time, statement_log.
+    CLEAR: statement_count, statement_time, statement_log, log_phase, log_node.
   ENDMETHOD.
 
   METHOD quote.

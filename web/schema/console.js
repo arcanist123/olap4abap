@@ -2,15 +2,23 @@
 // and shows the answer. A result of up to two axes is a grid (Axis0 the columns, Axis1 the rows), one of more axes
 // a flat table with a column per hierarchy of every axis and one row per cell. The cube browser on the left lists
 // the catalog's cubes, measures, hierarchies and levels from the schema rowsets; a click inserts a unique name.
-// Format lays the statement out for reading (mdx-format.js).
+// Format lays the statement out for reading (mdx-format.js). Next to the result are the SOAP request and response of
+// the Execute and, while Trace is on, its query plan (the resolved tree with the planner's marks,
+// ZZXXMLA1_CL_MDX_EXPLAIN) and the SQL statements it ran, each with the phase and the element of the query that read
+// it: the request asks the endpoint to trace the call
+// (header X-olap4abap-Trace), the answer names the traced call (X-olap4abap-Trace-Id) and its statements are read from
+// the trace (GET api/trace/entry, ZZXXMLA1_CL_TRACE), where the call is listed too.
 // No build step: Preact with htm, vendored as one ES module; this file is what the server serves.
-import { html, render, useState, useEffect, useRef, useCallback } from './vendor/htm-preact-standalone.mjs';
+import { html, render, useState, useEffect, useRef, useCallback, useMemo } from './vendor/htm-preact-standalone.mjs';
 import { formatMdx } from './mdx-format.js';
+import { prettyXml, download } from './trace-text.js';
+import { msText, statementCount, useCopied, SqlView, PlanView } from './query-plan.js';
 
 // beyond these the browser gets slow; the rest of the answer is counted, not shown
 const MAX_GRID_ROWS = 2000;
 const MAX_GRID_COLUMNS = 500;
 const MAX_FLAT_ROWS = 10000;
+const MAX_SHOWN_CHARS = 1000000;  // of the SOAP response and request
 const HISTORY_SIZE = 50;
 
 // ---------------------------------------------------------------------------------------------------------- XMLA
@@ -31,25 +39,44 @@ const first = (el, name) => all(el, name)[0];
 const children = (el, name) => (el ? [...el.children].filter((c) => c.localName === name) : []);
 const text = (el, name) => first(el, name)?.textContent ?? '';
 
-async function post(action, body) {
+// traced: the endpoint traces the call whatever the user's trace; the answer (and the error) has its traceId
+async function post(action, body, traced = false) {
   const started = performance.now();
+  const request = envelope(body);
   const response = await fetch(endpoint + (client ? `?sap-client=${encodeURIComponent(client)}` : ''), {
     method: 'POST',
-    headers: { 'Content-Type': 'text/xml; charset=utf-8', SOAPAction: `"urn:schemas-microsoft-com:xml-analysis:${action}"` },
-    body: envelope(body),
+    headers: { 'Content-Type': 'text/xml; charset=utf-8', SOAPAction: `"urn:schemas-microsoft-com:xml-analysis:${action}"`,
+      ...(traced ? { 'X-olap4abap-Trace': 'true' } : {}) },
+    body: request,
   });
   const raw = await response.text();
   const ms = performance.now() - started;
+  const exchange = { request, raw, ms, traceId: response.headers.get('X-olap4abap-Trace-Id') || '' };
   const doc = new DOMParser().parseFromString(raw, 'application/xml');
   if (doc.getElementsByTagName('parsererror')[0]) {
-    throw Object.assign(new Error(`${response.status} ${response.statusText}: the answer is not XML`), { raw, ms });
+    throw Object.assign(new Error(`${response.status} ${response.statusText}: the answer is not XML`), exchange);
   }
   const fault = first(doc, 'Fault');
   if (fault) {
     const description = first(fault, 'Error')?.getAttribute('Description');
-    throw Object.assign(new Error(description || text(fault, 'faultstring') || 'SOAP fault'), { raw, ms });
+    throw Object.assign(new Error(description || text(fault, 'faultstring') || 'SOAP fault'), exchange);
   }
-  return { doc, raw, ms };
+  return { doc, ...exchange };
+}
+
+// a traced call's entry without its response (the console has that): runtime, SQL statements with rows and time
+async function tracedCall(id) {
+  const query = new URLSearchParams({ id, response: 'false' });
+  if (client) query.set('sap-client', client);
+  const response = await fetch(`api/trace/entry?${query}`);
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error(`${response.status} ${response.statusText}`);
+  }
+  if (!response.ok) throw new Error(data.error || `${response.status} ${response.statusText}`);
+  return data;
 }
 
 async function discover(requestType, restrictions = {}, properties = {}) {
@@ -61,12 +88,12 @@ async function discover(requestType, restrictions = {}, properties = {}) {
   return all(doc, 'row').map((row) => Object.fromEntries([...row.children].map((c) => [c.localName, c.textContent])));
 }
 
-function execute(statement, dataSource, catalog) {
+function execute(statement, dataSource, catalog, traced) {
   return post('Execute', '<Execute xmlns="urn:schemas-microsoft-com:xml-analysis">'
     + `<Command><Statement>${escapeXml(statement)}</Statement></Command>`
     + `<Properties><PropertyList>${propertyList({ DataSourceInfo: dataSource, Catalog: catalog, Format: 'Multidimensional',
       AxisFormat: 'TupleFormat', Content: 'Data' })}</PropertyList></Properties>`
-    + '</Execute>');
+    + '</Execute>', traced);
 }
 
 // ------------------------------------------------------------------------------------------------------ cellset
@@ -202,35 +229,26 @@ function Flat({ result, limit }) {
   </table>`;
 }
 
-function Result({ run, view, setView }) {
+const size = (n) => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : n >= 1024 ? `${(n / 1024).toFixed(1)} KB` : `${n} B`;
+// the cells of the answer as a grid or a table
+function Cells({ run, view, setView }) {
   const tableRef = useRef(null);
-  const [copied, setCopied] = useState(false);
-  if (run.state === 'busy') return html`<div class="result-msg muted">Running…</div>`;
-  if (run.state === 'err') {
-    return html`<div class="result-msg"><div class="notice err">${run.message}</div></div>`;
-  }
-  const { result } = run;
+  const [copy, copied] = useCopied();
+  const { result, trace } = run;
   const grid = result.axes.length <= 2 && view !== 'flat';
   const truncated = grid
     ? (result.axes[0]?.tuples.length > MAX_GRID_COLUMNS || result.axes[1]?.tuples.length > MAX_GRID_ROWS)
     : result.size > MAX_FLAT_ROWS;
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(tableRef.current.innerText);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      setCopied(false);
-    }
-  };
   const slicer = result.slicer?.tuples.flat() || [];
 
-  return html`<div class="result">
+  return html`
     <div class="result-bar">
       <span class="muted small">
         ${result.cube && html`<span class="mono">${result.cube}</span> · `}
         ${`${result.axes.length} ${result.axes.length === 1 ? 'axis' : 'axes'} (${result.axes.map((a) => a.tuples.length).join(' × ') || '–'})`
-          + ` · ${result.size.toLocaleString()} cell${result.size === 1 ? '' : 's'} · ${Math.round(run.ms).toLocaleString()} ms`}
+          + ` · ${result.size.toLocaleString()} cell${result.size === 1 ? '' : 's'} · ${msText(run.ms)}`}
+        ${trace && !trace.error && html`<span title="On the server: the call's runtime, its SQL statements and their time">${
+          ` · server ${msText(trace.runtimeMs)}, ${statementCount(trace.sqlCount)} ${msText(trace.sqlMs)}`}</span>`}
       </span>
       ${slicer.length > 0 && html`<span class="small" title="The slicer (WHERE)">where ${slicer.map((m, i) => html`${i > 0 && ', '}<span
         class="kind" title=${m.uname}>${caption(m)}</span>`)}</span>`}
@@ -239,14 +257,98 @@ function Result({ run, view, setView }) {
         <button class=${grid ? 'active' : ''} onClick=${() => setView('grid')}>Grid</button>
         <button class=${grid ? '' : 'active'} onClick=${() => setView('flat')}>Table</button>
       </div>`}
-      <button onClick=${copy} title="Copy the table as tab-separated text">${copied ? 'Copied' : 'Copy'}</button>
+      ${copied}
+      <button onClick=${() => copy(tableRef.current.innerText)} title="Copy the table as tab-separated text">Copy</button>
     </div>
     ${truncated && html`<div class="notice warn">The answer is too large to show in full: ${grid
       ? `the first ${MAX_GRID_ROWS.toLocaleString()} rows and ${MAX_GRID_COLUMNS.toLocaleString()} columns are shown`
       : `the first ${MAX_FLAT_ROWS.toLocaleString()} of ${result.size.toLocaleString()} rows are shown`}.</div>`}
     <div class="result-table" ref=${tableRef}>
       ${grid ? html`<${Grid} result=${result} />` : html`<${Flat} result=${result} limit=${MAX_FLAT_ROWS} />`}
+    </div>`;
+}
+
+// the SOAP request or response as sent, or indented for reading
+// A browser cannot lay out a textarea of a hundred megabytes: of a larger text the first MAX_SHOWN_CHARS are shown
+// (as on the trace page); Download gives all of it.
+function Xml({ text, name, children: notices }) {
+  const [pretty, setPretty] = useState(true);
+  const [copy, copied] = useCopied();
+  const cut = text.length > MAX_SHOWN_CHARS;
+  const part = useMemo(() => (cut ? text.slice(0, MAX_SHOWN_CHARS) : text), [text]);
+  const shown = useMemo(() => (pretty ? prettyXml(part) : part), [part, pretty]);
+  return html`
+    <div class="result-bar">
+      <label class="inline"><input type="checkbox" checked=${pretty} onChange=${(e) => setPretty(e.target.checked)} /> Indent XML</label>
+      <span class="muted small">${size(text.length)}</span>
+      <span class="spacer"></span>
+      ${copied}
+      <button onClick=${() => copy(shown)} disabled=${!text} title=${cut ? 'Copy the part shown' : 'Copy the text shown'}>Copy</button>
+      <button onClick=${() => download(text, name)} disabled=${!text} title="All of it, as sent">Download</button>
     </div>
+    ${cut && html`<div class="notice warn">${`The text has ${size(text.length)}; the first ${MAX_SHOWN_CHARS.toLocaleString('en')} characters are shown`
+      + ' (Copy copies those). Download gives all of it.'}</div>`}
+    ${notices}
+    <textarea class="trace" readonly spellcheck="false" value=${shown} aria-label=${name}></textarea>`;
+}
+
+// ------------------------------------------------------------------------------------------- query plan and SQL
+
+// the run's traced call as the shared views take it (query-plan.js): its trace with the statement and the browser's time
+const tracedCallOf = (run) => ({ ...run.trace, id: run.traceId, mdx: run.mdx, browserMs: run.ms });
+
+// what is shown instead of the trace while there is none: Trace off, not read yet, not readable
+function traceMissing(run, traced, what) {
+  if (!run.traceId) {
+    return html`<div class="result-msg muted">${traced
+      ? 'The endpoint did not trace the call.'
+      : `Trace is off: switch it on next to Run and run the statement again to see its ${what}.`}</div>`;
+  }
+  if (!run.trace) return html`<div class="result-msg muted">Reading the trace…</div>`;
+  if (run.trace.error) return html`<div class="result-msg"><div class="notice err">The trace could not be read: ${run.trace.error}</div></div>`;
+  return null;
+}
+
+function Sql({ run, traced, onNode, onPhase }) {
+  return traceMissing(run, traced, 'SQL statements') || html`<${SqlView} call=${tracedCallOf(run)} onNode=${onNode} onPhase=${onPhase}>
+    <a class="button" href=${`trace.html${location.search}`} target="_blank" rel="noopener" title="The call is listed on the trace page too">Trace page</a>
+  <//>`;
+}
+
+function Plan({ run, traced, selection, setSelection }) {
+  return traceMissing(run, traced, 'query plan')
+    || html`<${PlanView} call=${tracedCallOf(run)} selection=${selection} setSelection=${setSelection} />`;
+}
+
+// The answer of the last run: its cells (or its error), its query plan, the SQL statements it ran and the SOAP
+// response and request
+function Result({ run, view, setView, tab, setTab, traced }) {
+  const [selection, setSelection] = useState(null);  // the element ({node}) or phase ({phase}) of the query plan
+  if (run.state === 'busy') return html`<div class="result-msg muted">Running…</div>`;
+  const { trace } = run;
+  const sqlLabel = !run.traceId ? 'off' : !trace ? '…' : trace.error ? '!' : `${trace.sqlCount} · ${msText(trace.sqlMs)}`;
+  const planLabel = !run.traceId ? 'off' : !trace ? '…' : trace.error || !trace.explain ? 'none' : '';
+  const tabs = [['result', 'Result', run.state === 'err' ? 'error' : ''], ['plan', 'Query plan', planLabel],
+    ['sql', 'SQL statements', sqlLabel], ['response', 'SOAP response', size((run.raw || '').length)], ['request', 'SOAP request', '']];
+  // from a statement to its element or phase in the plan
+  const show = (target) => {
+    setSelection(target);
+    setTab('plan');
+  };
+  return html`<div class="result">
+    <div class="tabs result-tabs" role="tablist">
+      ${tabs.map(([key, label, note]) => html`<button role="tab" class=${tab === key ? 'active' : ''} aria-selected=${tab === key}
+        onClick=${() => setTab(key)}>${label}${note && html` <span class="muted small">${note}</span>`}</button>`)}
+    </div>
+    ${tab === 'response' ? html`<${Xml} text=${run.raw || ''} name="execute-response.xml">
+        ${run.state === 'err' && run.raw && html`<div class="notice err">The answer is a SOAP fault, or no XML.</div>`}
+        ${!run.raw && html`<div class="notice warn">No response: ${run.message}</div>`}
+      <//>`
+      : tab === 'request' ? html`<${Xml} text=${run.request || ''} name="execute-request.xml" />`
+      : tab === 'sql' ? html`<${Sql} run=${run} traced=${traced} onNode=${(id) => show({ node: id })} onPhase=${(phase) => show({ phase })} />`
+      : tab === 'plan' ? html`<${Plan} run=${run} traced=${traced} selection=${selection} setSelection=${setSelection} />`
+      : run.state === 'err' ? html`<div class="notice err">${run.message}</div>`
+      : html`<${Cells} run=${run} view=${view} setView=${setView} />`}
   </div>`;
 }
 
@@ -381,6 +483,9 @@ function App() {
   const [history, setHistory] = useState(load('history', []));
   const [run, setRun] = useState(null);
   const [view, setView] = useState('grid');
+  const [tab, setTab] = useState('result');
+  const [traced, setTraced] = useState(() => load('trace', true));
+  const runs = useRef(0);  // the number of the last run: a trace read for an earlier one is dropped
   const [error, setError] = useState('');
   const editor = useRef(null);
   const dataSource = sources?.[0]?.DataSourceName || '';
@@ -401,6 +506,7 @@ function App() {
   }, []);
   useEffect(() => save('catalog', catalog), [catalog]);
   useEffect(() => save('statement', statement), [statement]);
+  useEffect(() => save('trace', traced), [traced]);
 
   const runStatement = useCallback(async () => {
     const area = editor.current;
@@ -408,19 +514,27 @@ function App() {
       ? area.value.slice(area.selectionStart, area.selectionEnd) : statement;
     const mdx = selected.trim();
     if (!mdx || !catalog) return;
+    const number = ++runs.current;
     setRun({ state: 'busy' });
+    let done;
     try {
-      const { doc, ms } = await execute(mdx, dataSource, catalog);
-      setRun({ state: 'ok', result: parseCellset(doc), ms });
+      const { doc, ms, raw, request, traceId } = await execute(mdx, dataSource, catalog, traced);
+      done = { state: 'ok', result: parseCellset(doc), ms, raw, request, traceId, mdx };
     } catch (e) {
-      setRun({ state: 'err', message: e.message, ms: e.ms });
+      done = { state: 'err', message: e.message, ms: e.ms, raw: e.raw || '', request: e.request || '', traceId: e.traceId || '', mdx };
+    }
+    if (number !== runs.current) return;
+    setRun(done);
+    if (done.traceId) {
+      tracedCall(done.traceId).catch((e) => ({ error: e.message }))
+        .then((trace) => number === runs.current && setRun({ ...done, trace }));
     }
     setHistory((h) => {
       const next = [mdx, ...h.filter((x) => x !== mdx)].slice(0, HISTORY_SIZE);
       save('history', next);
       return next;
     });
-  }, [statement, catalog, dataSource]);
+  }, [statement, catalog, dataSource, traced]);
 
   const insert = (piece) => {
     const area = editor.current;
@@ -483,6 +597,8 @@ function App() {
               title="Run the statement, or the selected part of it (Ctrl+Enter)">${busy ? 'Running…' : 'Run'}</button>
             <button disabled=${!statement.trim()} onClick=${format}
               title="Lay out the statement, or the selected part of it, for reading (Shift+Alt+F)">Format</button>
+            <label class="inline" title="Trace the call: its SQL statements, their rows and time (the call is listed on the trace page too)">
+              <input type="checkbox" checked=${traced} onChange=${(e) => setTraced(e.target.checked)} /> Trace SQL</label>
             <select value="" aria-label="History" disabled=${!history.length} onChange=${(e) => {
               const i = e.target.value;
               e.target.value = '';
@@ -494,7 +610,7 @@ function App() {
             <span class="muted small">Ctrl+Enter runs the statement or the selection, Shift+Alt+F formats it; click a name on the left to insert it.</span>
           </div>
         </div>
-        ${run ? html`<${Result} run=${run} view=${view} setView=${setView} />`
+        ${run ? html`<${Result} run=${run} view=${view} setView=${setView} tab=${tab} setTab=${setTab} traced=${traced} />`
           : html`<div class="result-msg muted">Write a statement and run it. Up to two axes show as a grid, more as a table.</div>`}
       </main>
     </div>`;

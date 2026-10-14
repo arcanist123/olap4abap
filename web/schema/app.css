@@ -224,7 +224,35 @@ table.flat thead th { position: sticky; top: 0; z-index: 1; }
 /* the axis as generated content, so Copy (innerText) leaves it out */
 table.flat th[data-axis]::after { content: attr(data-axis); margin-left: 6px; font-size: 10.5px; color: var(--muted); font-weight: 400; }
 table.flat th.num { text-align: right; }
-@media (max-width: 760px) { .console-main { overflow: visible; } }
+/* the result's tabs: cells, SOAP response, SQL statements, SOAP request */
+.result-tabs { padding: 0; background: none; flex: none; }
+.result textarea.trace { flex: 1; min-height: 200px; resize: none; }
+table.sql-list td { vertical-align: top; white-space: normal; }
+table.sql-list thead th { position: sticky; top: 0; z-index: 1; }
+pre.sql { margin: 0; font-family: var(--mono); font-size: 12px; line-height: 1.45; white-space: pre-wrap; word-break: break-word;
+  max-height: 12em; overflow: auto; }
+/* the query plan: the resolved tree on the left, the statements of the selected element or phase on the right */
+.plan { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 12px; }
+.plan-tree { overflow: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); padding: 4px 0; }
+.plan-sql { min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+.plan-summary { padding: 6px 8px 8px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.plan-part { padding: 8px 8px 2px; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.plan-node { display: flex; align-items: center; gap: 6px; padding: 2px 8px; cursor: pointer; white-space: nowrap; }
+.plan-node:hover { background: var(--sunken); }
+.plan-node.selected { background: var(--accent-soft); }
+.plan-node .twisty { width: 12px; color: var(--muted); flex: none; }
+.plan-node .spacer { flex: 1; }
+.plan-label { overflow: hidden; text-overflow: ellipsis; }
+.plan-label.phase { flex: none; }
+.plan-desc { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.plan-node .mark, .plan-node .sql-badge { flex: none; }
+.mark { font-size: 10.5px; border-radius: 999px; padding: 0 7px; background: var(--sunken); color: var(--muted); }
+.mark.relational { background: var(--ok-soft); color: var(--ok); }
+.mark.computed { background: var(--warn-soft); color: var(--warn); }
+.sql-badge { font-size: 11px; font-variant-numeric: tabular-nums; border-radius: 4px; padding: 0 6px; background: var(--accent-soft); color: var(--accent); }
+pre.plan-mdx { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--sunken); max-height: 6em; }
+@media (max-width: 760px) { .console-main { overflow: visible; } .result textarea.trace { min-height: 360px; }
+  .plan { grid-template-columns: minmax(0, 1fr); } .plan-tree { max-height: 420px; } }
 
 /* trace */
 tr.selected td { background: var(--accent-soft); }
@@ -238,6 +266,9 @@ textarea.trace { width: 100%; min-height: 420px; font-family: var(--mono); font-
 .trace-split td.statement { max-width: 260px; }
 .trace-split > .detail { position: sticky; top: 8px; }
 .trace-split textarea.trace { min-height: calc(100vh - 280px); }
+/* the query plan and the SQL statements of a call (query-plan.js), as in the MDX console */
+.trace-view { display: flex; flex-direction: column; gap: 8px; height: calc(100vh - 240px); min-height: 480px; }
+.trace-split .trace-view .plan { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
 @media (max-width: 1000px) {
   .trace-split { grid-template-columns: minmax(0, 1fr); }
   .trace-split .wide-only { display: table-cell; }
