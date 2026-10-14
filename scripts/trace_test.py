@@ -50,9 +50,9 @@ def main():
         if not condition:
             failures.append(name)
 
-    def api(method, resource, **params):
+    def api(http_method, resource, **params):
         query = urllib.parse.urlencode({"sap-client": args.client, **params})
-        status, text, headers = http(method, f"{args.url}/schema/api/{resource}?{query}")
+        status, text, headers = http(http_method, f"{args.url}/schema/api/{resource}?{query}")
         return status, (json.loads(text) if "json" in headers.get("content-type", "") else text)
 
     xmla = f"{args.url}?sap-client={args.client}"
@@ -92,6 +92,17 @@ def main():
               and entry.get("responseTruncated") is False, entry.get("response", "")[:300])
         status, raw = api("GET", "trace/response", id=execute["id"])
         check("trace/response: the response as XML", status == 200 and raw == execute_response, str(raw)[:300])
+
+        for method, call in (("EXECUTE", execute), ("DISCOVER", discover)):
+            status, only = api("GET", "trace", filter=user, method=method.lower())
+            ids = [c["id"] for c in only["calls"]]
+            check(f"method={method}: only these calls", status == 200 and call["id"] in ids
+                  and all(c["method"] == method for c in only["calls"]), only.get("calls", only)[:2])
+    check("an unknown method is refused", api("GET", "trace", method="select")[0] == 400)
+    status, one = api("GET", "trace", filter=user, max="1")
+    check("max=1: one call", status == 200 and len(one["calls"]) == 1 and one["max"] == 1, one.get("calls", one))
+    check("max out of range is refused", api("GET", "trace", max="0")[0] == 400 and api("GET", "trace", max="10001")[0] == 400
+          and api("GET", "trace", max="x")[0] == 400)
 
     status, state = api("POST", "trace/off", user=user)
     check("trace/off", status == 200 and not any(u["user"] == user for u in state["users"]), state)

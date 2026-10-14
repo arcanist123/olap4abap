@@ -74,6 +74,7 @@ a { color: var(--accent); }
 .topbar label.inline { display: flex; align-items: center; gap: 6px; color: var(--muted); }
 
 /* controls */
+a.button { text-decoration: none; display: inline-block; }
 button, .button {
   font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--text);
   border-radius: var(--radius); padding: 4px 10px; cursor: pointer; white-space: nowrap;
@@ -230,3 +231,15 @@ tr.selected td { background: var(--accent-soft); }
 td.statement { max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 textarea.trace { width: 100%; min-height: 420px; font-family: var(--mono); font-size: 12.5px; line-height: 1.5;
   white-space: pre; tab-size: 2; resize: vertical; }
+.pane.wide { max-width: none; }
+/* a selected call is shown next to the list, which then leaves out user and client */
+.trace-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.trace-split .wide-only { display: none; }
+.trace-split td.statement { max-width: 260px; }
+.trace-split > .detail { position: sticky; top: 8px; }
+.trace-split textarea.trace { min-height: calc(100vh - 280px); }
+@media (max-width: 1000px) {
+  .trace-split { grid-template-columns: minmax(0, 1fr); }
+  .trace-split .wide-only { display: table-cell; }
+  .trace-split > .detail { position: static; }
+}

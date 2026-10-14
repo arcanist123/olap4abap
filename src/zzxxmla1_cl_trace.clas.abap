@@ -95,9 +95,11 @@ CLASS zzxxmla1_cl_trace DEFINITION
       RETURNING VALUE(result)  TYPE REF TO zzxxmla1_cl_trace.
     "! The traced calls, newest first, without request and response.
     "! @parameter user_name | only this user's; initial: everyone's
+    "! @parameter xmla_method | only calls of this method (DISCOVER or EXECUTE); initial: all calls
     "! @parameter max | at most this many
     CLASS-METHODS list
       IMPORTING user_name     TYPE syuname OPTIONAL
+                xmla_method   TYPE string OPTIONAL
                 !max          TYPE i DEFAULT 200
       RETURNING VALUE(result) TYPE ty_t_entry.
     "! A traced call with its request and its response, unzipped; its trace_id is initial if there is none.
@@ -243,10 +245,15 @@ CLASS zzxxmla1_cl_trace IMPLEMENTATION.
     IF user_name IS NOT INITIAL.
       users = VALUE #( ( sign = 'I' option = 'EQ' low = user_name ) ).
     ENDIF.
+    DATA methods TYPE RANGE OF zzxxmla1_trace-xmla_method.
+    IF xmla_method IS NOT INITIAL.
+      methods = VALUE #( ( sign = 'I' option = 'EQ' low = xmla_method ) ).
+    ENDIF.
     SELECT trace_id, user_name, created_at, xmla_method, request_type, status, fault, runtime_ms, client_address,
            user_agent, request_length, response_length, mdx
       FROM zzxxmla1_trace
       WHERE user_name IN @users
+        AND xmla_method IN @methods
       ORDER BY created_at DESCENDING
       INTO CORRESPONDING FIELDS OF TABLE @result
       UP TO @max ROWS.

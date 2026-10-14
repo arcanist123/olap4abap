@@ -360,11 +360,22 @@ function save(key, value) {
   }
 }
 
+// A statement handed over in the URL's fragment (#statement=...&catalog=..., the trace page's "Open in MDX Console"):
+// read once, then removed from the address bar, so a reload shows what was typed since. The fragment is not sent to
+// the server, so a long statement fits.
+function handedOver() {
+  const params = new URLSearchParams(location.hash.slice(1));
+  if (!params.has('statement')) return {};
+  history.replaceState(null, '', location.pathname + location.search);
+  return { statement: params.get('statement'), catalog: params.get('catalog') || '' };
+}
+
 function App() {
+  const [handed] = useState(handedOver);
   const [sources, setSources] = useState(null);
   const [catalogs, setCatalogs] = useState([]);
-  const [catalog, setCatalog] = useState(load('catalog', ''));
-  const [statement, setStatement] = useState(load('statement', ''));
+  const [catalog, setCatalog] = useState(() => handed.catalog || load('catalog', ''));
+  const [statement, setStatement] = useState(() => handed.statement ?? load('statement', ''));
   const [history, setHistory] = useState(load('history', []));
   const [run, setRun] = useState(null);
   const [view, setView] = useState('grid');

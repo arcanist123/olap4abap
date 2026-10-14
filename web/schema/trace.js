@@ -6,6 +6,17 @@ import { html, render, useState, useEffect, useRef } from './vendor/htm-preact-s
 
 const client = new URLSearchParams(location.search).get('sap-client');
 const REFRESH_MS = 5000;
+const MAX_CHOICES = [50, 200, 500, 1000, 5000, 10000];
+const MAX_KEY = 'olap4abap.trace.max';
+// the number of calls listed is remembered per browser; storage may be unavailable (private windows)
+const storedMax = () => {
+  try {
+    const n = Number(localStorage.getItem(MAX_KEY));
+    return MAX_CHOICES.includes(n) ? n : 200;
+  } catch {
+    return 200;
+  }
+};
 
 const apiUrl = (resource, params = {}) => {
   const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v));
@@ -58,6 +69,40 @@ function prettyXml(text) {
   return out.join('\n');
 }
 
+// navigator.clipboard exists only on HTTPS and localhost; the endpoint is often plain HTTP, so a hidden textarea and
+// execCommand('copy') are the fallback
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch { /* the fallback below */ }
+  const area = Object.assign(document.createElement('textarea'), { value: text, readOnly: true });
+  area.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+  document.body.appendChild(area);
+  area.select();
+  let copied = false;
+  try { copied = document.execCommand('copy'); } catch { copied = false; }
+  area.remove();
+  return copied;
+}
+
+// the Catalog property of an Execute request, initial if it names none
+function requestCatalog(xml) {
+  const doc = new DOMParser().parseFromString(xml || '', 'application/xml');
+  const element = doc.getElementsByTagNameNS('*', 'Catalog')[0];
+  return element ? element.textContent.trim() : '';
+}
+
+// the MDX console with the statement and the catalog of a traced Execute (console.js reads the fragment)
+const consoleUrl = (entry) => {
+  const fragment = new URLSearchParams({ statement: entry.mdx });
+  const catalog = requestCatalog(entry.request);
+  if (catalog) fragment.set('catalog', catalog);
+  return `console.html${location.search}#${fragment}`;
+};
+
 const download = (text, name) => {
   const url = URL.createObjectURL(new Blob([text], { type: 'text/xml' }));
   const a = Object.assign(document.createElement('a'), { href: url, download: name });
@@ -89,7 +134,7 @@ function Users({ state, onSwitch, busy }) {
           <td class="actions"><button disabled=${busy} onClick=${() => onSwitch('off', u.user)}>Switch off</button></td>
         </tr>`)}</tbody>
       </table>` : html`<div class="muted">The trace is off for every user.</div>`}
-      <div class="notice info small">A call is traced under the SAP user it runs as. This page runs as
+      <div class="notice info small">A call is traced under the SAP user it runs as. This page runs as${' '}
         <span class="mono">${state.user}</span>; while the ICF node <span class="mono">/zzxxmla1</span> logs on anonymously,
         every XMLA call runs as that user too. The client's address and User-Agent tell the callers apart.</div>
     </div>
@@ -101,6 +146,12 @@ function Detail({ id, onClose }) {
   const [error, setError] = useState('');
   const [tab, setTab] = useState('');
   const [pretty, setPretty] = useState(true);
+  const [copied, setCopied] = useState('');  // the feedback of Copy, for a moment
+  useEffect(() => {
+    if (!copied) return undefined;
+    const timer = setTimeout(() => setCopied(''), 2000);
+    return () => clearTimeout(timer);
+  }, [copied]);
   useEffect(() => {
     setEntry(null);
     setError('');
@@ -109,19 +160,23 @@ function Detail({ id, onClose }) {
       setTab((t) => (t === 'mdx' && !e.mdx) || !t ? (e.mdx ? 'mdx' : 'request') : t);
     }, (e) => setError(e.message));
   }, [id]);
-  if (error) return html`<div class="notice err">${error}</div>`;
-  if (!entry) return html`<section class="section"><div class="body muted">Reading the call…</div></section>`;
+  if (error) return html`<section class="section detail"><div class="body"><div class="notice err">${error}</div></div></section>`;
+  if (!entry) return html`<section class="section detail"><div class="body muted">Reading the call…</div></section>`;
 
   const raw = tab === 'mdx' ? entry.mdx : tab === 'request' ? entry.request : entry.response;
   const shown = tab === 'mdx' || !pretty ? raw : prettyXml(raw);
-  const copy = () => navigator.clipboard?.writeText(raw);
+  // what is shown (indented or not) is what is copied
+  const copy = () => copyText(shown).then((ok) => setCopied(ok ? 'Copied' : 'Copy failed: select the text and press Ctrl+C'));
   const save = () => tab === 'response' && entry.responseTruncated
     ? window.open(apiUrl('trace/response', { id }), '_blank')
     : download(raw, `${entry.id}-${tab}.${tab === 'mdx' ? 'mdx' : 'xml'}`);
-  return html`<section class="section">
+  return html`<section class="section detail">
     <header><h2>${what(entry)}${entry.type && html` <span class="mono">${entry.type}</span>`}</h2>
       <span class="muted small">${time(entry.at)} · ${entry.user} · ${entry.client}${entry.status ? ` · ${entry.runtimeMs} ms` : ''}</span>
-      <span class="spacer"></span><button class="link" onClick=${onClose}>Close</button></header>
+      <span class="spacer"></span>
+      ${entry.mdx && html`<a class="button" href=${consoleUrl(entry)} target="_blank" rel="noopener"
+        title=${`Open the statement in the MDX console${requestCatalog(entry.request) ? ` on catalog ${requestCatalog(entry.request)}` : ''}`}>Open in MDX Console</a>`}
+      <button class="link" onClick=${onClose}>Close</button></header>
     <div class="tabs" role="tablist">
       ${entry.mdx && html`<button role="tab" class=${tab === 'mdx' ? 'active' : ''} onClick=${() => setTab('mdx')}>MDX statement</button>`}
       <button role="tab" class=${tab === 'request' ? 'active' : ''} onClick=${() => setTab('request')}>SOAP request <span class="muted small">${size(entry.requestLength)}</span></button>
@@ -131,6 +186,7 @@ function Detail({ id, onClose }) {
       <div class="row">
         ${tab !== 'mdx' && html`<label class="inline"><input type="checkbox" checked=${pretty} onChange=${(e) => setPretty(e.target.checked)} /> Indent XML</label>`}
         <span class="spacer"></span>
+        ${copied && html`<span class=${`status ${copied === 'Copied' ? 'ok' : 'err'}`} role="status">${copied}</span>`}
         <button onClick=${copy} disabled=${!raw}>Copy</button>
         <button onClick=${save} disabled=${!raw}>Download</button>
       </div>
@@ -146,20 +202,33 @@ function Detail({ id, onClose }) {
 function App() {
   const [state, setState] = useState(null);       // the answer of GET trace
   const [filter, setFilter] = useState('');
+  const [kinds, setKinds] = useState({ DISCOVER: true, EXECUTE: true });  // the toggles: which calls are listed
+  const [max, setMax] = useState(storedMax);
   const [selected, setSelected] = useState('');
   const [auto, setAuto] = useState(false);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const filterRef = useRef(filter);
   filterRef.current = filter;
+  // one toggle on: the server lists only that method (its newest 200); both on: every call; both off: none
+  const method = kinds.DISCOVER === kinds.EXECUTE ? '' : kinds.DISCOVER ? 'DISCOVER' : 'EXECUTE';
+  const methodRef = useRef(method);
+  methodRef.current = method;
+  const maxRef = useRef(max);
+  maxRef.current = max;
+  const chooseMax = (n) => {
+    setMax(n);
+    try { localStorage.setItem(MAX_KEY, String(n)); } catch { /* not remembered */ }
+  };
+  const none = !kinds.DISCOVER && !kinds.EXECUTE;
 
   const load = (quiet) => {
     if (!quiet) setBusy('Reading the trace…');
-    return api('GET', 'trace', { filter: filterRef.current })
+    return api('GET', 'trace', { filter: filterRef.current, method: methodRef.current, max: maxRef.current })
       .then((data) => { setState(data); setError(''); }, (e) => setError(e.message))
       .finally(() => quiet || setBusy(''));
   };
-  useEffect(() => { load(); }, [filter]);
+  useEffect(() => { load(); }, [filter, method, max]);
   useEffect(() => {
     if (!auto) return undefined;
     const timer = setInterval(() => load(true), REFRESH_MS);
@@ -169,7 +238,7 @@ function App() {
   const post = (resource, params, message) => {
     if (message && !confirm(message)) return;
     setBusy('Saving…');
-    api('POST', resource, { ...params, filter })
+    api('POST', resource, { ...params, filter, method, max })
       .then((data) => { setState(data); setError(''); }, (e) => setError(e.message))
       .finally(() => setBusy(''));
   };
@@ -184,15 +253,25 @@ function App() {
     <div class="topbar"><h1>XMLA Trace</h1><span class="muted">the calls of the XMLA endpoint, per user</span>
       <span class="spacer"></span><a href=${`./${location.search}`}>Schema Builder</a><a href=${`console.html${location.search}`}>MDX Console</a>
       <a href=${`time.html${location.search}`}>Time Master Data</a></div>
-    <div class="page"><div class="pane">
+    <div class="page"><div class="pane wide">
       ${error && html`<div class="notice err">${error}</div>`}
       ${state && html`<${Users} state=${state} onSwitch=${onSwitch} busy=${!!busy} />`}
+      <div class=${selected ? 'trace-split' : ''}>
       <section class="section">
         <header><h2>Calls</h2>
           <select value=${filter} onChange=${(e) => { setFilter(e.target.value); setSelected(''); }} aria-label="User">
             <option value="">All users</option>
             ${userNames.map((u) => html`<option value=${u}>${u}</option>`)}
           </select>
+          <div class="segmented" role="group" aria-label="Calls">
+            ${[['DISCOVER', 'Discover'], ['EXECUTE', 'Execute']].map(([k, label]) => html`<button
+              class=${kinds[k] ? 'active' : ''} aria-pressed=${kinds[k]} title=${`Show the ${label} calls`}
+              onClick=${() => { setKinds((s) => ({ ...s, [k]: !s[k] })); setSelected(''); }}>${label}</button>`)}
+          </div>
+          <label class="inline">Show
+            <select value=${max} onChange=${(e) => chooseMax(Number(e.target.value))} aria-label="Calls shown">
+              ${MAX_CHOICES.map((n) => html`<option value=${n}>${n.toLocaleString()}</option>`)}
+            </select> newest</label>
           <span class="spacer"></span>
           ${busy && html`<span class="status busy">${busy}</span>`}
           <label class="inline"><input type="checkbox" checked=${auto} onChange=${(e) => setAuto(e.target.checked)} /> Refresh every 5 s</label>
@@ -200,14 +279,15 @@ function App() {
           ${filter && html`<button class="danger" onClick=${() => clear(filter)} disabled=${!!busy || !state?.calls.length}>Delete ${filter}'s calls</button>`}
           <button class="danger" onClick=${() => clear('')} disabled=${!!busy}>Delete all</button></header>
         <div class="scroll-x">${!state ? html`<div class="body muted">${busy || 'No data.'}</div>`
-          : !state.calls.length ? html`<div class="body muted">No traced calls${filter ? ` of ${filter}` : ''}.</div>` : html`
+          : none ? html`<div class="body muted">Switch Discover or Execute on to list calls.</div>`
+          : !state.calls.length ? html`<div class="body muted">No traced ${method ? `${what({ method })} ` : ''}calls${filter ? ` of ${filter}` : ''}.</div>` : html`
           <table>
-            <thead><tr><th>Time</th><th>User</th><th>Call</th><th>Statement or rowset</th><th>Status</th>
-              <th class="num">ms</th><th class="num">Response</th><th>Client</th></tr></thead>
+            <thead><tr><th>Time</th><th class="wide-only">User</th><th>Call</th><th>Statement or rowset</th><th>Status</th>
+              <th class="num">ms</th><th class="num">Response</th><th class="wide-only">Client</th></tr></thead>
             <tbody>${state.calls.map((c) => html`
               <tr class=${`clickable${c.id === selected ? ' selected' : ''}`} onClick=${() => setSelected(c.id === selected ? '' : c.id)}>
                 <td class="small">${time(c.at)}</td>
-                <td class="mono">${c.user}</td>
+                <td class="mono wide-only">${c.user}</td>
                 <td>${what(c)}</td>
                 <td class="mono small statement" title=${c.mdx}>${c.mdx ? firstLine(c.mdx) : c.type}</td>
                 <td>${!c.status ? html`<span class="status warn">no answer</span>`
@@ -215,14 +295,15 @@ function App() {
                   : c.status === 200 ? html`<span class="status ok">ok</span>` : html`<span class="status err">${c.status}</span>`}</td>
                 <td class="num">${c.status ? c.runtimeMs : ''}</td>
                 <td class="num">${c.status ? size(c.responseLength) : ''}</td>
-                <td class="mono small">${c.client}</td>
+                <td class="mono small wide-only">${c.client}</td>
               </tr>`)}
             </tbody>
           </table>`}
         </div>
-        ${state && state.calls.length >= 200 && html`<div class="body muted small">The newest 200 calls are shown.</div>`}
+        ${state && !none && state.calls.length >= state.max && html`<div class="body muted small">The newest ${state.max.toLocaleString()} calls are shown; choose more next to Show.</div>`}
       </section>
       ${selected && html`<${Detail} id=${selected} onClose=${() => setSelected('')} />`}
+      </div>
     </div></div>`;
 }
 

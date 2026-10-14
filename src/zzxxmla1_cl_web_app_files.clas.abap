@@ -109,66 +109,70 @@ CLASS zzxxmla1_cl_web_app_files IMPLEMENTATION.
     APPEND |\n\n/* top bar */\n.topbar \{\n  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;\n  padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line| TO parts.
     APPEND |);\n  position: sticky; top: 0; z-index: 5;\n\}\n.topbar .title \{ display: flex; align-items: baseline; gap: 8px; min-width: 0; \}\n.topbar .title .src \{ color: var(--muted); whi| TO parts.
     APPEND |te-space: nowrap; overflow: hidden; text-overflow: ellipsis; \}\n.topbar .spacer \{ flex: 1; \}\n.topbar label.inline \{ display: flex; align-items: center; gap: 6px; color: var(--| TO parts.
-    APPEND |muted); \}\n\n/* controls */\nbutton, .button \{\n  font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--text);\n  border-radius: var(--radius); pad| TO parts.
-    APPEND |ding: 4px 10px; cursor: pointer; white-space: nowrap;\n\}\nbutton:hover:not(:disabled) \{ border-color: var(--muted); \}\nbutton:disabled \{ opacity: .5; cursor: default; \}\nbutto| TO parts.
-    APPEND |n.primary \{ background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; \}\nbutton.danger \{ color: var(--err); \}\nbutton.icon \{ padding| TO parts.
-    APPEND |: 2px 7px; line-height: 1.2; \}\nbutton.link \{ border: 0; background: none; color: var(--accent); padding: 0; \}\ninput[type=text], input[type=search], select, textarea \{\n  font| TO parts.
-    APPEND |: inherit; color: var(--text); background: var(--panel);\n  border: 1px solid var(--line); border-radius: var(--radius); padding: 4px 8px; min-width: 0;\n\}\ninput[type=text]:focus| TO parts.
-    APPEND |, input[type=search]:focus, select:focus, textarea:focus, button:focus-visible \{\n  outline: 2px solid var(--accent); outline-offset: -1px;\n\}\ninput.invalid \{ border-color: var| TO parts.
-    APPEND |(--err); \}\ninput[readonly] \{ background: var(--sunken); color: var(--muted); \}\n.field-error \{ color: var(--err); font-size: 12px; \}\n\n/* status pill */\n.status \{ display:| TO parts.
-    APPEND | inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 2px 10px; font-size: 12.5px;\n  max-width: 46ch; white-space: nowrap; overflow: hidden; text-overflow: e| TO parts.
-    APPEND |llipsis; \}\n.status.ok \{ background: var(--ok-soft); color: var(--ok); \}\n.status.err \{ background: var(--err-soft); color: var(--err); \}\n.status.busy \{ background: var(--su| TO parts.
-    APPEND |nken); color: var(--muted); \}\n.status.warn \{ background: var(--warn-soft); color: var(--warn); \}\n\n/* start page */\n.start \{ display: grid; grid-template-columns: minmax(0, | TO parts.
-    APPEND |1fr) minmax(0, 1.4fr); gap: 16px; padding: 16px; align-items: start; \}\n@media (max-width: 860px) \{ .start \{ grid-template-columns: minmax(0, 1fr); \} \}\n.card \{ background: v| TO parts.
-    APPEND |ar(--panel); border: 1px solid var(--line); border-radius: var(--radius); \}\n.card > header \{ display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px| TO parts.
-    APPEND | solid var(--line); \}\n.card > header .spacer \{ flex: 1; \}\n.card .body \{ padding: 12px; \}\n.card .scroll \{ max-height: calc(100vh - 170px); overflow: auto; \}\n\ntable \{ bo| TO parts.
-    APPEND |rder-collapse: collapse; width: 100%; \}\nth, td \{ text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; \}\nth \{ font-weight: 600; co| TO parts.
-    APPEND |lor: var(--muted); font-size: 12px; position: sticky; top: 0; background: var(--panel); z-index: 1; \}\ntr.clickable \{ cursor: pointer; \}\ntr.clickable:hover td \{ background: va| TO parts.
-    APPEND |r(--accent-soft); \}\ntd.num \{ text-align: right; font-variant-numeric: tabular-nums; \}\ntd.actions \{ white-space: nowrap; text-align: right; \}\ntd input[type=text], td select | TO parts.
-    APPEND |\{ width: 100%; \}\n/* the rows of a selection on a dimension's pane */\ntable.selection \{ width: auto; margin: 6px 0; \}\ntable.selection th \{ position: static; \}\ntable.select| TO parts.
-    APPEND |ion td \{ padding: 2px 6px; \}\ntable.selection td input[type=text] \{ width: auto; \}\n.kind \{ font-size: 11.5px; border: 1px solid var(--line); border-radius: 4px; padding: 0 5p| TO parts.
-    APPEND |x; color: var(--muted); \}\n\n/* editor */\n.editor \{ flex: 1; display: grid; grid-template-columns: 260px minmax(0, 1fr); min-height: 0; \}\n@media (max-width: 760px) \{ .editor | TO parts.
-    APPEND |\{ grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); \} .tree \{ max-height: 40vh; border-right: 0; border-bottom: 1px solid var(--line); \} \}\n.tree| TO parts.
-    APPEND | \{ background: var(--panel); border-right: 1px solid var(--line); overflow: auto; padding: 8px 0; \}\n.tree .group \{ padding: 10px 14px 4px; \}\n.tree .item \{\n  display: flex; | TO parts.
-    APPEND |align-items: center; gap: 6px; width: 100%; text-align: left; border: 0; border-radius: 0;\n  background: none; padding: 4px 14px; color: var(--text);\n\}\n.tree .item.sub \{ paddi| TO parts.
-    APPEND |ng-left: 28px; \}\n.tree .item:hover \{ background: var(--sunken); \}\n.tree .item.selected \{ background: var(--accent-soft); color: var(--accent); font-weight: 600; \}\n.tree .it| TO parts.
-    APPEND |em .badge \{ margin-left: auto; font-size: 11px; color: var(--muted); font-weight: 400; \}\n.main \{ overflow: auto; min-width: 0; \}\n.tabs \{ display: flex; gap: 2px; padding: 8p| TO parts.
-    APPEND |x 16px 0; border-bottom: 1px solid var(--line); background: var(--panel); \}\n.tabs button \{ border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; p| TO parts.
-    APPEND |adding: 6px 12px; color: var(--muted); \}\n.tabs button.active \{ border-bottom-color: var(--accent); color: var(--text); font-weight: 600; \}\n.pane \{ padding: 16px; display: fle| TO parts.
-    APPEND |x; flex-direction: column; gap: 16px; max-width: 1100px; \}\n\n.form \{ display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 12px; align-items: center; max-wi| TO parts.
-    APPEND |dth: 640px; \}\n.form > label \{ color: var(--muted); \}\n.row \{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; \}\n.row .spacer \{ flex: 1; \}\n.switch \{ display| TO parts.
-    APPEND |: inline-flex; align-items: center; gap: 6px; cursor: pointer; \}\n\n.section \{ background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); \}\n.section| TO parts.
-    APPEND | > header \{ display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; \}\n.section > header .spacer \{ flex: 1; \}\n.| TO parts.
-    APPEND |section > .body \{ padding: 12px; display: flex; flex-direction: column; gap: 10px; \}\n.section table th \{ position: static; \}\n.section .scroll-x \{ overflow-x: auto; \}\n\n.hi| TO parts.
-    APPEND |er \{ border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); \}\n.hier > header \{ display: flex; align-items: center; gap: 8px; padding: 8px 10px; fle| TO parts.
-    APPEND |x-wrap: wrap; border-bottom: 1px solid var(--line); \}\n.hier > .body \{ padding: 10px; display: flex; flex-direction: column; gap: 8px; \}\n.props \{ padding: 4px 0 4px 24px; disp| TO parts.
-    APPEND |lay: flex; flex-direction: column; gap: 4px; \}\n.props select, .props input[type=text] \{ width: auto; \}\n\n.notice \{ border-radius: var(--radius); padding: 8px 12px; \}\n.notic| TO parts.
-    APPEND |e.err \{ background: var(--err-soft); color: var(--err); white-space: pre-wrap; \}\n.notice.warn \{ background: var(--warn-soft); color: var(--warn); \}\n.notice.ok \{ background: | TO parts.
-    APPEND |var(--ok-soft); color: var(--ok); \}\n.notice.info \{ background: var(--sunken); color: var(--text); \}\nul.plain \{ margin: 0; padding-left: 18px; \}\n\ntextarea.xml \{ width: 100| TO parts.
-    APPEND |%; min-height: calc(100vh - 230px); font-family: var(--mono); font-size: 12.5px; line-height: 1.5;\n  white-space: pre; tab-size: 2; resize: vertical; \}\n\n/* dialog */\n.backdrop| TO parts.
-    APPEND | \{ position: fixed; inset: 0; background: rgba(0, 0, 0, .35); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 20; \}\n.dialog \{ background: v| TO parts.
-    APPEND |ar(--panel); border: 1px solid var(--line); border-radius: 8px; width: min(560px, 100%); max-height: 90vh; overflow: auto;\n  box-shadow: 0 12px 40px rgba(0, 0, 0, .25); \}\n.dialo| TO parts.
-    APPEND |g > header \{ padding: 14px 16px 0; \}\n.dialog > .body \{ padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; \}\n.dialog > footer \{ padding: 0 16px 14px; displ| TO parts.
-    APPEND |ay: flex; justify-content: flex-end; gap: 8px; \}\n\n/* MDX console (console.html): the cube browser on the left, the statement above the result */\n.console \{ grid-template-colum| TO parts.
-    APPEND |ns: 280px minmax(0, 1fr); \}\n.console-main \{ display: flex; flex-direction: column; overflow: hidden; \}\n.query \{ padding: 12px 16px; display: flex; flex-direction: column; gap| TO parts.
-    APPEND |: 8px; border-bottom: 1px solid var(--line); background: var(--panel); \}\ntextarea.mdx \{ width: 100%; height: 170px; min-height: 80px; font-family: var(--mono); font-size: 13px; | TO parts.
-    APPEND |line-height: 1.5;\n  white-space: pre; tab-size: 2; resize: vertical; \}\n.browser .item \{ gap: 4px; \}\n.browser .item .label \{ overflow: hidden; text-overflow: ellipsis; white-| TO parts.
-    APPEND |space: nowrap; \}\n.browser .twisty \{ width: 12px; color: var(--muted); flex: none; \}\n.browser .pad \{ padding: 4px 14px; \}\n.glyph \{ width: 9px; height: 9px; border-radius: 2| TO parts.
-    APPEND |px; flex: none; margin-right: 3px; background: var(--muted); \}\n.glyph.cube \{ background: var(--accent); \}\n.glyph.folder, .glyph.dimension \{ background: transparent; border: 1| TO parts.
-    APPEND |.5px solid var(--muted); \}\n.glyph.measure \{ background: var(--ok); border-radius: 50%; \}\n.glyph.hierarchy \{ background: var(--warn); \}\n.glyph.level \{ background: var(--lin| TO parts.
-    APPEND |e); border: 1px solid var(--muted); \}\n.result \{ flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 10px 16px 16px; \}\n.result-msg \{ padding: 16p| TO parts.
-    APPEND |x; \}\n.result-bar \{ display: flex; align-items: center; gap: 10px; flex-wrap: wrap; \}\n.result-bar .spacer \{ flex: 1; \}\n.result-table \{ flex: 1; min-height: 0; overflow: aut| TO parts.
-    APPEND |o; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); \}\n.segmented \{ display: inline-flex; \}\n.segmented button \{ border-radius: 0; \}\n.se| TO parts.
-    APPEND |gmented button:first-child \{ border-radius: var(--radius) 0 0 var(--radius); \}\n.segmented button:last-child \{ border-radius: 0 var(--radius) var(--radius) 0; margin-left: -1px;| TO parts.
-    APPEND | \}\n.segmented button.active \{ background: var(--accent-soft); color: var(--accent); border-color: var(--accent); position: relative; \}\ntable.grid \{ width: auto; min-width: 10| TO parts.
-    APPEND |0%; font-variant-numeric: tabular-nums; \}\ntable.grid th, table.grid td \{ border: 1px solid var(--line); padding: 3px 8px; white-space: nowrap; \}\ntable.grid th \{ position: sta| TO parts.
-    APPEND |tic; background: var(--sunken); color: var(--text); font-size: 12.5px; \}\ntable.grid th.corner \{ color: var(--muted); font-weight: 600; \}\ntable.grid th.member \{ font-weight: 5| TO parts.
-    APPEND |00; \}\ntable.grid th.col-head \{ text-align: center; \}\ntable.grid th.row-head \{ vertical-align: top; \}\ntable.grid td.num \{ text-align: right; \}\ntable.grid td.cell-err \{ c| TO parts.
-    APPEND |olor: var(--err); cursor: help; \}\ntable.grid tbody tr:hover td \{ background: var(--accent-soft); \}\ntable.flat thead th \{ position: sticky; top: 0; z-index: 1; \}\n/* the axis| TO parts.
-    APPEND | as generated content, so Copy (innerText) leaves it out */\ntable.flat th[data-axis]::after \{ content: attr(data-axis); margin-left: 6px; font-size: 10.5px; color: var(--muted); | TO parts.
-    APPEND |font-weight: 400; \}\ntable.flat th.num \{ text-align: right; \}\n@media (max-width: 760px) \{ .console-main \{ overflow: visible; \} \}\n\n/* trace */\ntr.selected td \{ backgroun| TO parts.
-    APPEND |d: var(--accent-soft); \}\ntd.statement \{ max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; \}\ntextarea.trace \{ width: 100%; min-height: 420px; f| TO parts.
-    APPEND |ont-family: var(--mono); font-size: 12.5px; line-height: 1.5;\n  white-space: pre; tab-size: 2; resize: vertical; \}\n| TO parts.
+    APPEND |muted); \}\n\n/* controls */\na.button \{ text-decoration: none; display: inline-block; \}\nbutton, .button \{\n  font: inherit; border: 1px solid var(--line); background: var(--pa| TO parts.
+    APPEND |nel); color: var(--text);\n  border-radius: var(--radius); padding: 4px 10px; cursor: pointer; white-space: nowrap;\n\}\nbutton:hover:not(:disabled) \{ border-color: var(--muted); | TO parts.
+    APPEND |\}\nbutton:disabled \{ opacity: .5; cursor: default; \}\nbutton.primary \{ background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; \}\n| TO parts.
+    APPEND |button.danger \{ color: var(--err); \}\nbutton.icon \{ padding: 2px 7px; line-height: 1.2; \}\nbutton.link \{ border: 0; background: none; color: var(--accent); padding: 0; \}\ninp| TO parts.
+    APPEND |ut[type=text], input[type=search], select, textarea \{\n  font: inherit; color: var(--text); background: var(--panel);\n  border: 1px solid var(--line); border-radius: var(--radius| TO parts.
+    APPEND |); padding: 4px 8px; min-width: 0;\n\}\ninput[type=text]:focus, input[type=search]:focus, select:focus, textarea:focus, button:focus-visible \{\n  outline: 2px solid var(--accent);| TO parts.
+    APPEND | outline-offset: -1px;\n\}\ninput.invalid \{ border-color: var(--err); \}\ninput[readonly] \{ background: var(--sunken); color: var(--muted); \}\n.field-error \{ color: var(--err);| TO parts.
+    APPEND | font-size: 12px; \}\n\n/* status pill */\n.status \{ display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 2px 10px; font-size: 12.5px;\n  max-width:| TO parts.
+    APPEND | 46ch; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; \}\n.status.ok \{ background: var(--ok-soft); color: var(--ok); \}\n.status.err \{ background: var(--err-soft| TO parts.
+    APPEND |); color: var(--err); \}\n.status.busy \{ background: var(--sunken); color: var(--muted); \}\n.status.warn \{ background: var(--warn-soft); color: var(--warn); \}\n\n/* start page | TO parts.
+    APPEND |*/\n.start \{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 16px; padding: 16px; align-items: start; \}\n@media (max-width: 860px) \{ .start \{ grid-t| TO parts.
+    APPEND |emplate-columns: minmax(0, 1fr); \} \}\n.card \{ background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); \}\n.card > header \{ display: flex; align-i| TO parts.
+    APPEND |tems: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); \}\n.card > header .spacer \{ flex: 1; \}\n.card .body \{ padding: 12px; \}\n.card .scroll \{ max-| TO parts.
+    APPEND |height: calc(100vh - 170px); overflow: auto; \}\n\ntable \{ border-collapse: collapse; width: 100%; \}\nth, td \{ text-align: left; padding: 5px 8px; border-bottom: 1px solid var(-| TO parts.
+    APPEND |-line); vertical-align: middle; \}\nth \{ font-weight: 600; color: var(--muted); font-size: 12px; position: sticky; top: 0; background: var(--panel); z-index: 1; \}\ntr.clickable | TO parts.
+    APPEND |\{ cursor: pointer; \}\ntr.clickable:hover td \{ background: var(--accent-soft); \}\ntd.num \{ text-align: right; font-variant-numeric: tabular-nums; \}\ntd.actions \{ white-space:| TO parts.
+    APPEND | nowrap; text-align: right; \}\ntd input[type=text], td select \{ width: 100%; \}\n/* the rows of a selection on a dimension's pane */\ntable.selection \{ width: auto; margin: 6px | TO parts.
+    APPEND |0; \}\ntable.selection th \{ position: static; \}\ntable.selection td \{ padding: 2px 6px; \}\ntable.selection td input[type=text] \{ width: auto; \}\n.kind \{ font-size: 11.5px; b| TO parts.
+    APPEND |order: 1px solid var(--line); border-radius: 4px; padding: 0 5px; color: var(--muted); \}\n\n/* editor */\n.editor \{ flex: 1; display: grid; grid-template-columns: 260px minmax(0,| TO parts.
+    APPEND | 1fr); min-height: 0; \}\n@media (max-width: 760px) \{ .editor \{ grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); \} .tree \{ max-height: 40vh; bord| TO parts.
+    APPEND |er-right: 0; border-bottom: 1px solid var(--line); \} \}\n.tree \{ background: var(--panel); border-right: 1px solid var(--line); overflow: auto; padding: 8px 0; \}\n.tree .group | TO parts.
+    APPEND |\{ padding: 10px 14px 4px; \}\n.tree .item \{\n  display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; border: 0; border-radius: 0;\n  background: none; padd| TO parts.
+    APPEND |ing: 4px 14px; color: var(--text);\n\}\n.tree .item.sub \{ padding-left: 28px; \}\n.tree .item:hover \{ background: var(--sunken); \}\n.tree .item.selected \{ background: var(--acc| TO parts.
+    APPEND |ent-soft); color: var(--accent); font-weight: 600; \}\n.tree .item .badge \{ margin-left: auto; font-size: 11px; color: var(--muted); font-weight: 400; \}\n.main \{ overflow: auto;| TO parts.
+    APPEND | min-width: 0; \}\n.tabs \{ display: flex; gap: 2px; padding: 8px 16px 0; border-bottom: 1px solid var(--line); background: var(--panel); \}\n.tabs button \{ border: 0; border-bott| TO parts.
+    APPEND |om: 2px solid transparent; border-radius: 0; background: none; padding: 6px 12px; color: var(--muted); \}\n.tabs button.active \{ border-bottom-color: var(--accent); color: var(--t| TO parts.
+    APPEND |ext); font-weight: 600; \}\n.pane \{ padding: 16px; display: flex; flex-direction: column; gap: 16px; max-width: 1100px; \}\n\n.form \{ display: grid; grid-template-columns: max-co| TO parts.
+    APPEND |ntent minmax(0, 1fr); gap: 8px 12px; align-items: center; max-width: 640px; \}\n.form > label \{ color: var(--muted); \}\n.row \{ display: flex; align-items: center; gap: 8px; flex| TO parts.
+    APPEND |-wrap: wrap; \}\n.row .spacer \{ flex: 1; \}\n.switch \{ display: inline-flex; align-items: center; gap: 6px; cursor: pointer; \}\n\n.section \{ background: var(--panel); border: 1| TO parts.
+    APPEND |px solid var(--line); border-radius: var(--radius); \}\n.section > header \{ display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); | TO parts.
+    APPEND |flex-wrap: wrap; \}\n.section > header .spacer \{ flex: 1; \}\n.section > .body \{ padding: 12px; display: flex; flex-direction: column; gap: 10px; \}\n.section table th \{ positio| TO parts.
+    APPEND |n: static; \}\n.section .scroll-x \{ overflow-x: auto; \}\n\n.hier \{ border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); \}\n.hier > header \{ disp| TO parts.
+    APPEND |lay: flex; align-items: center; gap: 8px; padding: 8px 10px; flex-wrap: wrap; border-bottom: 1px solid var(--line); \}\n.hier > .body \{ padding: 10px; display: flex; flex-directio| TO parts.
+    APPEND |n: column; gap: 8px; \}\n.props \{ padding: 4px 0 4px 24px; display: flex; flex-direction: column; gap: 4px; \}\n.props select, .props input[type=text] \{ width: auto; \}\n\n.notic| TO parts.
+    APPEND |e \{ border-radius: var(--radius); padding: 8px 12px; \}\n.notice.err \{ background: var(--err-soft); color: var(--err); white-space: pre-wrap; \}\n.notice.warn \{ background: var(| TO parts.
+    APPEND |--warn-soft); color: var(--warn); \}\n.notice.ok \{ background: var(--ok-soft); color: var(--ok); \}\n.notice.info \{ background: var(--sunken); color: var(--text); \}\nul.plain \{| TO parts.
+    APPEND | margin: 0; padding-left: 18px; \}\n\ntextarea.xml \{ width: 100%; min-height: calc(100vh - 230px); font-family: var(--mono); font-size: 12.5px; line-height: 1.5;\n  white-space: p| TO parts.
+    APPEND |re; tab-size: 2; resize: vertical; \}\n\n/* dialog */\n.backdrop \{ position: fixed; inset: 0; background: rgba(0, 0, 0, .35); display: flex; align-items: center; justify-content: | TO parts.
+    APPEND |center; padding: 16px; z-index: 20; \}\n.dialog \{ background: var(--panel); border: 1px solid var(--line); border-radius: 8px; width: min(560px, 100%); max-height: 90vh; overflow:| TO parts.
+    APPEND | auto;\n  box-shadow: 0 12px 40px rgba(0, 0, 0, .25); \}\n.dialog > header \{ padding: 14px 16px 0; \}\n.dialog > .body \{ padding: 12px 16px; display: flex; flex-direction: column| TO parts.
+    APPEND |; gap: 10px; \}\n.dialog > footer \{ padding: 0 16px 14px; display: flex; justify-content: flex-end; gap: 8px; \}\n\n/* MDX console (console.html): the cube browser on the left, th| TO parts.
+    APPEND |e statement above the result */\n.console \{ grid-template-columns: 280px minmax(0, 1fr); \}\n.console-main \{ display: flex; flex-direction: column; overflow: hidden; \}\n.query | TO parts.
+    APPEND |\{ padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid var(--line); background: var(--panel); \}\ntextarea.mdx \{ width: 100%; height: 170| TO parts.
+    APPEND |px; min-height: 80px; font-family: var(--mono); font-size: 13px; line-height: 1.5;\n  white-space: pre; tab-size: 2; resize: vertical; \}\n.browser .item \{ gap: 4px; \}\n.browser | TO parts.
+    APPEND |.item .label \{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; \}\n.browser .twisty \{ width: 12px; color: var(--muted); flex: none; \}\n.browser .pad \{ padding: | TO parts.
+    APPEND |4px 14px; \}\n.glyph \{ width: 9px; height: 9px; border-radius: 2px; flex: none; margin-right: 3px; background: var(--muted); \}\n.glyph.cube \{ background: var(--accent); \}\n.gly| TO parts.
+    APPEND |ph.folder, .glyph.dimension \{ background: transparent; border: 1.5px solid var(--muted); \}\n.glyph.measure \{ background: var(--ok); border-radius: 50%; \}\n.glyph.hierarchy \{ b| TO parts.
+    APPEND |ackground: var(--warn); \}\n.glyph.level \{ background: var(--line); border: 1px solid var(--muted); \}\n.result \{ flex: 1; min-height: 0; display: flex; flex-direction: column; g| TO parts.
+    APPEND |ap: 8px; padding: 10px 16px 16px; \}\n.result-msg \{ padding: 16px; \}\n.result-bar \{ display: flex; align-items: center; gap: 10px; flex-wrap: wrap; \}\n.result-bar .spacer \{ fl| TO parts.
+    APPEND |ex: 1; \}\n.result-table \{ flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); \}\n.segmented \{ display| TO parts.
+    APPEND |: inline-flex; \}\n.segmented button \{ border-radius: 0; \}\n.segmented button:first-child \{ border-radius: var(--radius) 0 0 var(--radius); \}\n.segmented button:last-child \{ b| TO parts.
+    APPEND |order-radius: 0 var(--radius) var(--radius) 0; margin-left: -1px; \}\n.segmented button.active \{ background: var(--accent-soft); color: var(--accent); border-color: var(--accent);| TO parts.
+    APPEND | position: relative; \}\ntable.grid \{ width: auto; min-width: 100%; font-variant-numeric: tabular-nums; \}\ntable.grid th, table.grid td \{ border: 1px solid var(--line); padding:| TO parts.
+    APPEND | 3px 8px; white-space: nowrap; \}\ntable.grid th \{ position: static; background: var(--sunken); color: var(--text); font-size: 12.5px; \}\ntable.grid th.corner \{ color: var(--mut| TO parts.
+    APPEND |ed); font-weight: 600; \}\ntable.grid th.member \{ font-weight: 500; \}\ntable.grid th.col-head \{ text-align: center; \}\ntable.grid th.row-head \{ vertical-align: top; \}\ntable.| TO parts.
+    APPEND |grid td.num \{ text-align: right; \}\ntable.grid td.cell-err \{ color: var(--err); cursor: help; \}\ntable.grid tbody tr:hover td \{ background: var(--accent-soft); \}\ntable.flat | TO parts.
+    APPEND |thead th \{ position: sticky; top: 0; z-index: 1; \}\n/* the axis as generated content, so Copy (innerText) leaves it out */\ntable.flat th[data-axis]::after \{ content: attr(data-| TO parts.
+    APPEND |axis); margin-left: 6px; font-size: 10.5px; color: var(--muted); font-weight: 400; \}\ntable.flat th.num \{ text-align: right; \}\n@media (max-width: 760px) \{ .console-main \{ ove| TO parts.
+    APPEND |rflow: visible; \} \}\n\n/* trace */\ntr.selected td \{ background: var(--accent-soft); \}\ntd.statement \{ max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space| TO parts.
+    APPEND |: nowrap; \}\ntextarea.trace \{ width: 100%; min-height: 420px; font-family: var(--mono); font-size: 12.5px; line-height: 1.5;\n  white-space: pre; tab-size: 2; resize: vertical; | TO parts.
+    APPEND |\}\n.pane.wide \{ max-width: none; \}\n/* a selected call is shown next to the list, which then leaves out user and client */\n.trace-split \{ display: grid; grid-template-columns:| TO parts.
+    APPEND | minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; \}\n.trace-split .wide-only \{ display: none; \}\n.trace-split td.statement \{ max-width: 260px; \}\n.trace-split > .| TO parts.
+    APPEND |detail \{ position: sticky; top: 8px; \}\n.trace-split textarea.trace \{ min-height: calc(100vh - 280px); \}\n@media (max-width: 1000px) \{\n  .trace-split \{ grid-template-columns| TO parts.
+    APPEND |: minmax(0, 1fr); \}\n  .trace-split .wide-only \{ display: table-cell; \}\n  .trace-split > .detail \{ position: static; \}\n\}\n| TO parts.
     result = concat_lines_of( parts ).
   ENDMETHOD.
 
@@ -793,36 +797,40 @@ CLASS zzxxmla1_cl_web_app_files IMPLEMENTATION.
     APPEND |ption, 'level', 3))\}`))\}`;\n          \})\}`)\}`;\n    \})\}\n  </nav>`;\n\}\n\n// -----------------------------------------------------------------------------------------------| TO parts.
     APPEND |----------- app\n\nfunction load(key, fallback) \{\n  try \{\n    const value = localStorage.getItem(`olap4abap.console.$\{key\}`);\n    return value == null ? fallback : JSON.pars| TO parts.
     APPEND |e(value);\n  \} catch \{\n    return fallback;\n  \}\n\}\nfunction save(key, value) \{\n  try \{\n    localStorage.setItem(`olap4abap.console.$\{key\}`, JSON.stringify(value));\n  | TO parts.
-    APPEND |\} catch \{\n    // private window or blocked storage: the console works without it\n  \}\n\}\n\nfunction App() \{\n  const [sources, setSources] = useState(null);\n  const [catalo| TO parts.
-    APPEND |gs, setCatalogs] = useState([]);\n  const [catalog, setCatalog] = useState(load('catalog', ''));\n  const [statement, setStatement] = useState(load('statement', ''));\n  const [his| TO parts.
-    APPEND |tory, setHistory] = useState(load('history', []));\n  const [run, setRun] = useState(null);\n  const [view, setView] = useState('grid');\n  const [error, setError] = useState('');| TO parts.
-    APPEND |\n  const editor = useRef(null);\n  const dataSource = sources?.[0]?.DataSourceName \|\| '';\n\n  useEffect(() => \{\n    (async () => \{\n      try \{\n        const ds = await di| TO parts.
-    APPEND |scover('DISCOVER_DATASOURCES');\n        setSources(ds);\n        const rows = await discover('DBSCHEMA_CATALOGS', \{\}, \{ DataSourceInfo: ds[0]?.DataSourceName \});\n        cons| TO parts.
-    APPEND |t names = rows.map((r) => r.CATALOG_NAME);\n        setCatalogs(names);\n        setCatalog((c) => (names.includes(c) ? c : names[0] \|\| ''));\n      \} catch (e) \{\n        setE| TO parts.
-    APPEND |rror(e.message);\n      \}\n    \})();\n  \}, []);\n  useEffect(() => save('catalog', catalog), [catalog]);\n  useEffect(() => save('statement', statement), [statement]);\n\n  cons| TO parts.
-    APPEND |t runStatement = useCallback(async () => \{\n    const area = editor.current;\n    const selected = area && area.selectionStart !== area.selectionEnd\n      ? area.value.slice(area| TO parts.
-    APPEND |.selectionStart, area.selectionEnd) : statement;\n    const mdx = selected.trim();\n    if (!mdx \|\| !catalog) return;\n    setRun(\{ state: 'busy' \});\n    try \{\n      const | TO parts.
-    APPEND |\{ doc, ms \} = await execute(mdx, dataSource, catalog);\n      setRun(\{ state: 'ok', result: parseCellset(doc), ms \});\n    \} catch (e) \{\n      setRun(\{ state: 'err', messag| TO parts.
-    APPEND |e: e.message, ms: e.ms \});\n    \}\n    setHistory((h) => \{\n      const next = [mdx, ...h.filter((x) => x !== mdx)].slice(0, HISTORY_SIZE);\n      save('history', next);\n      | TO parts.
-    APPEND |return next;\n    \});\n  \}, [statement, catalog, dataSource]);\n\n  const insert = (piece) => \{\n    const area = editor.current;\n    const start = area ? area.selectionStart :| TO parts.
-    APPEND | statement.length;\n    const end = area ? area.selectionEnd : statement.length;\n    const next = statement.slice(0, start) + piece + statement.slice(end);\n    setStatement(next)| TO parts.
-    APPEND |;\n    requestAnimationFrame(() => \{\n      if (!area) return;\n      area.focus();\n      area.setSelectionRange(start + piece.length, start + piece.length);\n    \});\n  \};\n\n| TO parts.
-    APPEND |  const busy = run?.state === 'busy';\n  return html`\n    <div class="topbar">\n      <div class="title"><h1>MDX Console</h1><span class="src">olap4abap</span></div>\n      <label| TO parts.
-    APPEND | class="inline">Catalog\n        <select value=$\{catalog\} onChange=$\{(e) => setCatalog(e.target.value)\} disabled=$\{!catalogs.length\}>\n          $\{!catalogs.length && html`<| TO parts.
-    APPEND |option value="">{ cl_abap_conv_in_ce=>uccp( '2013' ) }</option>`\}\n          $\{catalogs.map((c) => html`<option value=$\{c\}>$\{c\}</option>`)\}\n        </select>\n      </label| TO parts.
-    APPEND |>\n      <span class="spacer"></span>\n      <a href=$\{`./$\{location.search\}`\}>Schema Builder</a>\n      <a href=$\{`time.html$\{location.search\}`\}>Time Master Data</a>\n    | TO parts.
-    APPEND |  <a href=$\{`trace.html$\{location.search\}`\}>Trace</a>\n    </div>\n    $\{error && html`<div class="banner" role="alert">$\{error\}</div>`\}\n    <div class="editor console">\n| TO parts.
-    APPEND |      <$\{Browser\} dataSource=$\{dataSource\} catalog=$\{catalog\} onInsert=$\{insert\} />\n      <main class="main console-main">\n        <div class="query">\n          <textare| TO parts.
-    APPEND |a ref=$\{editor\} class="mdx" spellcheck="false" value=$\{statement\} aria-label="MDX statement"\n            placeholder=$\{'SELECT \{[Measures].Members\} ON COLUMNS\\nFROM [Cube]| TO parts.
-    APPEND |'\}\n            onInput=$\{(e) => setStatement(e.target.value)\}\n            onKeyDown=$\{(e) => \{\n              if ((e.ctrlKey \|\| e.metaKey) && e.key === 'Enter') \{ e.preve| TO parts.
-    APPEND |ntDefault(); runStatement(); \}\n            \}\}></textarea>\n          <div class="row">\n            <button class="primary" disabled=$\{busy \|\| !catalog \|\| !statement.trim(| TO parts.
-    APPEND |)\} onClick=$\{runStatement\}\n              title="Run the statement, or the selected part of it (Ctrl+Enter)">$\{busy ? 'Running{ cl_abap_conv_in_ce=>uccp( '2026' ) }' : 'Run'\}<| TO parts.
-    APPEND |/button>\n            <select value="" aria-label="History" disabled=$\{!history.length\} onChange=$\{(e) => \{\n              const i = e.target.value;\n              e.target.val| TO parts.
-    APPEND |ue = '';\n              if (i !== '') setStatement(history[Number(i)]);\n            \}\}>\n              <option value="">History{ cl_abap_conv_in_ce=>uccp( '2026' ) }</option>\n | TO parts.
-    APPEND |             $\{history.map((h, i) => html`<option value=$\{i\}>$\{h.replace(/\\s+/g, ' ').slice(0, 90)\}</option>`)\}\n            </select>\n            <span class="muted small"| TO parts.
-    APPEND |>Ctrl+Enter runs the statement or the selection; click a name on the left to insert it.</span>\n          </div>\n        </div>\n        $\{run ? html`<$\{Result\} run=$\{run\} vi| TO parts.
-    APPEND |ew=$\{view\} setView=$\{setView\} />`\n          : html`<div class="result-msg muted">Write a statement and run it. Up to two axes show as a grid, more as a table.</div>`\}\n      | TO parts.
-    APPEND |</main>\n    </div>`;\n\}\n\nconst root = document.getElementById('app');\nroot.textContent = '';\nrender(html`<$\{App\} />`, root);\n| TO parts.
+    APPEND |\} catch \{\n    // private window or blocked storage: the console works without it\n  \}\n\}\n\n// A statement handed over in the URL's fragment (#statement=...&catalog=..., the t| TO parts.
+    APPEND |race page's "Open in MDX Console"):\n// read once, then removed from the address bar, so a reload shows what was typed since. The fragment is not sent to\n// the server, so a long | TO parts.
+    APPEND |statement fits.\nfunction handedOver() \{\n  const params = new URLSearchParams(location.hash.slice(1));\n  if (!params.has('statement')) return \{\};\n  history.replaceState(null,| TO parts.
+    APPEND | '', location.pathname + location.search);\n  return \{ statement: params.get('statement'), catalog: params.get('catalog') \|\| '' \};\n\}\n\nfunction App() \{\n  const [handed] = | TO parts.
+    APPEND |useState(handedOver);\n  const [sources, setSources] = useState(null);\n  const [catalogs, setCatalogs] = useState([]);\n  const [catalog, setCatalog] = useState(() => handed.catal| TO parts.
+    APPEND |og \|\| load('catalog', ''));\n  const [statement, setStatement] = useState(() => handed.statement ?? load('statement', ''));\n  const [history, setHistory] = useState(load('histor| TO parts.
+    APPEND |y', []));\n  const [run, setRun] = useState(null);\n  const [view, setView] = useState('grid');\n  const [error, setError] = useState('');\n  const editor = useRef(null);\n  const | TO parts.
+    APPEND |dataSource = sources?.[0]?.DataSourceName \|\| '';\n\n  useEffect(() => \{\n    (async () => \{\n      try \{\n        const ds = await discover('DISCOVER_DATASOURCES');\n        s| TO parts.
+    APPEND |etSources(ds);\n        const rows = await discover('DBSCHEMA_CATALOGS', \{\}, \{ DataSourceInfo: ds[0]?.DataSourceName \});\n        const names = rows.map((r) => r.CATALOG_NAME);| TO parts.
+    APPEND |\n        setCatalogs(names);\n        setCatalog((c) => (names.includes(c) ? c : names[0] \|\| ''));\n      \} catch (e) \{\n        setError(e.message);\n      \}\n    \})();\n  | TO parts.
+    APPEND |\}, []);\n  useEffect(() => save('catalog', catalog), [catalog]);\n  useEffect(() => save('statement', statement), [statement]);\n\n  const runStatement = useCallback(async () => | TO parts.
+    APPEND |\{\n    const area = editor.current;\n    const selected = area && area.selectionStart !== area.selectionEnd\n      ? area.value.slice(area.selectionStart, area.selectionEnd) : sta| TO parts.
+    APPEND |tement;\n    const mdx = selected.trim();\n    if (!mdx \|\| !catalog) return;\n    setRun(\{ state: 'busy' \});\n    try \{\n      const \{ doc, ms \} = await execute(mdx, dataSou| TO parts.
+    APPEND |rce, catalog);\n      setRun(\{ state: 'ok', result: parseCellset(doc), ms \});\n    \} catch (e) \{\n      setRun(\{ state: 'err', message: e.message, ms: e.ms \});\n    \}\n    s| TO parts.
+    APPEND |etHistory((h) => \{\n      const next = [mdx, ...h.filter((x) => x !== mdx)].slice(0, HISTORY_SIZE);\n      save('history', next);\n      return next;\n    \});\n  \}, [statement, | TO parts.
+    APPEND |catalog, dataSource]);\n\n  const insert = (piece) => \{\n    const area = editor.current;\n    const start = area ? area.selectionStart : statement.length;\n    const end = area ?| TO parts.
+    APPEND | area.selectionEnd : statement.length;\n    const next = statement.slice(0, start) + piece + statement.slice(end);\n    setStatement(next);\n    requestAnimationFrame(() => \{\n   | TO parts.
+    APPEND |   if (!area) return;\n      area.focus();\n      area.setSelectionRange(start + piece.length, start + piece.length);\n    \});\n  \};\n\n  const busy = run?.state === 'busy';\n  r| TO parts.
+    APPEND |eturn html`\n    <div class="topbar">\n      <div class="title"><h1>MDX Console</h1><span class="src">olap4abap</span></div>\n      <label class="inline">Catalog\n        <select v| TO parts.
+    APPEND |alue=$\{catalog\} onChange=$\{(e) => setCatalog(e.target.value)\} disabled=$\{!catalogs.length\}>\n          $\{!catalogs.length && html`<option value="">| TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '2013' ) }</option>`\}\n          $\{catalogs.map((c) => html`<option value=$\{c\}>$\{c\}</option>`)\}\n        </select>\n      </label>\n      <span c| TO parts.
+    APPEND |lass="spacer"></span>\n      <a href=$\{`./$\{location.search\}`\}>Schema Builder</a>\n      <a href=$\{`time.html$\{location.search\}`\}>Time Master Data</a>\n      <a href=$\{`tr| TO parts.
+    APPEND |ace.html$\{location.search\}`\}>Trace</a>\n    </div>\n    $\{error && html`<div class="banner" role="alert">$\{error\}</div>`\}\n    <div class="editor console">\n      <$\{Browse| TO parts.
+    APPEND |r\} dataSource=$\{dataSource\} catalog=$\{catalog\} onInsert=$\{insert\} />\n      <main class="main console-main">\n        <div class="query">\n          <textarea ref=$\{editor| TO parts.
+    APPEND |\} class="mdx" spellcheck="false" value=$\{statement\} aria-label="MDX statement"\n            placeholder=$\{'SELECT \{[Measures].Members\} ON COLUMNS\\nFROM [Cube]'\}\n          | TO parts.
+    APPEND |  onInput=$\{(e) => setStatement(e.target.value)\}\n            onKeyDown=$\{(e) => \{\n              if ((e.ctrlKey \|\| e.metaKey) && e.key === 'Enter') \{ e.preventDefault(); ru| TO parts.
+    APPEND |nStatement(); \}\n            \}\}></textarea>\n          <div class="row">\n            <button class="primary" disabled=$\{busy \|\| !catalog \|\| !statement.trim()\} onClick=$\{| TO parts.
+    APPEND |runStatement\}\n              title="Run the statement, or the selected part of it (Ctrl+Enter)">$\{busy ? 'Running{ cl_abap_conv_in_ce=>uccp( '2026' ) }' : 'Run'\}</button>\n     | TO parts.
+    APPEND |       <select value="" aria-label="History" disabled=$\{!history.length\} onChange=$\{(e) => \{\n              const i = e.target.value;\n              e.target.value = '';\n     | TO parts.
+    APPEND |         if (i !== '') setStatement(history[Number(i)]);\n            \}\}>\n              <option value="">History{ cl_abap_conv_in_ce=>uccp( '2026' ) }</option>\n              $| TO parts.
+    APPEND |\{history.map((h, i) => html`<option value=$\{i\}>$\{h.replace(/\\s+/g, ' ').slice(0, 90)\}</option>`)\}\n            </select>\n            <span class="muted small">Ctrl+Enter ru| TO parts.
+    APPEND |ns the statement or the selection; click a name on the left to insert it.</span>\n          </div>\n        </div>\n        $\{run ? html`<$\{Result\} run=$\{run\} view=$\{view\} s| TO parts.
+    APPEND |etView=$\{setView\} />`\n          : html`<div class="result-msg muted">Write a statement and run it. Up to two axes show as a grid, more as a table.</div>`\}\n      </main>\n    <| TO parts.
+    APPEND |/div>`;\n\}\n\nconst root = document.getElementById('app');\nroot.textContent = '';\nrender(html`<$\{App\} />`, root);\n| TO parts.
     result = concat_lines_of( parts ).
   ENDMETHOD.
 
@@ -902,84 +910,109 @@ CLASS zzxxmla1_cl_web_app_files IMPLEMENTATION.
     APPEND |// The trace of the XMLA endpoint (ZZXXMLA1_CL_TRACE): switched on per SAP user for two hours (GET api/trace, POST\n// api/trace/on, trace/off; switching on deletes the calls older| TO parts.
     APPEND | than seven days), every call of a user with the trace on is listed with its SOAP request, the MDX statement of an Execute\n// and the SOAP response (GET api/trace/entry, the whole| TO parts.
     APPEND | response as sent from api/trace/response).\n// No build step: Preact with htm, vendored as one ES module; this file is what the server serves.\nimport \{ html, render, useState, u| TO parts.
-    APPEND |seEffect, useRef \} from './vendor/htm-preact-standalone.mjs';\n\nconst client = new URLSearchParams(location.search).get('sap-client');\nconst REFRESH_MS = 5000;\n\nconst apiUrl =| TO parts.
-    APPEND | (resource, params = \{\}) => \{\n  const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v));\n  if (client) query.set('sap-client', client);\n  return `api/$| TO parts.
-    APPEND |\{resource\}?$\{query\}`;\n\};\n\nasync function api(method, resource, params = \{\}) \{\n  const response = await fetch(apiUrl(resource, params), \{ method \});\n  let data;\n  tr| TO parts.
-    APPEND |y \{\n    data = await response.json();\n  \} catch \{\n    throw new Error(`$\{response.status\} $\{response.statusText\}`);\n  \}\n  if (!response.ok) throw new Error(data.error | TO parts.
-    APPEND |\|\| `$\{response.status\} $\{response.statusText\}`);\n  return data;\n\}\n\nconst time = (iso) => iso ? new Date(iso).toLocaleString() : '';\nconst size = (n) => n >= 1048576 ? `| TO parts.
-    APPEND |$\{(n / 1048576).toFixed(1)\} MB` : n >= 1024 ? `$\{(n / 1024).toFixed(1)\} KB` : `$\{n\} B`;\nconst what = (c) => c.method === 'EXECUTE' ? 'Execute' : c.method === 'DISCOVER' ? 'D| TO parts.
-    APPEND |iscover' : '(no XMLA)';\nconst firstLine = (s) => s.replace(/\\s+/g, ' ').trim();\n\n// XML indented for reading; the text as it is if it does not parse (or is too large to do it q| TO parts.
-    APPEND |uickly)\nfunction prettyXml(text) \{\n  if (!text \|\| text.length > 5000000) return text;\n  const doc = new DOMParser().parseFromString(text, 'application/xml');\n  if (doc.getEl| TO parts.
-    APPEND |ementsByTagName('parsererror').length) return text;\n  const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n  const out = [];\n  const walk = (| TO parts.
-    APPEND |node, depth) => \{\n    const pad = '  '.repeat(depth);\n    if (node.nodeType === Node.ELEMENT_NODE) \{\n      const attrs = [...node.attributes].map((a) => ` $\{a.name\}="$\{esc(| TO parts.
-    APPEND |a.value).replace(/"/g, '&quot;')\}"`).join('');\n      const kids = [...node.childNodes].filter((c) => c.nodeType !== Node.TEXT_NODE \|\| c.nodeValue.trim());\n      if (!kids.leng| TO parts.
-    APPEND |th) out.push(`$\{pad\}<$\{node.nodeName\}$\{attrs\}/>`);\n      else if (kids.length === 1 && kids[0].nodeType === Node.TEXT_NODE) \{\n        out.push(`$\{pad\}<$\{node.nodeName\}| TO parts.
-    APPEND |$\{attrs\}>$\{esc(kids[0].nodeValue)\}</$\{node.nodeName\}>`);\n      \} else \{\n        out.push(`$\{pad\}<$\{node.nodeName\}$\{attrs\}>`);\n        kids.forEach((c) => walk(c, d| TO parts.
-    APPEND |epth + 1));\n        out.push(`$\{pad\}</$\{node.nodeName\}>`);\n      \}\n    \} else if (node.nodeType === Node.TEXT_NODE) out.push(pad + esc(node.nodeValue.trim()));\n    else i| TO parts.
-    APPEND |f (node.nodeType === Node.CDATA_SECTION_NODE) out.push(`$\{pad\}<![CDATA[$\{node.nodeValue\}]]>`);\n    else if (node.nodeType === Node.COMMENT_NODE) out.push(`$\{pad\}<!--$\{node.| TO parts.
-    APPEND |nodeValue\}-->`);\n  \};\n  [...doc.childNodes].forEach((n) => walk(n, 0));\n  return out.join('\\n');\n\}\n\nconst download = (text, name) => \{\n  const url = URL.createObjectURL| TO parts.
-    APPEND |(new Blob([text], \{ type: 'text/xml' \}));\n  const a = Object.assign(document.createElement('a'), \{ href: url, download: name \});\n  a.click();\n  setTimeout(() => URL.revokeOb| TO parts.
-    APPEND |jectURL(url), 1000);\n\};\n\nfunction Users(\{ state, onSwitch, busy \}) \{\n  const [user, setUser] = useState('');\n  const name = (user \|\| state.user).trim().toUpperCase();\n | TO parts.
-    APPEND | const on = state.users.some((u) => u.user === name);\n  return html`<section class="section">\n    <header><h2>Traced users</h2><span class="spacer"></span>\n      <span class="mu| TO parts.
-    APPEND |ted small">a trace switches itself off after $\{state.activeHours\} hours; calls are kept $\{state.retentionDays\} days</span></header>\n    <div class="body">\n      <div class="r| TO parts.
-    APPEND |ow">\n        <label class="muted" for="user">User</label>\n        <input id="user" type="text" maxlength="12" placeholder=$\{state.user\} value=$\{user\}\n          onInput=$\{(e| TO parts.
-    APPEND |) => setUser(e.target.value)\} onKeyDown=$\{(e) => e.key === 'Enter' && onSwitch('on', name)\} />\n        <button class="primary" disabled=$\{busy \|\| !name\} onClick=$\{() => on| TO parts.
-    APPEND |Switch('on', name)\}\n          title=$\{`On for $\{state.activeHours\} hours from now`\}>$\{on ? `Switch on again for $\{state.activeHours\} hours` : 'Switch trace on'\}</button>| TO parts.
-    APPEND |\n        $\{on && html`<span class="status ok">on</span>`\}\n      </div>\n      $\{state.users.length ? html`<table>\n        <thead><tr><th>User</th><th>Since</th><th>On until</| TO parts.
-    APPEND |th><th>Switched on by</th><th></th></tr></thead>\n        <tbody>$\{state.users.map((u) => html`<tr>\n          <td><strong class="mono">$\{u.user\}</strong>$\{u.user === state.use| TO parts.
-    APPEND |r && html` <span class="muted small">(this page's user)</span>`\}</td>\n          <td>$\{time(u.since)\}</td><td>$\{time(u.until)\}</td><td class="mono">$\{u.by\}</td>\n          <| TO parts.
-    APPEND |td class="actions"><button disabled=$\{busy\} onClick=$\{() => onSwitch('off', u.user)\}>Switch off</button></td>\n        </tr>`)\}</tbody>\n      </table>` : html`<div class="mut| TO parts.
-    APPEND |ed">The trace is off for every user.</div>`\}\n      <div class="notice info small">A call is traced under the SAP user it runs as. This page runs as\n        <span class="mono">$| TO parts.
-    APPEND |\{state.user\}</span>; while the ICF node <span class="mono">/zzxxmla1</span> logs on anonymously,\n        every XMLA call runs as that user too. The client's address and User-Age| TO parts.
-    APPEND |nt tell the callers apart.</div>\n    </div>\n  </section>`;\n\}\n\nfunction Detail(\{ id, onClose \}) \{\n  const [entry, setEntry] = useState(null);\n  const [error, setError] = | TO parts.
-    APPEND |useState('');\n  const [tab, setTab] = useState('');\n  const [pretty, setPretty] = useState(true);\n  useEffect(() => \{\n    setEntry(null);\n    setError('');\n    api('GET', 't| TO parts.
-    APPEND |race/entry', \{ id \}).then((e) => \{\n      setEntry(e);\n      setTab((t) => (t === 'mdx' && !e.mdx) \|\| !t ? (e.mdx ? 'mdx' : 'request') : t);\n    \}, (e) => setError(e.messag| TO parts.
-    APPEND |e));\n  \}, [id]);\n  if (error) return html`<div class="notice err">$\{error\}</div>`;\n  if (!entry) return html`<section class="section"><div class="body muted">Reading the call| TO parts.
+    APPEND |seEffect, useRef \} from './vendor/htm-preact-standalone.mjs';\n\nconst client = new URLSearchParams(location.search).get('sap-client');\nconst REFRESH_MS = 5000;\nconst MAX_CHOICE| TO parts.
+    APPEND |S = [50, 200, 500, 1000, 5000, 10000];\nconst MAX_KEY = 'olap4abap.trace.max';\n// the number of calls listed is remembered per browser; storage may be unavailable (private windows| TO parts.
+    APPEND |)\nconst storedMax = () => \{\n  try \{\n    const n = Number(localStorage.getItem(MAX_KEY));\n    return MAX_CHOICES.includes(n) ? n : 200;\n  \} catch \{\n    return 200;\n  \}\n| TO parts.
+    APPEND |\};\n\nconst apiUrl = (resource, params = \{\}) => \{\n  const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v));\n  if (client) query.set('sap-client', clie| TO parts.
+    APPEND |nt);\n  return `api/$\{resource\}?$\{query\}`;\n\};\n\nasync function api(method, resource, params = \{\}) \{\n  const response = await fetch(apiUrl(resource, params), \{ method \}| TO parts.
+    APPEND |);\n  let data;\n  try \{\n    data = await response.json();\n  \} catch \{\n    throw new Error(`$\{response.status\} $\{response.statusText\}`);\n  \}\n  if (!response.ok) throw | TO parts.
+    APPEND |new Error(data.error \|\| `$\{response.status\} $\{response.statusText\}`);\n  return data;\n\}\n\nconst time = (iso) => iso ? new Date(iso).toLocaleString() : '';\nconst size = (n| TO parts.
+    APPEND |) => n >= 1048576 ? `$\{(n / 1048576).toFixed(1)\} MB` : n >= 1024 ? `$\{(n / 1024).toFixed(1)\} KB` : `$\{n\} B`;\nconst what = (c) => c.method === 'EXECUTE' ? 'Execute' : c.metho| TO parts.
+    APPEND |d === 'DISCOVER' ? 'Discover' : '(no XMLA)';\nconst firstLine = (s) => s.replace(/\\s+/g, ' ').trim();\n\n// XML indented for reading; the text as it is if it does not parse (or is| TO parts.
+    APPEND | too large to do it quickly)\nfunction prettyXml(text) \{\n  if (!text \|\| text.length > 5000000) return text;\n  const doc = new DOMParser().parseFromString(text, 'application/xm| TO parts.
+    APPEND |l');\n  if (doc.getElementsByTagName('parsererror').length) return text;\n  const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n  const out = | TO parts.
+    APPEND |[];\n  const walk = (node, depth) => \{\n    const pad = '  '.repeat(depth);\n    if (node.nodeType === Node.ELEMENT_NODE) \{\n      const attrs = [...node.attributes].map((a) => `| TO parts.
+    APPEND | $\{a.name\}="$\{esc(a.value).replace(/"/g, '&quot;')\}"`).join('');\n      const kids = [...node.childNodes].filter((c) => c.nodeType !== Node.TEXT_NODE \|\| c.nodeValue.trim());| TO parts.
+    APPEND |\n      if (!kids.length) out.push(`$\{pad\}<$\{node.nodeName\}$\{attrs\}/>`);\n      else if (kids.length === 1 && kids[0].nodeType === Node.TEXT_NODE) \{\n        out.push(`$\{pa| TO parts.
+    APPEND |d\}<$\{node.nodeName\}$\{attrs\}>$\{esc(kids[0].nodeValue)\}</$\{node.nodeName\}>`);\n      \} else \{\n        out.push(`$\{pad\}<$\{node.nodeName\}$\{attrs\}>`);\n        kids.fo| TO parts.
+    APPEND |rEach((c) => walk(c, depth + 1));\n        out.push(`$\{pad\}</$\{node.nodeName\}>`);\n      \}\n    \} else if (node.nodeType === Node.TEXT_NODE) out.push(pad + esc(node.nodeValue| TO parts.
+    APPEND |.trim()));\n    else if (node.nodeType === Node.CDATA_SECTION_NODE) out.push(`$\{pad\}<![CDATA[$\{node.nodeValue\}]]>`);\n    else if (node.nodeType === Node.COMMENT_NODE) out.push| TO parts.
+    APPEND |(`$\{pad\}<!--$\{node.nodeValue\}-->`);\n  \};\n  [...doc.childNodes].forEach((n) => walk(n, 0));\n  return out.join('\\n');\n\}\n\n// navigator.clipboard exists only on HTTPS and | TO parts.
+    APPEND |localhost; the endpoint is often plain HTTP, so a hidden textarea and\n// execCommand('copy') are the fallback\nasync function copyText(text) \{\n  try \{\n    if (navigator.clipbo| TO parts.
+    APPEND |ard && window.isSecureContext) \{\n      await navigator.clipboard.writeText(text);\n      return true;\n    \}\n  \} catch \{ /* the fallback below */ \}\n  const area = Object.as| TO parts.
+    APPEND |sign(document.createElement('textarea'), \{ value: text, readOnly: true \});\n  area.style.cssText = 'position:fixed;top:0;left:0;opacity:0';\n  document.body.appendChild(area);\n | TO parts.
+    APPEND | area.select();\n  let copied = false;\n  try \{ copied = document.execCommand('copy'); \} catch \{ copied = false; \}\n  area.remove();\n  return copied;\n\}\n\n// the Catalog pro| TO parts.
+    APPEND |perty of an Execute request, initial if it names none\nfunction requestCatalog(xml) \{\n  const doc = new DOMParser().parseFromString(xml \|\| '', 'application/xml');\n  const elem| TO parts.
+    APPEND |ent = doc.getElementsByTagNameNS('*', 'Catalog')[0];\n  return element ? element.textContent.trim() : '';\n\}\n\n// the MDX console with the statement and the catalog of a traced E| TO parts.
+    APPEND |xecute (console.js reads the fragment)\nconst consoleUrl = (entry) => \{\n  const fragment = new URLSearchParams(\{ statement: entry.mdx \});\n  const catalog = requestCatalog(entr| TO parts.
+    APPEND |y.request);\n  if (catalog) fragment.set('catalog', catalog);\n  return `console.html$\{location.search\}#$\{fragment\}`;\n\};\n\nconst download = (text, name) => \{\n  const url =| TO parts.
+    APPEND | URL.createObjectURL(new Blob([text], \{ type: 'text/xml' \}));\n  const a = Object.assign(document.createElement('a'), \{ href: url, download: name \});\n  a.click();\n  setTimeou| TO parts.
+    APPEND |t(() => URL.revokeObjectURL(url), 1000);\n\};\n\nfunction Users(\{ state, onSwitch, busy \}) \{\n  const [user, setUser] = useState('');\n  const name = (user \|\| state.user).trim| TO parts.
+    APPEND |().toUpperCase();\n  const on = state.users.some((u) => u.user === name);\n  return html`<section class="section">\n    <header><h2>Traced users</h2><span class="spacer"></span>\n | TO parts.
+    APPEND |     <span class="muted small">a trace switches itself off after $\{state.activeHours\} hours; calls are kept $\{state.retentionDays\} days</span></header>\n    <div class="body">| TO parts.
+    APPEND |\n      <div class="row">\n        <label class="muted" for="user">User</label>\n        <input id="user" type="text" maxlength="12" placeholder=$\{state.user\} value=$\{user\}\n  | TO parts.
+    APPEND |        onInput=$\{(e) => setUser(e.target.value)\} onKeyDown=$\{(e) => e.key === 'Enter' && onSwitch('on', name)\} />\n        <button class="primary" disabled=$\{busy \|\| !name| TO parts.
+    APPEND |\} onClick=$\{() => onSwitch('on', name)\}\n          title=$\{`On for $\{state.activeHours\} hours from now`\}>$\{on ? `Switch on again for $\{state.activeHours\} hours` : 'Switch| TO parts.
+    APPEND | trace on'\}</button>\n        $\{on && html`<span class="status ok">on</span>`\}\n      </div>\n      $\{state.users.length ? html`<table>\n        <thead><tr><th>User</th><th>Sin| TO parts.
+    APPEND |ce</th><th>On until</th><th>Switched on by</th><th></th></tr></thead>\n        <tbody>$\{state.users.map((u) => html`<tr>\n          <td><strong class="mono">$\{u.user\}</strong>$| TO parts.
+    APPEND |\{u.user === state.user && html` <span class="muted small">(this page's user)</span>`\}</td>\n          <td>$\{time(u.since)\}</td><td>$\{time(u.until)\}</td><td class="mono">$\{u.| TO parts.
+    APPEND |by\}</td>\n          <td class="actions"><button disabled=$\{busy\} onClick=$\{() => onSwitch('off', u.user)\}>Switch off</button></td>\n        </tr>`)\}</tbody>\n      </table>` | TO parts.
+    APPEND |: html`<div class="muted">The trace is off for every user.</div>`\}\n      <div class="notice info small">A call is traced under the SAP user it runs as. This page runs as$\{' '\}| TO parts.
+    APPEND |\n        <span class="mono">$\{state.user\}</span>; while the ICF node <span class="mono">/zzxxmla1</span> logs on anonymously,\n        every XMLA call runs as that user too. The| TO parts.
+    APPEND | client's address and User-Agent tell the callers apart.</div>\n    </div>\n  </section>`;\n\}\n\nfunction Detail(\{ id, onClose \}) \{\n  const [entry, setEntry] = useState(null);| TO parts.
+    APPEND |\n  const [error, setError] = useState('');\n  const [tab, setTab] = useState('');\n  const [pretty, setPretty] = useState(true);\n  const [copied, setCopied] = useState('');  // t| TO parts.
+    APPEND |he feedback of Copy, for a moment\n  useEffect(() => \{\n    if (!copied) return undefined;\n    const timer = setTimeout(() => setCopied(''), 2000);\n    return () => clearTimeout| TO parts.
+    APPEND |(timer);\n  \}, [copied]);\n  useEffect(() => \{\n    setEntry(null);\n    setError('');\n    api('GET', 'trace/entry', \{ id \}).then((e) => \{\n      setEntry(e);\n      setTab((| TO parts.
+    APPEND |t) => (t === 'mdx' && !e.mdx) \|\| !t ? (e.mdx ? 'mdx' : 'request') : t);\n    \}, (e) => setError(e.message));\n  \}, [id]);\n  if (error) return html`<section class="section deta| TO parts.
+    APPEND |il"><div class="body"><div class="notice err">$\{error\}</div></div></section>`;\n  if (!entry) return html`<section class="section detail"><div class="body muted">Reading the call| TO parts.
     APPEND |{ cl_abap_conv_in_ce=>uccp( '2026' ) }</div></section>`;\n\n  const raw = tab === 'mdx' ? entry.mdx : tab === 'request' ? entry.request : entry.response;\n  const shown = tab === '| TO parts.
-    APPEND |mdx' \|\| !pretty ? raw : prettyXml(raw);\n  const copy = () => navigator.clipboard?.writeText(raw);\n  const save = () => tab === 'response' && entry.responseTruncated\n    ? wind| TO parts.
-    APPEND |ow.open(apiUrl('trace/response', \{ id \}), '_blank')\n    : download(raw, `$\{entry.id\}-$\{tab\}.$\{tab === 'mdx' ? 'mdx' : 'xml'\}`);\n  return html`<section class="section">\n | TO parts.
-    APPEND |   <header><h2>$\{what(entry)\}$\{entry.type && html` <span class="mono">$\{entry.type\}</span>`\}</h2>\n      <span class="muted small">$\{time(entry.at)\} | TO parts.
-    APPEND |{ cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{entry.user\} { cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{entry.client\}$\{entry.status ? ` { cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{entry.r| TO parts.
-    APPEND |untimeMs\} ms` : ''\}</span>\n      <span class="spacer"></span><button class="link" onClick=$\{onClose\}>Close</button></header>\n    <div class="tabs" role="tablist">\n      $\{e| TO parts.
-    APPEND |ntry.mdx && html`<button role="tab" class=$\{tab === 'mdx' ? 'active' : ''\} onClick=$\{() => setTab('mdx')\}>MDX statement</button>`\}\n      <button role="tab" class=$\{tab === '| TO parts.
-    APPEND |request' ? 'active' : ''\} onClick=$\{() => setTab('request')\}>SOAP request <span class="muted small">$\{size(entry.requestLength)\}</span></button>\n      <button role="tab" clas| TO parts.
-    APPEND |s=$\{tab === 'response' ? 'active' : ''\} onClick=$\{() => setTab('response')\}>SOAP response <span class="muted small">$\{entry.status ? size(entry.responseLength) : 'none'\}</spa| TO parts.
-    APPEND |n></button>\n    </div>\n    <div class="body">\n      <div class="row">\n        $\{tab !== 'mdx' && html`<label class="inline"><input type="checkbox" checked=$\{pretty\} onChange| TO parts.
-    APPEND |=$\{(e) => setPretty(e.target.checked)\} /> Indent XML</label>`\}\n        <span class="spacer"></span>\n        <button onClick=$\{copy\} disabled=$\{!raw\}>Copy</button>\n       | TO parts.
-    APPEND | <button onClick=$\{save\} disabled=$\{!raw\}>Download</button>\n      </div>\n      $\{tab === 'response' && !entry.status && html`<div class="notice warn">No response: the call i| TO parts.
-    APPEND |s still running, or it was aborted (a short dump, ST22).</div>`\}\n      $\{tab === 'response' && entry.responseTruncated && html`<div class="notice warn">The response has $\{size(| TO parts.
-    APPEND |entry.responseLength)\}; the first million characters are shown, Download gives all of it.</div>`\}\n      $\{tab === 'response' && entry.fault && html`<div class="notice err">The | TO parts.
-    APPEND |answer is a SOAP fault.</div>`\}\n      <textarea class="trace" readonly spellcheck="false" value=$\{shown\} aria-label=$\{tab\}></textarea>\n      $\{entry.userAgent && html`<div | TO parts.
-    APPEND |class="muted small">User-Agent: <span class="mono">$\{entry.userAgent\}</span></div>`\}\n    </div>\n  </section>`;\n\}\n\nfunction App() \{\n  const [state, setState] = useState(n| TO parts.
-    APPEND |ull);       // the answer of GET trace\n  const [filter, setFilter] = useState('');\n  const [selected, setSelected] = useState('');\n  const [auto, setAuto] = useState(false);\n  | TO parts.
-    APPEND |const [busy, setBusy] = useState('');\n  const [error, setError] = useState('');\n  const filterRef = useRef(filter);\n  filterRef.current = filter;\n\n  const load = (quiet) => \{| TO parts.
-    APPEND |\n    if (!quiet) setBusy('Reading the trace{ cl_abap_conv_in_ce=>uccp( '2026' ) }');\n    return api('GET', 'trace', \{ filter: filterRef.current \})\n      .then((data) => \{ set| TO parts.
-    APPEND |State(data); setError(''); \}, (e) => setError(e.message))\n      .finally(() => quiet \|\| setBusy(''));\n  \};\n  useEffect(() => \{ load(); \}, [filter]);\n  useEffect(() => \{| TO parts.
-    APPEND |\n    if (!auto) return undefined;\n    const timer = setInterval(() => load(true), REFRESH_MS);\n    return () => clearInterval(timer);\n  \}, [auto]);\n\n  const post = (resource| TO parts.
-    APPEND |, params, message) => \{\n    if (message && !confirm(message)) return;\n    setBusy('Saving{ cl_abap_conv_in_ce=>uccp( '2026' ) }');\n    api('POST', resource, \{ ...params, filte| TO parts.
-    APPEND |r \})\n      .then((data) => \{ setState(data); setError(''); \}, (e) => setError(e.message))\n      .finally(() => setBusy(''));\n  \};\n  const onSwitch = (how, user) => post(`tr| TO parts.
-    APPEND |ace/$\{how\}`, \{ user \});\n  const clear = (user) => \{\n    post('trace/clear', \{ user \}, user ? `Delete the traced calls of $\{user\}?` : 'Delete all traced calls of every us| TO parts.
-    APPEND |er?');\n    setSelected('');\n  \};\n\n  const userNames = state ? [...new Set([...state.users.map((u) => u.user), ...state.calls.map((c) => c.user), filter].filter(Boolean))].sort| TO parts.
-    APPEND |() : [];\n  return html`\n    <div class="topbar"><h1>XMLA Trace</h1><span class="muted">the calls of the XMLA endpoint, per user</span>\n      <span class="spacer"></span><a href=| TO parts.
-    APPEND |$\{`./$\{location.search\}`\}>Schema Builder</a><a href=$\{`console.html$\{location.search\}`\}>MDX Console</a>\n      <a href=$\{`time.html$\{location.search\}`\}>Time Master Data| TO parts.
-    APPEND |</a></div>\n    <div class="page"><div class="pane">\n      $\{error && html`<div class="notice err">$\{error\}</div>`\}\n      $\{state && html`<$\{Users\} state=$\{state\} onSwit| TO parts.
-    APPEND |ch=$\{onSwitch\} busy=$\{!!busy\} />`\}\n      <section class="section">\n        <header><h2>Calls</h2>\n          <select value=$\{filter\} onChange=$\{(e) => \{ setFilter(e.targ| TO parts.
-    APPEND |et.value); setSelected(''); \}\} aria-label="User">\n            <option value="">All users</option>\n            $\{userNames.map((u) => html`<option value=$\{u\}>$\{u\}</option>`| TO parts.
-    APPEND |)\}\n          </select>\n          <span class="spacer"></span>\n          $\{busy && html`<span class="status busy">$\{busy\}</span>`\}\n          <label class="inline"><input ty| TO parts.
-    APPEND |pe="checkbox" checked=$\{auto\} onChange=$\{(e) => setAuto(e.target.checked)\} /> Refresh every 5 s</label>\n          <button onClick=$\{() => load()\} disabled=$\{!!busy\}>Refres| TO parts.
-    APPEND |h</button>\n          $\{filter && html`<button class="danger" onClick=$\{() => clear(filter)\} disabled=$\{!!busy \|\| !state?.calls.length\}>Delete $\{filter\}'s calls</button>`| TO parts.
-    APPEND |\}\n          <button class="danger" onClick=$\{() => clear('')\} disabled=$\{!!busy\}>Delete all</button></header>\n        <div class="scroll-x">$\{!state ? html`<div class="body| TO parts.
-    APPEND | muted">$\{busy \|\| 'No data.'\}</div>`\n          : !state.calls.length ? html`<div class="body muted">No traced calls$\{filter ? ` of $\{filter\}` : ''\}.</div>` : html`\n      | TO parts.
-    APPEND |    <table>\n            <thead><tr><th>Time</th><th>User</th><th>Call</th><th>Statement or rowset</th><th>Status</th>\n              <th class="num">ms</th><th class="num">Respons| TO parts.
-    APPEND |e</th><th>Client</th></tr></thead>\n            <tbody>$\{state.calls.map((c) => html`\n              <tr class=$\{`clickable$\{c.id === selected ? ' selected' : ''\}`\} onClick=$| TO parts.
-    APPEND |\{() => setSelected(c.id === selected ? '' : c.id)\}>\n                <td class="small">$\{time(c.at)\}</td>\n                <td class="mono">$\{c.user\}</td>\n                <t| TO parts.
-    APPEND |d>$\{what(c)\}</td>\n                <td class="mono small statement" title=$\{c.mdx\}>$\{c.mdx ? firstLine(c.mdx) : c.type\}</td>\n                <td>$\{!c.status ? html`<span cl| TO parts.
-    APPEND |ass="status warn">no answer</span>`\n                  : c.fault ? html`<span class="status err">fault</span>`\n                  : c.status === 200 ? html`<span class="status ok">| TO parts.
-    APPEND |ok</span>` : html`<span class="status err">$\{c.status\}</span>`\}</td>\n                <td class="num">$\{c.status ? c.runtimeMs : ''\}</td>\n                <td class="num">$\{c| TO parts.
-    APPEND |.status ? size(c.responseLength) : ''\}</td>\n                <td class="mono small">$\{c.client\}</td>\n              </tr>`)\}\n            </tbody>\n          </table>`\}\n     | TO parts.
-    APPEND |   </div>\n        $\{state && state.calls.length >= 200 && html`<div class="body muted small">The newest 200 calls are shown.</div>`\}\n      </section>\n      $\{selected && html| TO parts.
-    APPEND |`<$\{Detail\} id=$\{selected\} onClose=$\{() => setSelected('')\} />`\}\n    </div></div>`;\n\}\n\nconst root = document.getElementById('app');\nroot.textContent = '';\nrender(html| TO parts.
-    APPEND |`<$\{App\} />`, root);\n| TO parts.
+    APPEND |mdx' \|\| !pretty ? raw : prettyXml(raw);\n  // what is shown (indented or not) is what is copied\n  const copy = () => copyText(shown).then((ok) => setCopied(ok ? 'Copied' : 'Copy| TO parts.
+    APPEND | failed: select the text and press Ctrl+C'));\n  const save = () => tab === 'response' && entry.responseTruncated\n    ? window.open(apiUrl('trace/response', \{ id \}), '_blank')\n| TO parts.
+    APPEND |    : download(raw, `$\{entry.id\}-$\{tab\}.$\{tab === 'mdx' ? 'mdx' : 'xml'\}`);\n  return html`<section class="section detail">\n    <header><h2>$\{what(entry)\}$\{entry.type && | TO parts.
+    APPEND |html` <span class="mono">$\{entry.type\}</span>`\}</h2>\n      <span class="muted small">$\{time(entry.at)\} { cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{entry.user\} | TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{entry.client\}$\{entry.status ? ` { cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{entry.runtimeMs\} ms` : ''\}</span>\n      <span class="spacer| TO parts.
+    APPEND |"></span>\n      $\{entry.mdx && html`<a class="button" href=$\{consoleUrl(entry)\} target="_blank" rel="noopener"\n        title=$\{`Open the statement in the MDX console$\{reques| TO parts.
+    APPEND |tCatalog(entry.request) ? ` on catalog $\{requestCatalog(entry.request)\}` : ''\}`\}>Open in MDX Console</a>`\}\n      <button class="link" onClick=$\{onClose\}>Close</button></hea| TO parts.
+    APPEND |der>\n    <div class="tabs" role="tablist">\n      $\{entry.mdx && html`<button role="tab" class=$\{tab === 'mdx' ? 'active' : ''\} onClick=$\{() => setTab('mdx')\}>MDX statement</| TO parts.
+    APPEND |button>`\}\n      <button role="tab" class=$\{tab === 'request' ? 'active' : ''\} onClick=$\{() => setTab('request')\}>SOAP request <span class="muted small">$\{size(entry.requestL| TO parts.
+    APPEND |ength)\}</span></button>\n      <button role="tab" class=$\{tab === 'response' ? 'active' : ''\} onClick=$\{() => setTab('response')\}>SOAP response <span class="muted small">$\{en| TO parts.
+    APPEND |try.status ? size(entry.responseLength) : 'none'\}</span></button>\n    </div>\n    <div class="body">\n      <div class="row">\n        $\{tab !== 'mdx' && html`<label class="inli| TO parts.
+    APPEND |ne"><input type="checkbox" checked=$\{pretty\} onChange=$\{(e) => setPretty(e.target.checked)\} /> Indent XML</label>`\}\n        <span class="spacer"></span>\n        $\{copied &&| TO parts.
+    APPEND | html`<span class=$\{`status $\{copied === 'Copied' ? 'ok' : 'err'\}`\} role="status">$\{copied\}</span>`\}\n        <button onClick=$\{copy\} disabled=$\{!raw\}>Copy</button>\n   | TO parts.
+    APPEND |     <button onClick=$\{save\} disabled=$\{!raw\}>Download</button>\n      </div>\n      $\{tab === 'response' && !entry.status && html`<div class="notice warn">No response: the ca| TO parts.
+    APPEND |ll is still running, or it was aborted (a short dump, ST22).</div>`\}\n      $\{tab === 'response' && entry.responseTruncated && html`<div class="notice warn">The response has $\{s| TO parts.
+    APPEND |ize(entry.responseLength)\}; the first million characters are shown, Download gives all of it.</div>`\}\n      $\{tab === 'response' && entry.fault && html`<div class="notice err">| TO parts.
+    APPEND |The answer is a SOAP fault.</div>`\}\n      <textarea class="trace" readonly spellcheck="false" value=$\{shown\} aria-label=$\{tab\}></textarea>\n      $\{entry.userAgent && html`<| TO parts.
+    APPEND |div class="muted small">User-Agent: <span class="mono">$\{entry.userAgent\}</span></div>`\}\n    </div>\n  </section>`;\n\}\n\nfunction App() \{\n  const [state, setState] = useSta| TO parts.
+    APPEND |te(null);       // the answer of GET trace\n  const [filter, setFilter] = useState('');\n  const [kinds, setKinds] = useState(\{ DISCOVER: true, EXECUTE: true \});  // the toggles:| TO parts.
+    APPEND | which calls are listed\n  const [max, setMax] = useState(storedMax);\n  const [selected, setSelected] = useState('');\n  const [auto, setAuto] = useState(false);\n  const [busy, s| TO parts.
+    APPEND |etBusy] = useState('');\n  const [error, setError] = useState('');\n  const filterRef = useRef(filter);\n  filterRef.current = filter;\n  // one toggle on: the server lists only th| TO parts.
+    APPEND |at method (its newest 200); both on: every call; both off: none\n  const method = kinds.DISCOVER === kinds.EXECUTE ? '' : kinds.DISCOVER ? 'DISCOVER' : 'EXECUTE';\n  const methodRe| TO parts.
+    APPEND |f = useRef(method);\n  methodRef.current = method;\n  const maxRef = useRef(max);\n  maxRef.current = max;\n  const chooseMax = (n) => \{\n    setMax(n);\n    try \{ localStorage.s| TO parts.
+    APPEND |etItem(MAX_KEY, String(n)); \} catch \{ /* not remembered */ \}\n  \};\n  const none = !kinds.DISCOVER && !kinds.EXECUTE;\n\n  const load = (quiet) => \{\n    if (!quiet) setBusy('| TO parts.
+    APPEND |Reading the trace{ cl_abap_conv_in_ce=>uccp( '2026' ) }');\n    return api('GET', 'trace', \{ filter: filterRef.current, method: methodRef.current, max: maxRef.current \})\n      .| TO parts.
+    APPEND |then((data) => \{ setState(data); setError(''); \}, (e) => setError(e.message))\n      .finally(() => quiet \|\| setBusy(''));\n  \};\n  useEffect(() => \{ load(); \}, [filter, met| TO parts.
+    APPEND |hod, max]);\n  useEffect(() => \{\n    if (!auto) return undefined;\n    const timer = setInterval(() => load(true), REFRESH_MS);\n    return () => clearInterval(timer);\n  \}, [au| TO parts.
+    APPEND |to]);\n\n  const post = (resource, params, message) => \{\n    if (message && !confirm(message)) return;\n    setBusy('Saving{ cl_abap_conv_in_ce=>uccp( '2026' ) }');\n    api('POS| TO parts.
+    APPEND |T', resource, \{ ...params, filter, method, max \})\n      .then((data) => \{ setState(data); setError(''); \}, (e) => setError(e.message))\n      .finally(() => setBusy(''));\n  | TO parts.
+    APPEND |\};\n  const onSwitch = (how, user) => post(`trace/$\{how\}`, \{ user \});\n  const clear = (user) => \{\n    post('trace/clear', \{ user \}, user ? `Delete the traced calls of $\{| TO parts.
+    APPEND |user\}?` : 'Delete all traced calls of every user?');\n    setSelected('');\n  \};\n\n  const userNames = state ? [...new Set([...state.users.map((u) => u.user), ...state.calls.map| TO parts.
+    APPEND |((c) => c.user), filter].filter(Boolean))].sort() : [];\n  return html`\n    <div class="topbar"><h1>XMLA Trace</h1><span class="muted">the calls of the XMLA endpoint, per user</sp| TO parts.
+    APPEND |an>\n      <span class="spacer"></span><a href=$\{`./$\{location.search\}`\}>Schema Builder</a><a href=$\{`console.html$\{location.search\}`\}>MDX Console</a>\n      <a href=$\{`ti| TO parts.
+    APPEND |me.html$\{location.search\}`\}>Time Master Data</a></div>\n    <div class="page"><div class="pane wide">\n      $\{error && html`<div class="notice err">$\{error\}</div>`\}\n      | TO parts.
+    APPEND |$\{state && html`<$\{Users\} state=$\{state\} onSwitch=$\{onSwitch\} busy=$\{!!busy\} />`\}\n      <div class=$\{selected ? 'trace-split' : ''\}>\n      <section class="section">\n| TO parts.
+    APPEND |        <header><h2>Calls</h2>\n          <select value=$\{filter\} onChange=$\{(e) => \{ setFilter(e.target.value); setSelected(''); \}\} aria-label="User">\n            <option v| TO parts.
+    APPEND |alue="">All users</option>\n            $\{userNames.map((u) => html`<option value=$\{u\}>$\{u\}</option>`)\}\n          </select>\n          <div class="segmented" role="group" ar| TO parts.
+    APPEND |ia-label="Calls">\n            $\{[['DISCOVER', 'Discover'], ['EXECUTE', 'Execute']].map(([k, label]) => html`<button\n              class=$\{kinds[k] ? 'active' : ''\} aria-presse| TO parts.
+    APPEND |d=$\{kinds[k]\} title=$\{`Show the $\{label\} calls`\}\n              onClick=$\{() => \{ setKinds((s) => (\{ ...s, [k]: !s[k] \})); setSelected(''); \}\}>$\{label\}</button>`)\}\n| TO parts.
+    APPEND |          </div>\n          <label class="inline">Show\n            <select value=$\{max\} onChange=$\{(e) => chooseMax(Number(e.target.value))\} aria-label="Calls shown">\n       | TO parts.
+    APPEND |       $\{MAX_CHOICES.map((n) => html`<option value=$\{n\}>$\{n.toLocaleString()\}</option>`)\}\n            </select> newest</label>\n          <span class="spacer"></span>\n     | TO parts.
+    APPEND |     $\{busy && html`<span class="status busy">$\{busy\}</span>`\}\n          <label class="inline"><input type="checkbox" checked=$\{auto\} onChange=$\{(e) => setAuto(e.target.che| TO parts.
+    APPEND |cked)\} /> Refresh every 5 s</label>\n          <button onClick=$\{() => load()\} disabled=$\{!!busy\}>Refresh</button>\n          $\{filter && html`<button class="danger" onClick=| TO parts.
+    APPEND |$\{() => clear(filter)\} disabled=$\{!!busy \|\| !state?.calls.length\}>Delete $\{filter\}'s calls</button>`\}\n          <button class="danger" onClick=$\{() => clear('')\} disabl| TO parts.
+    APPEND |ed=$\{!!busy\}>Delete all</button></header>\n        <div class="scroll-x">$\{!state ? html`<div class="body muted">$\{busy \|\| 'No data.'\}</div>`\n          : none ? html`<div c| TO parts.
+    APPEND |lass="body muted">Switch Discover or Execute on to list calls.</div>`\n          : !state.calls.length ? html`<div class="body muted">No traced $\{method ? `$\{what(\{ method \})\}| TO parts.
+    APPEND | ` : ''\}calls$\{filter ? ` of $\{filter\}` : ''\}.</div>` : html`\n          <table>\n            <thead><tr><th>Time</th><th class="wide-only">User</th><th>Call</th><th>Statement| TO parts.
+    APPEND | or rowset</th><th>Status</th>\n              <th class="num">ms</th><th class="num">Response</th><th class="wide-only">Client</th></tr></thead>\n            <tbody>$\{state.calls.| TO parts.
+    APPEND |map((c) => html`\n              <tr class=$\{`clickable$\{c.id === selected ? ' selected' : ''\}`\} onClick=$\{() => setSelected(c.id === selected ? '' : c.id)\}>\n                | TO parts.
+    APPEND |<td class="small">$\{time(c.at)\}</td>\n                <td class="mono wide-only">$\{c.user\}</td>\n                <td>$\{what(c)\}</td>\n                <td class="mono small st| TO parts.
+    APPEND |atement" title=$\{c.mdx\}>$\{c.mdx ? firstLine(c.mdx) : c.type\}</td>\n                <td>$\{!c.status ? html`<span class="status warn">no answer</span>`\n                  : c.fa| TO parts.
+    APPEND |ult ? html`<span class="status err">fault</span>`\n                  : c.status === 200 ? html`<span class="status ok">ok</span>` : html`<span class="status err">$\{c.status\}</spa| TO parts.
+    APPEND |n>`\}</td>\n                <td class="num">$\{c.status ? c.runtimeMs : ''\}</td>\n                <td class="num">$\{c.status ? size(c.responseLength) : ''\}</td>\n               | TO parts.
+    APPEND | <td class="mono small wide-only">$\{c.client\}</td>\n              </tr>`)\}\n            </tbody>\n          </table>`\}\n        </div>\n        $\{state && !none && state.calls| TO parts.
+    APPEND |.length >= state.max && html`<div class="body muted small">The newest $\{state.max.toLocaleString()\} calls are shown; choose more next to Show.</div>`\}\n      </section>\n      $| TO parts.
+    APPEND |\{selected && html`<$\{Detail\} id=$\{selected\} onClose=$\{() => setSelected('')\} />`\}\n      </div>\n    </div></div>`;\n\}\n\nconst root = document.getElementById('app');\nroo| TO parts.
+    APPEND |t.textContent = '';\nrender(html`<$\{App\} />`, root);\n| TO parts.
     result = concat_lines_of( parts ).
   ENDMETHOD.
 
