@@ -300,12 +300,14 @@ and round trips (about 25 ms per statement); on the big grid the transfer of the
 first `GROUPING SETS` run of a case was sometimes much slower (179, 990, 1,567 ms) while the other forms' first
 runs were not.
 
+On the FoodMart InfoCube `GROUPING SETS` costs some 40 ms more than `GROUP BY` also from the plan cache (48 ms
+against 8 ms), which the wide aDSO did not show. Decided (2026-10-14): the cost is accepted for the MVP. HANA is
+built to run analytical statements fast, and one statement per query keeps the reads simple; one grouping set stays a
+plain `GROUP BY`. Not to be revisited before a real provider shows it matters.
+
 ## Open
 
 - Mixed plans and the batching passes: how much of `phase` remains once the relational inputs are read first.
-- `GROUPING SETS` has a fixed cost on the FoodMart InfoCube (some 40 ms more than `GROUP BY`, also from the plan
-  cache), which the wide aDSO did not show; a statement per pattern may be cheaper there when HANA's plan cache
-  answers. Measure on a real provider before relying on either.
 - The grid's ABAP (groups to values, placement, writing the answer) is now its cost, not SQL.
 - `fast_cells` formats every value although the query may not ask for `FORMATTED_VALUE`: Excel's grid asks for
   `VALUE, FORMAT_STRING, LANGUAGE, BACK_COLOR, FORE_COLOR, FONT_FLAGS` only. Format only when the cell properties

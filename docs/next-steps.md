@@ -67,8 +67,7 @@ keeps the answers: both test suites give the same answers with planning on and o
    neighbours and after a restart of eMondrian), SAP 196 to 216 s in total (271 s).
    Left over (`query-planning.md`, Open): the grid's 17 s are ABAP (rows to groups and values about 7 s, placing
    them 5 s, writing 633,830 cells, 119 MB); `fast_cells` formats every value although Excel's grid does not ask for
-   `FORMATTED_VALUE`; `GROUPING SETS` costs some 40 ms more than `GROUP BY` on the FoodMart InfoCube, to be measured
-   on a real provider; a calculated measure in a NON EMPTY query still filters its axis with the evaluator (step 4).
+   `FORMATTED_VALUE`; a calculated measure in a NON EMPTY query still filters its axis with the evaluator (step 4).
 4. Mixed queries: the relational inputs of computed nodes read as one batch before the first pass.
 5. More set nodes relational: `Filter` on a stored measure (`RolapNativeFilter`), `NonEmpty` with a second set.
 
