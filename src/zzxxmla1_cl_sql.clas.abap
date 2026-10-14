@@ -21,12 +21,28 @@ CLASS zzxxmla1_cl_sql DEFINITION
   PUBLIC SECTION.
     TYPES ty_t_row TYPE STANDARD TABLE OF string_table WITH EMPTY KEY.
 
+    "! The statements query has run since the last reset_statistics, and their time in microseconds (the trace of a
+    "! call records them, ZZXXMLA1_CL_TRACE).
+    CLASS-DATA statement_count TYPE i READ-ONLY.
+    CLASS-DATA statement_time TYPE int8 READ-ONLY.
+    "! Set: query keeps each statement with its rows and microseconds in statement_log (for measurements).
+    CLASS-DATA log_statements TYPE abap_bool.
+    TYPES:
+      BEGIN OF ty_logged,
+        sql  TYPE string,
+        rows TYPE i,
+        time TYPE int8,
+      END OF ty_logged.
+    CLASS-DATA statement_log TYPE STANDARD TABLE OF ty_logged WITH EMPTY KEY READ-ONLY.
+
     "! The rows of a query with the given number of columns, each row the values of its columns in order. A database
     "! error raises ZZXXMLA1_CX_SQL (unchecked).
     CLASS-METHODS query
       IMPORTING !sql          TYPE string
                 !columns      TYPE i
       RETURNING VALUE(result) TYPE ty_t_row.
+    "! Sets statement_count and statement_time to 0.
+    CLASS-METHODS reset_statistics.
     "! An identifier as a quoted SQL identifier, e.g. "/BIC/FZFMSALES".
     CLASS-METHODS quote
       IMPORTING identifier    TYPE csequence
@@ -68,6 +84,7 @@ CLASS zzxxmla1_cl_sql IMPLEMENTATION.
     FIELD-SYMBOLS <rows> TYPE STANDARD TABLE.
     ASSIGN rows->* TO <rows>.
 
+    GET RUN TIME FIELD DATA(started).
     TRY.
         DATA(statement) = NEW cl_sql_statement( ).
         DATA(result_set) = statement->execute_query( sql ).
@@ -81,6 +98,12 @@ CLASS zzxxmla1_cl_sql IMPLEMENTATION.
             error_message = error->get_text( )
             previous      = error.
     ENDTRY.
+    GET RUN TIME FIELD DATA(stopped).
+    statement_count = statement_count + 1.
+    statement_time = statement_time + stopped - started.
+    IF log_statements = abap_true.
+      APPEND VALUE #( sql = sql rows = lines( <rows> ) time = stopped - started ) TO statement_log.
+    ENDIF.
 
     LOOP AT <rows> ASSIGNING FIELD-SYMBOL(<row>).
       DATA(values) = VALUE string_table( ).
@@ -90,6 +113,10 @@ CLASS zzxxmla1_cl_sql IMPLEMENTATION.
       ENDDO.
       APPEND values TO result.
     ENDLOOP.
+  ENDMETHOD.
+
+  METHOD reset_statistics.
+    CLEAR: statement_count, statement_time, statement_log.
   ENDMETHOD.
 
   METHOD quote.

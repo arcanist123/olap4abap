@@ -325,13 +325,17 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
     "! The SqlContextConstraint of context_members for members of a hierarchy: whether it applies, the filters of the
     "! other hierarchies and the member of the hierarchy in the context (initial: none).
     "! @parameter skip_own | the hierarchy's member in the context does not count (each member is set as it)
+    "! @parameter defaults | the default members of other hierarchies in the context that are not their All member
+    "!   (Time's 1997): the constraint leaves them out, the cells have them; the read of the paths gives the cells'
+    "!   groups with them too (ZZXXMLA1_CL_MDX_FACTS=>non_empty_paths, docs/query-planning.md, step 3)
     METHODS context_constraint
       IMPORTING evaluator TYPE ty_evaluator
                 hierarchy TYPE i
                 skip_own  TYPE abap_bool DEFAULT abap_false
       EXPORTING applies   TYPE abap_bool
                 filters   TYPE zzxxmla1_cl_mdx_facts=>ty_t_filter
-                own       TYPE ty_member.
+                own       TYPE ty_member
+                defaults  TYPE zzxxmla1_cl_mdx_facts=>ty_t_filter.
     "! The children of stored members of one level (of one hierarchy) in the order of the members, under a non-empty
     "! evaluator only those with facts in the context (context_members): their paths read from the facts in one grouped
     "! query, then the members of these paths, without reading all children first (docs/mvp-scope.md, Member decision).
@@ -348,11 +352,13 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
                 level         TYPE i
       EXPORTING found         TYPE abap_bool
       RETURNING VALUE(result) TYPE ty_t_member.
-    "! The paths of the members of the hierarchy's level with facts with the filters (kept for the query).
+    "! The paths of the members of the hierarchy's level with facts with the filters (kept for the query); the read
+    "! also gives the groups with the defaults of context_constraint.
     METHODS context_paths
       IMPORTING filters       TYPE zzxxmla1_cl_mdx_facts=>ty_t_filter
                 hierarchy     TYPE i
                 key_level     TYPE i
+                defaults      TYPE zzxxmla1_cl_mdx_facts=>ty_t_filter OPTIONAL
       RETURNING VALUE(result) TYPE ty_path_set.
     "! One path is the other or begins with it: the members are on one line of ancestors.
     CLASS-METHODS on_one_path
@@ -380,6 +386,14 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
                 axis_index TYPE i
       CHANGING  cells      TYPE ty_t_cell
       RAISING   zzxxmla1_cx_xmla.
+    TYPES ty_t_flag TYPE STANDARD TABLE OF abap_bool WITH EMPTY KEY.
+    TYPES:
+      "! the positions of an axis to keep (true) or drop
+      BEGIN OF ty_kept,
+        axis TYPE i,
+        keep TYPE ty_t_flag,
+      END OF ty_kept,
+      ty_t_kept TYPE STANDARD TABLE OF ty_kept WITH EMPTY KEY.
     "! Our shortcut of the cells (the reference evaluates every cell, executeStripe, and reads the cells a pass missed
     "! before the next): when no member of the context, the slicer or the axes is calculated or null, a cell is the
     "! stored measure of its context aggregated over the facts of its non-All members (evaluate_current). The cells are
@@ -389,14 +403,28 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
     "! @parameter grouped | planning: all combinations read with one statement (GROUPING SETS)
     "! @parameter slicer_predicate | planning: a compound slicer as its tuples ORed (compound_predicate); its
     "! placeholders are then no calculated members here
+    "! @parameter filter_axes | planning: NON EMPTY axes (their indexes) to be filtered by NonEmpty(set, {measures}) in
+    "!   the context of the slicer (non_empty_axis): per pattern of the axis also its groups with the context's member
+    "!   of every other hierarchy, in the same statement; a tuple is kept if its group has facts (for stored measures
+    "!   a cell is not empty exactly then, whatever the measure)
+    "! @parameter kept | per axis of filter_axes the positions NonEmpty keeps (when done)
     METHODS fast_cells
       IMPORTING evaluator        TYPE ty_evaluator
                 axes             TYPE ty_t_axis
                 slicer           TYPE ty_tuple
                 grouped          TYPE abap_bool DEFAULT abap_false
                 slicer_predicate TYPE zzxxmla1_cl_mdx_facts=>ty_t_predicate OPTIONAL
+                filter_axes      TYPE zzxxmla1_cl_mdx_facts=>ty_t_index OPTIONAL
       EXPORTING done             TYPE abap_bool
-                cells            TYPE ty_t_cell.
+                cells            TYPE ty_t_cell
+                kept             TYPE ty_t_kept.
+    "! The NON EMPTY axes at the indexes filtered by NonEmpty(set, {measures}) in the context of the slicer with the
+    "! evaluator (non_empty_axis), a phase of its own.
+    METHODS filter_by_evaluator
+      IMPORTING evaluator TYPE ty_evaluator
+                indexes   TYPE zzxxmla1_cl_mdx_facts=>ty_t_index
+      CHANGING  axes      TYPE ty_t_axis
+      RAISING   zzxxmla1_cx_xmla.
     "! Planning (docs/query-planning.md): a NON EMPTY axis of an all-relational query is filtered by its cells only
     "! (remove_empty_positions), not first by NonEmpty(set, {measures}) in the context of the slicer (non_empty_axis).
     "! Both keep the same positions when every cell's context lies inside the context NonEmpty sees: true (the axis
@@ -415,6 +443,8 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       IMPORTING tuples        TYPE ty_t_tuple
       RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_facts=>ty_t_predicate.
     CONSTANTS c_max_slicer_tuples TYPE i VALUE 200.
+    "! fast_cells: the most values kept written and formatted
+    CONSTANTS c_max_written TYPE i VALUE 100000.
     "! The predicate of the slicer's tuples on the hierarchies given: OR of the AND of each tuple's members of them.
     CLASS-METHODS slicer_predicate
       IMPORTING tuples        TYPE ty_t_tuple
@@ -422,6 +452,11 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_facts=>ty_t_predicate.
     "! Planning: an axis set is not filtered by non_empty_axis in execute_axis (the cells filter it)
     DATA skip_axis_filter TYPE abap_bool.
+    "! Planning: the reads of members with facts also give the groups with the default members they leave out
+    "! (context_constraint's defaults): for a relational query of one axis, whose cells are then these groups and
+    "! need no statement of their own (Excel's filter and member lists). With more axes the cells need a statement
+    "! for their crossed patterns anyway, and the defaults' join would only slow the reads down.
+    DATA read_defaults TYPE abap_bool.
     "! The cell of the evaluator's context as text: the value as XMLA writes it (XmlaHandler.ValueInfo), formatted with
     "! the format string of the context.
     METHODS compute_cell
@@ -439,6 +474,11 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
     "! cells.
     METHODS remove_empty_positions
       IMPORTING position TYPE i
+      CHANGING  result   TYPE ty_result.
+    "! Removes the positions of the axis (from 1) not kept, and their cells.
+    METHODS drop_positions
+      IMPORTING position TYPE i
+                keep     TYPE ty_t_flag
       CHANGING  result   TYPE ty_result.
     "! A set expression (compileList): the tuples of a resolved expression of set type, or of a member or tuple.
     METHODS evaluate_set
@@ -1608,6 +1648,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
                             = zzxxmla1_cl_mdx_planner=>c_mark-relational ).
     ENDIF.
     CLEAR: context_paths_cache, skip_axis_filter.
+    read_defaults = xsdbool( relational = abap_true AND lines( resolved-axes ) = 1 ).
     " the subcube of a subselect restricts every read of facts
     fact_reader->set_subcube( subcube_predicate( resolved ) ).
     root_evaluator = zzxxmla1_cl_mdx_evaluator=>create( schema_reader = schema_reader facts = fact_reader calc = me ).
@@ -1730,24 +1771,27 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
           APPEND filter_index TO to_filter.
         ENDIF.
       ENDLOOP.
+      " with the cells (fast_cells), the groups NonEmpty sees read in the same statement; by the evaluator if a measure
+      " of the query is calculated (its formula is computed) or the axis sets a hierarchy of the slicer
+      DATA(relational_filter) = VALUE zzxxmla1_cl_mdx_facts=>ty_t_index( ).
+      DATA(evaluator_filter) = VALUE zzxxmla1_cl_mdx_facts=>ty_t_index( ).
       LOOP AT to_filter INTO filter_index.
-        DATA(unfiltered) = result-axes[ filter_index ]-tuples.
-        attempt = 0.
-        DO.
-          DATA(axis_savepoint) = evaluator->savepoint( ).
-          evaluator->set_non_empty( abap_true ).
-          evaluator->set_eval_axes( abap_true ).
-          TRY.
-              result-axes[ filter_index ]-tuples = non_empty_axis( evaluator = evaluator tuples = unfiltered ).
-            CLEANUP.
-              evaluator->restore( axis_savepoint ).
-          ENDTRY.
-          evaluator->restore( axis_savepoint ).
-          IF phase( CHANGING attempt = attempt ) = abap_false.
-            EXIT.
-          ENDIF.
-        ENDDO.
+        DATA(shares_slicer) = abap_false.
+        LOOP AT result-slicer INTO DATA(slicer_tuple_of_axis).
+          LOOP AT slicer_tuple_of_axis INTO DATA(slicer_member_of_axis).
+            IF result-axes[ filter_index ]-tuples IS NOT INITIAL
+                AND line_exists( result-axes[ filter_index ]-tuples[ 1 ][ hier_id = slicer_member_of_axis-hier_id ] ).
+              shares_slicer = abap_true.
+            ENDIF.
+          ENDLOOP.
+        ENDLOOP.
+        IF line_exists( query_measures[ calculated = abap_true ] ) OR shares_slicer = abap_true.
+          APPEND filter_index TO evaluator_filter.
+        ELSE.
+          APPEND filter_index TO relational_filter.
+        ENDIF.
       ENDLOOP.
+      filter_by_evaluator( EXPORTING evaluator = evaluator indexes = evaluator_filter CHANGING axes = result-axes ).
     ENDIF.
 
     result-cube_name = cube-cube_name.
@@ -1775,9 +1819,15 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       DATA(slicer_predicate) = COND zzxxmla1_cl_mdx_facts=>ty_t_predicate(
         WHEN relational = abap_true AND lines( result-slicer ) > 1 THEN compound_predicate( result-slicer ) ).
       fast_cells( EXPORTING evaluator = evaluator axes = result-axes slicer = slicer_context grouped = relational
-                            slicer_predicate = slicer_predicate
-                  IMPORTING done = DATA(fast) cells = result-cells ).
-      IF fast = abap_false.
+                            slicer_predicate = slicer_predicate filter_axes = relational_filter
+                  IMPORTING done = DATA(fast) cells = result-cells kept = DATA(kept) ).
+      IF fast = abap_true.
+        " the positions NonEmpty drops, with their cells
+        LOOP AT kept INTO DATA(kept_axis).
+          drop_positions( EXPORTING position = kept_axis-axis keep = kept_axis-keep CHANGING result = result ).
+        ENDLOOP.
+      ELSE.
+        filter_by_evaluator( EXPORTING evaluator = evaluator indexes = relational_filter CHANGING axes = result-axes ).
         DATA(body) = evaluator->savepoint( ).
         attempt = 0.
         DO.
@@ -2764,7 +2814,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD context_constraint.
-    CLEAR: applies, filters, own.
+    CLEAR: applies, filters, own, defaults.
     IF evaluator->is_non_empty( ) = abap_false OR hierarchy = zzxxmla1_cl_mdx_schema_reader=>c_measures.
       RETURN.
     ENDIF.
@@ -2773,12 +2823,18 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       RETURN.
     ENDIF.
     LOOP AT context INTO DATA(member) WHERE hier_id <> zzxxmla1_cl_mdx_schema_reader=>c_measures.
-      IF member-unique_name = schema_reader->get_default_member( member-hier_id )-unique_name
-          OR ( skip_own = abap_true AND member-hier_id = hierarchy ).
+      IF member-unique_name = schema_reader->get_default_member( member-hier_id )-unique_name.
+        IF member-hier_id <> hierarchy AND member-key_level > 0 AND member-calculated = abap_false
+            AND member-is_null = abap_false.
+          APPEND VALUE #( hierarchy = member-hier_id level = member-key_level path = member-path ) TO defaults.
+        ENDIF.
+        CONTINUE.
+      ENDIF.
+      IF skip_own = abap_true AND member-hier_id = hierarchy.
         CONTINUE.
       ENDIF.
       IF member-calculated = abap_true OR member-is_null = abap_true.
-        CLEAR: filters, own.
+        CLEAR: filters, own, defaults.
         RETURN.
       ENDIF.
       IF member-key_level = 0.
@@ -2801,7 +2857,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     ENDLOOP.
     IF stored IS NOT INITIAL.
       context_constraint( EXPORTING evaluator = evaluator hierarchy = stored[ 1 ]-hier_id skip_own = as_context
-                          IMPORTING applies = DATA(applies) filters = DATA(filters) own = DATA(own) ).
+                          IMPORTING applies = DATA(applies) filters = DATA(filters) own = DATA(own)
+                                    defaults = DATA(defaults) ).
     ENDIF.
     IF applies = abap_false.
       LOOP AT parents INTO parent.
@@ -2823,7 +2880,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       RETURN.
     ENDIF.
     DATA(paths) = VALUE string_table( ).
-    LOOP AT context_paths( filters = filters hierarchy = hierarchy key_level = key_level ) INTO DATA(path).
+    LOOP AT context_paths( filters = filters hierarchy = hierarchy key_level = key_level defaults = defaults )
+         INTO DATA(path).
       IF own IS INITIAL OR on_one_path( path1 = own-path path2 = path ) = abap_true.
         APPEND path TO paths.
       ENDIF.
@@ -2868,12 +2926,13 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       RETURN.
     ENDIF.
     context_constraint( EXPORTING evaluator = evaluator hierarchy = element-hierarchy
-                        IMPORTING applies = found filters = DATA(filters) own = DATA(own) ).
+                        IMPORTING applies = found filters = DATA(filters) own = DATA(own) defaults = DATA(defaults) ).
     IF found = abap_false.
       RETURN.
     ENDIF.
     DATA(paths) = VALUE string_table( ).
-    LOOP AT context_paths( filters = filters hierarchy = element-hierarchy key_level = element-key_level )
+    LOOP AT context_paths( filters = filters hierarchy = element-hierarchy key_level = element-key_level
+                           defaults = defaults )
          INTO DATA(path).
       IF own IS INITIAL OR on_one_path( path1 = own-path path2 = path ) = abap_true.
         APPEND path TO paths.
@@ -2889,7 +2948,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     ENDIF.
     DATA(hierarchy) = members[ 1 ]-hier_id.
     context_constraint( EXPORTING evaluator = evaluator hierarchy = hierarchy
-                        IMPORTING applies = DATA(applies) filters = DATA(filters) own = DATA(own) ).
+                        IMPORTING applies = DATA(applies) filters = DATA(filters) own = DATA(own)
+                                  defaults = DATA(defaults) ).
     IF applies = abap_false.
       RETURN.
     ENDIF.
@@ -2905,7 +2965,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       ENDIF.
       IF member-key_level <> key_level.
         key_level = member-key_level.
-        paths = context_paths( filters = filters hierarchy = hierarchy key_level = key_level ).
+        paths = context_paths( filters = filters hierarchy = hierarchy key_level = key_level defaults = defaults ).
       ENDIF.
       IF line_exists( paths[ table_line = member-path ] )
           AND ( own IS INITIAL OR on_one_path( path1 = own-path path2 = member-path ) = abap_true ).
@@ -2915,6 +2975,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD context_paths.
+    DATA(with_defaults) = COND zzxxmla1_cl_mdx_facts=>ty_t_filter( WHEN read_defaults = abap_true THEN defaults ).
     DATA(all) = filters.
     APPEND VALUE #( hierarchy = hierarchy level = key_level any = abap_true ) TO all.
     DATA(key) = ``.
@@ -2926,7 +2987,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       result = <cached>-paths.
       RETURN.
     ENDIF.
-    LOOP AT fact_reader->non_empty_paths( all ) INTO DATA(paths).
+    LOOP AT fact_reader->non_empty_paths( filters = all defaults = with_defaults ) INTO DATA(paths).
       INSERT paths[ 1 ] INTO TABLE result.
     ENDLOOP.
     INSERT VALUE #( key = key paths = result ) INTO TABLE context_paths_cache.
@@ -3133,10 +3194,11 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         keys    TYPE ty_t_fast_key,
       END OF ty_fast_pattern,
       BEGIN OF ty_fast_axis,
-        size     TYPE i,
-        stride   TYPE i,   " the ordinal of a cell is the sum of (position - 1) * stride over the axes
-        tuples   TYPE STANDARD TABLE OF ty_fast_tuple WITH EMPTY KEY,
-        patterns TYPE STANDARD TABLE OF ty_fast_pattern WITH EMPTY KEY,
+        size        TYPE i,
+        stride      TYPE i,   " the ordinal of a cell is the sum of (position - 1) * stride over the axes
+        tuples      TYPE STANDARD TABLE OF ty_fast_tuple WITH EMPTY KEY,
+        patterns    TYPE STANDARD TABLE OF ty_fast_pattern WITH EMPTY KEY,
+        hierarchies TYPE SORTED TABLE OF i WITH UNIQUE KEY table_line,   " that its tuples set
       END OF ty_fast_axis,
       "! a filter of a combination of patterns: of the context (axis 0) or of the pattern of an axis (its position
       "! among the pattern's filters)
@@ -3146,10 +3208,12 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         filter   TYPE zzxxmla1_cl_mdx_facts=>ty_filter,
       END OF ty_fast_source,
       ty_t_fast_source TYPE STANDARD TABLE OF ty_fast_source WITH EMPTY KEY,
-      "! a combination of a pattern of each axis (their positions) and the filters of its pattern of the facts
+      "! a combination of a pattern of each axis (their positions) and the filters of its pattern of the facts; of a
+      "! filtered axis (filter_axis) its pattern with the context only
       BEGIN OF ty_fast_combination,
-        choice  TYPE ty_t_index,
-        sources TYPE ty_t_fast_source,
+        choice      TYPE ty_t_index,
+        sources     TYPE ty_t_fast_source,
+        filter_axis TYPE i,
       END OF ty_fast_combination.
     DATA fast_axes TYPE STANDARD TABLE OF ty_fast_axis WITH EMPTY KEY.
     DATA sources TYPE ty_t_fast_source.
@@ -3159,7 +3223,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     DATA axis_hierarchies TYPE SORTED TABLE OF i WITH UNIQUE KEY table_line.
     DATA count TYPE int8 VALUE 1.
 
-    CLEAR: done, cells.
+    CLEAR: done, cells, kept.
     DATA(context) = evaluator->get_members( ).
     " a compound slicer's placeholders are its predicate when there is one
     DATA(plain) = VALUE ty_t_member( ).
@@ -3191,6 +3255,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
             CONTINUE.
           ENDIF.
           INSERT member-hier_id INTO TABLE axis_hierarchies.
+          INSERT member-hier_id INTO TABLE <axis>-hierarchies.
           IF member-hier_id = zzxxmla1_if_mdx_schema_reader=>c_measures.
             fast_tuple-measure = member-measure_index.
             measure_axis = axis_index.
@@ -3259,7 +3324,16 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     ENDIF.
 
     " each combination of a pattern of each axis: its groups with facts are the cells that are not empty
-    DATA(choice) = VALUE ty_t_index( FOR fast_axis IN fast_axes ( 1 ) ).
+    DATA(choice) = VALUE ty_t_index( FOR a = 1 WHILE a <= lines( fast_axes ) ( 1 ) ).
+    " each amount of a measure written and formatted once (a grid repeats its values)
+    TYPES:
+      BEGIN OF ty_written,
+        measure   TYPE i,
+        amount    TYPE decfloat34,
+        value     TYPE string,
+        formatted TYPE string,
+      END OF ty_written.
+    DATA written TYPE HASHED TABLE OF ty_written WITH UNIQUE KEY measure amount.
     DO.
       sources = VALUE #( FOR base IN base_filters ( filter = base ) ).
       LOOP AT fast_axes ASSIGNING <axis>.
@@ -3298,6 +3372,41 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       ENDIF.
     ENDDO.
 
+    " the filtered axes: per pattern its groups with the context's members of the hierarchies it does not set (the
+    " context NonEmpty sees: the slicer and the default members, also of the other axes' hierarchies)
+    LOOP AT filter_axes INTO DATA(filter_axis).
+      ASSIGN fast_axes[ filter_axis ] TO <axis>.
+      APPEND VALUE #( axis = filter_axis keep = VALUE #( FOR t = 1 WHILE t <= <axis>-size ( abap_false ) ) ) TO kept.
+      DATA(context_filters) = VALUE zzxxmla1_cl_mdx_facts=>ty_t_filter( ).
+      LOOP AT context INTO member WHERE hier_id > 0 AND key_level > 0.
+        IF NOT line_exists( <axis>-hierarchies[ table_line = member-hier_id ] ).
+          APPEND VALUE #( hierarchy = member-hier_id level = member-key_level path = member-path ) TO context_filters.
+        ENDIF.
+      ENDLOOP.
+      LOOP AT <axis>-patterns ASSIGNING <pattern>.
+        DATA(pattern_index) = sy-tabix.
+        choice = VALUE #( FOR a = 1 WHILE a <= lines( fast_axes ) ( 1 ) ).
+        choice[ filter_axis ] = pattern_index.
+        sources = VALUE #( FOR c IN context_filters ( filter = c ) ).
+        LOOP AT <pattern>-filters INTO filter.
+          APPEND VALUE #( axis = filter_axis position = sy-tabix filter = filter ) TO sources.
+        ENDLOOP.
+        SORT sources BY filter-hierarchy ASCENDING.
+        filters = VALUE #( ).
+        paths = VALUE #( ).
+        LOOP AT sources INTO source.
+          APPEND VALUE #( hierarchy = source-filter-hierarchy level = source-filter-level ) TO filters.
+          IF source-axis = 0.
+            APPEND VALUE #( ( source-filter-path ) ) TO paths.
+          ELSE.
+            APPEND <pattern>-paths[ source-position ] TO paths.
+          ENDIF.
+        ENDLOOP.
+        APPEND VALUE #( choice = choice sources = sources filter_axis = filter_axis ) TO combinations.
+        APPEND VALUE #( filters = filters paths = paths ) TO patterns.
+      ENDLOOP.
+    ENDLOOP.
+
     " the combinations' groups: with one statement (grouped), else with one per combination
     DATA(reads) = COND i( WHEN grouped = abap_true THEN 1 ELSE lines( patterns ) ).
     DO reads TIMES.
@@ -3308,8 +3417,9 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       LOOP AT values INTO DATA(value).
         ASSIGN combinations[ COND i( WHEN grouped = abap_true THEN value-pattern ELSE read ) ]
                TO FIELD-SYMBOL(<combination>).
-        " the key of each axis from the group's paths; the context's must be its own
-        DATA(keys) = VALUE string_table( FOR fast_axis IN fast_axes ( ) ).
+        " the key of each axis from the group's paths; the context's must be its own (not FOR ... IN fast_axes: it
+        " would copy every axis per group)
+        DATA(keys) = VALUE string_table( FOR a = 1 WHILE a <= lines( fast_axes ) ( ) ).
         DATA(match) = abap_true.
         LOOP AT <combination>-sources INTO source.
           DATA(path) = value-paths[ sy-tabix ].
@@ -3324,6 +3434,19 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
           ENDIF.
         ENDLOOP.
         IF match = abap_false.
+          CONTINUE.
+        ENDIF.
+        " a filtered axis' tuples with these keys are kept
+        IF <combination>-filter_axis > 0.
+          DATA(kept_index) = line_index( kept[ axis = <combination>-filter_axis ] ).
+          ASSIGN fast_axes[ <combination>-filter_axis ]-patterns[ <combination>-choice[ <combination>-filter_axis ] ]
+                 TO <pattern>.
+          ASSIGN <pattern>-keys[ KEY primary_key COMPONENTS key = keys[ <combination>-filter_axis ] ] TO <key>.
+          IF sy-subrc = 0.
+            LOOP AT <key>-indexes INTO DATA(kept_position).
+              kept[ kept_index ]-keep[ kept_position ] = abap_true.
+            ENDLOOP.
+          ENDIF.
           CONTINUE.
         ENDIF.
         " the cells of the tuples with these keys
@@ -3346,14 +3469,25 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
             measure_index = fast_axes[ measure_axis ]-tuples[ ( ordinal DIV measure_stride ) MOD measure_size + 1 ]-measure.
           ENDIF.
           " evaluate_current's value of the cell, written as compute_cell writes it
-          DATA(number) = VALUE zzxxmla1_if_mdx_evaluator=>ty_value( kind   = zzxxmla1_cl_mdx_evaluator=>c_value-numeric
-                                                                   number = value-amounts[ measure_index ] ).
+          ASSIGN written[ measure = measure_index amount = value-amounts[ measure_index ] ] TO FIELD-SYMBOL(<written>).
+          IF sy-subrc <> 0.
+            IF lines( written ) >= c_max_written.
+              CLEAR written.
+            ENDIF.
+            DATA(number) = VALUE zzxxmla1_if_mdx_evaluator=>ty_value(
+                             kind = zzxxmla1_cl_mdx_evaluator=>c_value-numeric number = value-amounts[ measure_index ] ).
+            INSERT VALUE #( measure   = measure_index
+                            amount    = value-amounts[ measure_index ]
+                            value     = zzxxmla1_cl_mdx_format=>xmla_double( number-number )
+                            formatted = zzxxmla1_cl_mdx_format=>format_number(
+                                          value = number-number format_string = stored_measures[ measure_index ]-format ) )
+                   INTO TABLE written ASSIGNING <written>.
+          ENDIF.
           ASSIGN cells[ ordinal + 1 ] TO FIELD-SYMBOL(<cell>).
           <cell>-empty = abap_false.
           <cell>-value_type = `xsd:double`.
-          <cell>-value = zzxxmla1_cl_mdx_format=>xmla_double( number-number ).
-          <cell>-formatted = zzxxmla1_cl_mdx_format=>format_number( value         = number-number
-                                                                   format_string = stored_measures[ measure_index ]-format ).
+          <cell>-value = <written>-value.
+          <cell>-formatted = <written>-formatted.
         ENDLOOP.
       ENDLOOP.
     ENDDO.
@@ -3475,20 +3609,54 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     needed = abap_false.
   ENDMETHOD.
 
+  METHOD filter_by_evaluator.
+    DATA attempt TYPE i.
+    LOOP AT indexes INTO DATA(index).
+      DATA(unfiltered) = axes[ index ]-tuples.
+      attempt = 0.
+      DO.
+        DATA(savepoint) = evaluator->savepoint( ).
+        evaluator->set_non_empty( abap_true ).
+        evaluator->set_eval_axes( abap_true ).
+        TRY.
+            axes[ index ]-tuples = non_empty_axis( evaluator = evaluator tuples = unfiltered ).
+          CLEANUP.
+            evaluator->restore( savepoint ).
+        ENDTRY.
+        evaluator->restore( savepoint ).
+        IF phase( CHANGING attempt = attempt ) = abap_false.
+          EXIT.
+        ENDIF.
+      ENDDO.
+    ENDLOOP.
+  ENDMETHOD.
+
   METHOD remove_empty_positions.
     " the cell of position p of the axis has the coordinate (ordinal DIV stride) MOD size, stride being the product of
     " the sizes of the axes before it
-    DATA keep TYPE STANDARD TABLE OF abap_bool WITH EMPTY KEY.
     DATA(stride) = 1.
     DATA(before) = position - 1.
     LOOP AT result-axes INTO DATA(axis) TO before.
       stride = stride * lines( axis-tuples ).
     ENDLOOP.
     DATA(size) = lines( result-axes[ position ]-tuples ).
-    keep = VALUE #( FOR i = 1 UNTIL i > size ( abap_false ) ).
+    DATA(keep) = VALUE ty_t_flag( FOR i = 1 WHILE i <= size ( abap_false ) ).
     LOOP AT result-cells INTO DATA(cell) WHERE empty = abap_false.
       keep[ ( cell-ordinal DIV stride ) MOD size + 1 ] = abap_true.
     ENDLOOP.
+    drop_positions( EXPORTING position = position keep = keep CHANGING result = result ).
+  ENDMETHOD.
+
+  METHOD drop_positions.
+    IF NOT line_exists( keep[ table_line = abap_false ] ).
+      RETURN.
+    ENDIF.
+    DATA(stride) = 1.
+    DATA(before) = position - 1.
+    LOOP AT result-axes INTO DATA(axis) TO before.
+      stride = stride * lines( axis-tuples ).
+    ENDLOOP.
+    DATA(size) = lines( result-axes[ position ]-tuples ).
 
     DATA(tuples) = VALUE ty_t_tuple( ).
     LOOP AT result-axes[ position ]-tuples INTO DATA(tuple).
@@ -3499,7 +3667,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     result-axes[ position ]-tuples = tuples.
 
     DATA(cells) = VALUE ty_t_cell( ).
-    LOOP AT result-cells INTO cell.
+    LOOP AT result-cells INTO DATA(cell).
       IF keep[ ( cell-ordinal DIV stride ) MOD size + 1 ] = abap_true.
         cell-ordinal = lines( cells ).
         APPEND cell TO cells.

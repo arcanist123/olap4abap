@@ -217,6 +217,11 @@ CLASS ltc_format IMPLEMENTATION.
     " (90.875399999999984856...), as the reference server does for Store Sales - Store Cost of product 90
     value = CONV f( '153.23' ) - CONV f( '62.3546' ).
     assert_java( value = value exp = `90.87539999999998` ).
+    " next to powers of ten: the exponent from the double's logarithm is corrected
+    assert_java( value = CONV f( '0.01' ) exp = `0.01` ).
+    assert_java( value = CONV f( '999.9999999999999' ) exp = `999.9999999999999` ).
+    assert_java( value = CONV f( '1000.5' ) exp = `1000.5` ).
+    assert_java( value = CONV f( '1E23' ) exp = `1.0E23` ).
   ENDMETHOD.
 
   METHOD xmla_double.

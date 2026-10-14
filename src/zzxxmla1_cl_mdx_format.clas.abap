@@ -218,6 +218,10 @@ CLASS zzxxmla1_cl_mdx_format DEFINITION
       IMPORTING value    TYPE f
       EXPORTING digits   TYPE string
                 exponent TYPE i.
+    "! The decimal of the fewest digits (15 to 17) that gives the double back, rounded from its exact value.
+    CLASS-METHODS exact_shortest
+      IMPORTING value         TYPE f
+      RETURNING VALUE(result) TYPE decfloat34.
 ENDCLASS.
 
 CLASS zzxxmla1_cl_mdx_format IMPLEMENTATION.
@@ -965,6 +969,30 @@ CLASS zzxxmla1_cl_mdx_format IMPLEMENTATION.
       digits = shift_right( val = digits sub = `0` ).
       RETURN.
     ENDIF.
+    " most doubles (sums of decimals) have a decimal of at most 15 digits that gives them back: the double's 17 digits
+    " rounded to 15. Two decimals of 15 digits never give the same double, so it is the one the exact rounding below
+    " finds first; only where it does not give the double back is the exact value needed
+    DATA(shortest) = round( val = CONV decfloat34( value ) prec = 15 ).
+    IF CONV f( shortest ) <> value.
+      shortest = exact_shortest( value ).
+    ENDIF.
+    DATA(ten) = CONV decfloat34( 10 ).
+    " the exponent from the double's logarithm (log10 of a decfloat34 is a thousand times slower), corrected below
+    exponent = floor( log10( value ) ).
+    DATA(mantissa) = shortest / ipow( base = ten exp = exponent ).
+    IF mantissa >= 10.
+      exponent = exponent + 1.
+      mantissa = mantissa / 10.
+    ELSEIF mantissa < 1.
+      exponent = exponent - 1.
+      mantissa = mantissa * 10.
+    ENDIF.
+    DATA scaled TYPE p LENGTH 16 DECIMALS 0.
+    scaled = round( val = mantissa * ipow( base = ten exp = 16 ) dec = 0 ).
+    digits = shift_right( val = condense( |{ scaled }| ) sub = `0` ).
+  ENDMETHOD.
+
+  METHOD exact_shortest.
     " the double's value to about 33 digits (CONV decfloat34 keeps only about 17): mantissa * 2^exponent, so that
     " the rounding below picks the decimal nearest to it, as Double.toString does
     DATA(two) = CONV f( 2 ).
@@ -984,28 +1012,15 @@ CLASS zzxxmla1_cl_mdx_format IMPLEMENTATION.
                 * ipow( base = CONV decfloat34( 2 ) exp = binary_exponent ).
     " the fewest digits that give the double back; from 15 on: a decimal of at most 15 digits comes back from its double
     " rounded to 15 digits (DBL_DIG), so a shorter one is these with trailing zeros, which are cut below
-    DATA(shortest) = exact.
+    result = exact.
     DATA(precision) = 15.
     DO 3 TIMES.
-      shortest = round( val = exact prec = precision ).
-      IF CONV f( shortest ) = value.
+      result = round( val = exact prec = precision ).
+      IF CONV f( result ) = value.
         EXIT.
       ENDIF.
       precision = precision + 1.
     ENDDO.
-    DATA(ten) = CONV decfloat34( 10 ).
-    exponent = floor( log10( shortest ) ).
-    DATA(mantissa) = shortest / ipow( base = ten exp = exponent ).
-    IF mantissa >= 10.
-      exponent = exponent + 1.
-      mantissa = mantissa / 10.
-    ELSEIF mantissa < 1.
-      exponent = exponent - 1.
-      mantissa = mantissa * 10.
-    ENDIF.
-    DATA scaled TYPE p LENGTH 16 DECIMALS 0.
-    scaled = round( val = mantissa * ipow( base = ten exp = 16 ) dec = 0 ).
-    digits = shift_right( val = condense( |{ scaled }| ) sub = `0` ).
   ENDMETHOD.
 
 ENDCLASS.

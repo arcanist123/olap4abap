@@ -51,7 +51,20 @@ keeps the answers: both test suites give the same answers with planning on and o
    269 s in total. HANA's plan cache shows the `GROUPING SETS` statements, the filter list's as in
    `query-planning.md`, and #218's compound slicer as one read with `CA OR OR`. Not changed: the evaluator's reads
    while the axes are evaluated (`DrilldownLevel`'s context members, the native crossjoin, TopCount, Order).
-3. Retire `non_empty_axis`' evaluator loop and the repeated reads of the same groups; measure.
+3. Done (2026-10-14): one read per group (`query-planning.md`, One read per group). Decided with the user: no runtime
+   switch for planning (the unit test `planning_on_and_off` compares), the engine's unit tests `DURATION LONG`, and
+   BW's master data for every fact is assumed (the grouped statements join every dimension of their patterns). The
+   facts roll a pattern up from a finer segment read before; a one-axis relational query's read of members with facts
+   also sums under the default members it leaves out (the filter list: one fact statement); NON EMPTY axes that
+   `axis_filter_needed` finds are filtered by groups of the same `cross_values` call, the evaluator only for a
+   calculated measure of the query; a set without constraint is read alone, a column constrained to all its keys with
+   facts not constrained, one grouping set a plain `GROUP BY`; `fast_cells` no longer copies the axes per group and
+   formats each value once, and the shortest digits of a double are no longer computed with `decfloat34` logarithms.
+   The trace records the SQL statements of each call and their time (`sql_count`, `sql_ms` of `ZZXXMLA1_TRACE`, shown
+   on the trace page); `python scripts/planning_measure.py` measures. Filter list 175 to 148 ms, pivot 196 to 185 ms,
+   `[Time].[1998]` case 134 to 122 ms, the 1,001 x 1,001 grid from an ICM timeout to 17 s; `xmla_test.py` 272 of 274
+   (the two datasources cases), `compare-applicable.py` 394 of 395 (#64; #35 differed once in a parallel run, the same alone, with its
+   neighbours and after a restart of eMondrian), SAP 196 to 216 s in total (271 s).
 4. Mixed queries: the relational inputs of computed nodes read as one batch before the first pass.
 5. More set nodes relational: `Filter` on a stored measure (`RolapNativeFilter`), `NonEmpty` with a second set.
 

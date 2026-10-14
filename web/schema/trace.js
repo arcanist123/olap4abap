@@ -172,7 +172,7 @@ function Detail({ id, onClose }) {
     : download(raw, `${entry.id}-${tab}.${tab === 'mdx' ? 'mdx' : 'xml'}`);
   return html`<section class="section detail">
     <header><h2>${what(entry)}${entry.type && html` <span class="mono">${entry.type}</span>`}</h2>
-      <span class="muted small">${time(entry.at)} · ${entry.user} · ${entry.client}${entry.status ? ` · ${entry.runtimeMs} ms` : ''}</span>
+      <span class="muted small">${time(entry.at)} · ${entry.user} · ${entry.client}${entry.status ? ` · ${entry.runtimeMs} ms · ${entry.sqlCount} SQL statements, ${entry.sqlMs} ms` : ''}</span>
       <span class="spacer"></span>
       ${entry.mdx && html`<a class="button" href=${consoleUrl(entry)} target="_blank" rel="noopener"
         title=${`Open the statement in the MDX console${requestCatalog(entry.request) ? ` on catalog ${requestCatalog(entry.request)}` : ''}`}>Open in MDX Console</a>`}
@@ -283,7 +283,7 @@ function App() {
           : !state.calls.length ? html`<div class="body muted">No traced ${method ? `${what({ method })} ` : ''}calls${filter ? ` of ${filter}` : ''}.</div>` : html`
           <table>
             <thead><tr><th>Time</th><th class="wide-only">User</th><th>Call</th><th>Statement or rowset</th><th>Status</th>
-              <th class="num">ms</th><th class="num">Response</th><th class="wide-only">Client</th></tr></thead>
+              <th class="num">ms</th><th class="num" title="SQL statements and their milliseconds">SQL</th><th class="num">Response</th><th class="wide-only">Client</th></tr></thead>
             <tbody>${state.calls.map((c) => html`
               <tr class=${`clickable${c.id === selected ? ' selected' : ''}`} onClick=${() => setSelected(c.id === selected ? '' : c.id)}>
                 <td class="small">${time(c.at)}</td>
@@ -294,6 +294,7 @@ function App() {
                   : c.fault ? html`<span class="status err">fault</span>`
                   : c.status === 200 ? html`<span class="status ok">ok</span>` : html`<span class="status err">${c.status}</span>`}</td>
                 <td class="num">${c.status ? c.runtimeMs : ''}</td>
+                <td class="num" title="SQL statements, their milliseconds">${c.status ? `${c.sqlCount} · ${c.sqlMs}` : ''}</td>
                 <td class="num">${c.status ? size(c.responseLength) : ''}</td>
                 <td class="mono small wide-only">${c.client}</td>
               </tr>`)}

@@ -141,8 +141,9 @@ Read before designing anything:
   attributes. Filling adds members to every time view; see `docs/time-master-data.md`.
 - Trace: `/zzxxmla1/schema/trace.html` (`web/schema/trace.js`) switches the trace of XMLA calls on and off per SAP
   user (table `ZZXXMLA1_TRCUSR`) and lists the traced calls (table `ZZXXMLA1_TRACE`, `ZZXXMLA1_CL_TRACE`): per call
-  the SOAP request, Discover with its rowset or Execute with its MDX statement, status, fault, runtime, client address
-  and User-Agent, and the SOAP response gzipped (`cl_abap_gzip`). `ZZXXMLA1_MAIN_ENDPOINT` writes and commits the row
+  the SOAP request, Discover with its rowset or Execute with its MDX statement, status, fault, runtime, the SQL
+  statements it ran and their time (`ZZXXMLA1_CL_SQL`'s statistics), client address and User-Agent, and the SOAP
+  response gzipped (`cl_abap_gzip`). `ZZXXMLA1_MAIN_ENDPOINT` writes and commits the row
   before the handler runs (a call that dumps is traced without response) and adds the answer after it. A trace is
   on for 2 hours after it is switched on (`c_active_hours`); switching one on deletes the calls older than 7 days
   (`c_retention_days`) and the expired users' rows. "Delete all" on the page deletes every traced call. The list is the newest calls, filtered on the server by user,
@@ -229,7 +230,7 @@ Read before designing anything:
   the context, the slicer or the axes is calculated or null, the cells are not evaluated one by one either
   (`fast_cells`, our shortcut, same answer): per combination of the axes' level patterns one grouped fact query
   (`ZZXXMLA1_CL_MDX_FACTS=>cross_values`), each group put at the positions of its tuples, every other cell empty
-  (Excel's 1,001 x 1,001 grid on `ZXMLWIDEA`: 75 s to 25 s). A cube annotated `olap4abap.omitEmptyCells` (`true`, our
+  (Excel's 1,001 x 1,001 grid on `ZXMLWIDEA`: 17 s since query planning step 3). A cube annotated `olap4abap.omitEmptyCells` (`true`, our
   extension, `docs/mvp-scope.md`, Empty cells decision) leaves its empty cells but the first out of the answer.
   Subselects (`FROM (SELECT ... FROM ...)`, Excel's pivot filters) are eMondrian's subcube: the axes of every inner
   SELECT become a predicate that every fact read adds (`Query.getSubcubePredicates`, `ZZXXMLA1_CL_MDX_FACTS=>set_subcube`),
@@ -260,7 +261,12 @@ Read before designing anything:
   `resolve_query`; when the plan is relational (switch `ZZXXMLA1_CL_MDX_ENGINE=>planning`) its NON EMPTY axes are
   filtered by their cells instead of `non_empty_axis`, and the cells of all combinations of patterns come from one
   `GROUP BY GROUPING SETS` statement (`ZZXXMLA1_CL_MDX_FACTS=>cross_values`), a compound slicer of disjoint tuples
-  as an ORed predicate (`docs/next-steps.md`, query planning step 2).
+  as an ORed predicate (`docs/next-steps.md`, query planning step 2). Step 3: the facts roll a pattern up from a
+  finer segment read before (`roll_up`), so the axes' reads of members with facts feed the cells; a one-axis query's
+  read also sums under the default members it leaves out (Time's 1997; the filter list is one fact statement); the
+  NON EMPTY axes `axis_filter_needed` finds are filtered by groups of the cells' statement (the evaluator only for a
+  calculated measure of the query); `python scripts/planning_measure.py` measures from the trace. The grouped
+  statements join every dimension of their patterns: BW has master data for every fact.
 - Schema definition (step 1 of moving the model to Mondrian schema XML, see `docs/mvp-scope.md`, schema decision):
   `ZZXXMLA1_CL_SCHEMA_DEF` reads any Mondrian schema as `MondrianDef` does and writes it back as `toXML` does,
   generated from Mondrian's `MondrianDef.java` (`docs/environment.md`, Mondrian's schema definition). The reference

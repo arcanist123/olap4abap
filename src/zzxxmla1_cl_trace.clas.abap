@@ -61,6 +61,8 @@ CLASS zzxxmla1_cl_trace DEFINITION
         user_agent      TYPE string,
         request_length  TYPE i,           " characters
         response_length TYPE i,           " characters, before it was gzipped
+        sql_count       TYPE i,           " the SQL statements the call ran (ZZXXMLA1_CL_SQL)
+        sql_ms          TYPE i,           " their time
         mdx             TYPE string,
       END OF ty_entry,
       ty_t_entry TYPE STANDARD TABLE OF ty_entry WITH EMPTY KEY.
@@ -116,7 +118,7 @@ CLASS zzxxmla1_cl_trace DEFINITION
       IMPORTING request       TYPE string
       RETURNING VALUE(result) TYPE ty_call.
 
-    "! Adds the answer to the call's row and commits.
+    "! Adds the answer to the call's row, with the SQL statements run since start and their time, and commits.
     "! @parameter status | the HTTP status
     "! @parameter response | the SOAP response
     METHODS finish
@@ -209,6 +211,7 @@ CLASS zzxxmla1_cl_trace IMPLEMENTATION.
     result = NEW #( ).
     result->trace_id = row-trace_id.
     GET RUN TIME FIELD result->started.
+    zzxxmla1_cl_sql=>reset_statistics( ).
     DATA(call) = describe( request ).
     row-user_name = sy-uname.
     row-xmla_method = call-xmla_method.
@@ -230,11 +233,15 @@ CLASS zzxxmla1_cl_trace IMPLEMENTATION.
     DATA(fault) = is_fault( response ).
     DATA(response_length) = strlen( response ).
     DATA(zipped) = compress( response ).
+    DATA(sql_count) = zzxxmla1_cl_sql=>statement_count.
+    DATA(sql_ms) = CONV i( zzxxmla1_cl_sql=>statement_time DIV 1000 ).
     UPDATE zzxxmla1_trace
       SET status          = @status,
           fault           = @fault,
           runtime_ms      = @runtime_ms,
           response_length = @response_length,
+          sql_count       = @sql_count,
+          sql_ms          = @sql_ms,
           response        = @zipped
       WHERE trace_id = @trace_id.
     COMMIT WORK.
@@ -250,7 +257,7 @@ CLASS zzxxmla1_cl_trace IMPLEMENTATION.
       methods = VALUE #( ( sign = 'I' option = 'EQ' low = xmla_method ) ).
     ENDIF.
     SELECT trace_id, user_name, created_at, xmla_method, request_type, status, fault, runtime_ms, client_address,
-           user_agent, request_length, response_length, mdx
+           user_agent, request_length, response_length, sql_count, sql_ms, mdx
       FROM zzxxmla1_trace
       WHERE user_name IN @users
         AND xmla_method IN @methods

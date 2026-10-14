@@ -1020,7 +1020,8 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
              |"type":{ json( entry-request_type ) },"mdx":{ json( entry-mdx ) },"status":{ entry-status },| &&
              |"fault":{ json_bool( entry-fault ) },"runtimeMs":{ entry-runtime_ms },| &&
              |"client":{ json( entry-client_address ) },"userAgent":{ json( entry-user_agent ) },| &&
-             |"requestLength":{ entry-request_length },"responseLength":{ entry-response_length }|.
+             |"requestLength":{ entry-request_length },"responseLength":{ entry-response_length },| &&
+             |"sqlCount":{ entry-sql_count },"sqlMs":{ entry-sql_ms }|.
   ENDMETHOD.
 
   METHOD time_interval.

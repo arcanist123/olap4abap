@@ -11,7 +11,7 @@
 *----------------------------------------------------------------------------------------------------------------------*
 "! Queries on ZFMSALES with the answers of the reference server: Order, Cast, Aggregate, the set functions, the aggregates, the
 "! operators IN, IS, MATCHES, Existing and evaluation errors as cell values.
-CLASS ltc_engine DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+CLASS ltc_engine DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION LONG.
   PRIVATE SECTION.
     METHODS execute
       IMPORTING mdx           TYPE string
@@ -313,8 +313,17 @@ CLASS ltc_engine IMPLEMENTATION.
       cl_abap_unit_assert=>assert_equals( act = planned exp = execute( statement ) msg = statement ).
     ENDLOOP.
     zzxxmla1_cl_mdx_engine=>planning = abap_true.
-    " the filter list's answer
+    " the filter list's answer, from one read of the facts: the countries with facts, with their sums in 1997 (Time's
+    " default member) in the same statement; the cells are these groups and their sum
+    zzxxmla1_cl_sql=>reset_statistics( ).
+    zzxxmla1_cl_sql=>log_statements = abap_true.
     planned = execute( statements[ 1 ] ).
+    zzxxmla1_cl_sql=>log_statements = abap_false.
+    DATA(fact_reads) = 0.
+    LOOP AT zzxxmla1_cl_sql=>statement_log INTO DATA(logged) WHERE sql CS `/BIC/FZFMSALES`.
+      fact_reads = fact_reads + 1.
+    ENDLOOP.
+    cl_abap_unit_assert=>assert_equals( act = fact_reads exp = 1 ).
     cl_abap_unit_assert=>assert_equals( act = tuples( planned )
                                         exp = VALUE string_table( ( `[Store].[All Stores]` ) ( `[Store].[USA]` ) ) ).
     cl_abap_unit_assert=>assert_equals( act = values( planned ) exp = VALUE string_table( ( `266773` ) ( `266773` ) ) ).

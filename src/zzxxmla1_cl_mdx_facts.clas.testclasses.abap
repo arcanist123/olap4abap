@@ -25,15 +25,29 @@ CLASS ltc_facts DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
     METHODS ordered_paths FOR TESTING RAISING zzxxmla1_cx_xmla.
     METHODS grouping_sets FOR TESTING RAISING zzxxmla1_cx_xmla.
     METHODS slicer_predicate FOR TESTING RAISING zzxxmla1_cx_xmla.
+    METHODS roll_up FOR TESTING RAISING zzxxmla1_cx_xmla.
+    METHODS defaults FOR TESTING RAISING zzxxmla1_cx_xmla.
+    METHODS unconstrained_set FOR TESTING RAISING zzxxmla1_cx_xmla.
+    "! the pattern of a level of a member's hierarchy, with the paths asked for
+    METHODS pattern
+      IMPORTING filter        TYPE zzxxmla1_cl_mdx_facts=>ty_filter
+                paths         TYPE string_table
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_facts=>ty_cross_pattern.
+    "! the first quarter of 1997
+    METHODS quarter
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_facts=>ty_filter
+      RAISING   zzxxmla1_cx_xmla.
     "! the filter of a state of the USA in Store
     METHODS state
       IMPORTING name          TYPE string
       RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_facts=>ty_t_filter
       RAISING   zzxxmla1_cx_xmla.
     "! the unit sales of the groups of a pattern of cross_values, by their paths
+    "! @parameter only | the groups of these paths only (each the paths of its filters joined by /); all if empty
     METHODS sales_of
       IMPORTING values        TYPE zzxxmla1_cl_mdx_facts=>ty_t_cross_value
                 pattern       TYPE i
+                only          TYPE string_table OPTIONAL
       RETURNING VALUE(result) TYPE string_table.
     "! the filter of a product family
     METHODS family
@@ -70,7 +84,10 @@ CLASS ltc_facts IMPLEMENTATION.
 
   METHOD sales_of.
     LOOP AT values INTO DATA(value) WHERE pattern = pattern.
-      APPEND |{ concat_lines_of( table = value-paths sep = `/` ) }={ value-amounts[ unit_sales ] }| TO result.
+      DATA(paths) = concat_lines_of( table = value-paths sep = `/` ).
+      IF only IS INITIAL OR line_exists( only[ table_line = paths ] ).
+        APPEND |{ paths }={ value-amounts[ unit_sales ] }| TO result.
+      ENDIF.
     ENDLOOP.
     SORT result.
   ENDMETHOD.
@@ -127,6 +144,95 @@ CLASS ltc_facts IMPLEMENTATION.
       patterns = VALUE #( ( filters = VALUE #( ( hierarchy = drink[ 1 ]-hierarchy level = 1 ) )
                             paths   = VALUE #( ( VALUE #( ( drink[ 1 ]-path ) ) ) ) ) ) ).
     cl_abap_unit_assert=>assert_equals( act = plain[ 1 ]-amounts[ unit_sales ] exp = 24597 ).
+  ENDMETHOD.
+
+  METHOD pattern.
+    result = VALUE #( filters = VALUE #( ( hierarchy = filter-hierarchy level = filter-level ) )
+                      paths   = VALUE #( ( paths ) ) ).
+  ENDMETHOD.
+
+  METHOD quarter.
+    DATA(member) = reader->lookup_compound( VALUE #( ( name = `Time` quoting = `QUOTED` )
+                                                     ( name = `1997` quoting = `QUOTED` )
+                                                     ( name = `Q1` quoting = `QUOTED` ) ) )-member.
+    result = VALUE #( hierarchy = member-hier_id level = member-key_level path = member-path ).
+  ENDMETHOD.
+
+  METHOD roll_up.
+    " the families with facts, read for a native set: the All member and two families are their sums, without a read
+    DATA(drink) = family( `Drink` ).
+    facts->non_empty_paths( VALUE #( ( hierarchy = drink[ 1 ]-hierarchy level = 1 any = abap_true ) ) ).
+    DATA(food) = family( `Food` ).
+    zzxxmla1_cl_sql=>reset_statistics( ).
+    DATA(values) = facts->cross_values( VALUE #( ( )
+                                                 ( pattern( filter = drink[ 1 ]
+                                                            paths  = VALUE #( ( drink[ 1 ]-path ) ( food[ 1 ]-path ) ) ) ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_sql=>statement_count exp = 0 ).
+    cl_abap_unit_assert=>assert_equals( act = sales_of( values = values pattern = 1 )
+                                        exp = VALUE string_table( ( `=266773` ) ) ).
+    " the segment's other families are among them
+    cl_abap_unit_assert=>assert_equals( act = sales_of( values = values pattern = 2
+                                                        only   = VALUE #( ( drink[ 1 ]-path ) ( food[ 1 ]-path ) ) )
+                                        exp = VALUE string_table( ( |{ drink[ 1 ]-path }=24597| )
+                                                                  ( |{ food[ 1 ]-path }=191940| ) ) ).
+    " a cell of the evaluator too
+    cl_abap_unit_assert=>assert_equals( act = facts->value( filters = VALUE #( ) measure = unit_sales )-amount
+                                        exp = 266773 ).
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_sql=>statement_count exp = 0 ).
+    " a family's departments are not in the families' groups: read
+    DATA(departments) = facts->cross_values( VALUE #( ( pattern(
+      filter = VALUE #( hierarchy = drink[ 1 ]-hierarchy level = 2 )
+      paths  = VALUE #( ( |{ drink[ 1 ]-path }{ zzxxmla1_cl_model=>c_separator }Beverages| ) ) ) ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_sql=>statement_count exp = 1 ).
+    cl_abap_unit_assert=>assert_equals( act = lines( departments ) exp = 1 ).
+  ENDMETHOD.
+
+  METHOD defaults.
+    " the families with facts in any time, read with the first quarter of 1997 as a default member: the same statement
+    " gives the families' sales in the quarter, which a reader without it reads
+    DATA(drink) = family( `Drink` ).
+    DATA(q1) = quarter( ).
+    facts->non_empty_paths( filters  = VALUE #( ( hierarchy = drink[ 1 ]-hierarchy level = 1 any = abap_true ) )
+                            defaults = VALUE #( ( q1 ) ) ).
+    " the pattern of both, its filters in the order of the hierarchies
+    DATA(both) = VALUE zzxxmla1_cl_mdx_facts=>ty_cross_pattern(
+      filters = VALUE #( ( hierarchy = drink[ 1 ]-hierarchy level = 1 ) ( hierarchy = q1-hierarchy level = q1-level ) )
+      paths   = VALUE #( ( VALUE #( ( drink[ 1 ]-path ) ) ) ( VALUE #( ( q1-path ) ) ) ) ).
+    IF q1-hierarchy < drink[ 1 ]-hierarchy.
+      both = VALUE #( filters = VALUE #( ( both-filters[ 2 ] ) ( both-filters[ 1 ] ) )
+                      paths   = VALUE #( ( both-paths[ 2 ] ) ( both-paths[ 1 ] ) ) ).
+    ENDIF.
+    DATA(patterns) = VALUE zzxxmla1_cl_mdx_facts=>ty_t_cross_pattern(
+      ( both ) ( pattern( filter = q1 paths = VALUE #( ( q1-path ) ) ) ) ).
+    zzxxmla1_cl_sql=>reset_statistics( ).
+    DATA(values) = facts->cross_values( patterns ).
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_sql=>statement_count exp = 0 ).
+    DATA(read) = NEW zzxxmla1_cl_mdx_facts( cube = reader->cube hierarchies = reader->get_model_hierarchies( )
+                                            measures = reader->measures )->cross_values( patterns ).
+    " Drink in the quarter (the other families' groups of the segment are among them)
+    DATA(drink_q1) = VALUE string_table( ( concat_lines_of( table = VALUE string_table( FOR p IN both-paths ( p[ 1 ] ) )
+                                                            sep   = `/` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = sales_of( values = values pattern = 1 only = drink_q1 )
+                                        exp = sales_of( values = read pattern = 1 only = drink_q1 ) ).
+    cl_abap_unit_assert=>assert_equals( act = lines( sales_of( values = read pattern = 1 only = drink_q1 ) ) exp = 1 ).
+    cl_abap_unit_assert=>assert_equals( act = sales_of( values = values pattern = 2 )
+                                        exp = sales_of( values = read pattern = 2 ) ).
+  ENDMETHOD.
+
+  METHOD unconstrained_set.
+    " the All member's set has no constraint: it is read on its own, so the families' WHERE stays
+    DATA(drink) = family( `Drink` ).
+    zzxxmla1_cl_sql=>reset_statistics( ).
+    zzxxmla1_cl_sql=>log_statements = abap_true.
+    DATA(values) = facts->cross_values( VALUE #( ( pattern( filter = drink[ 1 ] paths = VALUE #( ( drink[ 1 ]-path ) ) ) )
+                                                 ( ) ) ).
+    zzxxmla1_cl_sql=>log_statements = abap_false.
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_sql=>statement_count exp = 2 ).
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_sql=>statement_log[ 1 ]-rows exp = 1 ).
+    cl_abap_unit_assert=>assert_equals( act = sales_of( values = values pattern = 1 )
+                                        exp = VALUE string_table( ( |{ drink[ 1 ]-path }=24597| ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = sales_of( values = values pattern = 2 )
+                                        exp = VALUE string_table( ( `=266773` ) ) ).
   ENDMETHOD.
 
   METHOD batching.

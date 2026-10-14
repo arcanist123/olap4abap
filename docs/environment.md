@@ -334,6 +334,13 @@ factory method (`of_code`, `create`) the raising helpers `ZZXXMLA1_CX_XMLA=>rais
   `scripts/sap-sync.sh pull` afterwards to mirror SAP into git. There is no delete tool:
   `sapcli class delete <name>` (logon as in `sap-sync.sh`) deletes a class.
 - ADT does not store comments between the methods of an implementation section, nor lines over 255 characters.
+- `abapfs_run_unit_tests` runs only tests of `DURATION SHORT` and `MEDIUM`: for a class with long tests (the engine's,
+  `ZZXXMLA1_CL_MDX_ENGINE`) it reports "No test classes found". sapcli runs all durations:
+  `sapcli aunit run class ZZXXMLA1_CL_MDX_ENGINE --output human` (logon as in `sap-sync.sh`).
+- A table's source (`define table`) can be edited with `replace_string_in_abap_object` (workspace URI of type
+  `TABL/DT`), but `abapfs_activate_object` fails with status 400; `sapcli table activate ZZXXMLA1_TRACE` activates it
+  (the name in upper case: in lower case sapcli fails with "Deserializing wrong object"). The table's `.tabl.xml` in
+  `src/` is then changed by hand.
 - Edit one object with `replace_string_in_abap_object` one call at a time: parallel calls on the same file each report
   success, but they overwrite each other and only some of the changes remain.
 - A `\uXXXX` in an edit's text arrives decoded (as the character); write `\` && `u20ac` to keep it literal.

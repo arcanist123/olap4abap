@@ -188,6 +188,53 @@ A query whose axes are computed but whose cells are relational (a `Filter` on a 
 - Unchanged: the axes' set evaluation, with its own fact reads under the non-empty evaluator (step 3), and the cells
   of every plan that is not relational.
 
+### One read per group (step 3, done 2026-10-14)
+
+- **The axes' reads feed the cells.** `ZZXXMLA1_CL_MDX_FACTS` answers a pattern from a finer one read before, as a
+  segment cache rolls up (`roll_up`): an entry with every hierarchy of the pattern at the same or a deeper level and a
+  segment that covers the constraint on these columns and constrains none of its others; its groups are summed by the
+  pattern's columns (sum and count are additive; the finer read joins more dimension tables, which drops no fact in
+  BW). So the All member's cell is the sum of the level a native set read, and a level's cells are the groups the axis
+  read. `cross_values`, `value` and `load_aggregations` try it before a statement.
+- **The default members the constraint leaves out.** The reference's context constraint drops the default members
+  (`SqlConstraintUtils.removeCalculatedAndDefaultMembers`), so the countries of the filter list are read without
+  Time's 1997, while its cells have it. For a relational query of one axis (filter and member lists) the read of the
+  members with facts also sums the measures and counts the facts under the condition of those default members that
+  are not All, in the same statement (`SUM( CASE WHEN <1997> THEN ... END )`, `non_empty_paths`' `defaults`), and keeps
+  these groups as a segment of their own pattern: the filter list is then one fact statement, the cells none. With
+  more axes the crossed patterns need a statement anyway and the extra join only slowed the reads down (the pivot of
+  `planning_measure.py`: 256 ms with it, 185 ms without), so they are not read there.
+- **No evaluator for NonEmpty.** The NON EMPTY axes that `axis_filter_needed` finds (`[Time].[1998]` on the other
+  axis) are filtered by groups too: per pattern of the axis its group with the context's members of every other
+  hierarchy (the context NonEmpty sees), read in the same `cross_values` call as the cells (`fast_cells`'
+  `filter_axes`); a tuple without facts there is dropped with its cells (`drop_positions`). The evaluator stays for a
+  calculated measure among the query's measures (a computed part, step 4), an axis on a hierarchy of the slicer, and
+  as the fallback when `fast_cells` cannot place the cells.
+- **Statements.** A set without constraint (the grand total) is read in a statement of its own: in the others' it
+  removes their `WHERE`, and the grid's sets then returned 633,830 groups for 90,000 cells. A column constrained to
+  every key of its level that has facts (known from a segment read without constraint) is not constrained (`widen`):
+  the 1,001 x 1,001 grid's statement with two `IN` lists of 1,000 keys took 21.4 s, without them 0.9 s. Patterns of
+  the same columns are one grouping set, and one grouping set is a plain `GROUP BY` (on the FoodMart InfoCube
+  `GROUPING SETS` costs some 40 ms more than `GROUP BY` also from the plan cache: 48 ms against 8 ms).
+- **ABAP.** `fast_cells` copied every axis per group (`FOR ... IN fast_axes`), 20 s of the 300 x 300 grid; each value
+  is now written and formatted once per query; `ZZXXMLA1_CL_MDX_FORMAT`'s shortest digits take the 15-digit rounding
+  of the double first and the logarithm of the double (`log10` of a `decfloat34` takes 130 µs): `xmla_double` 142 to
+  4 µs, `format_number` 168 to 21 µs.
+
+Measured with `python scripts/planning_measure.py` (the trace's runtime and SQL count and time, best of 3; before:
+step 2, runtime only):
+
+| statement                                   | before                  | after                         |
+| ------------------------------------------- | ----------------------- | ----------------------------- |
+| filter list (one axis)                      | 175 ms, 2 fact reads    | 148 ms, 6 statements, 1 fact read |
+| Excel pivot (Product drilled x Customers)   | 196 ms                  | 185 ms, 15 statements         |
+| `NON EMPTY` states with `[Time].[1998]`     | 134 ms                  | 122 ms, 7 statements          |
+| 1,001 x 1,001 grid on `ZXMLWIDEA`           | ICM timeout (> 5 min)   | 17.1 s, 8 statements, 0.9 s SQL |
+
+The grid's 17 s are ABAP: about 7 s to turn 632,000 rows into groups and values (`ZZXXMLA1_CL_SQL=>query` 0.7 s,
+`load` 2 s, the rest the values), 5 s to place them, and writing the 119 MB answer (the wide schema is not annotated
+`omitEmptyCells`). `compare-applicable.py`: SAP 196 to 216 s in total (271 s at step 2).
+
 ## Semantics that must not change
 
 - Empty is "no group", not 0: a stored measure whose group sums to 0 is a cell with 0, written, and `NON EMPTY` keeps
@@ -210,7 +257,8 @@ A query whose axes are computed but whose cells are relational (a `Filter` on a 
 
 - A switch (class attribute, as `result_limit`) turns planning off; the two runs of `python scripts/xmla_test.py` (244
   cases) and `python scripts/compare-applicable.py` (395 statements) must give the same answers with it on and off,
-  and eMondrian's answers as now.
+  and eMondrian's answers as now. Since step 3 the engine's unit test `planning_on_and_off` compares the two in one
+  run, and the suites run with planning on.
 - Unit tests of the planner's marking: one statement per row of the principle table and per item of "What needs the
   evaluator", each with its expected marks.
 - Runtime and SQL count from the trace (`ZZXXMLA1_TRACE`) for the statement above, an Excel pivot on FoodMart and the
@@ -225,7 +273,8 @@ A query whose axes are computed but whose cells are relational (a `Filter` on a 
    combinations of patterns (`GROUPING SETS` in `ZZXXMLA1_CL_MDX_FACTS=>cross_values`), filters the non-empty axes
    and places the cells from it; the switch `ZZXXMLA1_CL_MDX_ENGINE=>planning`; both test suites with it on and off
    (`next-steps.md`, query planning step 2). See All-relational queries (step 2) below.
-3. Retire `non_empty_axis`' evaluator loop and the second and third reads of the statement above; measure.
+3. Done (2026-10-14): `non_empty_axis`' evaluator loop retired for relational plans, the axes' reads feed the cells;
+   measured. See One read per group (step 3) above.
 4. Mixed queries: the relational inputs of computed nodes read as one batch before the first pass.
 5. More set nodes relational: `Filter` on a stored measure (`RolapNativeFilter`), `NonEmpty` with a second set.
 
@@ -253,3 +302,7 @@ runs were not.
 ## Open
 
 - Mixed plans and the batching passes: how much of `phase` remains once the relational inputs are read first.
+- `GROUPING SETS` has a fixed cost on the FoodMart InfoCube (some 40 ms more than `GROUP BY`, also from the plan
+  cache), which the wide aDSO did not show; a statement per pattern may be cheaper there when HANA's plan cache
+  answers. Measure on a real provider before relying on either.
+- The grid's ABAP (groups to values, placement, writing the answer) is now its cost, not SQL.
