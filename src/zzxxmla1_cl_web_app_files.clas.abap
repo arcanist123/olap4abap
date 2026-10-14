@@ -1005,95 +1005,95 @@ CLASS zzxxmla1_cl_web_app_files IMPLEMENTATION.
     APPEND |Ctrl+C'));\n  const status = copied && html`<span class=$\{`status $\{copied === 'Copied' ? 'ok' : 'err'\}`\} role="status">$\{copied\}</span>`;\n  return [copy, status];\n\}\n\n//| TO parts.
     APPEND | What the engine did when a statement ran (ZZXXMLA1_CL_MDX_ENGINE's phases, ZZXXMLA1_CL_SQL=>log_phase)\nconst PHASE_TEXT = \{\n  '': 'before the query: the schema and its metadata| TO parts.
     APPEND |',\n  Resolve: 'resolving the names of the query: the columns and the members it names',\n  Prepare: 'the members of hierarchies without an All member',\n  Slicer: 'the slicer (WHE| TO parts.
-    APPEND |RE)',\n  Axes: 'the cells the axes needed, read in one batch',\n  'NON EMPTY': 'the NON EMPTY filter of the axes',\n  Cells: 'the cells of the answer',\n  Finish: 'the details of t| TO parts.
-    APPEND |he axes\\' members: children counts',\n  Drillthrough: 'the fact rows of the drill-through',\n\};\nconst phaseName = (p) => p \|\| 'Before';\nconst phaseText = (p) => PHASE_TEXT[p]| TO parts.
-    APPEND | ?? (/^Axis\\d+$/.test(p) ? `axis $\{p.slice(4)\}: its sets and members` : p);\nconst MARK_TEXT = \{\n  STATIC: 'static: answered by the schema and member reads',\n  RELATIONAL: 'r| TO parts.
-    APPEND |elational: answered by grouped SQL over the facts',\n  COMPUTED: 'computed: evaluated by the evaluator, cell by cell',\n\};\n\n// the explanation's nodes by id, each with its paren| TO parts.
-    APPEND |t's id (0 for the top of a part) and its part\nfunction explainIndex(explain) \{\n  const nodes = new Map();\n  const visit = (node, parent, part) => \{\n    if (!node \|\| node.re| TO parts.
-    APPEND |f) return;\n    nodes.set(node.id, \{ node, parent, part \});\n    node.args.forEach((a) => visit(a, node.id, part));\n  \};\n  const visitPart = (part) => \{\n    visit(part.node,| TO parts.
-    APPEND | 0, part);\n    (part.children \|\| []).forEach(visitPart);\n  \};\n  (explain?.parts \|\| []).forEach(visitPart);\n  return nodes;\n\}\n\n// whether a statement was read by the no| TO parts.
-    APPEND |de or one of its arguments\nconst readBelow = (statement, id, nodes) => \{\n  for (let n = statement.node; n; n = nodes.get(n)?.parent) if (n === id) return true;\n  return false;| TO parts.
-    APPEND |\n\};\n\n// the statements and their time per node (own: read by it; all: by it or its arguments) and per phase\nfunction sqlStats(statements, nodes) \{\n  const add = (map, key, s| TO parts.
-    APPEND |) => \{\n    const v = map.get(key) \|\| \{ count: 0, us: 0 \};\n    v.count += 1;\n    v.us += s.us;\n    map.set(key, v);\n  \};\n  const own = new Map();\n  const all = new Map(| TO parts.
-    APPEND |);\n  const phases = new Map();\n  for (const s of statements) \{\n    add(phases, s.phase \|\| '', s);\n    if (!s.node) continue;\n    add(own, s.node, s);\n    for (let n = s.no| TO parts.
-    APPEND |de; n; n = nodes.get(n)?.parent) add(all, n, s);\n  \}\n  return \{ own, all, phases \};\n\}\n\nconst serverTime = (call) => `$\{msText(call.runtimeMs)\} on the server`\n  + (call.| TO parts.
-    APPEND |browserMs != null ? ` ($\{msText(call.browserMs)\} in the browser)` : '');\n\nconst Mark = (\{ mark \}) => mark && html`<span class=$\{`mark $\{mark.toLowerCase()\}`\} title=$\{MAR| TO parts.
-    APPEND |K_TEXT[mark] \|\| mark\}>$\{mark.toLowerCase()\}</span>`;\nconst SqlBadge = (\{ stat, title \}) => stat && html`<span class="sql-badge" title=$\{title\}>$\{stat.count\} SQL | TO parts.
-    APPEND |{ cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{msText(stat.us / 1000)\}</span>`;\n\n// statements with their time (a bar shows its share of the slowest), rows, phase, element and error| TO parts.
-    APPEND |\nfunction SqlTable(\{ statements, slowest, nodes, onNode, onPhase \}) \{\n  if (!statements.length) return html`<div class="result-msg muted">No SQL statement.</div>`;\n  return h| TO parts.
-    APPEND |tml`<table class="grid sql-list">\n    <thead><tr><th class="num">#</th><th class="num">ms</th><th class="num">Rows</th><th>Phase</th><th>Element</th><th>Statement</th></tr></thead| TO parts.
-    APPEND |>\n    <tbody>$\{statements.map((s) => \{\n      const element = nodes.get(s.node)?.node;\n      return html`<tr>\n        <td class="num muted">$\{s.n\}</td>\n        <td class="n| TO parts.
-    APPEND |um" style=$\{`background: linear-gradient(to left, var(--accent-soft) $\{(100 * s.us) / slowest\}%, transparent 0)`\}>$\{(s.us / 1000).toFixed(1)\}</td>\n        <td class="num">$| TO parts.
-    APPEND |\{s.error ? '' : s.rows.toLocaleString()\}</td>\n        <td><button class="link small" title=$\{phaseText(s.phase \|\| '')\} onClick=$\{() => onPhase(s.phase \|\| '')\}>$\{phaseNa| TO parts.
-    APPEND |me(s.phase)\}</button></td>\n        <td>$\{element ? html`<button class="link small mono" title=$\{`$\{element.mdx\}\\n{ cl_abap_conv_in_ce=>uccp( '2013' ) } show it in the query | TO parts.
-    APPEND |plan`\}\n          onClick=$\{() => onNode(s.node)\}>$\{element.label\}</button>` : html`<span class="muted small">{ cl_abap_conv_in_ce=>uccp( '2013' ) }</span>`\}</td>\n        <t| TO parts.
-    APPEND |d><pre class="sql">$\{s.sql.trim()\}</pre>$\{s.error && html`<div class="notice err small">$\{s.error\}</div>`\}</td>\n      </tr>`;\n    \})\}</tbody>\n  </table>`;\n\}\n\n// The | TO parts.
-    APPEND |SQL statements a call ran: in the order they ran or the slowest first, each with its phase and the element of\n// the query that read it (a click shows it in the query plan: onNode| TO parts.
-    APPEND |, onPhase). children: more buttons for the bar.\nexport function SqlView(\{ call, onNode, onPhase, children \}) \{\n  const [order, setOrder] = useState('ran');\n  const [copy, cop| TO parts.
-    APPEND |ied] = useCopied();\n  const nodes = explainIndex(call.explain);\n  const statements = call.sql.map((s, i) => (\{ ...s, n: i + 1 \}));\n  if (order === 'slowest') statements.sort((| TO parts.
-    APPEND |a, b) => b.us - a.us);\n  return html`\n    <div class="result-bar">\n      <span class="muted small">$\{`$\{statementCount(call.sqlCount)\}, $\{msText(call.sqlMs)\} of $\{serverTi| TO parts.
-    APPEND |me(call)\}`\}</span>\n      <span class="spacer"></span>\n      <div class="segmented" role="group" aria-label="Order">\n        <button class=$\{order === 'ran' ? 'active' : ''\} | TO parts.
-    APPEND |onClick=$\{() => setOrder('ran')\}>As they ran</button>\n        <button class=$\{order === 'slowest' ? 'active' : ''\} onClick=$\{() => setOrder('slowest')\}>Slowest first</button| TO parts.
-    APPEND |>\n      </div>\n      $\{children\}\n      $\{copied\}\n      <button onClick=$\{() => copy(sqlScript(call.sql))\} disabled=$\{!call.sql.length\} title="Copy the statements as one| TO parts.
-    APPEND | script">Copy</button>\n      <button onClick=$\{() => download(sqlScript(call.sql), `$\{call.id\}.sql`, 'text/plain')\} disabled=$\{!call.sql.length\}>Download</button>\n    </div| TO parts.
-    APPEND |>\n    $\{call.sql.length < call.sqlCount && html`<div class="notice warn">$\{call.sql.length\n      ? `The first $\{call.sql.length.toLocaleString()\} of $\{call.sqlCount.toLocale| TO parts.
-    APPEND |String()\} statements are kept.`\n      : 'The statements were not recorded: the call was traced before the trace kept them.'\}</div>`\}\n    $\{call.sql.some((s) => s.error) && ht| TO parts.
-    APPEND |ml`<div class="notice err">A statement failed; its error is below it.</div>`\}\n    <div class="result-table">\n      <$\{SqlTable\} statements=$\{statements\} slowest=$\{Math.max(| TO parts.
-    APPEND |1, ...call.sql.map((s) => s.us))\} nodes=$\{nodes\}\n        onNode=$\{onNode\} onPhase=$\{onPhase\} />\n    </div>`;\n\}\n\n// The query plan as text to read or pass on: the state| TO parts.
-    APPEND |ment, the plan's marks, the server's time, the phases, the tree\n// (each element with its type, mark and the SQL statements it and its arguments read; #n numbers the elements) and| TO parts.
-    APPEND |\n// the SQL statements, each with its phase and element\nexport function planText(call) \{\n  const \{ explain \} = call;\n  const nodes = explainIndex(explain);\n  const stats = | TO parts.
-    APPEND |sqlStats(call.sql, nodes);\n  const sql = (stat) => (stat ? `  [$\{stat.count\} SQL, $\{msText(stat.us / 1000)\}]` : '');\n  const lines = [`Query plan of $\{explain.cube\} (olap4a| TO parts.
-    APPEND |bap, $\{new Date().toLocaleString()\})`, '', call.mdx \|\| '', '',\n    `Plan: query $\{explain.plan.query.toLowerCase()\}$\{explain.plan.slicer ? `, slicer $\{explain.plan.slicer.| TO parts.
-    APPEND |toLowerCase()\}` : ''\}`\n      + explain.plan.axes.map((m, i) => `, axis $\{i\} $\{m.toLowerCase()\}`).join('') + `, cells $\{explain.plan.cells.toLowerCase()\}`,\n    `Time: $\{s| TO parts.
-    APPEND |tatementCount(call.sqlCount)\} $\{msText(call.sqlMs)\} of $\{serverTime(call)\}`,\n    '', 'Phases'];\n  for (const [phase, stat] of stats.phases) lines.push(`  $\{phaseName(phase)| TO parts.
-    APPEND |.padEnd(12)\}$\{sql(stat).trim().padEnd(20)\}  $\{phaseText(phase)\}`);\n  const walk = (node, depth) => \{\n    const pad = '  '.repeat(depth);\n    if (node.ref) \{\n      lines.| TO parts.
-    APPEND |push(`$\{pad\}$\{node.label\}  (named set #$\{node.ref\}, above)`);\n      return;\n    \}\n    lines.push(`$\{pad\}#$\{node.id\} $\{node.label\}  $\{node.type \|\| ''\}  $\{(node.| TO parts.
-    APPEND |mark \|\| '').toLowerCase()\}$\{sql(stats.all.get(node.id))\}`);\n    node.args.forEach((a) => walk(a, depth + 1));\n  \};\n  const walkPart = (part, depth) => \{\n    lines.push('| TO parts.
-    APPEND |', `$\{'  '.repeat(depth)\}$\{part.label\}`);\n    if (part.node) walk(part.node, depth + 1);\n    (part.children \|\| []).forEach((c) => walkPart(c, depth + 1));\n  \};\n  explain| TO parts.
-    APPEND |.parts.forEach((part) => walkPart(part, 0));\n  lines.push('', 'SQL statements', '');\n  call.sql.forEach((s, i) => \{\n    const element = nodes.get(s.node)?.node;\n    lines.push| TO parts.
-    APPEND |(`-- $\{i + 1\}: $\{phaseName(s.phase)\}$\{element ? `, #$\{element.id\} $\{element.label\}` : ''\}, `\n      + `$\{s.error ? `failed: $\{s.error.replace(/\\s+/g, ' ')\}` : `$\{s.r| TO parts.
-    APPEND |ows\} $\{s.rows === 1 ? 'row' : 'rows'\}`\}, $\{(s.us / 1000).toFixed(1)\} ms`,\n    `$\{s.sql.trim()\};`, '');\n  \});\n  return lines.join('\\n');\n\}\n\n// the query plan as dat| TO parts.
-    APPEND |a: the statement, the explanation and the statements\nexport const planJson = (call) => JSON.stringify(\{\n  mdx: call.mdx, traceId: call.id, runtimeMs: call.runtimeMs, sqlCount: c| TO parts.
-    APPEND |all.sqlCount, sqlMs: call.sqlMs,\n  browserMs: call.browserMs != null ? Math.round(call.browserMs) : undefined, explain: call.explain, sql: call.sql,\n\}, null, 2);\n\n// a node of| TO parts.
-    APPEND | the resolved tree: what it is, its type, its mark of the plan and the SQL it and its arguments read\nfunction PlanNode(\{ node, depth, stats, selection, onSelect, nodes \}) \{\n  | TO parts.
-    APPEND |const [open, setOpen] = useState(() => !node.args \|\| node.args.length <= 12);\n  if (node.ref) \{\n    const target = nodes.get(node.ref)?.node;\n    return html`<div class="plan| TO parts.
-    APPEND |-node ref" style=$\{`padding-left: $\{8 + depth * 16\}px`\}>\n      <span class="twisty"></span><button class="link small" onClick=$\{() => onSelect(\{ node: node.ref \})\}\n      | TO parts.
-    APPEND |  title="The named set, explained where it first appears">$\{node.label\} { cl_abap_conv_in_ce=>uccp( '2191' ) }</button>\n      $\{target && html`<$\{Mark\} mark=$\{target.mark\} | TO parts.
-    APPEND |/>`\}\n    </div>`;\n  \}\n  const own = stats.own.get(node.id);\n  const all = stats.all.get(node.id);\n  const selected = selection?.node === node.id;\n  return html`\n    <div c| TO parts.
-    APPEND |lass=$\{`plan-node$\{selected ? ' selected' : ''\}`\} style=$\{`padding-left: $\{8 + depth * 16\}px`\}\n      onClick=$\{() => onSelect(\{ node: node.id \})\} title=$\{node.mdx\}>| TO parts.
-    APPEND |\n      <span class="twisty" onClick=$\{(e) => \{ e.stopPropagation(); setOpen(!open); \}\}>$\{node.args.length ? (open ? '{ cl_abap_conv_in_ce=>uccp( '25BE' ) }' : '| TO parts.
-    APPEND |{ cl_abap_conv_in_ce=>uccp( '25B8' ) }') : ''\}</span>\n      <span class="plan-label mono">$\{node.label\}</span>\n      $\{node.type && html`<span class="muted small">$\{node.typ| TO parts.
-    APPEND |e\}</span>`\}\n      <$\{Mark\} mark=$\{node.mark\} />\n      <span class="spacer"></span>\n      $\{all && html`<$\{SqlBadge\} stat=$\{all\} title=$\{own && own.count === all.coun| TO parts.
-    APPEND |t ? 'SQL statements it read'\n        : `SQL statements it and its arguments read; itself: $\{own ? `$\{own.count\}, $\{msText(own.us / 1000)\}` : 'none'\}`\} />`\}\n    </div>\n  | TO parts.
-    APPEND |  $\{open && node.args.map((a) => html`<$\{PlanNode\} node=$\{a\} depth=$\{depth + 1\} stats=$\{stats\} selection=$\{selection\}\n      onSelect=$\{onSelect\} nodes=$\{nodes\} />`)| TO parts.
-    APPEND |\}`;\n\}\n\nfunction PlanPart(\{ part, depth, ...rest \}) \{\n  return html`\n    <div class="plan-part" style=$\{`padding-left: $\{8 + depth * 16\}px`\}>$\{part.label\}</div>\n   | TO parts.
-    APPEND | $\{part.node && html`<$\{PlanNode\} node=$\{part.node\} depth=$\{depth + 1\} ...$\{rest\} />`\}\n    $\{(part.children \|\| []).map((c) => html`<$\{PlanPart\} part=$\{c\} depth=$| TO parts.
-    APPEND |\{depth + 1\} ...$\{rest\} />`)\}`;\n\}\n\n// The query plan: the resolved tree of the formulas, subselects, slicer and axes with each element's mark of the plan\n// and the SQL st| TO parts.
-    APPEND |atements it read; the phases of the engine with theirs. A click on an element or a phase lists its\n// statements next to the tree. selection: the element (\{node\}) or phase (\{ph| TO parts.
-    APPEND |ase\}) selected, null for all.\nexport function PlanView(\{ call, selection, setSelection \}) \{\n  const [below, setBelow] = useState(true);\n  const \{ explain \} = call;\n  if (| TO parts.
-    APPEND |!explain) \{\n    return html`<div class="result-msg muted">No query plan: the call is no Execute of a query, or the statement failed\n      before it was resolved$\{call.sql.lengt| TO parts.
-    APPEND |h ? ' (its SQL statements are on the SQL statements tab)' : ''\}.</div>`;\n  \}\n  const nodes = explainIndex(explain);\n  const stats = sqlStats(call.sql, nodes);\n  const numbere| TO parts.
-    APPEND |d = call.sql.map((s, i) => (\{ ...s, n: i + 1 \}));\n  const slowest = Math.max(1, ...call.sql.map((s) => s.us));\n  const selectedNode = selection?.node != null ? nodes.get(select| TO parts.
-    APPEND |ion.node)?.node : null;\n  const shown = selectedNode ? numbered.filter((s) => (below ? readBelow(s, selectedNode.id, nodes) : s.node === selectedNode.id))\n    : selection?.phase | TO parts.
-    APPEND |!= null ? numbered.filter((s) => (s.phase \|\| '') === selection.phase) : numbered;\n  const phases = [...stats.phases.keys()];\n  const onNode = (id) => setSelection(\{ node: id | TO parts.
-    APPEND |\});\n  const onPhase = (phase) => setSelection(\{ phase \});\n  const name = `query-plan-$\{explain.cube\}-$\{call.id.slice(0, 8)\}`;\n  return html`\n    <div class="result-bar">| TO parts.
-    APPEND |\n      <span class="muted small">Click an element or a phase to list its SQL statements.</span>\n      <span class="spacer"></span>\n      <span class="muted small">Download</span| TO parts.
-    APPEND |>\n      <div class="segmented" role="group" aria-label="Download the query plan">\n        <button onClick=$\{() => download(planText(call), `$\{name\}.txt`, 'text/plain')\}\n    | TO parts.
-    APPEND |      title="The statement, the plan, the tree with each element's SQL and the SQL statements, as text">Text</button>\n        <button onClick=$\{() => download(planJson(call), `$| TO parts.
-    APPEND |\{name\}.json`, 'application/json')\}\n          title="The statement, the explanation and the SQL statements as JSON">JSON</button>\n      </div>\n    </div>\n    <div class="plan| TO parts.
-    APPEND |">\n    <div class="plan-tree">\n      <div class="plan-summary small">\n        <span class="muted">Plan of $\{explain.cube\}:</span> query <$\{Mark\} mark=$\{explain.plan.query\}| TO parts.
-    APPEND | />\n        $\{explain.plan.slicer && html`slicer <$\{Mark\} mark=$\{explain.plan.slicer\} />`\}\n        $\{explain.plan.axes.map((m, i) => html`axis $\{i\} <$\{Mark\} mark=$\{m| TO parts.
-    APPEND |\} /> `)\}\n        cells <$\{Mark\} mark=$\{explain.plan.cells\} />\n      </div>\n      <div class="plan-part">Phases</div>\n      $\{phases.map((p) => html`<div class=$\{`plan-n| TO parts.
-    APPEND |ode$\{selection?.phase === p ? ' selected' : ''\}`\} style="padding-left: 24px"\n        onClick=$\{() => onPhase(p)\} title=$\{phaseText(p)\}>\n        <span class="plan-label pha| TO parts.
-    APPEND |se">$\{phaseName(p)\}</span><span class="muted small plan-desc">$\{phaseText(p)\}</span>\n        <span class="spacer"></span><$\{SqlBadge\} stat=$\{stats.phases.get(p)\} title="SQ| TO parts.
-    APPEND |L statements of the phase" />\n      </div>`)\}\n      $\{explain.parts.map((part) => html`<$\{PlanPart\} part=$\{part\} depth=$\{0\} stats=$\{stats\} selection=$\{selection\}\n   | TO parts.
-    APPEND |     onSelect=$\{setSelection\} nodes=$\{nodes\} />`)\}\n    </div>\n    <div class="plan-sql">\n      <div class="result-bar">\n        <span class="small">$\{selectedNode ? html`| TO parts.
-    APPEND |<span class="mono">$\{selectedNode.label\}</span> <$\{Mark\} mark=$\{selectedNode.mark\} />`\n          : selection?.phase != null ? html`Phase <strong>$\{phaseName(selection.phase| TO parts.
-    APPEND |)\}</strong>: $\{phaseText(selection.phase)\}`\n          : 'All statements; click an element or a phase'\}</span>\n        <span class="spacer"></span>\n        $\{selectedNode &&| TO parts.
-    APPEND | html`<label class="inline small"><input type="checkbox" checked=$\{below\}\n          onChange=$\{(e) => setBelow(e.target.checked)\} /> with its arguments</label>`\}\n        $\{| TO parts.
-    APPEND |selection && html`<button onClick=$\{() => setSelection(null)\}>All</button>`\}\n      </div>\n      $\{selectedNode && html`<pre class="sql plan-mdx" title="The element as MDX">$| TO parts.
-    APPEND |\{selectedNode.mdx\}</pre>`\}\n      <div class="result-table">\n        <$\{SqlTable\} statements=$\{shown\} slowest=$\{slowest\} nodes=$\{nodes\} onNode=$\{onNode\} onPhase=$\{on| TO parts.
-    APPEND |Phase\} />\n      </div>\n    </div>\n  </div>`;\n\}\n| TO parts.
+    APPEND |RE)',\n  Axes: 'the cells the axes needed, read in one batch',\n  'NON EMPTY': 'the NON EMPTY filter of the axes',\n  Cells: 'the cells of the answer',\n  'Cells first': 'the axes | TO parts.
+    APPEND |and the cells from one statement of the facts',\n  Finish: 'the details of the axes\\' members: children counts',\n  Drillthrough: 'the fact rows of the drill-through',\n\};\nconst| TO parts.
+    APPEND | phaseName = (p) => p \|\| 'Before';\nconst phaseText = (p) => PHASE_TEXT[p] ?? (/^Axis\\d+$/.test(p) ? `axis $\{p.slice(4)\}: its sets and members` : p);\nconst MARK_TEXT = \{\n  | TO parts.
+    APPEND |STATIC: 'static: answered by the schema and member reads',\n  RELATIONAL: 'relational: answered by grouped SQL over the facts',\n  COMPUTED: 'computed: evaluated by the evaluator, | TO parts.
+    APPEND |cell by cell',\n\};\n\n// the explanation's nodes by id, each with its parent's id (0 for the top of a part) and its part\nfunction explainIndex(explain) \{\n  const nodes = new Ma| TO parts.
+    APPEND |p();\n  const visit = (node, parent, part) => \{\n    if (!node \|\| node.ref) return;\n    nodes.set(node.id, \{ node, parent, part \});\n    node.args.forEach((a) => visit(a, nod| TO parts.
+    APPEND |e.id, part));\n  \};\n  const visitPart = (part) => \{\n    visit(part.node, 0, part);\n    (part.children \|\| []).forEach(visitPart);\n  \};\n  (explain?.parts \|\| []).forEach(v| TO parts.
+    APPEND |isitPart);\n  return nodes;\n\}\n\n// whether a statement was read by the node or one of its arguments\nconst readBelow = (statement, id, nodes) => \{\n  for (let n = statement.nod| TO parts.
+    APPEND |e; n; n = nodes.get(n)?.parent) if (n === id) return true;\n  return false;\n\};\n\n// the statements and their time per node (own: read by it; all: by it or its arguments) and per| TO parts.
+    APPEND | phase\nfunction sqlStats(statements, nodes) \{\n  const add = (map, key, s) => \{\n    const v = map.get(key) \|\| \{ count: 0, us: 0 \};\n    v.count += 1;\n    v.us += s.us;\n  | TO parts.
+    APPEND |  map.set(key, v);\n  \};\n  const own = new Map();\n  const all = new Map();\n  const phases = new Map();\n  for (const s of statements) \{\n    add(phases, s.phase \|\| '', s);\n| TO parts.
+    APPEND |    if (!s.node) continue;\n    add(own, s.node, s);\n    for (let n = s.node; n; n = nodes.get(n)?.parent) add(all, n, s);\n  \}\n  return \{ own, all, phases \};\n\}\n\nconst ser| TO parts.
+    APPEND |verTime = (call) => `$\{msText(call.runtimeMs)\} on the server`\n  + (call.browserMs != null ? ` ($\{msText(call.browserMs)\} in the browser)` : '');\n\nconst Mark = (\{ mark \}) =| TO parts.
+    APPEND |> mark && html`<span class=$\{`mark $\{mark.toLowerCase()\}`\} title=$\{MARK_TEXT[mark] \|\| mark\}>$\{mark.toLowerCase()\}</span>`;\nconst SqlBadge = (\{ stat, title \}) => stat &| TO parts.
+    APPEND |& html`<span class="sql-badge" title=$\{title\}>$\{stat.count\} SQL { cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{msText(stat.us / 1000)\}</span>`;\n\n// statements with their time (a | TO parts.
+    APPEND |bar shows its share of the slowest), rows, phase, element and error\nfunction SqlTable(\{ statements, slowest, nodes, onNode, onPhase \}) \{\n  if (!statements.length) return html`| TO parts.
+    APPEND |<div class="result-msg muted">No SQL statement.</div>`;\n  return html`<table class="grid sql-list">\n    <thead><tr><th class="num">#</th><th class="num">ms</th><th class="num">Ro| TO parts.
+    APPEND |ws</th><th>Phase</th><th>Element</th><th>Statement</th></tr></thead>\n    <tbody>$\{statements.map((s) => \{\n      const element = nodes.get(s.node)?.node;\n      return html`<tr>| TO parts.
+    APPEND |\n        <td class="num muted">$\{s.n\}</td>\n        <td class="num" style=$\{`background: linear-gradient(to left, var(--accent-soft) $\{(100 * s.us) / slowest\}%, transparent 0| TO parts.
+    APPEND |)`\}>$\{(s.us / 1000).toFixed(1)\}</td>\n        <td class="num">$\{s.error ? '' : s.rows.toLocaleString()\}</td>\n        <td><button class="link small" title=$\{phaseText(s.phase| TO parts.
+    APPEND | \|\| '')\} onClick=$\{() => onPhase(s.phase \|\| '')\}>$\{phaseName(s.phase)\}</button></td>\n        <td>$\{element ? html`<button class="link small mono" title=$\{`$\{element.md| TO parts.
+    APPEND |x\}\\n{ cl_abap_conv_in_ce=>uccp( '2013' ) } show it in the query plan`\}\n          onClick=$\{() => onNode(s.node)\}>$\{element.label\}</button>` : html`<span class="muted small"| TO parts.
+    APPEND |>{ cl_abap_conv_in_ce=>uccp( '2013' ) }</span>`\}</td>\n        <td><pre class="sql">$\{s.sql.trim()\}</pre>$\{s.error && html`<div class="notice err small">$\{s.error\}</div>`\}</| TO parts.
+    APPEND |td>\n      </tr>`;\n    \})\}</tbody>\n  </table>`;\n\}\n\n// The SQL statements a call ran: in the order they ran or the slowest first, each with its phase and the element of\n// | TO parts.
+    APPEND |the query that read it (a click shows it in the query plan: onNode, onPhase). children: more buttons for the bar.\nexport function SqlView(\{ call, onNode, onPhase, children \}) \{| TO parts.
+    APPEND |\n  const [order, setOrder] = useState('ran');\n  const [copy, copied] = useCopied();\n  const nodes = explainIndex(call.explain);\n  const statements = call.sql.map((s, i) => (\{ | TO parts.
+    APPEND |...s, n: i + 1 \}));\n  if (order === 'slowest') statements.sort((a, b) => b.us - a.us);\n  return html`\n    <div class="result-bar">\n      <span class="muted small">$\{`$\{state| TO parts.
+    APPEND |mentCount(call.sqlCount)\}, $\{msText(call.sqlMs)\} of $\{serverTime(call)\}`\}</span>\n      <span class="spacer"></span>\n      <div class="segmented" role="group" aria-label="Or| TO parts.
+    APPEND |der">\n        <button class=$\{order === 'ran' ? 'active' : ''\} onClick=$\{() => setOrder('ran')\}>As they ran</button>\n        <button class=$\{order === 'slowest' ? 'active' :| TO parts.
+    APPEND | ''\} onClick=$\{() => setOrder('slowest')\}>Slowest first</button>\n      </div>\n      $\{children\}\n      $\{copied\}\n      <button onClick=$\{() => copy(sqlScript(call.sql))| TO parts.
+    APPEND |\} disabled=$\{!call.sql.length\} title="Copy the statements as one script">Copy</button>\n      <button onClick=$\{() => download(sqlScript(call.sql), `$\{call.id\}.sql`, 'text/pl| TO parts.
+    APPEND |ain')\} disabled=$\{!call.sql.length\}>Download</button>\n    </div>\n    $\{call.sql.length < call.sqlCount && html`<div class="notice warn">$\{call.sql.length\n      ? `The first| TO parts.
+    APPEND | $\{call.sql.length.toLocaleString()\} of $\{call.sqlCount.toLocaleString()\} statements are kept.`\n      : 'The statements were not recorded: the call was traced before the trace| TO parts.
+    APPEND | kept them.'\}</div>`\}\n    $\{call.sql.some((s) => s.error) && html`<div class="notice err">A statement failed; its error is below it.</div>`\}\n    <div class="result-table">\n | TO parts.
+    APPEND |     <$\{SqlTable\} statements=$\{statements\} slowest=$\{Math.max(1, ...call.sql.map((s) => s.us))\} nodes=$\{nodes\}\n        onNode=$\{onNode\} onPhase=$\{onPhase\} />\n    </di| TO parts.
+    APPEND |v>`;\n\}\n\n// The query plan as text to read or pass on: the statement, the plan's marks, the server's time, the phases, the tree\n// (each element with its type, mark and the SQL| TO parts.
+    APPEND | statements it and its arguments read; #n numbers the elements) and\n// the SQL statements, each with its phase and element\nexport function planText(call) \{\n  const \{ explain | TO parts.
+    APPEND |\} = call;\n  const nodes = explainIndex(explain);\n  const stats = sqlStats(call.sql, nodes);\n  const sql = (stat) => (stat ? `  [$\{stat.count\} SQL, $\{msText(stat.us / 1000)\}| TO parts.
+    APPEND |]` : '');\n  const lines = [`Query plan of $\{explain.cube\} (olap4abap, $\{new Date().toLocaleString()\})`, '', call.mdx \|\| '', '',\n    `Plan: query $\{explain.plan.query.toLow| TO parts.
+    APPEND |erCase()\}$\{explain.plan.slicer ? `, slicer $\{explain.plan.slicer.toLowerCase()\}` : ''\}`\n      + explain.plan.axes.map((m, i) => `, axis $\{i\} $\{m.toLowerCase()\}`).join('')| TO parts.
+    APPEND | + `, cells $\{explain.plan.cells.toLowerCase()\}`,\n    `Time: $\{statementCount(call.sqlCount)\} $\{msText(call.sqlMs)\} of $\{serverTime(call)\}`,\n    '', 'Phases'];\n  for (co| TO parts.
+    APPEND |nst [phase, stat] of stats.phases) lines.push(`  $\{phaseName(phase).padEnd(12)\}$\{sql(stat).trim().padEnd(20)\}  $\{phaseText(phase)\}`);\n  const walk = (node, depth) => \{\n   | TO parts.
+    APPEND | const pad = '  '.repeat(depth);\n    if (node.ref) \{\n      lines.push(`$\{pad\}$\{node.label\}  (named set #$\{node.ref\}, above)`);\n      return;\n    \}\n    lines.push(`$\{p| TO parts.
+    APPEND |ad\}#$\{node.id\} $\{node.label\}  $\{node.type \|\| ''\}  $\{(node.mark \|\| '').toLowerCase()\}$\{sql(stats.all.get(node.id))\}`);\n    node.args.forEach((a) => walk(a, depth + 1| TO parts.
+    APPEND |));\n  \};\n  const walkPart = (part, depth) => \{\n    lines.push('', `$\{'  '.repeat(depth)\}$\{part.label\}`);\n    if (part.node) walk(part.node, depth + 1);\n    (part.childre| TO parts.
+    APPEND |n \|\| []).forEach((c) => walkPart(c, depth + 1));\n  \};\n  explain.parts.forEach((part) => walkPart(part, 0));\n  lines.push('', 'SQL statements', '');\n  call.sql.forEach((s, i)| TO parts.
+    APPEND | => \{\n    const element = nodes.get(s.node)?.node;\n    lines.push(`-- $\{i + 1\}: $\{phaseName(s.phase)\}$\{element ? `, #$\{element.id\} $\{element.label\}` : ''\}, `\n      + | TO parts.
+    APPEND |`$\{s.error ? `failed: $\{s.error.replace(/\\s+/g, ' ')\}` : `$\{s.rows\} $\{s.rows === 1 ? 'row' : 'rows'\}`\}, $\{(s.us / 1000).toFixed(1)\} ms`,\n    `$\{s.sql.trim()\};`, '');| TO parts.
+    APPEND |\n  \});\n  return lines.join('\\n');\n\}\n\n// the query plan as data: the statement, the explanation and the statements\nexport const planJson = (call) => JSON.stringify(\{\n  md| TO parts.
+    APPEND |x: call.mdx, traceId: call.id, runtimeMs: call.runtimeMs, sqlCount: call.sqlCount, sqlMs: call.sqlMs,\n  browserMs: call.browserMs != null ? Math.round(call.browserMs) : undefined,| TO parts.
+    APPEND | explain: call.explain, sql: call.sql,\n\}, null, 2);\n\n// a node of the resolved tree: what it is, its type, its mark of the plan and the SQL it and its arguments read\nfunction | TO parts.
+    APPEND |PlanNode(\{ node, depth, stats, selection, onSelect, nodes \}) \{\n  const [open, setOpen] = useState(() => !node.args \|\| node.args.length <= 12);\n  if (node.ref) \{\n    const | TO parts.
+    APPEND |target = nodes.get(node.ref)?.node;\n    return html`<div class="plan-node ref" style=$\{`padding-left: $\{8 + depth * 16\}px`\}>\n      <span class="twisty"></span><button class="| TO parts.
+    APPEND |link small" onClick=$\{() => onSelect(\{ node: node.ref \})\}\n        title="The named set, explained where it first appears">$\{node.label\} | TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '2191' ) }</button>\n      $\{target && html`<$\{Mark\} mark=$\{target.mark\} />`\}\n    </div>`;\n  \}\n  const own = stats.own.get(node.id);\n  const | TO parts.
+    APPEND |all = stats.all.get(node.id);\n  const selected = selection?.node === node.id;\n  return html`\n    <div class=$\{`plan-node$\{selected ? ' selected' : ''\}`\} style=$\{`padding-le| TO parts.
+    APPEND |ft: $\{8 + depth * 16\}px`\}\n      onClick=$\{() => onSelect(\{ node: node.id \})\} title=$\{node.mdx\}>\n      <span class="twisty" onClick=$\{(e) => \{ e.stopPropagation(); setO| TO parts.
+    APPEND |pen(!open); \}\}>$\{node.args.length ? (open ? '{ cl_abap_conv_in_ce=>uccp( '25BE' ) }' : '{ cl_abap_conv_in_ce=>uccp( '25B8' ) }') : ''\}</span>\n      <span class="plan-label mon| TO parts.
+    APPEND |o">$\{node.label\}</span>\n      $\{node.type && html`<span class="muted small">$\{node.type\}</span>`\}\n      <$\{Mark\} mark=$\{node.mark\} />\n      <span class="spacer"></span| TO parts.
+    APPEND |>\n      $\{all && html`<$\{SqlBadge\} stat=$\{all\} title=$\{own && own.count === all.count ? 'SQL statements it read'\n        : `SQL statements it and its arguments read; itself| TO parts.
+    APPEND |: $\{own ? `$\{own.count\}, $\{msText(own.us / 1000)\}` : 'none'\}`\} />`\}\n    </div>\n    $\{open && node.args.map((a) => html`<$\{PlanNode\} node=$\{a\} depth=$\{depth + 1\} st| TO parts.
+    APPEND |ats=$\{stats\} selection=$\{selection\}\n      onSelect=$\{onSelect\} nodes=$\{nodes\} />`)\}`;\n\}\n\nfunction PlanPart(\{ part, depth, ...rest \}) \{\n  return html`\n    <div cl| TO parts.
+    APPEND |ass="plan-part" style=$\{`padding-left: $\{8 + depth * 16\}px`\}>$\{part.label\}</div>\n    $\{part.node && html`<$\{PlanNode\} node=$\{part.node\} depth=$\{depth + 1\} ...$\{rest| TO parts.
+    APPEND |\} />`\}\n    $\{(part.children \|\| []).map((c) => html`<$\{PlanPart\} part=$\{c\} depth=$\{depth + 1\} ...$\{rest\} />`)\}`;\n\}\n\n// The query plan: the resolved tree of the fo| TO parts.
+    APPEND |rmulas, subselects, slicer and axes with each element's mark of the plan\n// and the SQL statements it read; the phases of the engine with theirs. A click on an element or a phase | TO parts.
+    APPEND |lists its\n// statements next to the tree. selection: the element (\{node\}) or phase (\{phase\}) selected, null for all.\nexport function PlanView(\{ call, selection, setSelection| TO parts.
+    APPEND | \}) \{\n  const [below, setBelow] = useState(true);\n  const \{ explain \} = call;\n  if (!explain) \{\n    return html`<div class="result-msg muted">No query plan: the call is no| TO parts.
+    APPEND | Execute of a query, or the statement failed\n      before it was resolved$\{call.sql.length ? ' (its SQL statements are on the SQL statements tab)' : ''\}.</div>`;\n  \}\n  const | TO parts.
+    APPEND |nodes = explainIndex(explain);\n  const stats = sqlStats(call.sql, nodes);\n  const numbered = call.sql.map((s, i) => (\{ ...s, n: i + 1 \}));\n  const slowest = Math.max(1, ...cal| TO parts.
+    APPEND |l.sql.map((s) => s.us));\n  const selectedNode = selection?.node != null ? nodes.get(selection.node)?.node : null;\n  const shown = selectedNode ? numbered.filter((s) => (below ? r| TO parts.
+    APPEND |eadBelow(s, selectedNode.id, nodes) : s.node === selectedNode.id))\n    : selection?.phase != null ? numbered.filter((s) => (s.phase \|\| '') === selection.phase) : numbered;\n  co| TO parts.
+    APPEND |nst phases = [...stats.phases.keys()];\n  const onNode = (id) => setSelection(\{ node: id \});\n  const onPhase = (phase) => setSelection(\{ phase \});\n  const name = `query-plan-| TO parts.
+    APPEND |$\{explain.cube\}-$\{call.id.slice(0, 8)\}`;\n  return html`\n    <div class="result-bar">\n      <span class="muted small">Click an element or a phase to list its SQL statements.<| TO parts.
+    APPEND |/span>\n      <span class="spacer"></span>\n      <span class="muted small">Download</span>\n      <div class="segmented" role="group" aria-label="Download the query plan">\n      | TO parts.
+    APPEND |  <button onClick=$\{() => download(planText(call), `$\{name\}.txt`, 'text/plain')\}\n          title="The statement, the plan, the tree with each element's SQL and the SQL stateme| TO parts.
+    APPEND |nts, as text">Text</button>\n        <button onClick=$\{() => download(planJson(call), `$\{name\}.json`, 'application/json')\}\n          title="The statement, the explanation and | TO parts.
+    APPEND |the SQL statements as JSON">JSON</button>\n      </div>\n    </div>\n    <div class="plan">\n    <div class="plan-tree">\n      <div class="plan-summary small">\n        <span clas| TO parts.
+    APPEND |s="muted">Plan of $\{explain.cube\}:</span> query <$\{Mark\} mark=$\{explain.plan.query\} />\n        $\{explain.plan.slicer && html`slicer <$\{Mark\} mark=$\{explain.plan.slicer\}| TO parts.
+    APPEND | />`\}\n        $\{explain.plan.axes.map((m, i) => html`axis $\{i\} <$\{Mark\} mark=$\{m\} /> `)\}\n        cells <$\{Mark\} mark=$\{explain.plan.cells\} />\n      </div>\n      <d| TO parts.
+    APPEND |iv class="plan-part">Phases</div>\n      $\{phases.map((p) => html`<div class=$\{`plan-node$\{selection?.phase === p ? ' selected' : ''\}`\} style="padding-left: 24px"\n        onC| TO parts.
+    APPEND |lick=$\{() => onPhase(p)\} title=$\{phaseText(p)\}>\n        <span class="plan-label phase">$\{phaseName(p)\}</span><span class="muted small plan-desc">$\{phaseText(p)\}</span>\n  | TO parts.
+    APPEND |      <span class="spacer"></span><$\{SqlBadge\} stat=$\{stats.phases.get(p)\} title="SQL statements of the phase" />\n      </div>`)\}\n      $\{explain.parts.map((part) => html`<| TO parts.
+    APPEND |$\{PlanPart\} part=$\{part\} depth=$\{0\} stats=$\{stats\} selection=$\{selection\}\n        onSelect=$\{setSelection\} nodes=$\{nodes\} />`)\}\n    </div>\n    <div class="plan-sq| TO parts.
+    APPEND |l">\n      <div class="result-bar">\n        <span class="small">$\{selectedNode ? html`<span class="mono">$\{selectedNode.label\}</span> <$\{Mark\} mark=$\{selectedNode.mark\} />`| TO parts.
+    APPEND |\n          : selection?.phase != null ? html`Phase <strong>$\{phaseName(selection.phase)\}</strong>: $\{phaseText(selection.phase)\}`\n          : 'All statements; click an elemen| TO parts.
+    APPEND |t or a phase'\}</span>\n        <span class="spacer"></span>\n        $\{selectedNode && html`<label class="inline small"><input type="checkbox" checked=$\{below\}\n          onCha| TO parts.
+    APPEND |nge=$\{(e) => setBelow(e.target.checked)\} /> with its arguments</label>`\}\n        $\{selection && html`<button onClick=$\{() => setSelection(null)\}>All</button>`\}\n      </div| TO parts.
+    APPEND |>\n      $\{selectedNode && html`<pre class="sql plan-mdx" title="The element as MDX">$\{selectedNode.mdx\}</pre>`\}\n      <div class="result-table">\n        <$\{SqlTable\} state| TO parts.
+    APPEND |ments=$\{shown\} slowest=$\{slowest\} nodes=$\{nodes\} onNode=$\{onNode\} onPhase=$\{onPhase\} />\n      </div>\n    </div>\n  </div>`;\n\}\n| TO parts.
     result = concat_lines_of( parts ).
   ENDMETHOD.
 

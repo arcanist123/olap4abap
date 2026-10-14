@@ -31,6 +31,7 @@ const PHASE_TEXT = {
   Axes: 'the cells the axes needed, read in one batch',
   'NON EMPTY': 'the NON EMPTY filter of the axes',
   Cells: 'the cells of the answer',
+  'Cells first': 'the axes and the cells from one statement of the facts',
   Finish: 'the details of the axes\' members: children counts',
   Drillthrough: 'the fact rows of the drill-through',
 };

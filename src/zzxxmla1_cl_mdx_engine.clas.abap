@@ -88,6 +88,7 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
         format_string TYPE string, " only if the query asks for the cell property FORMAT_STRING
       END OF ty_cell,
       ty_t_cell TYPE STANDARD TABLE OF ty_cell WITH EMPTY KEY.
+    TYPES ty_t_cell_ref TYPE STANDARD TABLE OF i WITH EMPTY KEY.
     TYPES:
       BEGIN OF ty_result,
         cube_name   TYPE string,
@@ -96,6 +97,10 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
         has_slicer  TYPE abap_bool,
         slicer      TYPE ty_t_tuple,  " the tuples of the slicer; several for a compound slicer
         cells       TYPE ty_t_cell,
+        "! cells first (docs/query-planning.md, step 4): the cells as their distinct ones (the first the empty cell) and
+        "! per ordinal the index of its cell among them; cells is then empty (cells_of gives them as cells)
+        cell_values TYPE ty_t_cell,
+        cell_refs   TYPE ty_t_cell_ref,
         "! the CELL PROPERTIES of the query, upper case; VALUE and FORMATTED_VALUE if it names none
         cell_properties TYPE string_table,
         "! the cube's annotation olap4abap.omitEmptyCells: the empty cells but the first are not written
@@ -127,6 +132,10 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       IMPORTING statement     TYPE zzxxmla1_cl_mdx_parser=>ty_statement
       RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_facts=>ty_drill_through
       RAISING   zzxxmla1_cx_xmla.
+    "! The cells of a result, one per ordinal, also when they are given as cell_values and cell_refs.
+    CLASS-METHODS cells_of
+      IMPORTING result        TYPE ty_result
+      RETURNING VALUE(cells)  TYPE ty_t_cell.
 
   PRIVATE SECTION.
     "! the context of the slicer that every cell of the executed query has (a compound slicer's placeholders)
@@ -429,6 +438,56 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       EXPORTING done             TYPE abap_bool
                 cells            TYPE ty_t_cell
                 kept             TYPE ty_t_kept.
+    TYPES:
+      "! cells first: an axis of a grid, as the facts read it, and the id of its level
+      BEGIN OF ty_grid_axis,
+        grid  TYPE zzxxmla1_cl_mdx_facts=>ty_grid_axis,
+        level TYPE i,
+      END OF ty_grid_axis,
+      ty_t_grid_axis TYPE STANDARD TABLE OF ty_grid_axis WITH EMPTY KEY.
+    "! Cells first (docs/query-planning.md, step 4), our shortcut: the axes of a query whose plan is relational if
+    "! every axis is NON EMPTY and the members with facts of one level of a hierarchy (grid_axis), at most two axes of
+    "! three levels (ZZXXMLA1_CL_MDX_FACTS=>c_max_grid_axes, c_max_grid_levels), no formula in the query, no
+    "! calculated or null member in the context, its measure stored and the slicer one tuple. Initial for any other
+    "! query.
+    METHODS grid_axes
+      IMPORTING query         TYPE zzxxmla1_cl_mdx_parser=>ty_query
+                query_axes    TYPE zzxxmla1_cl_mdx_parser=>ty_t_axis
+                evaluator     TYPE ty_evaluator
+                slicer        TYPE ty_t_tuple
+      RETURNING VALUE(result) TYPE ty_t_grid_axis.
+    "! The grid axis of a set: DrilldownLevel({the All member}) (the All member and the first level, Excel's form with
+    "! INCLUDE_CALC_MEMBERS where the hierarchy has no calculated member), Level.Members or the All member's
+    "! Children, also inside Hierarchize or braces; initial for any other set.
+    METHODS grid_axis
+      IMPORTING node          TYPE ty_node
+      RETURNING VALUE(result) TYPE ty_grid_axis.
+    "! The first level below the All member of a hierarchy as a grid axis; initial if the member is no All member.
+    METHODS grid_first_level
+      IMPORTING member        TYPE ty_member
+                has_all       TYPE abap_bool
+      RETURNING VALUE(result) TYPE ty_grid_axis.
+    "! Cells first: the axes and the cells from one statement of the facts (ZZXXMLA1_CL_MDX_FACTS=>grid), not from the
+    "! axes' sets, the group cache and a cell table: an axis' members are the paths with facts of its level, read by
+    "! them and hierarchized, its All member first; each group's cell is placed at the positions of its keys, its value
+    "! written once per distinct amount, the cells given as cell_values and cell_refs. NON EMPTY keeps every position
+    "! then: each has a group with facts.
+    METHODS cells_first
+      IMPORTING evaluator  TYPE ty_evaluator
+                axes       TYPE ty_t_grid_axis
+                query_axes TYPE zzxxmla1_cl_mdx_parser=>ty_t_axis
+      CHANGING  result     TYPE ty_result.
+    "! The path of an axis (1 or 2) in a grid row: the keys of its levels (ZZXXMLA1_CL_MODEL's path).
+    CLASS-METHODS grid_path
+      IMPORTING !row          TYPE zzxxmla1_cl_mdx_facts=>ty_grid_row
+                axis          TYPE i
+                levels        TYPE i
+      RETURNING VALUE(result) TYPE string.
+    "! The axes' and the slicer's DISPLAY_INFO and the axes' DIMENSION PROPERTIES.
+    METHODS finish
+      IMPORTING query_axes TYPE zzxxmla1_cl_mdx_parser=>ty_t_axis
+      CHANGING  result     TYPE ty_result
+      RAISING   zzxxmla1_cx_xmla.
     "! fast_cells: the key of an axis' tuple from a group's paths at the positions given, separated by the separator
     CLASS-METHODS fast_key
       IMPORTING paths         TYPE string_table
@@ -1776,10 +1835,43 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       cell_slicer = slicer_context.
     ENDIF.
 
-    " the axes in the order of their ordinals (the validator made sure they follow each other from 0). The top members
-    " of their members replace the root members of their hierarchies (Determine Axes).
+    result-cube_name = cube-cube_name.
+    result-omit_empty_cells = cube-omit_empty_cells.
+    " cut the fraction of the seconds as cl_abap_tstmp=>move_to_short does (not in 7.50); rounding could give second 60
+    result-last_update = trunc( cube-generated_at ).
+    " the cell properties: the name of each (its first segment), in upper case
+    LOOP AT resolved-cell_properties INTO DATA(cell_property).
+      SPLIT cell_property AT `.` INTO cell_property DATA(rest) ##NEEDED.
+      IF cell_property CP `[*]`.
+        cell_property = substring( val = cell_property off = 1 len = strlen( cell_property ) - 2 ).
+      ENDIF.
+      APPEND to_upper( cell_property ) TO result-cell_properties.
+    ENDLOOP.
+    IF result-cell_properties IS INITIAL.
+      result-cell_properties = VALUE #( ( `VALUE` ) ( `FORMATTED_VALUE` ) ).
+    ENDIF.
+    want_format_string = xsdbool( line_exists( result-cell_properties[ table_line = `FORMAT_STRING` ] ) ).
+    want_formatted = xsdbool( line_exists( result-cell_properties[ table_line = `FORMATTED_VALUE` ] ) ).
+
+    " the axes in the order of their ordinals (the validator made sure they follow each other from 0)
     DATA(query_axes) = resolved-axes.
     SORT query_axes BY ordinal ASCENDING.
+
+    " planning, cells first: a query whose NON EMPTY axes are the members with facts of a level each is one statement
+    " of the facts, its axes made from the groups
+    IF relational = abap_true AND non_all_members IS INITIAL.
+      DATA(grid_axes) = grid_axes( query = resolved query_axes = query_axes evaluator = evaluator
+                                   slicer = result-slicer ).
+      IF grid_axes IS NOT INITIAL.
+        cells_first( EXPORTING evaluator = evaluator axes = grid_axes query_axes = query_axes CHANGING result = result ).
+        fact_reader->set_batching( abap_false ).
+        set_phase( `Finish` ).
+        finish( EXPORTING query_axes = query_axes CHANGING result = result ).
+        RETURN.
+      ENDIF.
+    ENDIF.
+
+    " the top members of the axes' members replace the root members of their hierarchies (Determine Axes)
     IF non_all_members IS NOT INITIAL.
       DATA(axis_members) = VALUE ty_t_member( ).
       LOOP AT query_axes INTO DATA(query_axis).
@@ -1874,24 +1966,6 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       filter_by_evaluator( EXPORTING evaluator = evaluator indexes = evaluator_filter CHANGING axes = result-axes ).
     ENDIF.
 
-    result-cube_name = cube-cube_name.
-    result-omit_empty_cells = cube-omit_empty_cells.
-    " cut the fraction of the seconds as cl_abap_tstmp=>move_to_short does (not in 7.50); rounding could give second 60
-    result-last_update = trunc( cube-generated_at ).
-    " the cell properties: the name of each (its first segment), in upper case
-    LOOP AT resolved-cell_properties INTO DATA(cell_property).
-      SPLIT cell_property AT `.` INTO cell_property DATA(rest) ##NEEDED.
-      IF cell_property CP `[*]`.
-        cell_property = substring( val = cell_property off = 1 len = strlen( cell_property ) - 2 ).
-      ENDIF.
-      APPEND to_upper( cell_property ) TO result-cell_properties.
-    ENDLOOP.
-    IF result-cell_properties IS INITIAL.
-      result-cell_properties = VALUE #( ( `VALUE` ) ( `FORMATTED_VALUE` ) ).
-    ENDIF.
-    want_format_string = xsdbool( line_exists( result-cell_properties[ table_line = `FORMAT_STRING` ] ) ).
-    want_formatted = xsdbool( line_exists( result-cell_properties[ table_line = `FORMATTED_VALUE` ] ) ).
-
     " one cell per combination of the axes' tuples; no axis is one cell, an empty axis none (executeBody); again until
     " no cell is missed, the final cells kept
     IF cells_needed( result = result non_empty = xsdbool( line_exists( query_axes[ non_empty = abap_true ] ) ) )
@@ -1941,7 +2015,10 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     LOOP AT query_axes INTO query_axis WHERE non_empty = abap_true.
       remove_empty_positions( EXPORTING position = query_axis-ordinal + 1 CHANGING result = result ).
     ENDLOOP.
+    finish( EXPORTING query_axes = query_axes CHANGING result = result ).
+  ENDMETHOD.
 
+  METHOD finish.
     LOOP AT result-axes ASSIGNING FIELD-SYMBOL(<axis>).
       set_display_info( CHANGING tuples = <axis>-tuples ).
     ENDLOOP.
@@ -1950,6 +2027,18 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
 
     LOOP AT result-axes ASSIGNING <axis>.
       axis_properties( EXPORTING query_axis = query_axes[ sy-tabix ] CHANGING axis = <axis> ).
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD cells_of.
+    IF result-cell_refs IS INITIAL.
+      cells = result-cells.
+      RETURN.
+    ENDIF.
+    LOOP AT result-cell_refs INTO DATA(ref).
+      DATA(cell) = result-cell_values[ ref ].
+      cell-ordinal = sy-tabix - 1.
+      APPEND cell TO cells.
     ENDLOOP.
   ENDMETHOD.
 
@@ -3790,6 +3879,270 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       ENDIF.
       result = result && paths[ position ].
     ENDLOOP.
+  ENDMETHOD.
+
+  METHOD grid_axes.
+    IF query-formulas IS NOT INITIAL OR lines( slicer ) > 1 OR query_axes IS INITIAL
+        OR lines( query_axes ) > zzxxmla1_cl_mdx_facts=>c_max_grid_axes.
+      RETURN.
+    ENDIF.
+    DATA(context) = evaluator->get_members( ).
+    IF line_exists( context[ calculated = abap_true ] ) OR line_exists( context[ is_null = abap_true ] )
+        OR context[ zzxxmla1_if_mdx_schema_reader=>c_measures + 1 ]-measure_index = 0.
+      RETURN.
+    ENDIF.
+    DATA(axes) = VALUE ty_t_grid_axis( ).
+    LOOP AT query_axes INTO DATA(query_axis).
+      DATA(axis) = grid_axis( query_axis-expression ).
+      IF query_axis-non_empty = abap_false OR axis IS INITIAL
+          OR axis-grid-level > zzxxmla1_cl_mdx_facts=>c_max_grid_levels
+          OR line_exists( axes[ grid-hierarchy = axis-grid-hierarchy ] ).
+        RETURN.
+      ENDIF.
+      APPEND axis TO axes.
+    ENDLOOP.
+    result = axes.
+  ENDMETHOD.
+
+  METHOD grid_axis.
+    IF node->kind <> zzxxmla1_cl_mdx_node=>c_kind-resolved_call.
+      RETURN.
+    ENDIF.
+    IF node->fun_def-implementation = `SetFunDef`.
+      IF lines( node->args ) = 1.
+        result = grid_axis( node->args[ 1 ] ).
+      ENDIF.
+      RETURN.
+    ENDIF.
+    IF node->args IS INITIAL.
+      RETURN.
+    ENDIF.
+    DATA(arg) = node->args[ 1 ].
+    CASE key_of( node ).
+      WHEN `HIERARCHIZE|Function|8`.
+        result = grid_axis( arg ).
+      WHEN `MEMBERS|Property|4`.
+        IF arg->kind = zzxxmla1_cl_mdx_node=>c_kind-level.
+          DATA(level) = schema_reader->get_level( arg->element-id ).
+          IF level-key_level > 0 AND level-hierarchy <> zzxxmla1_cl_mdx_schema_reader=>c_measures.
+            result = VALUE #( grid  = VALUE #( hierarchy = level-hierarchy level = level-key_level )
+                              level = level-id ).
+          ENDIF.
+        ENDIF.
+      WHEN `CHILDREN|Property|6`.
+        IF arg->kind = zzxxmla1_cl_mdx_node=>c_kind-member.
+          result = grid_first_level( member = arg->element-member has_all = abap_false ).
+        ENDIF.
+      WHEN `DRILLDOWNLEVEL|Function|8` OR `DRILLDOWNLEVEL|Function|8,17,17,11`.
+        " {the All member}; INCLUDE_CALC_MEMBERS adds none if the hierarchy has no calculated member
+        IF arg->kind = zzxxmla1_cl_mdx_node=>c_kind-resolved_call AND arg->fun_def-implementation = `SetFunDef`
+            AND lines( arg->args ) = 1 AND arg->args[ 1 ]->kind = zzxxmla1_cl_mdx_node=>c_kind-member.
+          DATA(all) = arg->args[ 1 ]->element-member.
+          IF lines( node->args ) = 1
+              OR ( to_upper( node->args[ 4 ]->value ) = `INCLUDE_CALC_MEMBERS`
+                   AND query_calculated_members( all-hier_id ) IS INITIAL ).
+            result = grid_first_level( member = all has_all = abap_true ).
+          ENDIF.
+        ENDIF.
+    ENDCASE.
+  ENDMETHOD.
+
+  METHOD grid_first_level.
+    IF member-key_level <> 0 OR member-calculated = abap_true OR member-is_null = abap_true
+        OR member-hier_id = zzxxmla1_cl_mdx_schema_reader=>c_measures.
+      RETURN.
+    ENDIF.
+    DATA(hierarchy) = schema_reader->get_hierarchy( member-hier_id ).
+    IF hierarchy-has_all = abap_false OR lines( hierarchy-levels ) < 2.
+      RETURN.
+    ENDIF.
+    DATA(level) = schema_reader->get_level( hierarchy-levels[ 2 ] ).
+    result = VALUE #( grid  = VALUE #( hierarchy = hierarchy-id level = level-key_level has_all = has_all )
+                      level = level-id ).
+  ENDMETHOD.
+
+  METHOD cells_first.
+    TYPES:
+      BEGIN OF ty_position,
+        path     TYPE string,
+        position TYPE i,
+      END OF ty_position,
+      ty_t_position TYPE HASHED TABLE OF ty_position WITH UNIQUE KEY path,
+      "! an amount of the measure as the row has it and its cell among cell_values
+      BEGIN OF ty_written,
+        amount TYPE string,
+        index  TYPE i,
+      END OF ty_written,
+      "! a grouping set by its GROUPING_ID (from 1): per axis grouped (1) or its All member (0); -1 no set
+      BEGIN OF ty_set_flags,
+        axis1 TYPE i,
+        axis2 TYPE i,
+      END OF ty_set_flags,
+      ty_t_set_flags TYPE STANDARD TABLE OF ty_set_flags WITH EMPTY KEY.
+    DATA written TYPE HASHED TABLE OF ty_written WITH UNIQUE KEY amount.
+    DATA positions1 TYPE ty_t_position.
+    DATA positions2 TYPE ty_t_position.
+    DATA paths1 TYPE ty_path_set.
+    DATA paths2 TYPE ty_path_set.
+    DATA path TYPE string.
+    DATA position TYPE i.
+    DATA ordinal TYPE i.
+
+    set_phase( `Cells first` ).
+    " the context's members of the other hierarchies that are not All (the slicer's, Time's 1997) restrict the facts
+    DATA(context) = evaluator->get_members( ).
+    DATA(filters) = VALUE zzxxmla1_cl_mdx_facts=>ty_t_filter( ).
+    LOOP AT context INTO DATA(member) WHERE hier_id > 0 AND key_level > 0.
+      IF NOT line_exists( axes[ grid-hierarchy = member-hier_id ] ).
+        APPEND VALUE #( hierarchy = member-hier_id level = member-key_level path = member-path ) TO filters.
+      ENDIF.
+    ENDLOOP.
+    DATA(measure) = context[ zzxxmla1_if_mdx_schema_reader=>c_measures + 1 ]-measure_index.
+    DATA(grid) = fact_reader->grid( axes = VALUE #( FOR a IN axes ( a-grid ) ) filters = filters measure = measure ).
+
+    " the sets by GROUPING_ID; per axis the set its paths are taken from: grouped by it and by the fewest other axes
+    " (every set that groups by it has the same paths)
+    DATA(axis_count) = lines( axes ).
+    DATA(levels1) = axes[ 1 ]-grid-level.
+    DATA(levels2) = COND i( WHEN axis_count = 2 THEN axes[ 2 ]-grid-level ).
+    DATA(max_id) = CONV int8( 0 ).
+    LOOP AT grid-sets INTO DATA(set).
+      max_id = nmax( val1 = max_id val2 = set-id ).
+    ENDLOOP.
+    DATA(set_flags) = VALUE ty_t_set_flags( FOR s = 0 WHILE s <= max_id ( axis1 = -1 axis2 = -1 ) ).
+    DATA(paths_id1) = CONV int8( -1 ).
+    DATA(paths_id2) = CONV int8( -1 ).
+    LOOP AT grid-sets INTO set.
+      ASSIGN set_flags[ set-id + 1 ] TO FIELD-SYMBOL(<flags>).
+      <flags>-axis1 = set-grouped[ 1 ].
+      <flags>-axis2 = COND #( WHEN axis_count = 2 THEN set-grouped[ 2 ] ).
+      " the set grouped by one axis only, else the finest
+      IF <flags>-axis1 = 1 AND ( paths_id1 < 0 OR <flags>-axis2 = 0 ).
+        paths_id1 = set-id.
+      ENDIF.
+      IF <flags>-axis2 = 1 AND ( paths_id2 < 0 OR <flags>-axis1 = 0 ).
+        paths_id2 = set-id.
+      ENDIF.
+    ENDLOOP.
+    " the axes' paths with facts (a group of count 0: the total of no fact)
+    LOOP AT grid-rows ASSIGNING FIELD-SYMBOL(<row>) WHERE count > 0.
+      IF <row>-id = paths_id1.
+        INSERT COND string( WHEN levels1 = 1 THEN <row>-a1k1 ELSE grid_path( row = <row> axis = 1 levels = levels1 ) )
+               INTO TABLE paths1.
+      ENDIF.
+      IF <row>-id = paths_id2.
+        INSERT COND string( WHEN levels2 = 1 THEN <row>-a2k1 ELSE grid_path( row = <row> axis = 2 levels = levels2 ) )
+               INTO TABLE paths2.
+      ENDIF.
+    ENDLOOP.
+
+    " the axes: the members of the paths in hierarchy order, the All member first; a position per path
+    DATA(count) = 1.
+    DATA(all1) = 0.
+    DATA(all2) = 0.
+    DATA(stride2) = 0.
+    LOOP AT axes INTO DATA(axis).
+      DATA(axis_index) = sy-tabix.
+      DATA(paths) = COND string_table( WHEN axis_index = 1 THEN VALUE #( FOR p1 IN paths1 ( p1 ) )
+                                       ELSE VALUE #( FOR p2 IN paths2 ( p2 ) ) ).
+      DATA(tuples) = VALUE ty_t_tuple( FOR m IN schema_reader->get_members_by_paths( level = axis-level paths = paths )
+                                       ( VALUE #( ( m ) ) ) ).
+      IF axis-grid-has_all = abap_true AND tuples IS NOT INITIAL.
+        INSERT VALUE #( ( schema_reader->get_all_member( axis-grid-hierarchy ) ) ) INTO tuples INDEX 1.
+      ENDIF.
+      tuples = hierarchize( tuples ).
+      DATA(positions) = VALUE ty_t_position( ).
+      DATA(all) = 0.
+      LOOP AT tuples INTO DATA(tuple).
+        IF tuple[ 1 ]-key_level = 0.
+          all = sy-tabix.
+        ELSE.
+          INSERT VALUE #( path = tuple[ 1 ]-path position = sy-tabix ) INTO TABLE positions.
+        ENDIF.
+      ENDLOOP.
+      IF axis_index = 1.
+        positions1 = positions.
+        all1 = all.
+      ELSE.
+        positions2 = positions.
+        all2 = all.
+        stride2 = count.
+      ENDIF.
+      count = count * lines( tuples ).
+      APPEND VALUE #( name = |Axis{ query_axes[ axis_index ]-ordinal }| tuples = tuples
+                      hierarchies = type_hierarchies( query_axes[ axis_index ]-expression->get_type( ) ) )
+             TO result-axes.
+    ENDLOOP.
+    IF count = 0.
+      RETURN.
+    ENDIF.
+
+    " every cell empty, with the format string of the measure; each group's cell at the positions of its keys
+    DATA(format) = schema_reader->measures[ measure ]-format.
+    DATA(format_string) = COND #( WHEN want_format_string = abap_true THEN format ).
+    result-cell_values = VALUE #( ( empty = abap_true format_string = format_string ) ).
+    DO count TIMES.
+      APPEND 1 TO result-cell_refs.
+    ENDDO.
+    LOOP AT grid-rows ASSIGNING <row> WHERE count > 0.
+      ASSIGN set_flags[ <row>-id + 1 ] TO <flags>.
+      " the position on each axis; a key without member is left out (BW has master data for every fact)
+      IF <flags>-axis1 = 0.
+        ordinal = all1 - 1.
+      ELSE.
+        IF levels1 = 1.
+          READ TABLE positions1 ASSIGNING FIELD-SYMBOL(<position>) WITH TABLE KEY path = <row>-a1k1.
+        ELSE.
+          path = grid_path( row = <row> axis = 1 levels = levels1 ).
+          READ TABLE positions1 ASSIGNING <position> WITH TABLE KEY path = path.
+        ENDIF.
+        IF sy-subrc <> 0.
+          CONTINUE.
+        ENDIF.
+        ordinal = <position>-position - 1.
+      ENDIF.
+      IF axis_count = 2.
+        IF <flags>-axis2 = 0.
+          position = all2.
+        ELSE.
+          IF levels2 = 1.
+            READ TABLE positions2 ASSIGNING <position> WITH TABLE KEY path = <row>-a2k1.
+          ELSE.
+            path = grid_path( row = <row> axis = 2 levels = levels2 ).
+            READ TABLE positions2 ASSIGNING <position> WITH TABLE KEY path = path.
+          ENDIF.
+          IF sy-subrc <> 0.
+            CONTINUE.
+          ENDIF.
+          position = <position>-position.
+        ENDIF.
+        ordinal = ordinal + ( position - 1 ) * stride2.
+      ENDIF.
+      " evaluate_current's value of the cell, written as compute_cell writes it, once per amount
+      READ TABLE written ASSIGNING FIELD-SYMBOL(<written>) WITH TABLE KEY amount = <row>-amount.
+      IF sy-subrc <> 0.
+        DATA(amount) = COND decfloat34( WHEN <row>-amount IS INITIAL THEN 0 ELSE <row>-amount ).
+        DATA(number) = VALUE zzxxmla1_if_mdx_evaluator=>ty_value( kind   = zzxxmla1_cl_mdx_evaluator=>c_value-numeric
+                                                                  number = amount ).
+        APPEND VALUE #( value_type    = `xsd:double`
+                        value         = zzxxmla1_cl_mdx_format=>xmla_double( number-number )
+                        formatted     = COND #( WHEN want_formatted = abap_true
+                                                THEN zzxxmla1_cl_mdx_format=>format_number(
+                                                       value = number-number format_string = format ) )
+                        format_string = format_string ) TO result-cell_values.
+        INSERT VALUE #( amount = <row>-amount index = lines( result-cell_values ) )
+               INTO TABLE written ASSIGNING <written>.
+      ENDIF.
+      result-cell_refs[ ordinal + 1 ] = <written>-index.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD grid_path.
+    DATA(keys) = COND string_table( WHEN axis = 1 THEN VALUE #( ( row-a1k1 ) ( row-a1k2 ) ( row-a1k3 ) )
+                                    ELSE VALUE #( ( row-a2k1 ) ( row-a2k2 ) ( row-a2k3 ) ) ).
+    DO levels TIMES.
+      result = COND #( WHEN sy-index = 1 THEN keys[ 1 ] ELSE result && zzxxmla1_cl_model=>c_separator && keys[ sy-index ] ).
+    ENDDO.
   ENDMETHOD.
 
   METHOD axis_filter_needed.

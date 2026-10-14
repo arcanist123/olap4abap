@@ -50,6 +50,13 @@ CLASS zzxxmla1_cl_sql DEFINITION
       IMPORTING !sql          TYPE string
                 !columns      TYPE i
       RETURNING VALUE(result) TYPE ty_t_row.
+    "! Fetches the rows of a query into a standard table of a structure with a component per column, in their order
+    "! (ADBC converts each value to its component's type): a reader of many rows (a grid's statement has some hundred
+    "! thousand) reads them typed, not copied into a table per row as query gives them. A database error raises
+    "! ZZXXMLA1_CX_SQL (unchecked).
+    CLASS-METHODS fetch
+      IMPORTING !sql  TYPE string
+                !rows TYPE REF TO data.
     "! Sets statement_count and statement_time to 0, empties statement_log and clears log_phase and log_node.
     CLASS-METHODS reset_statistics.
     "! An identifier as a quoted SQL identifier, e.g. "/BIC/FZFMSALES".
@@ -90,9 +97,23 @@ CLASS zzxxmla1_cl_sql IMPLEMENTATION.
     DATA(table_type) = cl_abap_tabledescr=>create( cl_abap_structdescr=>create( components ) ).
     DATA rows TYPE REF TO data.
     CREATE DATA rows TYPE HANDLE table_type.
+    fetch( sql = sql rows = rows ).
     FIELD-SYMBOLS <rows> TYPE STANDARD TABLE.
     ASSIGN rows->* TO <rows>.
+    " each row's values appended to its line of the result in place, not to a table of its own copied there
+    LOOP AT <rows> ASSIGNING FIELD-SYMBOL(<row>).
+      APPEND INITIAL LINE TO result ASSIGNING FIELD-SYMBOL(<values>).
+      DO columns TIMES.
+        ASSIGN COMPONENT sy-index OF STRUCTURE <row> TO FIELD-SYMBOL(<value>).
+        APPEND <value> TO <values>.
+      ENDDO.
+    ENDLOOP.
+    FREE <rows>.
+  ENDMETHOD.
 
+  METHOD fetch.
+    FIELD-SYMBOLS <rows> TYPE STANDARD TABLE.
+    ASSIGN rows->* TO <rows>.
     GET RUN TIME FIELD DATA(started).
     TRY.
         DATA(statement) = NEW cl_sql_statement( ).
@@ -119,16 +140,6 @@ CLASS zzxxmla1_cl_sql IMPLEMENTATION.
       APPEND VALUE #( sql = sql rows = lines( <rows> ) time = stopped - started phase = log_phase node = log_node )
              TO statement_log.
     ENDIF.
-
-    " each row's values appended to its line of the result in place, not to a table of its own copied there
-    LOOP AT <rows> ASSIGNING FIELD-SYMBOL(<row>).
-      APPEND INITIAL LINE TO result ASSIGNING FIELD-SYMBOL(<values>).
-      DO columns TIMES.
-        ASSIGN COMPONENT sy-index OF STRUCTURE <row> TO FIELD-SYMBOL(<value>).
-        APPEND <value> TO <values>.
-      ENDDO.
-    ENDLOOP.
-    FREE <rows>.
   ENDMETHOD.
 
   METHOD reset_statistics.

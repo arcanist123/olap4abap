@@ -80,6 +80,13 @@ CLASS zzxxmla1_cl_xmla_mddataset DEFINITION
                 codes         TYPE ty_t_code
                 excel         TYPE abap_bool
       RETURNING VALUE(result) TYPE string.
+    "! The elements inside a cell's Cell element; any: it has one (a cell without is left out, but the first).
+    CLASS-METHODS cell_elements
+      IMPORTING cell     TYPE zzxxmla1_cl_mdx_engine=>ty_cell
+                codes    TYPE ty_t_code
+                excel    TYPE abap_bool
+      EXPORTING elements TYPE string
+                any      TYPE abap_bool.
     CLASS-METHODS axis_info
       IMPORTING name             TYPE string
                 tuples           TYPE zzxxmla1_cl_mdx_engine=>ty_t_tuple
@@ -137,6 +144,34 @@ CLASS zzxxmla1_cl_xmla_mddataset IMPLEMENTATION.
       ENDIF.
       has_cells = abap_true.
       APPEND cell_xml( cell = <cell> codes = codes excel = excel ) TO cell_lines.
+      IF lines( cell_lines ) = c_cells_per_part.
+        APPEND utf8( concat_lines_of( cell_lines ) ) TO cell_parts.
+        CLEAR cell_lines.
+      ENDIF.
+    ENDLOOP.
+    " cells first (cell_values and cell_refs): the elements of each distinct cell written once, and whether a cell
+    " with it is left out
+    DATA(bodies) = VALUE string_table( ).
+    DATA skipped TYPE STANDARD TABLE OF abap_bool WITH EMPTY KEY.
+    LOOP AT result-cell_values ASSIGNING <cell>.
+      cell_elements( EXPORTING cell = <cell> codes = codes excel = excel
+                     IMPORTING elements = DATA(elements) any = DATA(any) ).
+      APPEND elements TO bodies.
+      APPEND xsdbool( any = abap_false OR ( result-omit_empty_cells = abap_true AND <cell>-empty = abap_true ) )
+             TO skipped.
+    ENDLOOP.
+    LOOP AT result-cell_refs INTO DATA(ref).
+      DATA(ordinal) = sy-tabix - 1.
+      IF ordinal <> 0 AND skipped[ ref ] = abap_true.
+        CONTINUE.
+      ENDIF.
+      has_cells = abap_true.
+      ASSIGN bodies[ ref ] TO FIELD-SYMBOL(<body>).
+      IF <body> IS INITIAL.
+        APPEND |        <Cell CellOrdinal="{ ordinal }"/>\n| TO cell_lines.
+      ELSE.
+        APPEND |        <Cell CellOrdinal="{ ordinal }">\n{ <body> }        </Cell>\n| TO cell_lines.
+      ENDIF.
       IF lines( cell_lines ) = c_cells_per_part.
         APPEND utf8( concat_lines_of( cell_lines ) ) TO cell_parts.
         CLEAR cell_lines.
@@ -354,12 +389,23 @@ CLASS zzxxmla1_cl_xmla_mddataset IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD cell_xml.
+    cell_elements( EXPORTING cell = cell codes = codes excel = excel IMPORTING elements = DATA(elements) any = DATA(any) ).
+    IF any = abap_false AND cell-ordinal <> 0.
+      RETURN.
+    ENDIF.
+    IF elements IS INITIAL.
+      result = |        <Cell CellOrdinal="{ cell-ordinal }"/>\n|.
+    ELSE.
+      result = |        <Cell CellOrdinal="{ cell-ordinal }">\n{ elements }        </Cell>\n|.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD cell_elements.
     " the values of the asked properties that the cell has: no Value for an empty cell, an empty FmtValue, the format
     " string, font flags 0; LANGUAGE, BACK_COLOR and FORE_COLOR have none. A cell with none of them is left out, except
     " the first. An unknown cell property is left out (the reference's writer fails on one).
     " one string template per element: a grid writes some hundred thousand cells, and each piece appended is a copy
-    DATA(elements) = VALUE string( ).
-    DATA(any) = abap_false.
+    CLEAR: elements, any.
     LOOP AT codes INTO DATA(code).
       CASE code.
         WHEN 1.
@@ -393,14 +439,6 @@ CLASS zzxxmla1_cl_xmla_mddataset IMPLEMENTATION.
           any = abap_true.
       ENDCASE.
     ENDLOOP.
-    IF any = abap_false AND cell-ordinal <> 0.
-      RETURN.
-    ENDIF.
-    IF elements IS INITIAL.
-      result = |        <Cell CellOrdinal="{ cell-ordinal }"/>\n|.
-    ELSE.
-      result = |        <Cell CellOrdinal="{ cell-ordinal }">\n{ elements }        </Cell>\n|.
-    ENDIF.
   ENDMETHOD.
 
   METHOD axis_xml.

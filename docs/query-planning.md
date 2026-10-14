@@ -312,6 +312,42 @@ and the transfer):
 The runtime now includes the conversion to UTF-8, which `set_cdata` did after it before. Part 2 is the cells-first
 path itself: rows to positions and ordinals, without the group cache and the cell table.
 
+Done (part 2, 2026-10-14): `ZZXXMLA1_CL_MDX_ENGINE=>cells_first`, after the slicer, instead of the axes, NON EMPTY
+and cells phases (phase `Cells first` in the trace and the console's query plan).
+- **When** (`grid_axes`): the plan is relational, no hierarchy without All member is evaluated per root member, the
+  query has no formula, at most two axes (`ZZXXMLA1_CL_MDX_FACTS=>c_max_grid_axes`), each NON EMPTY and, also inside
+  `Hierarchize` or braces, `DrilldownLevel({the All member})` (Excel's form with `INCLUDE_CALC_MEMBERS` where the
+  hierarchy has no calculated member), `Level.Members` or the All member's `Children`, of a level of at most three
+  key columns (`c_max_grid_levels`); the context (slicer of one tuple, default members) has no calculated or null
+  member and a stored measure. Any other query runs as before; crossjoins, `Descendants`, filters and ranks on an
+  axis are later steps.
+- **The statement** (`ZZXXMLA1_CL_MDX_FACTS=>grid`): the facts grouped by the axes' levels, `GROUPING SETS` with
+  each axis' All member aggregated (one plain `GROUP BY` without All members), the measure of the context (or
+  `COUNT( * )`) and the fact count; the context's non-All members of the other hierarchies (Time's 1997, the slicer)
+  as `WHERE`, and the subcube. Fetched typed (`ZZXXMLA1_CL_SQL=>fetch`, the new reader of a typed table): the
+  `GROUPING_ID` as `int8`, three key columns per axis, the amount as text. Not the group cache: nothing else reads it.
+- **The axes**: per axis the distinct paths of the grouping set that groups by it alone (else the finest), read as
+  members with `get_members_by_paths`, the All member first, `hierarchize`d: the engine's member order, as decided.
+  NON EMPTY keeps every position then (each has a group with facts), so no axis is filtered.
+- **The cells**: `ty_result` has `cell_values` (the distinct cells, the first the empty one with the measure's format
+  string) and `cell_refs` (per ordinal its cell's index), instead of `cells`; `cells_of` gives them as cells (the unit
+  tests). Each row's ordinal from its axes' positions (a hashed read per axis, the All member's position where its
+  set aggregates the axis), its value written and formatted once per distinct amount text. The writer writes each
+  distinct cell's elements once and then one template per ordinal.
+- **Measured** (`planning_measure.py`, best of 3; trace runtime, client wall time):
+
+| statement   | before (part 1)        | after                 |
+| ----------- | ---------------------- | --------------------- |
+| filter list | 200 ms, 221 ms         | 202 ms, 240 ms (one fact statement as before) |
+| grid        | 12,569 ms, 14,759 ms   | 3,524 ms, 5,646 ms    |
+
+  In a classrun (`sapcli abap run`, `GET RUN TIME` marks): the grid statement 0.84 s with the typed fetch (0.72 s
+  in HANA), the rows to cells 1.06 s (three hashed reads per row, about 0.35 µs each: two positions and the
+  written amount), the axes 0.1 s, the writer 1.1 to 1.3 s. The first version (a structure of string columns read with
+  `ASSIGN COMPONENT`, about 80 ns each, and each row's set kept in a table) took 1 s more in execute. Rejected: `DENSE_RANK( ) OVER ( ORDER BY ...)`
+  per axis in the statement for array positions (HANA 1.25 s instead of 0.72 s, more than the reads it saves), and
+  numeric keys as array indexes (150 ms against 221 ms for 633,830 hashed reads; not worth a special case).
+
 ## Semantics that must not change
 
 - Empty is "no group", not 0: a stored measure whose group sums to 0 is a cell with 0, written, and `NON EMPTY` keeps
@@ -354,9 +390,9 @@ path itself: rows to positions and ordinals, without the group cache and the cel
    (`next-steps.md`, query planning step 2). See All-relational queries (step 2) below.
 3. Done (2026-10-14): `non_empty_axis`' evaluator loop retired for relational plans, the axes' reads feed the cells;
    measured. See One read per group (step 3) above.
-4. Cells first: a query whose NON EMPTY axes depend on the facts only is one fact statement, its axes built from the
-   result and its cells written from the rows, without the axis reads, the group cache, the cell table. Target for
-   the 1,001 x 1,001 grid: about 3 s (13.8 s). See Cells first (step 4) above.
+4. Done (2026-10-14) for two axes of a level each: a query whose NON EMPTY axes depend on the facts only is one fact
+   statement, its axes built from the result and its cells written from the rows, without the axis reads, the group
+   cache, the cell table. The 1,001 x 1,001 grid 3.5 s (13.8 s). See Cells first (step 4) above.
 5. Mixed queries: the relational inputs of computed nodes read as one batch before the first pass.
 6. More set nodes relational: `Filter` on a stored measure (`RolapNativeFilter`), `NonEmpty` with a second set.
 
@@ -389,7 +425,10 @@ plain `GROUP BY`. Not to be revisited before a real provider shows it matters.
 ## Open
 
 - Mixed plans and the batching passes: how much of `phase` remains once the relational inputs are read first.
-- The grid's ABAP (groups to values, placement, writing the answer) is now its cost, not SQL: step 4. A cell's value is
+- Cells first beyond a level per axis: crossjoins of levels (Excel's rows of two characteristics), `Descendants`, a
+  NON EMPTY axis of a non-All member's children, and an axis without NON EMPTY (its members without facts from the
+  dimension). The grid's remaining 3.5 s: the statement 0.8 s, rows to cells 1.1 s, the writer 1.2 s.
+- (Before step 4) The grid's ABAP (groups to values, placement, writing the answer) is now its cost, not SQL: step 4. A cell's value is
   formatted only when the query asks for `FORMATTED_VALUE` (`want_formatted`; Excel's grid asks for `VALUE,
   FORMAT_STRING, LANGUAGE, BACK_COLOR, FORE_COLOR, FONT_FLAGS`): 17 to 16.7 s. Fewer copies per group and the answer
   joined once (229d1cf): 15.7 s, 13.8 s in the console's trace.

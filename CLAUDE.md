@@ -250,7 +250,12 @@ Read before designing anything:
   the context, the slicer or the axes is calculated or null, the cells are not evaluated one by one either
   (`fast_cells`, our shortcut, same answer): per combination of the axes' level patterns one grouped fact query
   (`ZZXXMLA1_CL_MDX_FACTS=>cross_values`), each group put at the positions of its tuples, every other cell empty
-  (Excel's 1,001 x 1,001 grid on `ZXMLWIDEA`: 17 s since query planning step 3). A cube annotated `olap4abap.omitEmptyCells` (`true`, our
+  (Excel's 1,001 x 1,001 grid on `ZXMLWIDEA`: 17 s since query planning step 3). A relational query whose NON EMPTY
+  axes (at most two) are each a level's members with facts (`DrilldownLevel` of the All member, `Level.Members`, the
+  All member's `Children`) is cells first (query planning step 4, `cells_first`, our shortcut, same answer): one
+  grouped fact statement (`ZZXXMLA1_CL_MDX_FACTS=>grid`, `GROUPING SETS` for the All members) gives the axes (its
+  keys, read as members and hierarchized) and the cells (`cell_values` and `cell_refs` of the result, each distinct
+  cell written once; the grid 3.5 s). A cube annotated `olap4abap.omitEmptyCells` (`true`, our
   extension, `docs/mvp-scope.md`, Empty cells decision) leaves its empty cells but the first out of the answer.
   Subselects (`FROM (SELECT ... FROM ...)`, Excel's pivot filters) are eMondrian's subcube: the axes of every inner
   SELECT become a predicate that every fact read adds (`Query.getSubcubePredicates`, `ZZXXMLA1_CL_MDX_FACTS=>set_subcube`),

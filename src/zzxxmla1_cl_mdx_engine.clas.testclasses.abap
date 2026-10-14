@@ -86,7 +86,8 @@ CLASS ltc_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD values.
-    values = VALUE #( FOR cell IN result-cells ( COND #( WHEN cell-empty = abap_true THEN `null` ELSE cell-value ) ) ).
+    values = VALUE #( FOR cell IN zzxxmla1_cl_mdx_engine=>cells_of( result )
+                      ( COND #( WHEN cell-empty = abap_true THEN `null` ELSE cell-value ) ) ).
   ENDMETHOD.
 
   METHOD order_hierarchical.
@@ -305,13 +306,39 @@ CLASS ltc_engine IMPLEMENTATION.
      && `WHERE {[Time].[1997].[Q1], [Time].[1997].[Q1].[1]}` )
       " Time on the other axis outside its default member 1997: NonEmpty filters the rows still
       ( `SELECT {[Time].[1998]} ON COLUMNS, NON EMPTY [Store].[Store Country].Members ON ROWS FROM [ZFMSALES]` )
-      ( `SELECT [Time].[1997].Children ON COLUMNS, NON EMPTY [Store].[Store State].Members ON ROWS FROM [ZFMSALES]` ) ).
+      ( `SELECT [Time].[1997].Children ON COLUMNS, NON EMPTY [Store].[Store State].Members ON ROWS FROM [ZFMSALES]` )
+      " cells first: Excel's grid of two hierarchies with their All members, levels of two keys (Time's quarters), the
+      " fact count, Children with a slicer
+      ( `SELECT NON EMPTY Hierarchize({DrilldownLevel({[Product].[All Products]},,,INCLUDE_CALC_MEMBERS)}) `
+     && `DIMENSION PROPERTIES PARENT_UNIQUE_NAME ON COLUMNS, NON EMPTY Hierarchize({DrilldownLevel({[Store].[All `
+     && `Stores]},,,INCLUDE_CALC_MEMBERS)}) DIMENSION PROPERTIES PARENT_UNIQUE_NAME ON ROWS FROM [ZFMSALES] `
+     && `WHERE ([Measures].[Store Cost]) CELL PROPERTIES VALUE, FORMAT_STRING, LANGUAGE, BACK_COLOR, FORE_COLOR, `
+     && `FONT_FLAGS` )
+      ( `SELECT NON EMPTY [Customers].[State Province].Members ON COLUMNS, NON EMPTY [Time].[Quarter].Members ON ROWS `
+     && `FROM [ZFMSALES] WHERE [Measures].[Fact Count]` )
+      ( `SELECT NON EMPTY [Product].[All Products].Children ON COLUMNS FROM [ZFMSALES] `
+     && `WHERE ([Store].[USA].[CA], [Time].[1997].[Q1])` ) ).
     LOOP AT statements INTO DATA(statement).
       zzxxmla1_cl_mdx_engine=>planning = abap_true.
       DATA(planned) = execute( statement ).
+      " cells first gives the cells as their distinct ones
+      planned-cells = zzxxmla1_cl_mdx_engine=>cells_of( planned ).
+      CLEAR: planned-cell_values, planned-cell_refs.
       zzxxmla1_cl_mdx_engine=>planning = abap_false.
       cl_abap_unit_assert=>assert_equals( act = planned exp = execute( statement ) msg = statement ).
     ENDLOOP.
+    " the grid is one statement of the facts, its cells given as their distinct ones
+    zzxxmla1_cl_mdx_engine=>planning = abap_true.
+    zzxxmla1_cl_sql=>reset_statistics( ).
+    zzxxmla1_cl_sql=>log_statements = abap_true.
+    planned = execute( statements[ 7 ] ).
+    zzxxmla1_cl_sql=>log_statements = abap_false.
+    DATA(grid_reads) = 0.
+    LOOP AT zzxxmla1_cl_sql=>statement_log INTO DATA(grid_logged) WHERE sql CS `/BIC/FZFMSALES`.
+      grid_reads = grid_reads + 1.
+    ENDLOOP.
+    cl_abap_unit_assert=>assert_equals( act = grid_reads exp = 1 ).
+    cl_abap_unit_assert=>assert_not_initial( planned-cell_refs ).
     zzxxmla1_cl_mdx_engine=>planning = abap_true.
     " the filter list's answer, from one read of the facts: the countries with facts, with their sums in 1997 (Time's
     " default member) in the same statement; the cells are these groups and their sum

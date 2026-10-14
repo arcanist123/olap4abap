@@ -76,8 +76,13 @@ keeps the answers: both test suites give the same answers with planning on and o
    response (2.2 s to about 1 s for 633,830 cells; no simple transformation: the cell properties are dynamic and
    sapcli cannot sync one). Part 1 done (2026-10-14): the answer is UTF-8 parts from the writer to the response, the
    grid 13.4 to 12.2 s runtime (15.0 to 14.3 s wall); `xmla_test.py` 272 of 274, `compare-applicable.py` 394 of 395
-   (#64). Part 2: the cells-first path. Target: the 1,001 x 1,001 grid in about
-   3 s (15.7 s since 229d1cf). Filters and ranks later (they are most likely SQL too).
+   (#64). Part 2 done (2026-10-14): the cells-first path (`ZZXXMLA1_CL_MDX_ENGINE=>cells_first`,
+   `ZZXXMLA1_CL_MDX_FACTS=>grid`) for at most two NON EMPTY axes of a level's members with facts each (`DrilldownLevel`
+   of the All member, `Level.Members`, the All member's `Children`); the grid 12.6 to 3.5 s runtime (14.8 to 5.6 s
+   wall), the filter list one fact statement as before; `xmla_test.py` 272 of 274, `compare-applicable.py` 393 of 395
+   (#64; #46 differed once in the parallel run, the same alone and with its neighbours). Left over: crossjoins and
+   `Descendants` on an axis, NON EMPTY axes with a non-All member, filters and ranks (`query-planning.md`, Cells
+   first, Open).
 5. Mixed queries: the relational inputs of computed nodes read as one batch before the first pass.
 6. More set nodes relational: `Filter` on a stored measure (`RolapNativeFilter`), `NonEmpty` with a second set.
 

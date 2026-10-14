@@ -185,6 +185,53 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
       IMPORTING patterns      TYPE ty_t_cross_pattern
                 slicer        TYPE ty_t_predicate OPTIONAL
       RETURNING VALUE(result) TYPE ty_t_cross_groups.
+    TYPES:
+      "! An axis of a grid (cells first, docs/query-planning.md, step 4): the members of a level (from 1) of a
+      "! hierarchy, and its All member if it has one on the axis
+      BEGIN OF ty_grid_axis,
+        hierarchy TYPE i,
+        level     TYPE i,
+        has_all   TYPE abap_bool,
+      END OF ty_grid_axis,
+      ty_t_grid_axis TYPE STANDARD TABLE OF ty_grid_axis WITH EMPTY KEY,
+      "! A grouping set of a grid: its GROUPING_ID as the row has it, and per axis 1 if it is grouped by the axis'
+      "! level columns, 0 if it is aggregated over them (the axis' All member)
+      BEGIN OF ty_grid_set,
+        id      TYPE int8,
+        grouped TYPE ty_t_index,
+      END OF ty_grid_set,
+      ty_t_grid_set TYPE STANDARD TABLE OF ty_grid_set WITH EMPTY KEY,
+      "! A group of a grid as fetched: its GROUPING_ID, per axis the keys of its levels 1 to 3 (an axis' path; empty
+      "! where the axis has fewer levels, is aggregated or is not there), the measure's amount as text and the fact count
+      BEGIN OF ty_grid_row,
+        id     TYPE int8,
+        a1k1   TYPE string,
+        a1k2   TYPE string,
+        a1k3   TYPE string,
+        a2k1   TYPE string,
+        a2k2   TYPE string,
+        a2k3   TYPE string,
+        amount TYPE string,
+        count  TYPE int8,
+      END OF ty_grid_row,
+      ty_t_grid_row TYPE STANDARD TABLE OF ty_grid_row WITH EMPTY KEY,
+      BEGIN OF ty_grid,
+        rows TYPE ty_t_grid_row,
+        sets TYPE ty_t_grid_set,
+      END OF ty_grid.
+    "! a grid's most axes and most levels of an axis (the key components of ty_grid_row)
+    CONSTANTS c_max_grid_axes TYPE i VALUE 2.
+    CONSTANTS c_max_grid_levels TYPE i VALUE 3.
+    "! Cells first (docs/query-planning.md, step 4): the groups of the facts by the axes' levels and their All members
+    "! (GROUPING SETS, one GROUP BY if no axis has its All member) in one statement, of one measure (the fact count for
+    "! a measure of aggregator count), the facts restricted to the filters' members and the subcube, fetched typed
+    "! (ty_grid_row: at most c_max_grid_axes axes of c_max_grid_levels levels). Not cached: the caller makes the axes
+    "! and the cells from the rows.
+    METHODS grid
+      IMPORTING axes          TYPE ty_t_grid_axis
+                filters       TYPE ty_t_filter
+                measure       TYPE i
+      RETURNING VALUE(result) TYPE ty_grid.
     "! The native crossjoin's tuple reader (SqlTupleReader with a SqlContextConstraint): the combinations of members of
     "! the levels of the filters marked any that have facts with the other filters, as their paths. The facts are
     "! grouped as for value, so this is one query, or none if value has grouped them so already.
@@ -791,6 +838,95 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
         ENDLOOP.
       ENDLOOP.
     ENDLOOP.
+  ENDMETHOD.
+
+  METHOD grid.
+    " one join per hierarchy of an axis or a filter: the fact table with the dimension table on the foreign key
+    DATA joins TYPE SORTED TABLE OF i WITH UNIQUE KEY table_line.
+    LOOP AT axes INTO DATA(axis).
+      INSERT axis-hierarchy INTO TABLE joins.
+    ENDLOOP.
+    LOOP AT filters INTO DATA(filter).
+      INSERT filter-hierarchy INTO TABLE joins.
+    ENDLOOP.
+    DATA(source) = |{ zzxxmla1_cl_sql=>quote( cube-fact_table ) } f|.
+    LOOP AT joins INTO DATA(id).
+      DATA(hierarchy) = hierarchies[ id ].
+      source = source && | INNER JOIN { zzxxmla1_cl_sql=>quote( hierarchy-dim_table ) } d{ id }| &&
+               | ON d{ id }.{ zzxxmla1_cl_sql=>quote( hierarchy-key_column ) }| &&
+               | = f.{ zzxxmla1_cl_sql=>quote( hierarchy-fk_column ) }|.
+    ENDLOOP.
+
+    " the level columns of each axis, and the row's key components: c_max_grid_levels per axis, '' where unused
+    DATA(columns) = VALUE string_table( ).
+    DATA(axis_columns) = VALUE ty_t_paths( ).
+    DATA(keys_list) = VALUE string_table( ).
+    DO c_max_grid_axes TIMES.
+      DATA(slots) = VALUE string_table( FOR k = 1 WHILE k <= c_max_grid_levels ( `''` ) ).
+      IF sy-index <= lines( axes ).
+        axis = axes[ sy-index ].
+        APPEND INITIAL LINE TO axis_columns ASSIGNING FIELD-SYMBOL(<axis_columns>).
+        LOOP AT hierarchies[ axis-hierarchy ]-levels INTO DATA(level) TO axis-level.
+          APPEND |d{ axis-hierarchy }.{ zzxxmla1_cl_sql=>quote( level-key_column ) }| TO columns.
+          APPEND columns[ lines( columns ) ] TO <axis_columns>.
+          slots[ sy-tabix ] = columns[ lines( columns ) ].
+        ENDLOOP.
+      ENDIF.
+      APPEND LINES OF slots TO keys_list.
+    ENDDO.
+    " the grouping sets: each axis grouped by its level, or aggregated where it has its All member. GROUPING_ID has a
+    " bit per column, the first the highest, 1 where the column is aggregated
+    result-sets = VALUE #( ( grouped = VALUE #( FOR a IN axes ( 1 ) ) ) ).
+    LOOP AT axes INTO axis WHERE has_all = abap_true.
+      DATA(axis_index) = sy-tabix.
+      DATA(aggregated) = result-sets.
+      LOOP AT aggregated ASSIGNING FIELD-SYMBOL(<set>).
+        <set>-grouped[ axis_index ] = 0.
+      ENDLOOP.
+      APPEND LINES OF aggregated TO result-sets.
+    ENDLOOP.
+    DATA(grouping_sets) = VALUE string_table( ).
+    LOOP AT result-sets ASSIGNING <set>.
+      DATA(set_columns) = VALUE string_table( ).
+      LOOP AT axis_columns INTO DATA(one_axis).
+        axis_index = sy-tabix.
+        LOOP AT one_axis INTO DATA(column).
+          <set>-id = <set>-id * 2 + 1 - <set>-grouped[ axis_index ].
+          IF <set>-grouped[ axis_index ] = 1.
+            APPEND column TO set_columns.
+          ENDIF.
+        ENDLOOP.
+      ENDLOOP.
+      APPEND |( { concat_lines_of( table = set_columns sep = `, ` ) } )| TO grouping_sets.
+    ENDLOOP.
+
+    " the GROUPING_ID (a constant for one set), the level columns, the measure's amount and the fact count
+    DATA(single) = xsdbool( lines( result-sets ) = 1 ).
+    DATA(select_list) = VALUE string_table( ( COND #( WHEN single = abap_true THEN |{ result-sets[ 1 ]-id }|
+                                                      ELSE |GROUPING_ID( { concat_lines_of( table = columns
+                                                                                            sep   = `, ` ) } )| ) ) ).
+    APPEND LINES OF keys_list TO select_list.
+    DATA(stored) = measures[ measure ].
+    APPEND COND #( WHEN stored-aggregator = `count` THEN `COUNT( * )`
+                   ELSE |SUM( f.{ zzxxmla1_cl_sql=>quote( stored-fact_column ) } )| ) TO select_list.
+    APPEND `COUNT( * )` TO select_list.
+    " the filters' members: the key columns of their levels equal their paths' keys
+    DATA(conditions) = VALUE string_table( ).
+    LOOP AT filters INTO filter.
+      DATA(keys) = path_keys( path = filter-path level = filter-level ).
+      LOOP AT hierarchies[ filter-hierarchy ]-levels INTO level TO filter-level.
+        DATA(key_column) = |d{ filter-hierarchy }.{ zzxxmla1_cl_sql=>quote( level-key_column ) }|.
+        APPEND zzxxmla1_cl_sql=>key_condition( column = key_column key = keys[ sy-tabix ] ) TO conditions.
+      ENDLOOP.
+    ENDLOOP.
+    add_predicates( EXPORTING slicer = VALUE #( ) CHANGING source = source conditions = conditions ).
+    DATA(where) = COND string( WHEN conditions IS NOT INITIAL
+                               THEN | WHERE { concat_lines_of( table = conditions sep = ` AND ` ) }| ).
+    DATA(sql) = |SELECT { concat_lines_of( table = select_list sep = `, ` ) } FROM { source }{ where }| &&
+                COND string( WHEN single = abap_true
+                             THEN | GROUP BY { concat_lines_of( table = columns sep = `, ` ) }|
+                             ELSE | GROUP BY GROUPING SETS ( { concat_lines_of( table = grouping_sets sep = `, ` ) } )| ).
+    zzxxmla1_cl_sql=>fetch( sql = sql rows = REF #( result-rows ) ).
   ENDMETHOD.
 
   METHOD load_sets.
