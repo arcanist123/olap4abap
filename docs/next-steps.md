@@ -28,10 +28,29 @@ keeps the answers: both test suites give the same answers with planning on and o
    `compare-applicable.py`: 394 of 395 the same, #64 as known; 157 s with 3 workers, SAP 291 s in total, slowest #333
    41.9 s, #263 17.3 s, #264 15.5 s, the rest below 7.1 s.
 1. Done (2026-10-14): the marking, `ZZXXMLA1_CL_MDX_PLANNER` (static, relational, computed per node; the plan of
-   the axes, the slicer and the cells), 19 unit tests on `ZFMSALES`; not used by the engine yet. The rules are in
+   the axes, the slicer and the cells), 19 unit tests on `ZFMSALES`; used by the engine since step 2. The rules are in
    `query-planning.md`, The marking.
-2. All-relational queries: one grouped statement per combination of patterns (`GROUPING SETS` in
-   `ZZXXMLA1_CL_MDX_FACTS`) filters the non-empty axes and gives the cells; the switch; both suites on and off.
+2. Done (2026-10-14): all-relational queries. Decided with the user: `cross_values` of `ZZXXMLA1_CL_MDX_FACTS` is
+   extended (no parallel reader): it takes all the patterns of the axes' combinations and reads the ones no segment
+   covers with one `GROUP BY GROUPING SETS` statement (`load_sets`; `GROUPING_ID` tells the sets apart, the WHERE is
+   the OR of their constraints, a group outside its own set's constraint is dropped; one pattern, or more than 62
+   columns, as before). The planner runs in `execute` right after `resolve_query`; when the plan of the query is
+   relational (`ZZXXMLA1_CL_MDX_ENGINE=>planning`, the switch, on by default):
+   - the axes are evaluated as before, but a NON EMPTY axis is not filtered by `non_empty_axis`; its cells filter it
+     (`remove_empty_positions`). Kept where that would keep other positions (`axis_filter_needed`: a calculated
+     measure in the query, or a member of another axis outside its hierarchy's non-All default member, Time's 1997
+     with `[Time].[1998]` on the columns), and where the axes are evaluated once per root member of a hierarchy
+     without All member;
+   - `fast_cells` reads all combinations with one `cross_values` call, and a compound slicer of plain, disjoint
+     tuples (at most 200, the measure not varying) is a predicate of every read, its tuples ORed (`compound_predicate`,
+     the drill-through's `slicer_predicate`; read without the cache). Overlapping tuples (`{[Q1], [Q1].[1]}`) are
+     still rolled up by the evaluator.
+   Tests: unit tests `grouping_sets` and `slicer_predicate` (facts), `planning_on_and_off` (engine: six statements
+   the same with the switch on and off). With planning on and off (the switch deployed both ways):
+   `xmla_test.py` 272 of 274 (the two datasources cases), `compare-applicable.py` 394 of 395 (#64), SAP 271 s and
+   269 s in total. HANA's plan cache shows the `GROUPING SETS` statements, the filter list's as in
+   `query-planning.md`, and #218's compound slicer as one read with `CA OR OR`. Not changed: the evaluator's reads
+   while the axes are evaluated (`DrilldownLevel`'s context members, the native crossjoin, TopCount, Order).
 3. Retire `non_empty_axis`' evaluator loop and the repeated reads of the same groups; measure.
 4. Mixed queries: the relational inputs of computed nodes read as one batch before the first pass.
 5. More set nodes relational: `Filter` on a stored measure (`RolapNativeFilter`), `NonEmpty` with a second set.

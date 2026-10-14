@@ -25,7 +25,8 @@
 "! The plan of a query: the mark of each axis (a NON EMPTY one at least relational), of the slicer and of the cells
 "! (static: no cell property shows a value, no axis is NON EMPTY and no calculated member is in the context, as
 "! cells_needed of ZZXXMLA1_CL_MDX_ENGINE; relational: no calculated member in the context, as fast_cells; else
-"! computed). The marks are kept here by node; the tree is not changed. Not used by the engine yet.
+"! computed). The marks are kept here by node; the tree is not changed. ZZXXMLA1_CL_MDX_ENGINE answers a query whose
+"! plan is relational with one grouped read of its cells (its switch planning).
 CLASS zzxxmla1_cl_mdx_planner DEFINITION
   PUBLIC
   FINAL

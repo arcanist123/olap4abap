@@ -256,7 +256,11 @@ Read before designing anything:
   before parsing (`ZZXXMLA1_CL_XMLA_HANDLER=>unsupported_statement`); the reference gives a syntax error there.
   See `docs/test-strategy.md`, section Execute (MDX) cases.
   Query planning (`docs/query-planning.md`, in progress): `ZZXXMLA1_CL_MDX_PLANNER` marks every node of a resolved
-  query static, relational or computed and plans its axes, slicer and cells; not used by the engine yet.
+  query static, relational or computed and plans its axes, slicer and cells. The engine plans every query after
+  `resolve_query`; when the plan is relational (switch `ZZXXMLA1_CL_MDX_ENGINE=>planning`) its NON EMPTY axes are
+  filtered by their cells instead of `non_empty_axis`, and the cells of all combinations of patterns come from one
+  `GROUP BY GROUPING SETS` statement (`ZZXXMLA1_CL_MDX_FACTS=>cross_values`), a compound slicer of disjoint tuples
+  as an ORed predicate (`docs/next-steps.md`, query planning step 2).
 - Schema definition (step 1 of moving the model to Mondrian schema XML, see `docs/mvp-scope.md`, schema decision):
   `ZZXXMLA1_CL_SCHEMA_DEF` reads any Mondrian schema as `MondrianDef` does and writes it back as `toXML` does,
   generated from Mondrian's `MondrianDef.java` (`docs/environment.md`, Mondrian's schema definition). The reference

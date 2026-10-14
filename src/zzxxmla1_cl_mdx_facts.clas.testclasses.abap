@@ -23,6 +23,18 @@ CLASS ltc_facts DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
     METHODS without_batching FOR TESTING RAISING zzxxmla1_cx_xmla.
     METHODS top_count FOR TESTING RAISING zzxxmla1_cx_xmla.
     METHODS ordered_paths FOR TESTING RAISING zzxxmla1_cx_xmla.
+    METHODS grouping_sets FOR TESTING RAISING zzxxmla1_cx_xmla.
+    METHODS slicer_predicate FOR TESTING RAISING zzxxmla1_cx_xmla.
+    "! the filter of a state of the USA in Store
+    METHODS state
+      IMPORTING name          TYPE string
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_facts=>ty_t_filter
+      RAISING   zzxxmla1_cx_xmla.
+    "! the unit sales of the groups of a pattern of cross_values, by their paths
+    METHODS sales_of
+      IMPORTING values        TYPE zzxxmla1_cl_mdx_facts=>ty_t_cross_value
+                pattern       TYPE i
+      RETURNING VALUE(result) TYPE string_table.
     "! the filter of a product family
     METHODS family
       IMPORTING name          TYPE string
@@ -47,6 +59,74 @@ CLASS ltc_facts IMPLEMENTATION.
     DATA(member) = reader->lookup_compound( VALUE #( ( name = `Product` quoting = `QUOTED` )
                                                      ( name = name quoting = `QUOTED` ) ) )-member.
     result = VALUE #( ( hierarchy = member-hier_id level = member-key_level path = member-path ) ).
+  ENDMETHOD.
+
+  METHOD state.
+    DATA(member) = reader->lookup_compound( VALUE #( ( name = `Store` quoting = `QUOTED` )
+                                                     ( name = `USA` quoting = `QUOTED` )
+                                                     ( name = name quoting = `QUOTED` ) ) )-member.
+    result = VALUE #( ( hierarchy = member-hier_id level = member-key_level path = member-path ) ).
+  ENDMETHOD.
+
+  METHOD sales_of.
+    LOOP AT values INTO DATA(value) WHERE pattern = pattern.
+      APPEND |{ concat_lines_of( table = value-paths sep = `/` ) }={ value-amounts[ unit_sales ] }| TO result.
+    ENDLOOP.
+    SORT result.
+  ENDMETHOD.
+
+  METHOD grouping_sets.
+    " the families Drink and Food, the All member, and Drink's departments: one GROUPING SETS statement
+    DATA(drink) = family( `Drink` ).
+    DATA(food) = family( `Food` ).
+    DATA(patterns) = VALUE zzxxmla1_cl_mdx_facts=>ty_t_cross_pattern(
+      ( filters = VALUE #( ( hierarchy = drink[ 1 ]-hierarchy level = 1 ) )
+        paths   = VALUE #( ( VALUE #( ( drink[ 1 ]-path ) ( food[ 1 ]-path ) ) ) ) )
+      ( )
+      ( filters = VALUE #( ( hierarchy = drink[ 1 ]-hierarchy level = 2 ) )
+        paths   = VALUE #( ( VALUE #( ( |{ drink[ 1 ]-path }{ zzxxmla1_cl_model=>c_separator }Beverages| ) ) ) ) ) ).
+    DATA(grouped) = facts->cross_values( patterns ).
+    " the families asked for only: Non-Consumable is read for the All member's set but not kept for this one
+    cl_abap_unit_assert=>assert_equals( act = sales_of( values = grouped pattern = 1 )
+                                        exp = VALUE string_table( ( |{ drink[ 1 ]-path }=24597| )
+                                                                  ( |{ food[ 1 ]-path }=191940| ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = sales_of( values = grouped pattern = 2 )
+                                        exp = VALUE string_table( ( `=266773` ) ) ).
+    " each pattern read on its own gives the same groups
+    DO lines( patterns ) TIMES.
+      DATA(index) = sy-index.
+      DATA(single) = NEW zzxxmla1_cl_mdx_facts( cube = reader->cube hierarchies = reader->get_model_hierarchies( )
+                                                measures = reader->measures
+                    )->cross_values( VALUE #( ( patterns[ index ] ) ) ).
+      cl_abap_unit_assert=>assert_equals( act = sales_of( values = grouped pattern = index )
+                                          exp = sales_of( values = single pattern = 1 ) ).
+    ENDDO.
+    " read now, answered by the segments afterwards
+    cl_abap_unit_assert=>assert_equals( act = facts->cross_values( patterns ) exp = grouped ).
+  ENDMETHOD.
+
+  METHOD slicer_predicate.
+    " a compound slicer of two states: the families' sales in both, which their sums in each are
+    DATA(california) = state( `CA` ).
+    DATA(oregon) = state( `OR` ).
+    DATA(drink) = family( `Drink` ).
+    DATA(predicate) = VALUE zzxxmla1_cl_mdx_facts=>ty_t_predicate(
+      ( kind = zzxxmla1_cl_mdx_facts=>c_predicate-or children = VALUE #( ( 2 ) ( 3 ) ) )
+      ( kind = zzxxmla1_cl_mdx_facts=>c_predicate-member member = california[ 1 ] )
+      ( kind = zzxxmla1_cl_mdx_facts=>c_predicate-member member = oregon[ 1 ] ) ).
+    DATA(values) = facts->cross_values(
+      patterns = VALUE #( ( filters = VALUE #( ( hierarchy = drink[ 1 ]-hierarchy level = 1 ) )
+                            paths   = VALUE #( ( VALUE #( ( drink[ 1 ]-path ) ) ) ) ) )
+      slicer   = predicate ).
+    DATA(both) = facts->value( filters = VALUE #( ( drink[ 1 ] ) ( california[ 1 ] ) ) measure = unit_sales )-amount
+               + facts->value( filters = VALUE #( ( drink[ 1 ] ) ( oregon[ 1 ] ) ) measure = unit_sales )-amount.
+    cl_abap_unit_assert=>assert_equals( act = lines( values ) exp = 1 ).
+    cl_abap_unit_assert=>assert_equals( act = values[ 1 ]-amounts[ unit_sales ] exp = both ).
+    " the slicer's groups are not kept: without it the family has all its sales
+    DATA(plain) = facts->cross_values(
+      patterns = VALUE #( ( filters = VALUE #( ( hierarchy = drink[ 1 ]-hierarchy level = 1 ) )
+                            paths   = VALUE #( ( VALUE #( ( drink[ 1 ]-path ) ) ) ) ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = plain[ 1 ]-amounts[ unit_sales ] exp = 24597 ).
   ENDMETHOD.
 
   METHOD batching.

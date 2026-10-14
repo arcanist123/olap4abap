@@ -159,6 +159,35 @@ A query whose axes are computed but whose cells are relational (a `Filter` on a 
 | `remove_empty_positions`                     | kept for mixed plans; for relational ones the groups decided  |
 | `omitEmptyCells`                             | unchanged (writing the answer)                                |
 
+### All-relational queries (step 2, done 2026-10-14)
+
+- **One statement for all patterns.** `fast_cells` collects the combinations of a pattern of each axis first and
+  passes them to `cross_values` in one call. The patterns no segment covers are one statement: `GROUP BY GROUPING
+  SETS`, a set per pattern, `GROUPING_ID` over all the statement's level columns (the first argument the highest bit)
+  telling them apart. A pattern's constraint is on its own grouped columns only, so the WHERE is the OR of the
+  patterns' constraints: every fact of a group that meets its pattern's constraint passes it, and its value is
+  exact. A group that does not meet it was read for another pattern, with only part of its facts, and is dropped.
+  The groups go into the segments as `load_segment` keeps them. One pattern is read as before, and so is a
+  statement of more than 62 columns (`GROUPING_ID` is a `BIGINT`). Every hierarchy of any set is joined, so a set
+  that does not group by it still has the inner join; BW has master data for every value of a fact, so the join
+  drops no row (as in the drill-through).
+- **NON EMPTY by the cells.** The reference filters a NON EMPTY axis with `NonEmpty(set, {measures})` in the context
+  of the slicer, then removes the positions whose cells are all empty. For stored measures a cell is non-empty
+  exactly when its group has facts, whatever the measure. When every member of the other axes is the default
+  member of its hierarchy or below it (All, for most), each non-empty cell lies inside the context NonEmpty sees.
+  So the first filter keeps every position the second keeps, and the second alone gives the same axes.
+  `axis_filter_needed` finds where that does not hold (a calculated measure among the query's measures, Time's
+  default member 1997 with `[Time].[1998]` on another axis), and `non_empty_axis` filters those axes after they are
+  evaluated. Axes evaluated once per root member of a hierarchy without All member keep the filter, because their
+  merge depends on the filtered sets.
+- **Compound slicer.** The placeholder's value is the roll-up (sum) of the tuples' cells, which equals one group
+  over the ORed tuples when no fact is in two tuples. `compound_predicate` gives that predicate when the tuples are
+  stored members, the measure is not among the varying hierarchies and every two tuples differ in a varying
+  hierarchy where neither member is on the other's path. Its groups are read without the cache (the axes'
+  evaluation reads without the predicate). Otherwise the evaluator rolls up as before.
+- Unchanged: the axes' set evaluation, with its own fact reads under the non-empty evaluator (step 3), and the cells
+  of every plan that is not relational.
+
 ## Semantics that must not change
 
 - Empty is "no group", not 0: a stored measure whose group sums to 0 is a cell with 0, written, and `NON EMPTY` keeps
@@ -190,10 +219,12 @@ A query whose axes are computed but whose cells are relational (a `Filter` on a 
 
 ## Steps
 
-1. The marking: `ZZXXMLA1_CL_MDX_PLANNER` (static, relational, computed per node), with unit tests; not used yet.
-2. All-relational queries: the engine asks the plan, reads one grouped statement per combination of patterns
-   (`GROUPING SETS` in `ZZXXMLA1_CL_MDX_FACTS`), filters the non-empty axes and places the cells from it; the
-   switch; both test suites with it on and off.
+1. Done (2026-10-14): the marking: `ZZXXMLA1_CL_MDX_PLANNER` (static, relational, computed per node), with unit
+   tests.
+2. Done (2026-10-14): all-relational queries: the engine asks the plan, reads one grouped statement for all
+   combinations of patterns (`GROUPING SETS` in `ZZXXMLA1_CL_MDX_FACTS=>cross_values`), filters the non-empty axes
+   and places the cells from it; the switch `ZZXXMLA1_CL_MDX_ENGINE=>planning`; both test suites with it on and off
+   (`next-steps.md`, query planning step 2). See All-relational queries (step 2) below.
 3. Retire `non_empty_axis`' evaluator loop and the second and third reads of the statement above; measure.
 4. Mixed queries: the relational inputs of computed nodes read as one batch before the first pass.
 5. More set nodes relational: `Filter` on a stored measure (`RolapNativeFilter`), `NonEmpty` with a second set.

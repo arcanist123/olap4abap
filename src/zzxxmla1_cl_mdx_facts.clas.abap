@@ -40,9 +40,18 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
     "! the paths of the filters marked any, in their order
     TYPES ty_t_paths TYPE STANDARD TABLE OF string_table WITH EMPTY KEY.
     TYPES:
-      "! A group of cross_values: the path of each filter, in the order of the filters, and the value of each measure
-      "! (the fact count for a measure of aggregator count)
+      "! A pattern of cross_values: its filters, sorted by hierarchy (their paths are not used), and per filter the
+      "! paths asked for
+      BEGIN OF ty_cross_pattern,
+        filters TYPE ty_t_filter,
+        paths   TYPE ty_t_paths,
+      END OF ty_cross_pattern,
+      ty_t_cross_pattern TYPE STANDARD TABLE OF ty_cross_pattern WITH EMPTY KEY.
+    TYPES:
+      "! A group of cross_values: its pattern (the position in the patterns), the path of each filter, in the order of
+      "! the filters, and the value of each measure (the fact count for a measure of aggregator count)
       BEGIN OF ty_cross_value,
+        pattern TYPE i,
         paths   TYPE string_table,
         amounts TYPE STANDARD TABLE OF decfloat34 WITH EMPTY KEY,
       END OF ty_cross_value,
@@ -141,14 +150,17 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
     "! max_constraints); true if so: the pass is to be evaluated again.
     METHODS load_aggregations
       RETURNING VALUE(result) TYPE abap_bool.
-    "! The cells of a crossjoin at once (our fast path, ZZXXMLA1_CL_MDX_ENGINE=>fast_cells): the groups with facts of
-    "! the pattern of the filters (their hierarchies and levels, sorted by hierarchy; their paths are not used), the
-    "! level columns constrained to the keys of the paths asked for, read with one query as load_aggregations reads a
-    "! batch, unless a segment read before covers them. Groups of other segments of the pattern may be among them.
-    "! @parameter paths | per filter the paths asked for
+    "! The cells of crossjoins at once (our fast path, ZZXXMLA1_CL_MDX_ENGINE=>fast_cells): per pattern (hierarchies
+    "! and levels) the groups with facts, the level columns constrained to the keys of the paths asked for, unless a
+    "! segment read before covers them. The patterns not covered are read with one statement (docs/query-planning.md):
+    "! one pattern as load_aggregations reads a batch, several with GROUP BY GROUPING SETS, a set per pattern told
+    "! apart by GROUPING_ID (a blank key is '' as an aggregated column is), the WHERE the OR of their constraints, and
+    "! a group kept only for the pattern whose constraint it meets. Groups of other segments of a pattern may be among
+    "! them.
+    "! @parameter slicer | a compound slicer's predicate (its tuples ORed): its groups are read without the cache
     METHODS cross_values
-      IMPORTING filters       TYPE ty_t_filter
-                paths         TYPE ty_t_paths
+      IMPORTING patterns      TYPE ty_t_cross_pattern
+                slicer        TYPE ty_t_predicate OPTIONAL
       RETURNING VALUE(result) TYPE ty_t_cross_value.
     "! The native crossjoin's tuple reader (SqlTupleReader with a SqlContextConstraint): the combinations of members of
     "! the levels of the filters marked any that have facts with the other filters, as their paths. The facts are
@@ -445,10 +457,37 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
       RETURNING VALUE(result) TYPE string_table.
     "! Groups the facts by the level columns of the filters' hierarchies down to their levels and stores the sums of
     "! all measures; only the facts whose level columns satisfy the constraint.
+    "! @parameter slicer | a compound slicer's predicate, besides the subcube
     METHODS load
       IMPORTING filters       TYPE ty_t_filter
                 constraint    TYPE ty_t_constraint
+                slicer        TYPE ty_t_predicate OPTIONAL
       RETURNING VALUE(result) TYPE ty_t_group.
+    "! The subcube's condition and a slicer's, the hierarchies of their members joined to the source as s and the
+    "! position of the hierarchy.
+    METHODS add_predicates
+      IMPORTING slicer     TYPE ty_t_predicate
+      CHANGING  !source    TYPE string
+                conditions TYPE string_table.
+    TYPES:
+      "! The groups of a pattern of cross_values read by load_sets, and the segment they were read with.
+      BEGIN OF ty_set_groups,
+        pattern TYPE i,
+        segment TYPE ty_t_constraint,
+        columns TYPE ty_t_index,   " the positions of its level columns among the statement's
+        groups  TYPE ty_t_group,
+      END OF ty_set_groups,
+      ty_t_set_groups TYPE STANDARD TABLE OF ty_set_groups WITH EMPTY KEY.
+    "! GROUPING_ID is a BIGINT, a bit per column: the most columns of one GROUPING SETS statement
+    CONSTANTS c_max_grouping_columns TYPE i VALUE 62.
+    "! The groups of the patterns at the indexes, each read with its constraint (a column of more keys than
+    "! max_constraints not constrained): with load for one pattern, else with one GROUP BY GROUPING SETS statement.
+    METHODS load_sets
+      IMPORTING patterns      TYPE ty_t_cross_pattern
+                constraints   TYPE ty_t_segment
+                indexes       TYPE ty_t_index
+                slicer        TYPE ty_t_predicate
+      RETURNING VALUE(result) TYPE ty_t_set_groups.
 ENDCLASS.
 
 CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
@@ -565,45 +604,220 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD cross_values.
-    " each level column of a filter constrained to the keys of its paths at that level
-    DATA(constraint) = VALUE ty_t_constraint( ).
-    LOOP AT filters ASSIGNING FIELD-SYMBOL(<filter>).
-      DATA(filter_paths) = paths[ sy-tabix ].
-      DATA(first) = lines( constraint ).
-      DO <filter>-level TIMES.
-        APPEND INITIAL LINE TO constraint.
-      ENDDO.
-      LOOP AT filter_paths INTO DATA(path).
-        LOOP AT path_keys( path = path level = <filter>-level ) INTO DATA(key).
-          ASSIGN constraint[ first + sy-tabix ] TO FIELD-SYMBOL(<column>).
-          INSERT key INTO TABLE <column>-keys.
+    DATA(constraints) = VALUE ty_t_segment( ).
+    DATA(missing) = VALUE ty_t_index( ).
+    LOOP AT patterns ASSIGNING FIELD-SYMBOL(<pattern>).
+      DATA(index) = sy-tabix.
+      " each level column of a filter constrained to the keys of its paths at that level
+      DATA(constraint) = VALUE ty_t_constraint( ).
+      LOOP AT <pattern>-filters ASSIGNING FIELD-SYMBOL(<filter>).
+        DATA(filter_paths) = <pattern>-paths[ sy-tabix ].
+        DATA(first) = lines( constraint ).
+        DO <filter>-level TIMES.
+          APPEND INITIAL LINE TO constraint.
+        ENDDO.
+        LOOP AT filter_paths INTO DATA(path).
+          LOOP AT path_keys( path = path level = <filter>-level ) INTO DATA(key).
+            ASSIGN constraint[ first + sy-tabix ] TO FIELD-SYMBOL(<column>).
+            INSERT key INTO TABLE <column>-keys.
+          ENDLOOP.
         ENDLOOP.
       ENDLOOP.
+      APPEND constraint TO constraints.
+      " the facts read before answer it if a segment covers it, but not under a slicer of its own
+      DATA(entry) = cache_entry( <pattern>-filters ).
+      IF slicer IS NOT INITIAL OR covered( segments = entry->segments constraint = constraint ) = abap_false.
+        APPEND index TO missing.
+      ENDIF.
     ENDLOOP.
-    DATA(entry) = cache_entry( filters ).
-    IF covered( segments = entry->segments constraint = constraint ) = abap_false.
-      load_segment( entry = entry constraint = constraint ).
+    DATA(read) = COND ty_t_set_groups( WHEN missing IS NOT INITIAL
+                                       THEN load_sets( patterns = patterns constraints = constraints indexes = missing
+                                                       slicer   = slicer ) ).
+    IF slicer IS INITIAL.
+      LOOP AT read ASSIGNING FIELD-SYMBOL(<read>).
+        entry = cache_entry( patterns[ <read>-pattern ]-filters ).
+        LOOP AT <read>-groups INTO DATA(group).
+          " a group read before by another segment is the same
+          INSERT group INTO TABLE entry->groups.
+        ENDLOOP.
+        APPEND <read>-segment TO entry->segments.
+      ENDLOOP.
     ENDIF.
 
     " a group's key is the keys of each filter's levels, each followed by the separator (load)
-    LOOP AT entry->groups ASSIGNING FIELD-SYMBOL(<group>) WHERE count > 0.
-      SPLIT <group>-key AT zzxxmla1_cl_model=>c_separator INTO TABLE DATA(keys).
-      DATA(value) = VALUE ty_cross_value( ).
-      DATA(index) = 0.
-      LOOP AT filters ASSIGNING <filter>.
-        DATA(group_path) = VALUE string( ).
-        DO <filter>-level TIMES.
-          index = index + 1.
-          group_path = group_path && COND string( WHEN sy-index > 1 THEN zzxxmla1_cl_model=>c_separator ) &&
-                       VALUE string( keys[ index ] OPTIONAL ).
-        ENDDO.
-        APPEND group_path TO value-paths.
+    FIELD-SYMBOLS <groups> TYPE ty_t_group.
+    LOOP AT patterns ASSIGNING <pattern>.
+      index = sy-tabix.
+      IF slicer IS INITIAL.
+        entry = cache_entry( <pattern>-filters ).
+        ASSIGN entry->groups TO <groups>.
+      ELSE.
+        ASSIGN read[ pattern = index ]-groups TO <groups>.
+      ENDIF.
+      LOOP AT <groups> ASSIGNING FIELD-SYMBOL(<group>) WHERE count > 0.
+        SPLIT <group>-key AT zzxxmla1_cl_model=>c_separator INTO TABLE DATA(keys).
+        DATA(value) = VALUE ty_cross_value( pattern = index ).
+        DATA(position) = 0.
+        LOOP AT <pattern>-filters ASSIGNING <filter>.
+          DATA(group_path) = VALUE string( ).
+          DO <filter>-level TIMES.
+            position = position + 1.
+            group_path = group_path && COND string( WHEN sy-index > 1 THEN zzxxmla1_cl_model=>c_separator ) &&
+                         VALUE string( keys[ position ] OPTIONAL ).
+          ENDDO.
+          APPEND group_path TO value-paths.
+        ENDLOOP.
+        LOOP AT measures INTO DATA(measure).
+          APPEND COND decfloat34( WHEN measure-aggregator = `count` THEN <group>-count
+                                  ELSE <group>-sums[ sy-tabix ] ) TO value-amounts.
+        ENDLOOP.
+        APPEND value TO result.
       ENDLOOP.
-      LOOP AT measures INTO DATA(measure).
-        APPEND COND decfloat34( WHEN measure-aggregator = `count` THEN <group>-count
-                                ELSE <group>-sums[ sy-tabix ] ) TO value-amounts.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD load_sets.
+    " Aggregation.optimizePredicates: a column of more keys than max_constraints is not constrained
+    LOOP AT indexes INTO DATA(index).
+      DATA(segment) = constraints[ index ].
+      LOOP AT segment ASSIGNING FIELD-SYMBOL(<column>) WHERE all = abap_false.
+        IF lines( <column>-keys ) > max_constraints.
+          <column>-all = abap_true.
+          CLEAR <column>-keys.
+        ENDIF.
       ENDLOOP.
-      APPEND value TO result.
+      APPEND VALUE #( pattern = index segment = segment ) TO result.
+    ENDLOOP.
+
+    " the level columns of all patterns, each once, and per pattern their positions; one join per hierarchy
+    DATA columns TYPE string_table.
+    DATA joins TYPE SORTED TABLE OF i WITH UNIQUE KEY table_line.
+    LOOP AT result ASSIGNING FIELD-SYMBOL(<set>).
+      LOOP AT patterns[ <set>-pattern ]-filters INTO DATA(filter).
+        INSERT filter-hierarchy INTO TABLE joins.
+        LOOP AT hierarchies[ filter-hierarchy ]-levels INTO DATA(level) TO filter-level.
+          DATA(column) = |d{ filter-hierarchy }.{ zzxxmla1_cl_sql=>quote( level-key_column ) }|.
+          READ TABLE columns TRANSPORTING NO FIELDS WITH KEY table_line = column.
+          IF sy-subrc = 0.
+            APPEND sy-tabix TO <set>-columns.
+          ELSE.
+            APPEND column TO columns.
+            APPEND lines( columns ) TO <set>-columns.
+          ENDIF.
+        ENDLOOP.
+      ENDLOOP.
+    ENDLOOP.
+    IF lines( result ) = 1 OR lines( columns ) > c_max_grouping_columns.
+      LOOP AT result ASSIGNING <set>.
+        <set>-groups = load( filters = patterns[ <set>-pattern ]-filters constraint = <set>-segment slicer = slicer ).
+      ENDLOOP.
+      RETURN.
+    ENDIF.
+
+    DATA(source) = |{ zzxxmla1_cl_sql=>quote( cube-fact_table ) } f|.
+    LOOP AT joins INTO DATA(id).
+      DATA(hierarchy) = hierarchies[ id ].
+      source = source && | INNER JOIN { zzxxmla1_cl_sql=>quote( hierarchy-dim_table ) } d{ id }| &&
+               | ON d{ id }.{ zzxxmla1_cl_sql=>quote( hierarchy-key_column ) }| &&
+               | = f.{ zzxxmla1_cl_sql=>quote( hierarchy-fk_column ) }|.
+    ENDLOOP.
+    " per pattern its grouping set, its GROUPING_ID (a bit per column, the first the highest, 1 where the column is
+    " aggregated) and its constraint; the facts are those of any pattern's constraint
+    DATA(grouping_sets) = VALUE string_table( ).
+    DATA(disjuncts) = VALUE string_table( ).
+    DATA(unconstrained) = abap_false.
+    DATA ids TYPE STANDARD TABLE OF int8 WITH EMPTY KEY.
+    LOOP AT result ASSIGNING <set>.
+      DATA(set_columns) = VALUE string_table( FOR p IN <set>-columns ( columns[ p ] ) ).
+      APPEND |( { concat_lines_of( table = set_columns sep = `, ` ) } )| TO grouping_sets.
+      DATA(grouping_id) = CONV int8( 0 ).
+      DO lines( columns ) TIMES.
+        grouping_id = grouping_id * 2.
+        IF NOT line_exists( <set>-columns[ table_line = sy-index ] ).
+          grouping_id = grouping_id + 1.
+        ENDIF.
+      ENDDO.
+      APPEND grouping_id TO ids.
+      DATA(conjuncts) = VALUE string_table( ).
+      LOOP AT <set>-segment ASSIGNING <column> WHERE all = abap_false.
+        APPEND zzxxmla1_cl_sql=>keys_condition( column = set_columns[ sy-tabix ]
+                                                keys   = VALUE #( FOR k IN <column>-keys ( k ) ) ) TO conjuncts.
+      ENDLOOP.
+      IF conjuncts IS INITIAL.
+        unconstrained = abap_true.
+      ELSE.
+        APPEND |( { concat_lines_of( table = conjuncts sep = ` AND ` ) } )| TO disjuncts.
+      ENDIF.
+    ENDLOOP.
+    DATA(select_list) = VALUE string_table( ( |GROUPING_ID( { concat_lines_of( table = columns sep = `, ` ) } )| ) ).
+    APPEND LINES OF columns TO select_list.
+    LOOP AT measures INTO DATA(measure) WHERE aggregator <> `count`.
+      APPEND |SUM( f.{ zzxxmla1_cl_sql=>quote( measure-fact_column ) } )| TO select_list.
+    ENDLOOP.
+    APPEND `COUNT( * )` TO select_list.
+    DATA(conditions) = VALUE string_table( ).
+    IF unconstrained = abap_false.
+      APPEND |( { concat_lines_of( table = disjuncts sep = ` OR ` ) } )| TO conditions.
+    ENDIF.
+    add_predicates( EXPORTING slicer = slicer CHANGING source = source conditions = conditions ).
+    DATA(where) = COND string( WHEN conditions IS NOT INITIAL
+                               THEN | WHERE { concat_lines_of( table = conditions sep = ` AND ` ) }| ).
+    DATA(sql) = |SELECT { concat_lines_of( table = select_list sep = `, ` ) } FROM { source }{ where }| &&
+                | GROUP BY GROUPING SETS ( { concat_lines_of( table = grouping_sets sep = `, ` ) } )|.
+
+    LOOP AT zzxxmla1_cl_sql=>query( sql = sql columns = lines( select_list ) ) INTO DATA(row).
+      DATA(row_id) = CONV int8( row[ 1 ] ).
+      LOOP AT ids TRANSPORTING NO FIELDS WHERE table_line = row_id.
+        ASSIGN result[ sy-tabix ] TO <set>.
+        " the key: per filter its path, as load builds it. A group outside the pattern's own constraint was read for
+        " another pattern's, with part of its facts only.
+        DATA(group) = VALUE ty_group( ).
+        DATA(position) = 0.
+        DATA(inside) = abap_true.
+        LOOP AT patterns[ <set>-pattern ]-filters INTO filter.
+          DO filter-level TIMES.
+            position = position + 1.
+            DATA(key) = row[ 1 + <set>-columns[ position ] ].
+            ASSIGN <set>-segment[ position ] TO <column>.
+            IF <column>-all = abap_false AND NOT line_exists( <column>-keys[ table_line = key ] ).
+              inside = abap_false.
+            ENDIF.
+            group-key = group-key && key && COND string( WHEN sy-index < filter-level
+                                                         THEN zzxxmla1_cl_model=>c_separator ).
+          ENDDO.
+          group-key = group-key && zzxxmla1_cl_model=>c_separator.
+        ENDLOOP.
+        IF inside = abap_false.
+          CONTINUE.
+        ENDIF.
+        DATA(value_column) = 1 + lines( columns ).
+        LOOP AT measures INTO measure.
+          IF measure-aggregator = `count`.
+            APPEND 0 TO group-sums.
+          ELSE.
+            value_column = value_column + 1.
+            DATA(sum) = row[ value_column ].
+            APPEND COND decfloat34( WHEN sum IS INITIAL THEN 0 ELSE sum ) TO group-sums.
+          ENDIF.
+        ENDLOOP.
+        group-count = row[ lines( select_list ) ].
+        INSERT group INTO TABLE <set>-groups.
+      ENDLOOP.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD add_predicates.
+    DATA joined TYPE ty_t_index.
+    IF subcube IS NOT INITIAL.
+      APPEND predicate_sql( EXPORTING predicate = subcube index = 1 CHANGING joined = joined ) TO conditions.
+    ENDIF.
+    IF slicer IS NOT INITIAL.
+      APPEND predicate_sql( EXPORTING predicate = slicer index = 1 CHANGING joined = joined ) TO conditions.
+    ENDIF.
+    LOOP AT joined INTO DATA(id).
+      source = source && | INNER JOIN { zzxxmla1_cl_sql=>quote( hierarchies[ id ]-dim_table ) } s{ id }| &&
+               | ON s{ id }.{ zzxxmla1_cl_sql=>quote( hierarchies[ id ]-key_column ) }| &&
+               | = f.{ zzxxmla1_cl_sql=>quote( hierarchies[ id ]-fk_column ) }|.
     ENDLOOP.
   ENDMETHOD.
 
@@ -1033,17 +1247,8 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
       APPEND zzxxmla1_cl_sql=>keys_condition( column = group_by[ sy-tabix ]
                                               keys   = VALUE #( FOR k IN <column>-keys ( k ) ) ) TO conditions.
     ENDLOOP.
-    " the subcube: its condition, with the hierarchies of its members joined once more
-    IF subcube IS NOT INITIAL.
-      DATA joined TYPE ty_t_index.
-      DATA(condition) = predicate_sql( EXPORTING predicate = subcube index = 1 CHANGING joined = joined ).
-      LOOP AT joined INTO DATA(joined_id).
-        source = source && | INNER JOIN { zzxxmla1_cl_sql=>quote( hierarchies[ joined_id ]-dim_table ) } s{ joined_id }| &&
-                 | ON s{ joined_id }.{ zzxxmla1_cl_sql=>quote( hierarchies[ joined_id ]-key_column ) }| &&
-                 | = f.{ zzxxmla1_cl_sql=>quote( hierarchies[ joined_id ]-fk_column ) }|.
-      ENDLOOP.
-      APPEND condition TO conditions.
-    ENDIF.
+    " the subcube and a slicer: their conditions, with the hierarchies of their members joined once more
+    add_predicates( EXPORTING slicer = slicer CHANGING source = source conditions = conditions ).
     DATA(where) = COND string( WHEN conditions IS NOT INITIAL
                                THEN | WHERE { concat_lines_of( table = conditions sep = ` AND ` ) }| ).
     DATA(sql) = |SELECT { concat_lines_of( table = select_list sep = `, ` ) } FROM { source }{ where }| &&

@@ -66,6 +66,10 @@ CLASS ltc_engine DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT
     "! Native non-empty member reads (SqlContextConstraint): Children and the members of a large level under a
     "! non-empty evaluator are only those with facts in the context, the level's hierarchy's context member included.
     METHODS native_non_empty_members FOR TESTING RAISING zzxxmla1_cx_xmla.
+    "! Query planning: all-relational queries (NON EMPTY axes, All members, a compound slicer, Time on an axis) give
+    "! the same answer with planning on and off.
+    METHODS planning_on_and_off FOR TESTING RAISING zzxxmla1_cx_xmla.
+    METHODS teardown.
 ENDCLASS.
 
 CLASS ltc_engine IMPLEMENTATION.
@@ -278,6 +282,42 @@ CLASS ltc_engine IMPLEMENTATION.
                          && `{[Product.Product Id].[x], [Product.Product Id].[e]} on 1 from [ZFMSALES]` ).
     cl_abap_unit_assert=>assert_equals( act = values( result )
                                         exp = VALUE string_table( ( `254` ) ( `82` ) ( `null` ) ( `null` ) ) ).
+  ENDMETHOD.
+
+  METHOD teardown.
+    zzxxmla1_cl_mdx_engine=>planning = abap_true.
+  ENDMETHOD.
+
+  METHOD planning_on_and_off.
+    DATA(statements) = VALUE string_table(
+      " Excel's filter list: All Stores and USA (Canada and Mexico have no facts in 1997)
+      ( `SELECT NON EMPTY Hierarchize({DrilldownLevel({[Store].[All Stores]},,,INCLUDE_CALC_MEMBERS)}) `
+     && `DIMENSION PROPERTIES PARENT_UNIQUE_NAME ON COLUMNS FROM [ZFMSALES] CELL PROPERTIES VALUE, FORMAT_STRING` )
+      " a grid of two levels each with its All member: four patterns in one statement
+      ( `SELECT NON EMPTY {[Measures].[Unit Sales], [Measures].[Store Sales]} * `
+     && `{[Product].[All Products], [Product].[Product Family].Members} ON COLUMNS, `
+     && `NON EMPTY {[Store].[All Stores], [Store].[Store Country].Members, [Store].[Store State].Members} ON ROWS `
+     && `FROM [ZFMSALES]` )
+      " compound slicers: disjoint tuples as a predicate, overlapping ones rolled up by the evaluator
+      ( `select NON EMPTY {[Measures].[Unit Sales]} ON columns, NON EMPTY [Product].Children ON rows from [ZFMSALES] `
+     && `where {[Store].[USA].[CA], [Store].[USA].[OR]}` )
+      ( `SELECT {[Measures].[Unit Sales]} ON COLUMNS, {[Product].[All Products]} ON ROWS from [ZFMSALES] `
+     && `WHERE {[Time].[1997].[Q1], [Time].[1997].[Q1].[1]}` )
+      " Time on the other axis outside its default member 1997: NonEmpty filters the rows still
+      ( `SELECT {[Time].[1998]} ON COLUMNS, NON EMPTY [Store].[Store Country].Members ON ROWS FROM [ZFMSALES]` )
+      ( `SELECT [Time].[1997].Children ON COLUMNS, NON EMPTY [Store].[Store State].Members ON ROWS FROM [ZFMSALES]` ) ).
+    LOOP AT statements INTO DATA(statement).
+      zzxxmla1_cl_mdx_engine=>planning = abap_true.
+      DATA(planned) = execute( statement ).
+      zzxxmla1_cl_mdx_engine=>planning = abap_false.
+      cl_abap_unit_assert=>assert_equals( act = planned exp = execute( statement ) msg = statement ).
+    ENDLOOP.
+    zzxxmla1_cl_mdx_engine=>planning = abap_true.
+    " the filter list's answer
+    planned = execute( statements[ 1 ] ).
+    cl_abap_unit_assert=>assert_equals( act = tuples( planned )
+                                        exp = VALUE string_table( ( `[Store].[All Stores]` ) ( `[Store].[USA]` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = values( planned ) exp = VALUE string_table( ( `266773` ) ( `266773` ) ) ).
   ENDMETHOD.
 
   METHOD compound_slicer.
