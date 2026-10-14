@@ -131,7 +131,7 @@ reference: the tree (`ZZXXMLA1_CL_MDX_NODE`) is not changed. `get_mark( node )` 
   least relational; the query has the highest mark.
 
 On the filter-list statement above the axis expression is static, the axis (NON EMPTY) and the cells relational.
-A query whose axes are computed but whose cells are relational (a `Filter` on a value) is a mixed plan (step 4).
+A query whose axes are computed but whose cells are relational (a `Filter` on a value) is a mixed plan (step 5).
 
 ### Running a plan
 
@@ -208,7 +208,7 @@ A query whose axes are computed but whose cells are relational (a `Filter` on a 
   axis) are filtered by groups too: per pattern of the axis its group with the context's members of every other
   hierarchy (the context NonEmpty sees), read in the same `cross_values` call as the cells (`fast_cells`'
   `filter_axes`); a tuple without facts there is dropped with its cells (`drop_positions`). The evaluator stays for a
-  calculated measure among the query's measures (a computed part, step 4), an axis on a hierarchy of the slicer, and
+  calculated measure among the query's measures (a computed part, step 5), an axis on a hierarchy of the slicer, and
   as the fallback when `fast_cells` cannot place the cells.
 - **Statements.** A set without constraint (the grand total) is read in a statement of its own: in the others' it
   removes their `WHERE`, and the grid's sets then returned 633,830 groups for 90,000 cells. A column constrained to
@@ -236,6 +236,54 @@ The grid's 17 s are ABAP: about 7 s to turn 632,000 rows into groups and values 
 `omitEmptyCells`: the answer has the 633,830 cells with a value only (of 1,002,001) and 2,002 members, the cells
 118.6 MB, some 187 characters each (value, format string and font flags, indented). `compare-applicable.py`: SAP 196 to 216 s in total (271 s at step 2).
 
+### Cells first (step 4, decided 2026-10-14)
+
+The 1,001 x 1,001 grid (Excel's PivotTable of two characteristics, `planning_measure.py`'s `wide_grid`) runs 8
+statements with 0.9 s SQL and 13.8 s in all. Its axes are read first, as the reference evaluates them: per axis the
+members with facts (`DrilldownLevel`'s context members: a grouped fact read, then a member read with an `IN` list of
+all 1,000 keys) and, at the end, a count of them; then the cells statement groups the facts by both levels (631,829
+rows). Everything the axis reads give is in the cells statement's result: the members with facts on one axis are the
+keys among its groups (the other axis covers its whole level and All), the totals are sums of its groups (sum and
+count are additive), and the members' keys are its keys. Decided with the user: such a query is one fact statement,
+and its axes are built from the result, not read before it. Filters, ranks and the like come later; they are most
+likely SQL too (steps 5 and 6).
+
+What the query needs, and what it costs:
+
+| step             | work                                                                                   | cost       |
+| ---------------- | -------------------------------------------------------------------------------------- | ---------- |
+| read the facts   | one statement, 631,829 rows                                                            | 0.9 s      |
+| build the axes   | the distinct keys of each axis (1,000) in hierarchy order, a position per key          | ms         |
+| place the cells  | ordinal = position on axis 0 + position on axis 1 x 1,001; totals summed in one pass   | 0.3-0.5 s  |
+| write the answer | a `<Cell>` per row in ordinal order, 119 MB                                            | to measure |
+
+Today the same rows pass four layers, each with its own per-row allocations (method trace): `load` builds a string
+key per group into the hashed group cache (2.6 s), `cross_values` splits each key back into a paths table (2.4 s),
+`fast_cells` finds each axis' position by a string-keyed hash read and fills a cell table of 1,002,001 rows, a third
+of them empty (5.6 s), and the writer walks that table and builds each cell's XML from pieces (3.3 s).
+
+The plan of such a query (planner and engine):
+- **When.** Every NON EMPTY axis is a set whose members depend on the facts only: a level's members, `Children`,
+  `DrilldownLevel`, `Descendants` of members of the model, crossjoins of these, under NON EMPTY with stored measures
+  only; no calculated member, no `Filter`, `TopCount`, `Order` on values (later steps); additive aggregators. An axis
+  without NON EMPTY keeps the members without facts and is read from the dimension as now.
+- **The statement.** The patterns of the axes' combinations as now (`GROUPING SETS` for the totals, or the totals
+  summed in ABAP from the finest pattern: to measure), constrained only where an axis is not a whole level.
+- **The axes.** Each axis' positions from the distinct keys of the result, in hierarchy order (the engine's member
+  order stays authoritative: the keys are mapped to positions once in ABAP; `DENSE_RANK( ) OVER ( ORDER BY <order
+  column> )` in the statement is the alternative). Its members are made from the keys where the level's name is its
+  key; otherwise one member read per axis by the keys of the result.
+- **The cells.** Rows to cells without a cell table: each row's ordinal from its positions, the value written once per
+  distinct amount (as now). With `ORDER BY` the second axis' position, then the first's, the rows come in
+  `CellOrdinal` order and are written as they are read.
+
+The answer's text is measured before it is chosen: today `cell_xml` builds each cell from string pieces, the lines are
+joined once (`build`), and `set_cdata` converts the 119 MB string to UTF-8. Candidates: one string template per cell
+into a table joined once (the current shape, leaner), the sXML writer (`CL_SXML_STRING_WRITER`, UTF-8 directly into
+an xstring), a simple transformation (`CALL TRANSFORMATION`, the kernel serializes a table of cells), and appending
+to the response in parts (`append_cdata`). A benchmark of 633,830 cells decides; the handler then returns the
+answer as UTF-8 (`set_data`) if that is the faster form.
+
 ## Semantics that must not change
 
 - Empty is "no group", not 0: a stored measure whose group sums to 0 is a cell with 0, written, and `NON EMPTY` keeps
@@ -262,6 +310,8 @@ The grid's 17 s are ABAP: about 7 s to turn 632,000 rows into groups and values 
   run, and the suites run with planning on.
 - Unit tests of the planner's marking: one statement per row of the principle table and per item of "What needs the
   evaluator", each with its expected marks.
+- The MDX console's Query plan tab (Trace SQL on) shows a statement's marks and which element read which SQL
+  (`ZZXXMLA1_CL_MDX_EXPLAIN`); the same is in the trace (`GET trace/entry`, `explain` and each statement's `node`).
 - Runtime and SQL count from the trace (`ZZXXMLA1_TRACE`) for the statement above, an Excel pivot on FoodMart and the
   1,001 x 1,001 grid on `ZXMLWIDEA` (25 s with `fast_cells`): one fact statement per combination of patterns is the
   target.
@@ -276,8 +326,11 @@ The grid's 17 s are ABAP: about 7 s to turn 632,000 rows into groups and values 
    (`next-steps.md`, query planning step 2). See All-relational queries (step 2) below.
 3. Done (2026-10-14): `non_empty_axis`' evaluator loop retired for relational plans, the axes' reads feed the cells;
    measured. See One read per group (step 3) above.
-4. Mixed queries: the relational inputs of computed nodes read as one batch before the first pass.
-5. More set nodes relational: `Filter` on a stored measure (`RolapNativeFilter`), `NonEmpty` with a second set.
+4. Cells first: a query whose NON EMPTY axes depend on the facts only is one fact statement, its axes built from the
+   result and its cells written from the rows, without the axis reads, the group cache, the cell table. Target for
+   the 1,001 x 1,001 grid: about 3 s (13.8 s). See Cells first (step 4) above.
+5. Mixed queries: the relational inputs of computed nodes read as one batch before the first pass.
+6. More set nodes relational: `Filter` on a stored measure (`RolapNativeFilter`), `NonEmpty` with a second set.
 
 ## GROUPING SETS on HANA
 
@@ -308,8 +361,7 @@ plain `GROUP BY`. Not to be revisited before a real provider shows it matters.
 ## Open
 
 - Mixed plans and the batching passes: how much of `phase` remains once the relational inputs are read first.
-- The grid's ABAP (groups to values, placement, writing the answer) is now its cost, not SQL. A cell's value is formatted
-  only when the query asks for `FORMATTED_VALUE` (`want_formatted`; Excel's grid asks for `VALUE, FORMAT_STRING,
-- The MDX console's Query plan tab (Trace SQL on) shows a statement's marks and which element read which SQL
-  (`ZZXXMLA1_CL_MDX_EXPLAIN`); the same is in the trace (`GET trace/entry`, `explain` and each statement's `node`).
-  LANGUAGE, BACK_COLOR, FORE_COLOR, FONT_FLAGS`): 17 to 16.7 s, as each amount was formatted once per query already.
+- The grid's ABAP (groups to values, placement, writing the answer) is now its cost, not SQL: step 4. A cell's value is
+  formatted only when the query asks for `FORMATTED_VALUE` (`want_formatted`; Excel's grid asks for `VALUE,
+  FORMAT_STRING, LANGUAGE, BACK_COLOR, FORE_COLOR, FONT_FLAGS`): 17 to 16.7 s. Fewer copies per group and the answer
+  joined once (229d1cf): 15.7 s, 13.8 s in the console's trace.

@@ -67,9 +67,15 @@ keeps the answers: both test suites give the same answers with planning on and o
    neighbours and after a restart of eMondrian), SAP 196 to 216 s in total (271 s).
    Left over (`query-planning.md`, Open): the grid's 17 s are ABAP (rows to groups and values about 7 s, placing
    them 5 s, writing 633,830 cells, 119 MB; values are formatted only for `FORMATTED_VALUE` now, 16.7 s); a
-   calculated measure in a NON EMPTY query still filters its axis with the evaluator (step 4).
-4. Mixed queries: the relational inputs of computed nodes read as one batch before the first pass.
-5. More set nodes relational: `Filter` on a stored measure (`RolapNativeFilter`), `NonEmpty` with a second set.
+   calculated measure in a NON EMPTY query still filters its axis with the evaluator (step 5).
+4. Cells first (decided with the user 2026-10-14, `query-planning.md`, Cells first): a query whose NON EMPTY axes
+   depend on the facts only (Excel's grid of two characteristics) is one fact statement; its axes are built from the
+   result (positions from the keys, totals summed), its cells written from the rows in ordinal order, without the
+   axis reads, the group cache and the cell table. First a benchmark of the answer's text (string templates joined
+   once, the sXML writer, a simple transformation, the response in parts). Target: the 1,001 x 1,001 grid in about
+   3 s (15.7 s since 229d1cf). Filters and ranks later (they are most likely SQL too).
+5. Mixed queries: the relational inputs of computed nodes read as one batch before the first pass.
+6. More set nodes relational: `Filter` on a stored measure (`RolapNativeFilter`), `NonEmpty` with a second set.
 
 ## Paused: fixed selections
 
