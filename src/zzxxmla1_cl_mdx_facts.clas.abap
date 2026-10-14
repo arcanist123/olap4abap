@@ -47,6 +47,23 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
         paths   TYPE ty_t_paths,
       END OF ty_cross_pattern,
       ty_t_cross_pattern TYPE STANDARD TABLE OF ty_cross_pattern WITH EMPTY KEY.
+    TYPES ty_t_amount TYPE STANDARD TABLE OF decfloat34 WITH EMPTY KEY.
+    TYPES:
+      "! A group of facts: the keys of each filter's levels, each followed by the separator; the sums of the measures
+      "! (0 for a measure of aggregator count) and the fact count
+      BEGIN OF ty_group,
+        key   TYPE string,
+        sums  TYPE ty_t_amount,
+        count TYPE i,
+      END OF ty_group,
+      ty_t_group TYPE HASHED TABLE OF ty_group WITH UNIQUE KEY key.
+    TYPES:
+      "! The groups of a pattern of cross_groups (its position in the patterns); a group with count 0 has no facts
+      BEGIN OF ty_cross_groups,
+        pattern TYPE i,
+        groups  TYPE REF TO ty_t_group,
+      END OF ty_cross_groups,
+      ty_t_cross_groups TYPE STANDARD TABLE OF ty_cross_groups WITH EMPTY KEY.
     TYPES:
       "! A group of cross_values: its pattern (the position in the patterns), the path of each filter, in the order of
       "! the filters, and the value of each measure (the fact count for a measure of aggregator count)
@@ -162,6 +179,12 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
       IMPORTING patterns      TYPE ty_t_cross_pattern
                 slicer        TYPE ty_t_predicate OPTIONAL
       RETURNING VALUE(result) TYPE ty_t_cross_value.
+    "! cross_values' groups as they are read and kept, per pattern its group table (the cache's own, not to be
+    "! changed), for a reader of many groups (a grid's cells): no row per group with its key split into paths.
+    METHODS cross_groups
+      IMPORTING patterns      TYPE ty_t_cross_pattern
+                slicer        TYPE ty_t_predicate OPTIONAL
+      RETURNING VALUE(result) TYPE ty_t_cross_groups.
     "! The native crossjoin's tuple reader (SqlTupleReader with a SqlContextConstraint): the combinations of members of
     "! the levels of the filters marked any that have facts with the other filters, as their paths. The facts are
     "! grouped as for value, so this is one query, or none if value has grouped them so already.
@@ -307,14 +330,6 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
 
     DATA star_columns  TYPE ty_t_star_column.
     DATA level_columns TYPE ty_t_level_column.
-    TYPES ty_t_amount TYPE STANDARD TABLE OF decfloat34 WITH EMPTY KEY.
-    TYPES:
-      BEGIN OF ty_group,
-        key   TYPE string,
-        sums  TYPE ty_t_amount,
-        count TYPE i,
-      END OF ty_group,
-      ty_t_group TYPE HASHED TABLE OF ty_group WITH UNIQUE KEY key.
     TYPES ty_key_set TYPE HASHED TABLE OF string WITH UNIQUE KEY table_line.
     TYPES:
       "! a filter or a default of load: its pattern and which default it is (0: a filter, its position in filter)
@@ -669,7 +684,7 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
     result = abap_true.
   ENDMETHOD.
 
-  METHOD cross_values.
+  METHOD cross_groups.
     DATA(constraints) = VALUE ty_t_segment( ).
     DATA(missing) = VALUE ty_t_index( ).
     LOOP AT patterns ASSIGNING FIELD-SYMBOL(<pattern>).
@@ -720,21 +735,28 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
       ENDLOOP.
     ENDIF.
 
-    " a group's key is the keys of each filter's levels, each followed by the separator (load); its amounts are the
-    " sums, the count where the measure counts
-    FIELD-SYMBOLS <groups> TYPE ty_t_group.
-    DATA(counts) = VALUE ty_t_index( ).
-    LOOP AT measures TRANSPORTING NO FIELDS WHERE aggregator = `count`.
-      APPEND sy-tabix TO counts.
-    ENDLOOP.
     LOOP AT patterns ASSIGNING <pattern>.
       index = sy-tabix.
       IF slicer IS INITIAL.
         entry = cache_entry( <pattern>-filters ).
-        ASSIGN entry->groups TO <groups>.
+        APPEND VALUE #( pattern = index groups = REF #( entry->groups ) ) TO result.
       ELSE.
-        ASSIGN read[ pattern = index ]-groups TO <groups>.
+        APPEND VALUE #( pattern = index groups = NEW ty_t_group( read[ pattern = index ]-groups ) ) TO result.
       ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD cross_values.
+    " a group's key is the keys of each filter's levels, each followed by the separator (load); its amounts are the
+    " sums, the count where the measure counts
+    DATA(counts) = VALUE ty_t_index( ).
+    LOOP AT measures TRANSPORTING NO FIELDS WHERE aggregator = `count`.
+      APPEND sy-tabix TO counts.
+    ENDLOOP.
+    LOOP AT cross_groups( patterns = patterns slicer = slicer ) INTO DATA(pattern_groups).
+      DATA(index) = pattern_groups-pattern.
+      ASSIGN patterns[ index ] TO FIELD-SYMBOL(<pattern>).
+      ASSIGN pattern_groups-groups->* TO FIELD-SYMBOL(<groups>).
       " filters of one level each: the keys are the paths
       DATA(flat) = xsdbool( NOT line_exists( <pattern>-filters[ level = 2 ] )
                             AND NOT line_exists( <pattern>-filters[ level = 3 ] )
@@ -758,7 +780,7 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
         ENDIF.
         SPLIT <group>-key AT zzxxmla1_cl_model=>c_separator INTO TABLE DATA(keys).
         DATA(position) = 0.
-        LOOP AT <pattern>-filters ASSIGNING <filter>.
+        LOOP AT <pattern>-filters ASSIGNING FIELD-SYMBOL(<filter>).
           DATA(group_path) = VALUE string( ).
           DO <filter>-level TIMES.
             position = position + 1.
@@ -890,8 +912,9 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
                              WHEN columns IS NOT INITIAL
                              THEN | GROUP BY { concat_lines_of( table = columns sep = `, ` ) }| ).
 
-    LOOP AT zzxxmla1_cl_sql=>query( sql = sql columns = lines( select_list ) ) INTO DATA(row).
-      DATA(row_id) = CONV int8( row[ 1 ] ).
+    DATA(rows) = zzxxmla1_cl_sql=>query( sql = sql columns = lines( select_list ) ).
+    LOOP AT rows ASSIGNING FIELD-SYMBOL(<row>).
+      DATA(row_id) = CONV int8( <row>[ 1 ] ).
       LOOP AT ids TRANSPORTING NO FIELDS WHERE table_line = row_id.
         ASSIGN result[ sy-tabix ] TO <set>.
         " the key: per filter its path, as load builds it. A group outside the pattern's own constraint was read for
@@ -902,7 +925,7 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
         LOOP AT patterns[ <set>-pattern ]-filters INTO filter.
           DO filter-level TIMES.
             position = position + 1.
-            DATA(key) = row[ 1 + <set>-columns[ position ] ].
+            DATA(key) = <row>[ 1 + <set>-columns[ position ] ].
             ASSIGN <set>-segment[ position ] TO <column>.
             IF <column>-all = abap_false AND NOT line_exists( <column>-keys[ table_line = key ] ).
               inside = abap_false.
@@ -921,11 +944,11 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
             APPEND 0 TO group-sums.
           ELSE.
             value_column = value_column + 1.
-            DATA(sum) = row[ value_column ].
+            DATA(sum) = <row>[ value_column ].
             APPEND COND decfloat34( WHEN sum IS INITIAL THEN 0 ELSE sum ) TO group-sums.
           ENDIF.
         ENDLOOP.
-        group-count = row[ lines( select_list ) ].
+        group-count = <row>[ lines( select_list ) ].
         INSERT group INTO TABLE <set>-groups.
       ENDLOOP.
     ENDLOOP.
@@ -1649,15 +1672,16 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
                 COND string( WHEN group_by IS NOT INITIAL
                              THEN | GROUP BY { concat_lines_of( table = group_by sep = `, ` ) }| ).
 
-    LOOP AT zzxxmla1_cl_sql=>query( sql = sql columns = lines( select_list ) ) INTO DATA(row).
+    DATA(load_rows) = zzxxmla1_cl_sql=>query( sql = sql columns = lines( select_list ) ).
+    LOOP AT load_rows ASSIGNING FIELD-SYMBOL(<row>).
       " the key: per filter its path, as value builds it
       DATA(group) = VALUE ty_group( ).
       DATA(column) = 0.
       LOOP AT filters INTO filter.
         DO filter-level TIMES.
           column = column + 1.
-          group-key = group-key && row[ column ] && COND string( WHEN sy-index < filter-level
-                                                                 THEN zzxxmla1_cl_model=>c_separator ).
+          group-key = group-key && <row>[ column ] && COND string( WHEN sy-index < filter-level
+                                                                   THEN zzxxmla1_cl_model=>c_separator ).
         ENDDO.
         group-key = group-key && zzxxmla1_cl_model=>c_separator.
       ENDLOOP.
@@ -1666,17 +1690,17 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
           APPEND 0 TO group-sums.
         ELSE.
           column = column + 1.
-          DATA(sum) = row[ column ].
+          DATA(sum) = <row>[ column ].
           APPEND COND decfloat34( WHEN sum IS INITIAL THEN 0 ELSE sum ) TO group-sums.
         ENDIF.
       ENDLOOP.
-      group-count = row[ count_column ].
+      group-count = <row>[ count_column ].
       INSERT group INTO TABLE result.
       IF default_conditions IS INITIAL.
         CONTINUE.
       ENDIF.
       " the group with the defaults: the filters' keys and the defaults' paths in the order of the hierarchies
-      DATA(default_group) = VALUE ty_group( count = row[ lines( select_list ) ] ).
+      DATA(default_group) = VALUE ty_group( count = <row>[ lines( select_list ) ] ).
       IF default_group-count = 0.
         CONTINUE.
       ENDIF.
@@ -1687,7 +1711,7 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
           ENDLOOP.
         ELSE.
           DO item-level TIMES.
-            default_group-key = default_group-key && row[ first_columns[ item-filter ] + sy-index ]
+            default_group-key = default_group-key && <row>[ first_columns[ item-filter ] + sy-index ]
                                 && zzxxmla1_cl_model=>c_separator.
           ENDDO.
         ENDIF.
@@ -1698,7 +1722,7 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
           APPEND 0 TO default_group-sums.
         ELSE.
           column = column + 1.
-          sum = row[ column ].
+          sum = <row>[ column ].
           APPEND COND decfloat34( WHEN sum IS INITIAL THEN 0 ELSE sum ) TO default_group-sums.
         ENDIF.
       ENDLOOP.

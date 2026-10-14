@@ -111,14 +111,15 @@ CLASS zzxxmla1_cl_sql IMPLEMENTATION.
       APPEND VALUE #( sql = sql rows = lines( <rows> ) time = stopped - started ) TO statement_log.
     ENDIF.
 
+    " each row's values appended to its line of the result in place, not to a table of its own copied there
     LOOP AT <rows> ASSIGNING FIELD-SYMBOL(<row>).
-      DATA(values) = VALUE string_table( ).
+      APPEND INITIAL LINE TO result ASSIGNING FIELD-SYMBOL(<values>).
       DO columns TIMES.
         ASSIGN COMPONENT sy-index OF STRUCTURE <row> TO FIELD-SYMBOL(<value>).
-        APPEND <value> TO values.
+        APPEND <value> TO <values>.
       ENDDO.
-      APPEND values TO result.
     ENDLOOP.
+    FREE <rows>.
   ENDMETHOD.
 
   METHOD reset_statistics.

@@ -55,10 +55,17 @@ CLASS zzxxmla1_cl_xmla_mddataset DEFINITION
       IMPORTING name    TYPE string
       EXPORTING element TYPE string
                 type    TYPE string.
+    TYPES ty_t_code TYPE STANDARD TABLE OF i WITH EMPTY KEY.
+    "! The cell properties as cell_xml writes them, in their order: 1 VALUE, 2 FORMATTED_VALUE, 3 FORMAT_STRING,
+    "! 4 FONT_FLAGS; the others have no element in a cell.
+    CLASS-METHODS cell_codes
+      IMPORTING properties    TYPE string_table
+      RETURNING VALUE(result) TYPE ty_t_code.
     "! The elements of one cell (MDDataSet_Multidimensional.emitCell); empty if the cell is left out.
+    "! @parameter codes | the cell properties asked for (cell_codes)
     CLASS-METHODS cell_xml
       IMPORTING cell          TYPE zzxxmla1_cl_mdx_engine=>ty_cell
-                properties    TYPE string_table
+                codes         TYPE ty_t_code
                 excel         TYPE abap_bool
       RETURNING VALUE(result) TYPE string.
     CLASS-METHODS axis_info
@@ -105,16 +112,17 @@ CLASS zzxxmla1_cl_xmla_mddataset IMPLEMENTATION.
       axes_info = axes_info && `          <AxisInfo name="SlicerAxis"/>` && nl.
     ENDIF.
 
-    " the pieces are joined once: appending a method's result to a string copies the string every time
+    " the pieces are joined once, the cells' lines between the head and the tail: appending a method's result to a
+    " string copies the string every time, and a grid's answer has some hundred megabytes
     DATA(cell_lines) = VALUE string_table( ).
-    LOOP AT result-cells INTO DATA(cell).
+    DATA(codes) = cell_codes( result-cell_properties ).
+    LOOP AT result-cells ASSIGNING FIELD-SYMBOL(<cell>).
       " the cube's annotation olap4abap.omitEmptyCells (our extension): only the cells with a value, and the first
-      IF result-omit_empty_cells = abap_true AND cell-empty = abap_true AND cell-ordinal <> 0.
+      IF result-omit_empty_cells = abap_true AND <cell>-empty = abap_true AND <cell>-ordinal <> 0.
         CONTINUE.
       ENDIF.
-      APPEND cell_xml( cell = cell properties = result-cell_properties excel = excel ) TO cell_lines.
+      APPEND cell_xml( cell = <cell> codes = codes excel = excel ) TO cell_lines.
     ENDLOOP.
-    DATA(cells) = concat_lines_of( cell_lines ).
     DATA(cell_info) = VALUE string( ).
     LOOP AT result-cell_properties INTO DATA(cell_property_name).
       cell_property( EXPORTING name = cell_property_name IMPORTING element = DATA(element) type = DATA(type) ).
@@ -124,7 +132,7 @@ CLASS zzxxmla1_cl_xmla_mddataset IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
 
-    xml =
+    DATA(head) =
       `<?xml version="1.0" encoding="UTF-8"?>` && nl &&
       `<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">` && nl &&
       `<SOAP-ENV:Header>` && nl &&
@@ -151,13 +159,18 @@ CLASS zzxxmla1_cl_xmla_mddataset IMPLEMENTATION.
       `      </OlapInfo>` && nl &&
       COND string( WHEN axes_data IS INITIAL THEN `      <Axes/>` && nl
                    ELSE `      <Axes>` && nl && axes_data && `      </Axes>` && nl ) &&
-      COND string( WHEN cells IS INITIAL THEN `      <CellData/>` && nl
-                   ELSE `      <CellData>` && nl && cells && `      </CellData>` && nl ) &&
+      COND string( WHEN cell_lines IS INITIAL THEN `      <CellData/>` && nl
+                   ELSE `      <CellData>` && nl ).
+    DATA(tail) =
+      COND string( WHEN cell_lines IS NOT INITIAL THEN `      </CellData>` && nl ) &&
       `    </root>` && nl &&
       `  </return>` && nl &&
       `</ExecuteResponse>` && nl &&
       `</SOAP-ENV:Body>` && nl &&
       `</SOAP-ENV:Envelope>` && nl.
+    INSERT head INTO cell_lines INDEX 1.
+    APPEND tail TO cell_lines.
+    xml = concat_lines_of( cell_lines ).
   ENDMETHOD.
 
   METHOD text.
@@ -298,6 +311,21 @@ CLASS zzxxmla1_cl_xmla_mddataset IMPLEMENTATION.
     ENDCASE.
   ENDMETHOD.
 
+  METHOD cell_codes.
+    LOOP AT properties INTO DATA(property).
+      CASE property.
+        WHEN `VALUE`.
+          APPEND 1 TO result.
+        WHEN `FORMATTED_VALUE`.
+          APPEND 2 TO result.
+        WHEN `FORMAT_STRING`.
+          APPEND 3 TO result.
+        WHEN `FONT_FLAGS`.
+          APPEND 4 TO result.
+      ENDCASE.
+    ENDLOOP.
+  ENDMETHOD.
+
   METHOD cell_xml.
     " the values of the asked properties that the cell has: no Value for an empty cell, an empty FmtValue, the format
     " string, font flags 0; LANGUAGE, BACK_COLOR and FORE_COLOR have none. A cell with none of them is left out, except
@@ -305,24 +333,27 @@ CLASS zzxxmla1_cl_xmla_mddataset IMPLEMENTATION.
     DATA(nl) = cl_abap_char_utilities=>newline.
     DATA(elements) = VALUE string( ).
     DATA(any) = abap_false.
-    LOOP AT properties INTO DATA(property).
-      CASE property.
-        WHEN `VALUE`.
+    LOOP AT codes INTO DATA(code).
+      CASE code.
+        WHEN 1.
           IF cell-empty = abap_false.
             DATA(value_type) = COND string( WHEN excel = abap_true AND cell-value_type = `xsd:integer` THEN `xsd:int`
                                             ELSE cell-value_type ).
-            elements = elements && |          <Value xsi:type="{ value_type }">{ text( cell-value ) }</Value>| && nl.
+            " a number's text has nothing to escape
+            elements = elements && |          <Value xsi:type="{ value_type }">| &&
+                       COND string( WHEN value_type = `xsd:double` THEN cell-value ELSE text( cell-value ) ) &&
+                       `</Value>` && nl.
             any = abap_true.
           ENDIF.
-        WHEN `FORMATTED_VALUE`.
+        WHEN 2.
           elements = elements && COND string( WHEN cell-empty = abap_true THEN `          <FmtValue/>`
                                               ELSE |          <FmtValue>{ text( cell-formatted ) }</FmtValue>| ) && nl.
           any = abap_true.
-        WHEN `FORMAT_STRING`.
+        WHEN 3.
           elements = elements && COND string( WHEN cell-format_string IS INITIAL THEN `          <FormatString/>`
                                               ELSE |          <FormatString>{ text( cell-format_string ) }</FormatString>| ) && nl.
           any = abap_true.
-        WHEN `FONT_FLAGS`.
+        WHEN 4.
           elements = elements && `          <FontFlags>0</FontFlags>` && nl.
           any = abap_true.
       ENDCASE.

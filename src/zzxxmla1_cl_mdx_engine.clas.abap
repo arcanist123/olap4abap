@@ -418,6 +418,11 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       EXPORTING done             TYPE abap_bool
                 cells            TYPE ty_t_cell
                 kept             TYPE ty_t_kept.
+    "! fast_cells: the key of an axis' tuple from a group's paths at the positions given, separated by the separator
+    CLASS-METHODS fast_key
+      IMPORTING paths         TYPE string_table
+                positions     TYPE zzxxmla1_cl_mdx_facts=>ty_t_index
+      RETURNING VALUE(result) TYPE string.
     "! The NON EMPTY axes at the indexes filtered by NonEmpty(set, {measures}) in the context of the slicer with the
     "! evaluator (non_empty_axis), a phase of its own.
     METHODS filter_by_evaluator
@@ -3181,7 +3186,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       BEGIN OF ty_fast_tuple,
         pattern TYPE string,   " hierarchy:level of each: the pattern of their filters
         filters TYPE zzxxmla1_cl_mdx_facts=>ty_t_filter,
-        key     TYPE string,   " their paths, each followed by the separator
+        key     TYPE string,   " their paths, separated by the separator (one filter: its path)
         measure TYPE i,        " the measure it sets; 0: none
       END OF ty_fast_tuple,
       "! the tuples of a pattern with one key, their positions in the axis from 1
@@ -3212,13 +3217,24 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         filter   TYPE zzxxmla1_cl_mdx_facts=>ty_filter,
       END OF ty_fast_source,
       ty_t_fast_source TYPE STANDARD TABLE OF ty_fast_source WITH EMPTY KEY,
+      "! an axis in a combination: the positions of its filters among the sources, the tuples of its pattern by key
+      BEGIN OF ty_fast_part,
+        positions TYPE ty_t_index,
+        keys      TYPE REF TO ty_t_fast_key,
+        stride    TYPE i,
+      END OF ty_fast_part,
+      ty_t_fast_part TYPE STANDARD TABLE OF ty_fast_part WITH EMPTY KEY,
       "! a combination of a pattern of each axis (their positions) and the filters of its pattern of the facts; of a
       "! filtered axis (filter_axis) its pattern with the context only
       BEGIN OF ty_fast_combination,
         choice      TYPE ty_t_index,
         sources     TYPE ty_t_fast_source,
+        context     TYPE ty_t_index,       " the positions of the context's filters among the sources
+        parts       TYPE ty_t_fast_part,   " per axis
         filter_axis TYPE i,
       END OF ty_fast_combination.
+    DATA found TYPE STANDARD TABLE OF REF TO ty_fast_key WITH EMPTY KEY.
+    FIELD-SYMBOLS <part> TYPE ty_fast_part.
     DATA fast_axes TYPE STANDARD TABLE OF ty_fast_axis WITH EMPTY KEY.
     DATA sources TYPE ty_t_fast_source.
     DATA combinations TYPE STANDARD TABLE OF ty_fast_combination WITH EMPTY KEY.
@@ -3265,9 +3281,12 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
             measure_axis = axis_index.
           ELSEIF member-key_level > 0.
             fast_tuple-pattern = |{ fast_tuple-pattern }{ member-hier_id }:{ member-key_level },|.
+            IF fast_tuple-filters IS NOT INITIAL.
+              fast_tuple-key = fast_tuple-key && zzxxmla1_cl_model=>c_separator.
+            ENDIF.
             APPEND VALUE #( hierarchy = member-hier_id level = member-key_level path = member-path )
                    TO fast_tuple-filters.
-            fast_tuple-key = fast_tuple-key && member-path && zzxxmla1_cl_model=>c_separator.
+            fast_tuple-key = fast_tuple-key && member-path.
           ENDIF.
         ENDLOOP.
         APPEND fast_tuple TO <axis>-tuples.
@@ -3411,93 +3430,173 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       ENDLOOP.
     ENDLOOP.
 
+    " per combination each axis' tuples by key and the positions of its filters among the sources
+    LOOP AT combinations ASSIGNING FIELD-SYMBOL(<combination>).
+      LOOP AT fast_axes ASSIGNING <axis>.
+        axis_index = sy-tabix.
+        ASSIGN <axis>-patterns[ <combination>-choice[ axis_index ] ] TO <pattern>.
+        APPEND VALUE #( keys = REF #( <pattern>-keys ) stride = <axis>-stride ) TO <combination>-parts.
+      ENDLOOP.
+      LOOP AT <combination>-sources INTO source.
+        DATA(source_index) = sy-tabix.
+        IF source-axis = 0.
+          APPEND source_index TO <combination>-context.
+        ELSE.
+          ASSIGN <combination>-parts[ source-axis ] TO <part>.
+          APPEND source_index TO <part>-positions.
+        ENDIF.
+      ENDLOOP.
+    ENDLOOP.
+    found = VALUE #( FOR a = 1 WHILE a <= lines( fast_axes ) ( ) ).
+
     " the combinations' groups: with one statement (grouped), else with one per combination
     DATA(reads) = COND i( WHEN grouped = abap_true THEN 1 ELSE lines( patterns ) ).
+    DATA key TYPE string.
+    DATA ordinals TYPE ty_t_index.
+    " a measure that counts: its amount is the group's fact count
+    DATA(counting) = VALUE abap_bool_tab( FOR m IN stored_measures ( xsdbool( m-aggregator = `count` ) ) ).
+    DATA group_paths TYPE string_table.
+    DATA amount TYPE decfloat34.
     DO reads TIMES.
       DATA(read) = sy-index.
-      DATA(values) = COND zzxxmla1_cl_mdx_facts=>ty_t_cross_value(
-        WHEN grouped = abap_true THEN fact_reader->cross_values( patterns = patterns slicer = slicer_predicate )
-        ELSE fact_reader->cross_values( patterns = VALUE #( ( patterns[ read ] ) ) ) ).
-      LOOP AT values INTO DATA(value).
-        ASSIGN combinations[ COND i( WHEN grouped = abap_true THEN value-pattern ELSE read ) ]
-               TO FIELD-SYMBOL(<combination>).
-        " the key of each axis from the group's paths; the context's must be its own (not FOR ... IN fast_axes: it
-        " would copy every axis per group)
-        DATA(keys) = VALUE string_table( FOR a = 1 WHILE a <= lines( fast_axes ) ( ) ).
-        DATA(match) = abap_true.
-        LOOP AT <combination>-sources INTO source.
-          DATA(path) = value-paths[ sy-tabix ].
-          IF source-axis = 0.
-            IF path <> source-filter-path.
+      DATA(read_groups) = COND zzxxmla1_cl_mdx_facts=>ty_t_cross_groups(
+        WHEN grouped = abap_true THEN fact_reader->cross_groups( patterns = patterns slicer = slicer_predicate )
+        ELSE fact_reader->cross_groups( patterns = VALUE #( ( patterns[ read ] ) ) ) ).
+      LOOP AT read_groups INTO DATA(pattern_groups).
+        DATA(group_pattern) = COND i( WHEN grouped = abap_true THEN pattern_groups-pattern ELSE read ).
+        ASSIGN combinations[ group_pattern ] TO <combination>.
+        " a group's key is the keys of each filter's levels, each followed by the separator; with filters of one
+        " level each its keys are the paths
+        DATA(group_filters) = patterns[ group_pattern ]-filters.
+        DATA(flat) = abap_true.
+        LOOP AT group_filters TRANSPORTING NO FIELDS WHERE level > 1.
+          flat = abap_false.
+        ENDLOOP.
+        LOOP AT pattern_groups-groups->* ASSIGNING FIELD-SYMBOL(<group>) WHERE count > 0.
+          SPLIT <group>-key AT zzxxmla1_cl_model=>c_separator INTO TABLE group_paths.
+          IF flat = abap_true.
+            " an empty last key leaves no line
+            WHILE lines( group_paths ) < lines( group_filters ).
+              APPEND `` TO group_paths.
+            ENDWHILE.
+          ELSE.
+            DATA(tokens) = group_paths.
+            CLEAR group_paths.
+            DATA(position) = 0.
+            LOOP AT group_filters INTO filter.
+              DATA(group_path) = VALUE string( ).
+              DO filter-level TIMES.
+                position = position + 1.
+                group_path = group_path && COND string( WHEN sy-index > 1 THEN zzxxmla1_cl_model=>c_separator ) &&
+                             VALUE string( tokens[ position ] OPTIONAL ).
+              ENDDO.
+              APPEND group_path TO group_paths.
+            ENDLOOP.
+          ENDIF.
+          " the context's paths must be its own
+          DATA(match) = abap_true.
+          LOOP AT <combination>-context INTO source_index.
+            IF group_paths[ source_index ] <> <combination>-sources[ source_index ]-filter-path.
               match = abap_false.
               EXIT.
             ENDIF.
-          ELSE.
-            ASSIGN keys[ source-axis ] TO FIELD-SYMBOL(<axis_key>).
-            <axis_key> = <axis_key> && path && zzxxmla1_cl_model=>c_separator.
+          ENDLOOP.
+          IF match = abap_false.
+            CONTINUE.
           ENDIF.
-        ENDLOOP.
-        IF match = abap_false.
-          CONTINUE.
-        ENDIF.
-        " a filtered axis' tuples with these keys are kept
-        IF <combination>-filter_axis > 0.
-          DATA(kept_index) = line_index( kept[ axis = <combination>-filter_axis ] ).
-          ASSIGN fast_axes[ <combination>-filter_axis ]-patterns[ <combination>-choice[ <combination>-filter_axis ] ]
-                 TO <pattern>.
-          ASSIGN <pattern>-keys[ KEY primary_key COMPONENTS key = keys[ <combination>-filter_axis ] ] TO <key>.
-          IF sy-subrc = 0.
-            LOOP AT <key>-indexes INTO DATA(kept_position).
-              kept[ kept_index ]-keep[ kept_position ] = abap_true.
+          " a filtered axis' tuples with the group's key are kept
+          IF <combination>-filter_axis > 0.
+            ASSIGN <combination>-parts[ <combination>-filter_axis ] TO <part>.
+            key = fast_key( paths = group_paths positions = <part>-positions ).
+            ASSIGN <part>-keys->*[ KEY primary_key COMPONENTS key = key ] TO <key>.
+            IF sy-subrc = 0.
+              ASSIGN kept[ axis = <combination>-filter_axis ]-keep TO FIELD-SYMBOL(<keep>).
+              LOOP AT <key>-indexes INTO DATA(kept_position).
+                <keep>[ kept_position ] = abap_true.
+              ENDLOOP.
+            ENDIF.
+            CONTINUE.
+          ENDIF.
+          " the tuples of each axis with the group's key; the cell's ordinal the sum over the axes when each key has
+          " one tuple
+          ordinal = 0.
+          DATA(single) = abap_true.
+          DATA(missing) = abap_false.
+          LOOP AT <combination>-parts ASSIGNING <part>.
+            axis_index = sy-tabix.
+            IF lines( <part>-positions ) = 1.
+              ASSIGN <part>-keys->*[ KEY primary_key COMPONENTS key = group_paths[ <part>-positions[ 1 ] ] ] TO <key>.
+            ELSE.
+              key = fast_key( paths = group_paths positions = <part>-positions ).
+              ASSIGN <part>-keys->*[ KEY primary_key COMPONENTS key = key ] TO <key>.
+            ENDIF.
+            IF sy-subrc <> 0.
+              missing = abap_true.
+              EXIT.
+            ENDIF.
+            found[ axis_index ] = REF #( <key> ).
+            IF lines( <key>-indexes ) = 1.
+              ordinal = ordinal + ( <key>-indexes[ 1 ] - 1 ) * <part>-stride.
+            ELSE.
+              single = abap_false.
+            ENDIF.
+          ENDLOOP.
+          IF missing = abap_true.
+            CONTINUE.
+          ENDIF.
+          IF single = abap_true.
+            ordinals = VALUE #( ( ordinal ) ).
+          ELSE.
+            ordinals = VALUE #( ( 0 ) ).
+            LOOP AT <combination>-parts ASSIGNING <part>.
+              " a table of its own: VALUE clears its target first
+              DATA(stride) = <part>-stride.
+              DATA(before) = ordinals.
+              ordinals = VALUE #( FOR o IN before FOR i IN found[ sy-tabix ]->indexes ( o + ( i - 1 ) * stride ) ).
             ENDLOOP.
           ENDIF.
-          CONTINUE.
-        ENDIF.
-        " the cells of the tuples with these keys
-        DATA(ordinals) = VALUE ty_t_index( ( 0 ) ).
-        LOOP AT fast_axes ASSIGNING <axis>.
-          axis_index = sy-tabix.
-          ASSIGN <axis>-patterns[ <combination>-choice[ axis_index ] ] TO <pattern>.
-          ASSIGN <pattern>-keys[ KEY primary_key COMPONENTS key = keys[ axis_index ] ] TO <key>.
-          IF sy-subrc <> 0.
-            CLEAR ordinals.
-            EXIT.
-          ENDIF.
-          " a table of its own: VALUE clears its target first
-          DATA(stride) = <axis>-stride.
-          DATA(before) = ordinals.
-          ordinals = VALUE #( FOR o IN before FOR i IN <key>-indexes ( o + ( i - 1 ) * stride ) ).
-        ENDLOOP.
-        LOOP AT ordinals INTO ordinal.
-          IF measure_axis > 0.
-            measure_index = fast_axes[ measure_axis ]-tuples[ ( ordinal DIV measure_stride ) MOD measure_size + 1 ]-measure.
-          ENDIF.
-          " evaluate_current's value of the cell, written as compute_cell writes it
-          ASSIGN written[ measure = measure_index amount = value-amounts[ measure_index ] ] TO FIELD-SYMBOL(<written>).
-          IF sy-subrc <> 0.
-            IF lines( written ) >= c_max_written.
-              CLEAR written.
+          LOOP AT ordinals INTO ordinal.
+            IF measure_axis > 0.
+              measure_index = fast_axes[ measure_axis ]-tuples[ ( ordinal DIV measure_stride ) MOD measure_size + 1 ]-measure.
             ENDIF.
-            DATA(number) = VALUE zzxxmla1_if_mdx_evaluator=>ty_value(
-                             kind = zzxxmla1_cl_mdx_evaluator=>c_value-numeric number = value-amounts[ measure_index ] ).
-            INSERT VALUE #( measure   = measure_index
-                            amount    = value-amounts[ measure_index ]
-                            value     = zzxxmla1_cl_mdx_format=>xmla_double( number-number )
-                            formatted = COND #( WHEN want_formatted = abap_true
-                                                THEN zzxxmla1_cl_mdx_format=>format_number(
-                                                       value = number-number
-                                                       format_string = stored_measures[ measure_index ]-format ) ) )
-                   INTO TABLE written ASSIGNING <written>.
-          ENDIF.
-          ASSIGN cells[ ordinal + 1 ] TO FIELD-SYMBOL(<cell>).
-          <cell>-empty = abap_false.
-          <cell>-value_type = `xsd:double`.
-          <cell>-value = <written>-value.
-          <cell>-formatted = <written>-formatted.
+            " evaluate_current's value of the cell, written as compute_cell writes it
+            amount = COND #( WHEN counting[ measure_index ] = abap_true THEN <group>-count
+                             ELSE <group>-sums[ measure_index ] ).
+            ASSIGN written[ measure = measure_index amount = amount ] TO FIELD-SYMBOL(<written>).
+            IF sy-subrc <> 0.
+              IF lines( written ) >= c_max_written.
+                CLEAR written.
+              ENDIF.
+              DATA(number) = VALUE zzxxmla1_if_mdx_evaluator=>ty_value(
+                               kind = zzxxmla1_cl_mdx_evaluator=>c_value-numeric number = amount ).
+              INSERT VALUE #( measure   = measure_index
+                              amount    = amount
+                              value     = zzxxmla1_cl_mdx_format=>xmla_double( number-number )
+                              formatted = COND #( WHEN want_formatted = abap_true
+                                                  THEN zzxxmla1_cl_mdx_format=>format_number(
+                                                         value = number-number
+                                                         format_string = stored_measures[ measure_index ]-format ) ) )
+                     INTO TABLE written ASSIGNING <written>.
+            ENDIF.
+            ASSIGN cells[ ordinal + 1 ] TO FIELD-SYMBOL(<cell>).
+            <cell>-empty = abap_false.
+            <cell>-value_type = `xsd:double`.
+            <cell>-value = <written>-value.
+            <cell>-formatted = <written>-formatted.
+          ENDLOOP.
         ENDLOOP.
       ENDLOOP.
     ENDDO.
     done = abap_true.
+  ENDMETHOD.
+
+  METHOD fast_key.
+    LOOP AT positions INTO DATA(position).
+      IF sy-tabix > 1.
+        result = result && zzxxmla1_cl_model=>c_separator.
+      ENDIF.
+      result = result && paths[ position ].
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD axis_filter_needed.
