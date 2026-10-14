@@ -613,6 +613,9 @@ evaluation (`MemberArrayValueCalc`; before, `([Measures].[Foo], [Time].CurrentMe
 
 ## Later
 
+- The Discover cache (`docs/mvp-scope.md`, Discover cache decision) is cleared only by schema changes and expires
+  after 12 hours: clear it, or the answers of the cube concerned, when BW activates master data of a characteristic or
+  loads a request into a provider of a catalog.
 - Done: compound slicer (a set of several tuples in WHERE); Mondrian aggregates over the slicer tuples
   (`RolapResult`, `CompoundSlicerRolapMember`).
 - Done: `VisualTotals`, `CurrentDateMember`, `Parameter`, `LastNonEmpty`, `CASE`, `CoalesceEmpty`,

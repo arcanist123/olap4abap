@@ -14,6 +14,7 @@ CLASS ltc_xmla_handler DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION
   PRIVATE SECTION.
     METHODS unsupported_statements FOR TESTING.
     METHODS supported_statements FOR TESTING.
+    METHODS discover_key FOR TESTING.
 ENDCLASS.
 
 CLASS zzxxmla1_cl_xmla_handler DEFINITION LOCAL FRIENDS ltc_xmla_handler.
@@ -54,6 +55,32 @@ CLASS ltc_xmla_handler IMPLEMENTATION.
     cl_abap_unit_assert=>assert_initial( zzxxmla1_cl_xmla_handler=>unsupported_statement(
       `CREATE SESSION CUBES` ) ).
     cl_abap_unit_assert=>assert_initial( zzxxmla1_cl_xmla_handler=>unsupported_statement( `` ) ).
+  ENDMETHOD.
+
+  METHOD discover_key.
+    DATA(request) = VALUE zzxxmla1_cl_xmla_handler=>ty_request(
+      method       = `DISCOVER`
+      type         = `MDSCHEMA_CUBES`
+      restrictions = VALUE #( ( name = `CATALOG_NAME` value = `FoodMart` ) )
+      properties   = VALUE #( ( name = `Catalog` value = `FoodMart` ) ( name = `Content` value = `Data` ) )
+      session_id   = `abc` ).
+    DATA(key) = zzxxmla1_cl_xmla_handler=>discover_key( request = request url = `http://x/zzxxmla1` ).
+    cl_abap_unit_assert=>assert_equals(
+      act = key
+      exp = |DISCOVER MDSCHEMA_CUBES\nURL http://x/zzxxmla1\nR CATALOG_NAME=FoodMart\nP Catalog=FoodMart\nP Content=Data| ).
+    " another session asks the same
+    request-session_id = `def`.
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_xmla_handler=>discover_key( request = request url = `http://x/zzxxmla1` )
+                                        exp = key ).
+    " a restriction is not a property
+    DATA(other) = request.
+    other-restrictions = VALUE #( ).
+    other-properties = VALUE #( ( name = `CATALOG_NAME` value = `FoodMart` ) ( LINES OF request-properties ) ).
+    cl_abap_unit_assert=>assert_differs( act = zzxxmla1_cl_xmla_handler=>discover_key( request = other url = `http://x/zzxxmla1` )
+                                         exp = key ).
+    " another URL
+    cl_abap_unit_assert=>assert_differs( act = zzxxmla1_cl_xmla_handler=>discover_key( request = request url = `http://y/zzxxmla1` )
+                                         exp = key ).
   ENDMETHOD.
 
 ENDCLASS.

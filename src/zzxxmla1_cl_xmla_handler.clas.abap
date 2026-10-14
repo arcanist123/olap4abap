@@ -281,6 +281,13 @@ CLASS zzxxmla1_cl_xmla_handler DEFINITION
     CLASS-METHODS unsupported_statement
       IMPORTING statement     TYPE string
       RETURNING VALUE(result) TYPE string.
+    "! The text of everything of a Discover request its answer depends on, the key of ZZXXMLA1_CL_DISCOVER_CACHE: the
+    "! request type, the URL (DISCOVER_DATASOURCES), the restrictions and the properties in the order they came in (a
+    "! property given twice is read at its first place). The session is not in it: its header is added afterwards.
+    CLASS-METHODS discover_key
+      IMPORTING request       TYPE ty_request
+                url           TYPE string
+      RETURNING VALUE(result) TYPE string.
     "! The response body with the Session header element of the request's session, if it has one.
     METHODS with_session
       IMPORTING body          TYPE string
@@ -302,11 +309,29 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
         result = fault_result( fault ).
         RETURN.
     ENDTRY.
+    " a Discover answer is kept (ZZXXMLA1_CL_DISCOVER_CACHE): the same request is answered without reading the schemas
+    IF parsed-method = `DISCOVER`.
+      DATA(cache_key) = discover_key( request = parsed url = url ).
+      result-body = zzxxmla1_cl_discover_cache=>read( cache_key ).
+      IF result-body IS NOT INITIAL.
+        result-status = 200.
+        result-body = with_session( body = result-body request = parsed ).
+        RETURN.
+      ENDIF.
+      DATA started TYPE timestampl.
+      GET TIME STAMP FIELD started.
+    ENDIF.
     TRY.
         repository = zzxxmla1_cl_repository=>get( ).
         schema = zzxxmla1_cl_schema=>get( ).
         data_source = repository->data_source( VALUE #( parsed-properties[ name = 'DataSourceInfo' ]-value OPTIONAL ) ).
         result = VALUE #( status = 200 body = process( request = parsed url = url ) ).
+        IF cache_key IS NOT INITIAL.
+          zzxxmla1_cl_discover_cache=>write( key          = cache_key
+                                             request_type = parsed-type
+                                             response     = result-body
+                                             started      = started ).
+        ENDIF.
       CATCH zzxxmla1_cx_xmla INTO fault.
         result = fault_result( fault ).
       CATCH zzxxmla1_cx_sql INTO DATA(sql_error).
@@ -316,6 +341,16 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
           description = |olap4abap Error:Internal error: { sql_error->get_text( ) }| ) ).
     ENDTRY.
     result-body = with_session( body = result-body request = parsed ).
+  ENDMETHOD.
+
+  METHOD discover_key.
+    result = |{ request-method } { request-type }\nURL { url }|.
+    LOOP AT request-restrictions INTO DATA(restriction).
+      result = |{ result }\nR { restriction-name }={ restriction-value }|.
+    ENDLOOP.
+    LOOP AT request-properties INTO DATA(property).
+      result = |{ result }\nP { property-name }={ property-value }|.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD with_session.

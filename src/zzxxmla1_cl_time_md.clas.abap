@@ -320,6 +320,8 @@ CLASS zzxxmla1_cl_time_md IMPLEMENTATION.
                                                 values         = sid_values( usable )
                                                 calendar       = interval-calendar ).
     ENDIF.
+    " new members of the time dimensions: the kept Discover answers (MDSCHEMA_MEMBERS, cardinalities) are old
+    zzxxmla1_cl_discover_cache=>clear( ).
     COMMIT WORK.
   ENDMETHOD.
 

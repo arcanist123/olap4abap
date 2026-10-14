@@ -126,6 +126,19 @@ Decisions taken by the project owner on 2026-10-02, with reasons.
 - The schema generator proposes the annotation on every cube (on by default, 2026-10-14); the cube's pane in the UI
   switches it ("Omit empty cells"). FoodMart's reference schemas stay without it.
 
+## Discover cache decision (2026-10-14)
+
+- **Discover answers are kept** for 12 hours (`ZZXXMLA1_CL_DISCOVER_CACHE=>c_valid_hours`) in table
+  `ZZXXMLA1_DSCACHE`, gzipped, keyed by the SHA-1 of the request's text (`ZZXXMLA1_CL_XMLA_HANDLER=>discover_key`:
+  request type, URL, restrictions, properties; the text is kept and compared too). A hit is answered before the
+  repository and the schemas are read; the session header is added to it as to any answer. Faults are not kept.
+  The reference keeps its schemas in memory, not its answers; this is our extension.
+- **Invalidation:** every write or delete of a server file (`ZZXXMLA1_CL_FILES`: accept, remove, `sap-files.py`,
+  setup) and the time master data fill clear the table in their LUW; an answer started before a file changed is not
+  kept (`ZZXXMLA1_FILE-CHANGED_AT`). Its own table, not the file store: the cache is data, not a file of the server.
+- **Not in the MVP:** BW-specific checks of master data and facts (a characteristic's master data activated, a request
+  loaded); until then members and cardinalities changed in BW are seen after 12 hours at most.
+
 ## Catalog decision (2026-10-06, may be revisited)
 
 - Mondrian's levels are **data source → catalog → schema → cube**: `/WEB-INF/datasources.xml` lists data sources, each

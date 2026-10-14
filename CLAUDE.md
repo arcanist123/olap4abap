@@ -152,6 +152,11 @@ Read before designing anything:
   (`c_retention_days`) and the expired users' rows. "Delete all" on the page deletes every traced call. The list is the newest calls, filtered on the server by user,
   by toggles Discover/Execute (`method`) and limited by "Show N newest" (`max`, 200 by default, at most 10,000). The user is sy-uname: while the node logs on anonymously every caller is its service user. API: `GET trace`,
   `trace/entry`, `trace/response`, `POST trace/on`, `trace/off`, `trace/clear` (`scripts/trace_test.py`).
+- Discover cache: `ZZXXMLA1_CL_XMLA_HANDLER` answers a Discover request it answered before from table
+  `ZZXXMLA1_DSCACHE` (`ZZXXMLA1_CL_DISCOVER_CACHE`, gzipped, valid 12 hours, keyed by `discover_key`: type, URL,
+  restrictions, properties), without reading the schemas; only answers without fault are kept. Every write or delete
+  of a server file (`ZZXXMLA1_CL_FILES`) and the time master data fill clear it; BW master data and fact loads do not
+  yet (`docs/mvp-scope.md`, Discover cache decision).
 - Execute: the MDX parser is a port of Mondrian's JavaCC grammar `MdxParser.jj` (`ZZXXMLA1_CL_MDX_TOKEN_MANAGER`,
   `ZZXXMLA1_CL_MDX_PARSER`, tree `ZZXXMLA1_CL_MDX_NODE`). It parses the whole grammar, with Mondrian's error texts, and its
   unit tests carry Mondrian's `ParserTest`. Keep it in step with `MdxParser.jj`: change the grammar there first, then port.
@@ -279,8 +284,8 @@ Read before designing anything:
   reference database holds copies of the BW tables and the same views (`docs/environment.md`, the reference database
   holds the BW tables).
 - Setup: program `ZZXXMLA1_SETUP` (`ZZXXMLA1_CL_SETUP`) makes a system ready after the package is imported (the table
-  `ZZXXMLA1_FILE` comes with it, `src/zzxxmla1_file.tabl.xml`, and so do `ZZXXMLA1_VIEW`, `ZZXXMLA1_TRACE` and
-  `ZZXXMLA1_TRCUSR`, which sapcli neither exports nor imports): it deletes
+  `ZZXXMLA1_FILE` comes with it, `src/zzxxmla1_file.tabl.xml`, and so do `ZZXXMLA1_VIEW`, `ZZXXMLA1_TRACE`,
+  `ZZXXMLA1_TRCUSR` and `ZZXXMLA1_DSCACHE`, which sapcli neither exports nor imports): it deletes
   the schema builder's old copies below `/schema/` and, if there is none, writes a
   `/WEB-INF/datasources.xml` without catalogs; with its checkbox also the clinic demo (`docs/clinic-demo.md`): InfoCube
   `ZCLVISIT` and aDSO `ZCLVISITA` with made-up visits of patients to a clinic, their schemas and catalogs

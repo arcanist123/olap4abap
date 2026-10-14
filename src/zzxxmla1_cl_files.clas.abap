@@ -39,11 +39,12 @@ CLASS zzxxmla1_cl_files DEFINITION
     "! The files sorted by path, without their content.
     CLASS-METHODS list
       RETURNING VALUE(result) TYPE ty_t_file.
-    "! Writes the file (a new one or a new content), changed now by the user; the caller commits.
+    "! Writes the file (a new one or a new content), changed now by the user, and clears the Discover answers kept
+    "! (ZZXXMLA1_CL_DISCOVER_CACHE); the caller commits.
     CLASS-METHODS write
       IMPORTING !path    TYPE csequence
                 !content TYPE string.
-    "! Deletes the file; the caller commits.
+    "! Deletes the file and clears the Discover answers kept; the caller commits.
     CLASS-METHODS delete
       IMPORTING !path TYPE csequence.
     "! The data sources file of a new server: one data source without catalogs (ZZXXMLA1_CL_SETUP writes it).
@@ -78,12 +79,15 @@ CLASS zzxxmla1_cl_files IMPLEMENTATION.
     row-changed_by = sy-uname.
     GET TIME STAMP FIELD row-changed_at.
     MODIFY zzxxmla1_file FROM @row.
+    " the kept Discover answers may be of the old file
+    zzxxmla1_cl_discover_cache=>clear( ).
   ENDMETHOD.
 
   METHOD delete.
     DATA key TYPE zzxxmla1_file-path.
     key = path.
     DELETE FROM zzxxmla1_file WHERE path = @key.
+    zzxxmla1_cl_discover_cache=>clear( ).
   ENDMETHOD.
 
   METHOD default_datasources.
