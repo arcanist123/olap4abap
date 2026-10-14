@@ -167,6 +167,19 @@ def main():
               == annotated - 1, (annotated, xml.count('olap4abap.membersWithFacts')))
         page.click("role=tab[name='Outline']")
 
+        # empty cells: the proposal omits them, the cube's pane switches it off and on
+        omit = page.locator("label.switch:has-text('Omit empty cells') input")
+        check("omit empty cells proposed", omit.is_checked())
+        omit.uncheck()
+        page.click("role=tab[name='XML']")
+        check("switched off: no annotation", "omitEmptyCells" not in page.input_value("textarea.xml"))
+        page.click("role=tab[name='Outline']")
+        page.locator("label.switch:has-text('Omit empty cells') input").check()
+        page.click("role=tab[name='XML']")
+        check("switched on again", '<Annotation name="olap4abap.omitEmptyCells">true</Annotation>'
+              in page.input_value("textarea.xml"))
+        page.click("role=tab[name='Outline']")
+
         # the double-click columns: the proposal's default drill-through action (each characteristic's value, its
         # text where it has one); a measure added; a renamed dimension's columns follow
         page.click(".tree .item:has-text('ZFMSALESA') >> nth=1")

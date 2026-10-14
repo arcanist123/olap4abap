@@ -113,6 +113,19 @@ Decisions taken by the project owner on 2026-10-02, with reasons.
   switches it per dimension in the cube pane and removes it from a dimension marked as time.
 - Open: HANA's plan for the semi-join on a large provider (a fact scan per member read, kept for the request by the member cache) not measured.
 
+## Empty cells decision (2026-10-14)
+
+- **The reference writes every empty cell** of an Execute answer whose cell properties include one an empty cell has
+  (`FORMAT_STRING`, `FONT_FLAGS`, which Excel always asks for; `XmlaHandler.emitCell` leaves out only a cell without
+  any). An Excel grid of two large levels with few facts is then almost only empty cells: on the wide demo 1,002,001
+  cells of which 11,945 have a value, 137 MB, which also comes close to the memory of the work process.
+- **Our extension, per cube:** the annotation `olap4abap.omitEmptyCells` (`true`) on the `Cube`
+  (`ZZXXMLA1_CL_SCHEMA=>c_omit_empty_cells`) leaves the empty cells out of `CellData`, but the first (ordinal 0), as
+  the reference keeps the first; a client takes a missing ordinal as an empty cell (as from SSAS, which writes no empty
+  cells). Default false: the reference's answer, which the tests compare with. The same grid is then 3 MB.
+- The schema generator proposes the annotation on every cube (on by default, 2026-10-14); the cube's pane in the UI
+  switches it ("Omit empty cells"). FoodMart's reference schemas stay without it.
+
 ## Catalog decision (2026-10-06, may be revisited)
 
 - Mondrian's levels are **data source → catalog → schema → cube**: `/WEB-INF/datasources.xml` lists data sources, each

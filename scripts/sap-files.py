@@ -78,11 +78,12 @@ def literal(text):
 def put(local, path):
     text = pathlib.Path(local).read_text(encoding="utf-8-sig").replace("\r\n", "\n")
     encoded = base64.b64encode(text.encode("utf-8")).decode("ascii")
-    lines = [f"  ( {literal(encoded[i:i + CHUNK])} )" for i in range(0, len(encoded), CHUNK)] or ["  ( `` )"]
+    # a statement per chunk: one VALUE of all of them exceeds the length of a statement for a large schema
+    lines = [f"APPEND {literal(encoded[i:i + CHUNK])} TO chunks." for i in range(0, len(encoded), CHUNK)]
     code = "\n".join([
-        "DATA(encoded) = concat_lines_of( VALUE string_table(",
+        "DATA chunks TYPE string_table.",
         *lines,
-        ") ).",
+        "DATA(encoded) = concat_lines_of( chunks ).",
         "zzxxmla1_cl_files=>write(",
         f"  path    = {literal(path)}",
         "  content = cl_abap_codepage=>convert_from( source   = cl_http_utility=>decode_x_base64( encoded )",

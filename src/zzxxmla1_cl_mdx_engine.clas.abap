@@ -98,6 +98,8 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
         cells       TYPE ty_t_cell,
         "! the CELL PROPERTIES of the query, upper case; VALUE and FORMATTED_VALUE if it names none
         cell_properties TYPE string_table,
+        "! the cube's annotation olap4abap.omitEmptyCells: the empty cells but the first are not written
+        omit_empty_cells TYPE abap_bool,
       END OF ty_result.
 
     "! The largest crossjoin a query may build (result.limit, Util.checkCJResultLimit); 0: no limit. The
@@ -374,6 +376,18 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
                 axis_index TYPE i
       CHANGING  cells      TYPE ty_t_cell
       RAISING   zzxxmla1_cx_xmla.
+    "! Our shortcut of the cells (the reference evaluates every cell, executeStripe, and reads the cells a pass missed
+    "! before the next): when no member of the context, the slicer or the axes is calculated or null, a cell is the
+    "! stored measure of its context aggregated over the facts of its non-All members (evaluate_current). The cells are
+    "! then made from the groups of the facts: per combination of the patterns of the axes' tuples one read
+    "! (ZZXXMLA1_CL_MDX_FACTS=>cross_values), each group put at the positions of the tuples with its paths, every
+    "! other cell empty. The answer is the same as executeStripe's. Not done (done false) for any other query.
+    METHODS fast_cells
+      IMPORTING evaluator TYPE ty_evaluator
+                axes      TYPE ty_t_axis
+                slicer    TYPE ty_tuple
+      EXPORTING done      TYPE abap_bool
+                cells     TYPE ty_t_cell.
     "! The cell of the evaluator's context as text: the value as XMLA writes it (XmlaHandler.ValueInfo), formatted with
     "! the format string of the context.
     METHODS compute_cell
@@ -1665,6 +1679,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     ENDDO.
 
     result-cube_name = cube-cube_name.
+    result-omit_empty_cells = cube-omit_empty_cells.
     " cut the fraction of the seconds as cl_abap_tstmp=>move_to_short does (not in 7.50); rounding could give second 60
     result-last_update = trunc( cube-generated_at ).
     " the cell properties: the name of each (its first segment), in upper case
@@ -1684,19 +1699,23 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     " no cell is missed, the final cells kept
     IF cells_needed( result = result non_empty = xsdbool( line_exists( query_axes[ non_empty = abap_true ] ) ) )
        = abap_true.
-      DATA(body) = evaluator->savepoint( ).
-      attempt = 0.
-      DO.
-        CLEAR result-cells.
-        evaluator->set_cell_reader( ).
-        execute_stripe( EXPORTING evaluator = evaluator axes = result-axes slicer = slicer_context
-                                  axis_index = lines( result-axes )
-                        CHANGING  cells = result-cells ).
-        evaluator->restore( body ).
-        IF phase( CHANGING attempt = attempt ) = abap_false.
-          EXIT.
-        ENDIF.
-      ENDDO.
+      fast_cells( EXPORTING evaluator = evaluator axes = result-axes slicer = slicer_context
+                  IMPORTING done = DATA(fast) cells = result-cells ).
+      IF fast = abap_false.
+        DATA(body) = evaluator->savepoint( ).
+        attempt = 0.
+        DO.
+          CLEAR result-cells.
+          evaluator->set_cell_reader( ).
+          execute_stripe( EXPORTING evaluator = evaluator axes = result-axes slicer = slicer_context
+                                    axis_index = lines( result-axes )
+                          CHANGING  cells = result-cells ).
+          evaluator->restore( body ).
+          IF phase( CHANGING attempt = attempt ) = abap_false.
+            EXIT.
+          ENDIF.
+        ENDDO.
+      ENDIF.
     ELSE.
       " no cell shows anything then, and only the first is written (Excel's member lists ask for CELL_ORDINAL only)
       DATA(cell_count) = 1.
@@ -3027,6 +3046,232 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       ENDLOOP.
     ENDIF.
     evaluator->restore( savepoint ).
+  ENDMETHOD.
+
+  METHOD fast_cells.
+    TYPES ty_t_index TYPE zzxxmla1_cl_mdx_facts=>ty_t_index.
+    TYPES:
+      "! a tuple of an axis: its non-All members of the hierarchies it sets (the slicer's set it last), by hierarchy
+      BEGIN OF ty_fast_tuple,
+        pattern TYPE string,   " hierarchy:level of each: the pattern of their filters
+        filters TYPE zzxxmla1_cl_mdx_facts=>ty_t_filter,
+        key     TYPE string,   " their paths, each followed by the separator
+        measure TYPE i,        " the measure it sets; 0: none
+      END OF ty_fast_tuple,
+      "! the tuples of a pattern with one key, their positions in the axis from 1
+      BEGIN OF ty_fast_key,
+        key     TYPE string,
+        indexes TYPE ty_t_index,
+      END OF ty_fast_key,
+      ty_t_fast_key TYPE HASHED TABLE OF ty_fast_key WITH UNIQUE KEY key,
+      "! the tuples of an axis with one pattern: the paths of each filter, their tuples by key
+      BEGIN OF ty_fast_pattern,
+        pattern TYPE string,
+        filters TYPE zzxxmla1_cl_mdx_facts=>ty_t_filter,
+        paths   TYPE zzxxmla1_cl_mdx_facts=>ty_t_paths,
+        keys    TYPE ty_t_fast_key,
+      END OF ty_fast_pattern,
+      BEGIN OF ty_fast_axis,
+        size     TYPE i,
+        stride   TYPE i,   " the ordinal of a cell is the sum of (position - 1) * stride over the axes
+        tuples   TYPE STANDARD TABLE OF ty_fast_tuple WITH EMPTY KEY,
+        patterns TYPE STANDARD TABLE OF ty_fast_pattern WITH EMPTY KEY,
+      END OF ty_fast_axis,
+      "! a filter of a combination of patterns: of the context (axis 0) or of the pattern of an axis (its position
+      "! among the pattern's filters)
+      BEGIN OF ty_fast_source,
+        axis     TYPE i,
+        position TYPE i,
+        filter   TYPE zzxxmla1_cl_mdx_facts=>ty_filter,
+      END OF ty_fast_source.
+    DATA fast_axes TYPE STANDARD TABLE OF ty_fast_axis WITH EMPTY KEY.
+    DATA sources TYPE STANDARD TABLE OF ty_fast_source WITH EMPTY KEY.
+    DATA slicer_hierarchies TYPE SORTED TABLE OF i WITH UNIQUE KEY table_line.
+    DATA axis_hierarchies TYPE SORTED TABLE OF i WITH UNIQUE KEY table_line.
+    DATA count TYPE int8 VALUE 1.
+
+    CLEAR: done, cells.
+    DATA(context) = evaluator->get_members( ).
+    IF line_exists( context[ calculated = abap_true ] ) OR line_exists( context[ is_null = abap_true ] )
+       OR line_exists( slicer[ calculated = abap_true ] ) OR line_exists( slicer[ is_null = abap_true ] ).
+      RETURN.
+    ENDIF.
+    LOOP AT slicer INTO DATA(member).
+      INSERT member-hier_id INTO TABLE slicer_hierarchies.
+    ENDLOOP.
+
+    " the axes' tuples by pattern and key
+    DATA(measure_axis) = 0.
+    LOOP AT axes INTO DATA(axis).
+      DATA(axis_index) = sy-tabix.
+      APPEND VALUE #( size = lines( axis-tuples ) stride = count ) TO fast_axes ASSIGNING FIELD-SYMBOL(<axis>).
+      count = count * lines( axis-tuples ).
+      LOOP AT axis-tuples INTO DATA(tuple).
+        IF line_exists( tuple[ calculated = abap_true ] ) OR line_exists( tuple[ is_null = abap_true ] ).
+          RETURN.
+        ENDIF.
+        SORT tuple BY hier_id ASCENDING.
+        DATA(fast_tuple) = VALUE ty_fast_tuple( ).
+        LOOP AT tuple INTO member.
+          IF line_exists( slicer_hierarchies[ table_line = member-hier_id ] ).
+            CONTINUE.
+          ENDIF.
+          INSERT member-hier_id INTO TABLE axis_hierarchies.
+          IF member-hier_id = zzxxmla1_if_mdx_schema_reader=>c_measures.
+            fast_tuple-measure = member-measure_index.
+            measure_axis = axis_index.
+          ELSEIF member-key_level > 0.
+            fast_tuple-pattern = |{ fast_tuple-pattern }{ member-hier_id }:{ member-key_level },|.
+            APPEND VALUE #( hierarchy = member-hier_id level = member-key_level path = member-path )
+                   TO fast_tuple-filters.
+            fast_tuple-key = fast_tuple-key && member-path && zzxxmla1_cl_model=>c_separator.
+          ENDIF.
+        ENDLOOP.
+        APPEND fast_tuple TO <axis>-tuples.
+        DATA(tuple_index) = lines( <axis>-tuples ).
+        ASSIGN <axis>-patterns[ pattern = fast_tuple-pattern ] TO FIELD-SYMBOL(<pattern>).
+        IF sy-subrc <> 0.
+          APPEND VALUE #( pattern = fast_tuple-pattern filters = fast_tuple-filters
+                          paths = VALUE #( FOR f IN fast_tuple-filters ( ) ) ) TO <axis>-patterns ASSIGNING <pattern>.
+        ENDIF.
+        ASSIGN <pattern>-keys[ KEY primary_key COMPONENTS key = fast_tuple-key ] TO FIELD-SYMBOL(<key>).
+        IF sy-subrc <> 0.
+          INSERT VALUE #( key = fast_tuple-key ) INTO TABLE <pattern>-keys ASSIGNING <key>.
+          LOOP AT fast_tuple-filters INTO DATA(filter).
+            ASSIGN <pattern>-paths[ sy-tabix ] TO FIELD-SYMBOL(<paths>).
+            APPEND filter-path TO <paths>.
+          ENDLOOP.
+        ENDIF.
+        APPEND tuple_index TO <key>-indexes.
+      ENDLOOP.
+    ENDLOOP.
+    IF count > cl_abap_math=>max_int4.
+      RETURN.
+    ENDIF.
+
+    " the context's filters: its non-All members of the hierarchies no axis sets
+    DATA(base_filters) = VALUE zzxxmla1_cl_mdx_facts=>ty_t_filter( ).
+    LOOP AT context INTO member WHERE hier_id > 0 AND key_level > 0.
+      IF NOT line_exists( axis_hierarchies[ table_line = member-hier_id ] ).
+        APPEND VALUE #( hierarchy = member-hier_id level = member-key_level path = member-path ) TO base_filters.
+      ENDIF.
+    ENDLOOP.
+    DATA(base_measure) = context[ zzxxmla1_if_mdx_schema_reader=>c_measures + 1 ]-measure_index.
+    IF base_measure = 0.
+      RETURN.
+    ENDIF.
+    DATA(stored_measures) = schema_reader->measures.
+
+    " every cell empty, with the format string of its measure (get_format_string: a stored measure's own)
+    DATA(measure_index) = base_measure.
+    DATA(measure_size) = 1.
+    DATA(measure_stride) = 1.
+    IF measure_axis > 0.
+      measure_size = fast_axes[ measure_axis ]-size.
+      measure_stride = fast_axes[ measure_axis ]-stride.
+    ENDIF.
+    DO CONV i( count ) TIMES.
+      DATA(ordinal) = sy-index - 1.
+      IF measure_axis > 0.
+        measure_index = fast_axes[ measure_axis ]-tuples[ ( ordinal DIV measure_stride ) MOD measure_size + 1 ]-measure.
+      ENDIF.
+      APPEND VALUE #( ordinal = ordinal empty = abap_true
+                      format_string = COND #( WHEN want_format_string = abap_true
+                                              THEN stored_measures[ measure_index ]-format ) ) TO cells.
+    ENDDO.
+    IF count = 0.
+      done = abap_true.
+      RETURN.
+    ENDIF.
+
+    " each combination of a pattern of each axis: its groups with facts are the cells that are not empty
+    DATA(choice) = VALUE ty_t_index( FOR fast_axis IN fast_axes ( 1 ) ).
+    DO.
+      sources = VALUE #( FOR base IN base_filters ( filter = base ) ).
+      LOOP AT fast_axes ASSIGNING <axis>.
+        axis_index = sy-tabix.
+        ASSIGN <axis>-patterns[ choice[ axis_index ] ] TO <pattern>.
+        LOOP AT <pattern>-filters INTO filter.
+          APPEND VALUE #( axis = axis_index position = sy-tabix filter = filter ) TO sources.
+        ENDLOOP.
+      ENDLOOP.
+      SORT sources BY filter-hierarchy ASCENDING.
+      DATA(filters) = VALUE zzxxmla1_cl_mdx_facts=>ty_t_filter( ).
+      DATA(paths) = VALUE zzxxmla1_cl_mdx_facts=>ty_t_paths( ).
+      LOOP AT sources INTO DATA(source).
+        APPEND VALUE #( hierarchy = source-filter-hierarchy level = source-filter-level ) TO filters.
+        IF source-axis = 0.
+          APPEND VALUE #( ( source-filter-path ) ) TO paths.
+        ELSE.
+          APPEND fast_axes[ source-axis ]-patterns[ choice[ source-axis ] ]-paths[ source-position ] TO paths.
+        ENDIF.
+      ENDLOOP.
+
+      LOOP AT fact_reader->cross_values( filters = filters paths = paths ) INTO DATA(value).
+        " the key of each axis from the group's paths; the context's must be its own
+        DATA(keys) = VALUE string_table( FOR fast_axis IN fast_axes ( ) ).
+        DATA(match) = abap_true.
+        LOOP AT sources INTO source.
+          DATA(path) = value-paths[ sy-tabix ].
+          IF source-axis = 0.
+            IF path <> source-filter-path.
+              match = abap_false.
+              EXIT.
+            ENDIF.
+          ELSE.
+            ASSIGN keys[ source-axis ] TO FIELD-SYMBOL(<axis_key>).
+            <axis_key> = <axis_key> && path && zzxxmla1_cl_model=>c_separator.
+          ENDIF.
+        ENDLOOP.
+        IF match = abap_false.
+          CONTINUE.
+        ENDIF.
+        " the cells of the tuples with these keys
+        DATA(ordinals) = VALUE ty_t_index( ( 0 ) ).
+        LOOP AT fast_axes ASSIGNING <axis>.
+          axis_index = sy-tabix.
+          ASSIGN <axis>-patterns[ choice[ axis_index ] ] TO <pattern>.
+          ASSIGN <pattern>-keys[ KEY primary_key COMPONENTS key = keys[ axis_index ] ] TO <key>.
+          IF sy-subrc <> 0.
+            CLEAR ordinals.
+            EXIT.
+          ENDIF.
+          " a table of its own: VALUE clears its target first
+          DATA(stride) = <axis>-stride.
+          DATA(before) = ordinals.
+          ordinals = VALUE #( FOR o IN before FOR i IN <key>-indexes ( o + ( i - 1 ) * stride ) ).
+        ENDLOOP.
+        LOOP AT ordinals INTO ordinal.
+          IF measure_axis > 0.
+            measure_index = fast_axes[ measure_axis ]-tuples[ ( ordinal DIV measure_stride ) MOD measure_size + 1 ]-measure.
+          ENDIF.
+          " evaluate_current's value of the cell, written as compute_cell writes it
+          DATA(number) = VALUE zzxxmla1_if_mdx_evaluator=>ty_value( kind   = zzxxmla1_cl_mdx_evaluator=>c_value-numeric
+                                                                   number = value-amounts[ measure_index ] ).
+          ASSIGN cells[ ordinal + 1 ] TO FIELD-SYMBOL(<cell>).
+          <cell>-empty = abap_false.
+          <cell>-value_type = `xsd:double`.
+          <cell>-value = zzxxmla1_cl_mdx_format=>xmla_double( number-number ).
+          <cell>-formatted = zzxxmla1_cl_mdx_format=>format_number( value         = number-number
+                                                                   format_string = stored_measures[ measure_index ]-format ).
+        ENDLOOP.
+      ENDLOOP.
+
+      " the next combination
+      DATA(next) = abap_false.
+      LOOP AT choice ASSIGNING FIELD-SYMBOL(<choice>).
+        IF <choice> < lines( fast_axes[ sy-tabix ]-patterns ).
+          <choice> = <choice> + 1.
+          next = abap_true.
+          EXIT.
+        ENDIF.
+        <choice> = 1.
+      ENDLOOP.
+      IF next = abap_false.
+        EXIT.
+      ENDIF.
+    ENDDO.
+    done = abap_true.
   ENDMETHOD.
 
   METHOD cells_needed.

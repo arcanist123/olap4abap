@@ -39,6 +39,14 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
       END OF ty_value.
     "! the paths of the filters marked any, in their order
     TYPES ty_t_paths TYPE STANDARD TABLE OF string_table WITH EMPTY KEY.
+    TYPES:
+      "! A group of cross_values: the path of each filter, in the order of the filters, and the value of each measure
+      "! (the fact count for a measure of aggregator count)
+      BEGIN OF ty_cross_value,
+        paths   TYPE string_table,
+        amounts TYPE STANDARD TABLE OF decfloat34 WITH EMPTY KEY,
+      END OF ty_cross_value,
+      ty_t_cross_value TYPE STANDARD TABLE OF ty_cross_value WITH EMPTY KEY.
     "! A node of the subcube predicate (the reference server's StarPredicate of Query.getSubcubePredicates): AND, OR or NOT of its
     "! children (indexes in the predicate table), MEMBER (the facts of a member: the key columns of its levels equal
     "! its path; the All member any fact), VALUE (a column of a hierarchy's table equal to a value, as text if quoted, or NULL,
@@ -133,6 +141,15 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
     "! max_constraints); true if so: the pass is to be evaluated again.
     METHODS load_aggregations
       RETURNING VALUE(result) TYPE abap_bool.
+    "! The cells of a crossjoin at once (our fast path, ZZXXMLA1_CL_MDX_ENGINE=>fast_cells): the groups with facts of
+    "! the pattern of the filters (their hierarchies and levels, sorted by hierarchy; their paths are not used), the
+    "! level columns constrained to the keys of the paths asked for, read with one query as load_aggregations reads a
+    "! batch, unless a segment read before covers them. Groups of other segments of the pattern may be among them.
+    "! @parameter paths | per filter the paths asked for
+    METHODS cross_values
+      IMPORTING filters       TYPE ty_t_filter
+                paths         TYPE ty_t_paths
+      RETURNING VALUE(result) TYPE ty_t_cross_value.
     "! The native crossjoin's tuple reader (SqlTupleReader with a SqlContextConstraint): the combinations of members of
     "! the levels of the filters marked any that have facts with the other filters, as their paths. The facts are
     "! grouped as for value, so this is one query, or none if value has grouped them so already.
@@ -545,6 +562,49 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
     ENDLOOP.
     dirty = abap_false.
     result = abap_true.
+  ENDMETHOD.
+
+  METHOD cross_values.
+    " each level column of a filter constrained to the keys of its paths at that level
+    DATA(constraint) = VALUE ty_t_constraint( ).
+    LOOP AT filters ASSIGNING FIELD-SYMBOL(<filter>).
+      DATA(filter_paths) = paths[ sy-tabix ].
+      DATA(first) = lines( constraint ).
+      DO <filter>-level TIMES.
+        APPEND INITIAL LINE TO constraint.
+      ENDDO.
+      LOOP AT filter_paths INTO DATA(path).
+        LOOP AT path_keys( path = path level = <filter>-level ) INTO DATA(key).
+          ASSIGN constraint[ first + sy-tabix ] TO FIELD-SYMBOL(<column>).
+          INSERT key INTO TABLE <column>-keys.
+        ENDLOOP.
+      ENDLOOP.
+    ENDLOOP.
+    DATA(entry) = cache_entry( filters ).
+    IF covered( segments = entry->segments constraint = constraint ) = abap_false.
+      load_segment( entry = entry constraint = constraint ).
+    ENDIF.
+
+    " a group's key is the keys of each filter's levels, each followed by the separator (load)
+    LOOP AT entry->groups ASSIGNING FIELD-SYMBOL(<group>) WHERE count > 0.
+      SPLIT <group>-key AT zzxxmla1_cl_model=>c_separator INTO TABLE DATA(keys).
+      DATA(value) = VALUE ty_cross_value( ).
+      DATA(index) = 0.
+      LOOP AT filters ASSIGNING <filter>.
+        DATA(group_path) = VALUE string( ).
+        DO <filter>-level TIMES.
+          index = index + 1.
+          group_path = group_path && COND string( WHEN sy-index > 1 THEN zzxxmla1_cl_model=>c_separator ) &&
+                       VALUE string( keys[ index ] OPTIONAL ).
+        ENDDO.
+        APPEND group_path TO value-paths.
+      ENDLOOP.
+      LOOP AT measures INTO DATA(measure).
+        APPEND COND decfloat34( WHEN measure-aggregator = `count` THEN <group>-count
+                                ELSE <group>-sums[ sy-tabix ] ) TO value-amounts.
+      ENDLOOP.
+      APPEND value TO result.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD cache_entry.

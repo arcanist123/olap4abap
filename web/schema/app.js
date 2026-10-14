@@ -137,8 +137,10 @@ function setAnnotation(el, name, value) {
   }
   annotations.appendChild(create(el.ownerDocument, 'Annotation', { name })).textContent = value;
 }
-const annotatedTrue = (el) => {
-  const a = annotationOf(el, MEMBERS_WITH_FACTS);
+// Our extension (ZZXXMLA1_CL_SCHEMA, c_omit_empty_cells): a cube leaves its empty cells but the first out of the answer.
+const OMIT_EMPTY_CELLS = 'olap4abap.omitEmptyCells';
+const annotatedTrue = (el, name = MEMBERS_WITH_FACTS) => {
+  const a = annotationOf(el, name);
   return a ? a.textContent.trim().toLowerCase() === 'true' : null;
 };
 // The selections of a cube (docs/bw-schema-design-guide.md, section 3.8): annotations olap4abap.filter.<C> (filter
@@ -603,6 +605,12 @@ function CubePane({ doc, edit, cube, select, characteristics }) {
         })}</span>`}
       <label>Default measure</label>
       <${Select} value=${defaultMeasure} options=${measureNames} onChange=${(v) => edit(() => setAttr(cube, 'defaultMeasure', v))} />
+      <label>Empty cells</label>
+      <span class="row">
+        <${Check} checked=${annotatedTrue(cube, OMIT_EMPTY_CELLS) ?? false} label="Omit empty cells"
+          onChange=${(on) => edit(() => setAnnotation(cube, OMIT_EMPTY_CELLS, on ? 'true' : null))} />
+        <span class="muted small">only the cells with a value are sent (olap4abap.omitEmptyCells); a client takes a missing cell as empty. Off: every cell, as the reference sends it</span>
+      </span>
     </div>
 
     <section class="section">

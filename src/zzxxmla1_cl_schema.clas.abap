@@ -43,6 +43,8 @@ CLASS zzxxmla1_cl_schema DEFINITION
         caption      TYPE string,
         fact_table   TYPE string,
         generated_at TYPE timestampl,  " when the schema was last changed
+        "! the empty cells of an answer are not written (the annotation c_omit_empty_cells)
+        omit_empty_cells TYPE abap_bool,
       END OF ty_cube,
       ty_t_cube TYPE STANDARD TABLE OF ty_cube WITH EMPTY KEY.
     TYPES:
@@ -132,6 +134,11 @@ CLASS zzxxmla1_cl_schema DEFINITION
     "! BW characteristic is shared by many providers, which use few of its values. On a DimensionUsage it overrides the
     "! shared Dimension's. Not on a time dimension yet (docs/mvp-scope.md, Members with facts).
     CONSTANTS c_members_with_facts TYPE string VALUE `olap4abap.membersWithFacts`.
+    "! The annotation of a Cube (our extension, which the reference ignores) whose value true leaves the empty cells
+    "! out of the cells of an Execute answer, but the first, as the reference leaves out a cell without any property
+    "! (MDDataSet_Multidimensional.emitCell): the reference writes every empty cell with its format string, so a grid
+    "! of few cells with facts is mostly empty cells. Default false, the reference's answer.
+    CONSTANTS c_omit_empty_cells TYPE string VALUE `olap4abap.omitEmptyCells`.
 
     "! The schemas of all catalogs of the server, read once per session.
     CLASS-METHODS get
@@ -217,6 +224,14 @@ CLASS zzxxmla1_cl_schema DEFINITION
                 foreign_key        TYPE string
                 dimension          TYPE zzxxmla1_cl_schema_def=>ty_dimension
                 members_with_facts TYPE abap_bool
+      RAISING   zzxxmla1_cx_xmla.
+    "! The value of a cube's annotation that is true or false (c_omit_empty_cells); false without it. Fails on another
+    "! value.
+    CLASS-METHODS cube_flag
+      IMPORTING annotations   TYPE REF TO zzxxmla1_cl_schema_def=>ty_annotations
+                name          TYPE string
+                cube_name     TYPE string
+      RETURNING VALUE(result) TYPE abap_bool
       RAISING   zzxxmla1_cx_xmla.
     "! The value of c_members_with_facts: the usage's annotation if it has one, else the dimension's; false without
     "! either. Fails on a value other than true or false.
@@ -368,7 +383,9 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
                     catalog_name = catalog
                     caption      = COND #( WHEN cube-caption IS NOT INITIAL THEN cube-caption ELSE cube-name )
                     fact_table   = fact->name
-                    generated_at = updated ) TO all_cubes.
+                    generated_at = updated
+                    omit_empty_cells = cube_flag( annotations = cube-annotations name = c_omit_empty_cells
+                                                  cube_name   = cube-name ) ) TO all_cubes.
 
     DATA dimensions TYPE ty_t_cube_dimension.
     LOOP AT cube-dimensions INTO DATA(node).
@@ -535,6 +552,21 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
     IF <dim>-dim_type = `Time` AND members_with_facts = abap_true.
       fail( |Dimension '{ name }': { c_members_with_facts } is not supported on a time dimension| ).
     ENDIF.
+  ENDMETHOD.
+
+  METHOD cube_flag.
+    IF annotations IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    READ TABLE annotations->array INTO DATA(annotation) WITH KEY name = name.
+    IF sy-subrc <> 0.
+      RETURN.
+    ENDIF.
+    DATA(value) = condense( to_lower( annotation-cdata ) ).
+    IF value <> `true` AND value <> `false`.
+      fail( |Cube '{ cube_name }': the annotation { name } must be true or false| ).
+    ENDIF.
+    result = xsdbool( value = `true` ).
   ENDMETHOD.
 
   METHOD members_with_facts.

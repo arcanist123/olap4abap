@@ -41,7 +41,8 @@
 "! proposed is a note with its reason; a level type the user may want when marking a dimension as time is a
 "! suggestion. Every dimension of the cube shows only its members with facts (the annotation olap4abap.membersWithFacts
 "! on its DimensionUsage, docs/mvp-scope.md, Members with facts decision): a characteristic is shared by many providers,
-"! which use few of its values; the UI switches it per dimension. The proposal is written as schema XML and read as the reference reads it (ZZXXMLA1_CL_SCHEMA_DEF), so the
+"! which use few of its values; the UI switches it per dimension. The cube leaves its empty cells out of the answer
+"! (olap4abap.omitEmptyCells, docs/mvp-scope.md, Empty cells decision), which the UI switches. The proposal is written as schema XML and read as the reference reads it (ZZXXMLA1_CL_SCHEMA_DEF), so the
 "! definition has the reference's defaults and the XML is toXML.
 "! A provider read for a selection (docs/bw-schema-design-guide.md, section 3.8, ZZXXMLA1_CL_BW_SELECTION) gives a
 "! cube with an annotation olap4abap.filter.CHARACTERISTIC or olap4abap.members.CHARACTERISTIC per restricted one,
@@ -469,19 +470,21 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
     open( name = `Cube` attributes = VALUE #( ( name = `name` value = provider-name )
                                               ( name = `caption` value = provider-text )
                                               ( name = `defaultMeasure` value = VALUE #( measures[ 1 ]-name OPTIONAL ) ) ) ).
-    IF provider-selection IS NOT INITIAL.
-      open( `Annotations` ).
-      LOOP AT provider-selection INTO DATA(restricted).
-        DATA(name) = zzxxmla1_cl_bw_selection=>annotation_name( characteristic = restricted-iobjnm
-                                                                mode           = restricted-mode ).
-        xml = xml && repeat( val = ` ` occ = 2 * depth )
-                  && |<Annotation name="{ escape( val = name format = cl_abap_format=>e_xml_attr ) }">|
-                  && |{ escape( val    = zzxxmla1_cl_bw_selection=>rows_text( restricted-rows )
-                                format = cl_abap_format=>e_xml_text ) }</Annotation>|
-                  && cl_abap_char_utilities=>newline.
-      ENDLOOP.
-      close( `Annotations` ).
-    ENDIF.
+    open( `Annotations` ).
+    " an answer without the empty cells (docs/mvp-scope.md, Empty cells decision); the UI switches it off
+    xml = xml && repeat( val = ` ` occ = 2 * depth )
+              && |<Annotation name="{ zzxxmla1_cl_schema=>c_omit_empty_cells }">true</Annotation>|
+              && cl_abap_char_utilities=>newline.
+    LOOP AT provider-selection INTO DATA(restricted).
+      DATA(name) = zzxxmla1_cl_bw_selection=>annotation_name( characteristic = restricted-iobjnm
+                                                              mode           = restricted-mode ).
+      xml = xml && repeat( val = ` ` occ = 2 * depth )
+                && |<Annotation name="{ escape( val = name format = cl_abap_format=>e_xml_attr ) }">|
+                && |{ escape( val    = zzxxmla1_cl_bw_selection=>rows_text( restricted-rows )
+                              format = cl_abap_format=>e_xml_text ) }</Annotation>|
+                && cl_abap_char_utilities=>newline.
+    ENDLOOP.
+    close( `Annotations` ).
     leaf( name = `Table` attributes = VALUE #( ( name = `name` value = provider-fact_table ) ) ).
     LOOP AT usages INTO DATA(usage).
       open( name = `DimensionUsage` attributes = VALUE #( ( name = `name` value = usage-name )

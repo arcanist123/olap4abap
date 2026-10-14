@@ -84,7 +84,9 @@ catalogs `NWCOMPANY` and `NWPRODUCT` (`examples/bw-schema/`):
   decision): the cube shows only the members with facts, since a characteristic is shared by many providers, which
   use few of its values. In the UI the column "Members with facts" of the cube's dimensions switches it (off for a
   dimension whose shared `Dimension` has it writes `false` on the usage); marking a dimension as time removes it from
-  the dimension and its usages, as the server refuses it there.
+  the dimension and its usages, as the server refuses it there;
+- on the `Cube` the annotation `olap4abap.omitEmptyCells` `true` (`mvp-scope.md`, Empty cells decision): an Execute
+  answer leaves its empty cells but the first out. In the UI "Omit empty cells" on the cube's pane switches it.
 
 ### Time
 

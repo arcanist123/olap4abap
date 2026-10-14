@@ -93,7 +93,8 @@ Read before designing anything:
   hierarchy `<char>__<attribute>` per navigation attribute the provider switches on; no attribute hierarchies, no
   user hierarchies (the user makes them in the UI); a default drill-through action with each characteristic's value
   and text, which the UI's "Double-click columns" adjusts; every dimension of the cube annotated
-  `olap4abap.membersWithFacts`, which the UI's "Members with facts" switches per dimension (not on time ones). The views (`ZZXXMLA1_CL_BW_VIEW_GEN`, one per basic
+  `olap4abap.membersWithFacts`, which the UI's "Members with facts" switches per dimension (not on time ones); the cube
+  annotated `olap4abap.omitEmptyCells`, which the cube pane's "Omit empty cells" switches. The views (`ZZXXMLA1_CL_BW_VIEW_GEN`, one per basic
   characteristic) carry the EN texts and the time-dependent attributes at 9999-12-31, and every column as BW holds it,
   NUMC with its zeros, each NUMC column followed by its number `COLUMN_INT`: the proposal names BW's values (`0042`,
   String), the UI's "As numbers" switches a dimension to the `_INT` columns (`intColumns` of the API; on an aDSO the
@@ -215,7 +216,12 @@ Read before designing anything:
   `Order` sorts in ABAP, break keys evaluated once per tuple into a table and the indexes merge-sorted (step 8). Execute
   answers carry the query's `DIMENSION PROPERTIES` (olap4j's standard member properties) and `CELL PROPERTIES`; when
   these show no cell's value (Excel's member lists ask for `CELL_ORDINAL` only), no axis is NON EMPTY and no member is
-  calculated, the cells are not evaluated (`cells_needed`, our shortcut; the answer is the same).
+  calculated, the cells are not evaluated (`cells_needed`, our shortcut; the answer is the same). When no member of
+  the context, the slicer or the axes is calculated or null, the cells are not evaluated one by one either
+  (`fast_cells`, our shortcut, same answer): per combination of the axes' level patterns one grouped fact query
+  (`ZZXXMLA1_CL_MDX_FACTS=>cross_values`), each group put at the positions of its tuples, every other cell empty
+  (Excel's 1,001 x 1,001 grid on `ZXMLWIDEA`: 75 s to 25 s). A cube annotated `olap4abap.omitEmptyCells` (`true`, our
+  extension, `docs/mvp-scope.md`, Empty cells decision) leaves its empty cells but the first out of the answer.
   Subselects (`FROM (SELECT ... FROM ...)`, Excel's pivot filters) are eMondrian's subcube: the axes of every inner
   SELECT become a predicate that every fact read adds (`Query.getSubcubePredicates`, `ZZXXMLA1_CL_MDX_FACTS=>set_subcube`),
   so totals cover only the subcube; member sets, `-`, `Head`, `CrossJoin`, `Union`, `Members` and `Filter` on the

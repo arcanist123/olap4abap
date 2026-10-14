@@ -108,6 +108,10 @@ CLASS zzxxmla1_cl_xmla_mddataset IMPLEMENTATION.
     " the pieces are joined once: appending a method's result to a string copies the string every time
     DATA(cell_lines) = VALUE string_table( ).
     LOOP AT result-cells INTO DATA(cell).
+      " the cube's annotation olap4abap.omitEmptyCells (our extension): only the cells with a value, and the first
+      IF result-omit_empty_cells = abap_true AND cell-empty = abap_true AND cell-ordinal <> 0.
+        CONTINUE.
+      ENDIF.
       APPEND cell_xml( cell = cell properties = result-cell_properties excel = excel ) TO cell_lines.
     ENDLOOP.
     DATA(cells) = concat_lines_of( cell_lines ).

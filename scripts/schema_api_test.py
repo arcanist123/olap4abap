@@ -55,6 +55,9 @@ def main():
     check("proposal of an InfoCube", status == 200 and body["xml"].startswith("<Schema name=\"ZFMSALES\"")
           and [m["name"] for m in cube.get("measures", [])] == ["ZFMUNITS", "ZFMSCOST", "ZFMSSALES"]
           and len(outline.get("dimensions", [])) == len(cube.get("dimensions", [])), body)
+    check("proposal: the cube omits its empty cells",
+          re.search(r'<Annotation name="olap4abap.omitEmptyCells">\s*true\s*</Annotation>', zfmsales_xml) is not None,
+          zfmsales_xml[zfmsales_xml.find("<Cube"):][:300])
 
     status, body, _ = call(args.url, args.client, "GET", "proposal", {"provider": "ZFMSALESA"})
     adso_xml = body.get("xml", "")
