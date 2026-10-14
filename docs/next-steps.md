@@ -65,6 +65,10 @@ keeps the answers: both test suites give the same answers with planning on and o
    `[Time].[1998]` case 134 to 122 ms, the 1,001 x 1,001 grid from an ICM timeout to 17 s; `xmla_test.py` 272 of 274
    (the two datasources cases), `compare-applicable.py` 394 of 395 (#64; #35 differed once in a parallel run, the same alone, with its
    neighbours and after a restart of eMondrian), SAP 196 to 216 s in total (271 s).
+   Left over (`query-planning.md`, Open): the grid's 17 s are ABAP (rows to groups and values about 7 s, placing
+   them 5 s, writing 633,830 cells, 119 MB); `fast_cells` formats every value although Excel's grid does not ask for
+   `FORMATTED_VALUE`; `GROUPING SETS` costs some 40 ms more than `GROUP BY` on the FoodMart InfoCube, to be measured
+   on a real provider; a calculated measure in a NON EMPTY query still filters its axis with the evaluator (step 4).
 4. Mixed queries: the relational inputs of computed nodes read as one batch before the first pass.
 5. More set nodes relational: `Filter` on a stored measure (`RolapNativeFilter`), `NonEmpty` with a second set.
 

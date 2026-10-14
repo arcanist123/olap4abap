@@ -232,8 +232,9 @@ step 2, runtime only):
 | 1,001 x 1,001 grid on `ZXMLWIDEA`           | ICM timeout (> 5 min)   | 17.1 s, 8 statements, 0.9 s SQL |
 
 The grid's 17 s are ABAP: about 7 s to turn 632,000 rows into groups and values (`ZZXXMLA1_CL_SQL=>query` 0.7 s,
-`load` 2 s, the rest the values), 5 s to place them, and writing the 119 MB answer (the wide schema is not annotated
-`omitEmptyCells`). `compare-applicable.py`: SAP 196 to 216 s in total (271 s at step 2).
+`load` 2 s, the rest the values), 5 s to place them, and writing the 119 MB answer. The schema is annotated
+`omitEmptyCells`: the answer has the 633,830 cells with a value only (of 1,002,001) and 2,002 members, the cells
+118.6 MB, some 187 characters each (value, format string and font flags, indented). `compare-applicable.py`: SAP 196 to 216 s in total (271 s at step 2).
 
 ## Semantics that must not change
 
@@ -306,3 +307,6 @@ runs were not.
   cache), which the wide aDSO did not show; a statement per pattern may be cheaper there when HANA's plan cache
   answers. Measure on a real provider before relying on either.
 - The grid's ABAP (groups to values, placement, writing the answer) is now its cost, not SQL.
+- `fast_cells` formats every value although the query may not ask for `FORMATTED_VALUE`: Excel's grid asks for
+  `VALUE, FORMAT_STRING, LANGUAGE, BACK_COLOR, FORE_COLOR, FONT_FLAGS` only. Format only when the cell properties
+  show the formatted value.
