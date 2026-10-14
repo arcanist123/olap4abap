@@ -15,7 +15,28 @@ eMondrian's database adds in another order (`docs/test-strategy.md`). The run (t
 two minutes; #85 takes 1 s with the native `Order` (step 8, 105 s before), #46 2.3 s with the native `TopCount` (step
 9); everything else is below 10 s.
 
-## Now: fixed selections
+## Now: query planning
+
+Decided 2026-10-14 (`query-planning.md`): a planner between the validator and the engine marks every node static,
+relational or computed; the static and relational parts are answered from the schema, the member reads and grouped
+SQL (`GROUPING SETS`, measured on HANA in the note), and the evaluator runs only for the computed ones. Every step
+keeps the answers: both test suites give the same answers with planning on and off.
+
+0. Done (2026-10-14): baseline at 3b4ef55. `xmla_test.py`: 272 of 274 cases pass; `dbschema_schemata` and
+   `session_discover_schemadata` fail because the server's `/WEB-INF/datasources.xml` lists more catalogs than the
+   capture (`0D_NW_C01`, `1BW_C01`, `NWCOMPANY`, `NWPRODUCT`, the clinic demo's), not the engine.
+   `compare-applicable.py`: 394 of 395 the same, #64 as known; 157 s with 3 workers, SAP 291 s in total, slowest #333
+   41.9 s, #263 17.3 s, #264 15.5 s, the rest below 7.1 s.
+1. The marking: `ZZXXMLA1_CL_MDX_PLANNER` (static, relational, computed per node), with unit tests; not used yet.
+2. All-relational queries: one grouped statement per combination of patterns (`GROUPING SETS` in
+   `ZZXXMLA1_CL_MDX_FACTS`) filters the non-empty axes and gives the cells; the switch; both suites on and off.
+3. Retire `non_empty_axis`' evaluator loop and the repeated reads of the same groups; measure.
+4. Mixed queries: the relational inputs of computed nodes read as one batch before the first pass.
+5. More set nodes relational: `Filter` on a stored measure (`RolapNativeFilter`), `NonEmpty` with a second set.
+
+## Paused: fixed selections
+
+Not a priority since 2026-10-14; the open steps (13, 19, 20, and 21's fiscal hierarchy) wait.
 
 Decided 2026-10-13; the model is in `bw-schema-design-guide.md`, section 3.8. A cube fixes characteristics of its
 provider to one value each (`0FISCVARNT = K4`); a characteristic whose compounding is all fixed is then not
