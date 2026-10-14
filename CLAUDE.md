@@ -255,6 +255,8 @@ Read before designing anything:
   PivotTable, `CREATE SUBCUBE`, `ALTER CUBE`, `DROP CUBE`) is answered with a fault "... statements are not supported"
   before parsing (`ZZXXMLA1_CL_XMLA_HANDLER=>unsupported_statement`); the reference gives a syntax error there.
   See `docs/test-strategy.md`, section Execute (MDX) cases.
+  Query planning (`docs/query-planning.md`, in progress): `ZZXXMLA1_CL_MDX_PLANNER` marks every node of a resolved
+  query static, relational or computed and plans its axes, slicer and cells; not used by the engine yet.
 - Schema definition (step 1 of moving the model to Mondrian schema XML, see `docs/mvp-scope.md`, schema decision):
   `ZZXXMLA1_CL_SCHEMA_DEF` reads any Mondrian schema as `MondrianDef` does and writes it back as `toXML` does,
   generated from Mondrian's `MondrianDef.java` (`docs/environment.md`, Mondrian's schema definition). The reference

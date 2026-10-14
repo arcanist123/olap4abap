@@ -27,7 +27,9 @@ keeps the answers: both test suites give the same answers with planning on and o
    capture (`0D_NW_C01`, `1BW_C01`, `NWCOMPANY`, `NWPRODUCT`, the clinic demo's), not the engine.
    `compare-applicable.py`: 394 of 395 the same, #64 as known; 157 s with 3 workers, SAP 291 s in total, slowest #333
    41.9 s, #263 17.3 s, #264 15.5 s, the rest below 7.1 s.
-1. The marking: `ZZXXMLA1_CL_MDX_PLANNER` (static, relational, computed per node), with unit tests; not used yet.
+1. Done (2026-10-14): the marking, `ZZXXMLA1_CL_MDX_PLANNER` (static, relational, computed per node; the plan of
+   the axes, the slicer and the cells), 19 unit tests on `ZFMSALES`; not used by the engine yet. The rules are in
+   `query-planning.md`, The marking.
 2. All-relational queries: one grouped statement per combination of patterns (`GROUPING SETS` in
    `ZZXXMLA1_CL_MDX_FACTS`) filters the non-empty axes and gives the cells; the switch; both suites on and off.
 3. Retire `non_empty_axis`' evaluator loop and the repeated reads of the same groups; measure.

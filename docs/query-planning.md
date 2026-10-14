@@ -99,6 +99,40 @@ its context (the slicer's members, the default members of hierarchies without Al
 node makes its parent computed. The marking is the decision `fast_cells` makes today at run time, made once on the
 tree before anything runs.
 
+### The marking (step 1, done 2026-10-14)
+
+`ZZXXMLA1_CL_MDX_PLANNER->plan( query )` takes the query as the validator resolved it, with the validator's schema
+reader (which holds the query's calculated members), and keeps a mark per node in a table keyed by the node
+reference: the tree (`ZZXXMLA1_CL_MDX_NODE`) is not changed. `get_mark( node )` reads it. Rules:
+
+- Literals, levels, hierarchies, dimensions, stored and All members, and an argument left out are static; a
+  calculated or null member is computed.
+- Member reads are static (the highest mark of their arguments): `{}`, `()`, `CrossJoin`, `*`, set `+` and `-`, `:`,
+  `Members`, `Children`, the navigation functions (`Parent`, `Lag`, `Ancestor`, `Cousin`, ...), `Descendants`,
+  `Hierarchize`, `DrilldownLevel`, `DrilldownMember`, `Union`, `Except`, `Intersect`, `Head`, `Tail`, `Distinct`,
+  `Subset`, `Item`, `Exists` of two sets, the metadata functions (`Name`, `UniqueName`, `Caption`, `OrderKey`,
+  `Properties`, `Level`, ...), the time functions (`ParallelPeriod`, `PeriodsToDate`, `Ytd`, ...), `CurrentMember`
+  and `CurrentDateMember`. The null member needs no rule: axes and the slicer are sets, and `{}` leaves out the tuples
+  with it.
+- `NonEmpty` of one set, `NonEmptyCrossJoin`, `TopCount`/`BottomCount` by a stored measure with a static count and
+  `Order` whose keys are all `BASC`/`BDESC` on stored measures or `OrderKey` calls are relational (their value
+  arguments are SQL, so they do not make the node computed); a stored member, tuple or hierarchy where a value is
+  wanted is relational as an argument.
+- Everything else is computed: operators, value functions, `IIf`, `CASE`, aggregates, `Filter`, `Generate`,
+  `Existing`, `NonEmpty` with a second set (step 5), `VisualTotals`, functions not listed.
+- A member, tuple or set node also knows whether a calculated member can be among its members: a calculated member,
+  `AllMembers`, `AddCalculatedMembers`, `CalculatedChild`, `DrilldownLevel` with `INCLUDE_CALC_MEMBERS`, and the
+  current member (also a hierarchy where a member is wanted), each when its hierarchy has a calculated member of the
+  query; `VisualTotals` always. It passes up through member, tuple and set arguments.
+- Context: when the slicer can hold a calculated member, relational nodes are computed.
+- The plan: the slicer and each axis have the mark of their expression; the cells are computed when a calculated
+  member can reach the context (the slicer or an axis), static when no cell property shows a value and no axis is
+  NON EMPTY (`cells_needed`), else relational (`fast_cells`); a NON EMPTY axis is computed with computed cells, else at
+  least relational; the query has the highest mark.
+
+On the filter-list statement above the axis expression is static, the axis (NON EMPTY) and the cells relational.
+A query whose axes are computed but whose cells are relational (a `Filter` on a value) is a mixed plan (step 4).
+
 ### Running a plan
 
 - **All static and relational** (the statement above, Excel's member lists and filter lists, most pivot grids): the
@@ -187,6 +221,4 @@ runs were not.
 
 ## Open
 
-- Whether the planner works on the resolved tree (`ZZXXMLA1_CL_MDX_NODE`) or on a separate plan structure: marks on
-  the nodes are the smallest change.
 - Mixed plans and the batching passes: how much of `phase` remains once the relational inputs are read first.
