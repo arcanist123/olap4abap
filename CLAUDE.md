@@ -131,7 +131,9 @@ Read before designing anything:
   sends Execute and Discover requests to the endpoint itself. A catalog's cubes, measures, hierarchies and levels are
   listed from the schema rowsets (a click inserts the unique name); an answer of up to two axes is a grid (Axis0 the
   columns, Axis1 the rows, spanning headers), one of more axes a flat table (a column per hierarchy, highest axis first,
-  a row per cell) (`scripts/console_ui_test.py`).
+  a row per cell) (`scripts/console_ui_test.py`). Format (Shift+Alt+F, `web/schema/mdx-format.js`) lays out the
+  statement or the selection: a line per clause and axis, bracket groups broken where they exceed 100 characters,
+  keywords upper case, quoted formulas too; only white space and keyword case change.
 - Time master data: `/zzxxmla1/schema/time.html` (`web/schema/time.js`) and `GET time`, `POST time/fill` of the schema
   API fill the SID and attribute tables of the calendar characteristics (`0CALYEAR`, `0CALQUARTER`, `0CALMONTH`,
   `0CALWEEK` and the ones without year) and of `0FISCYEAR` and `0FISCPER` (as `0CALYEAR` and

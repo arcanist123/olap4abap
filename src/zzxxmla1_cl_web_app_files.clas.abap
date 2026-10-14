@@ -44,6 +44,9 @@ CLASS zzxxmla1_cl_web_app_files DEFINITION
     "! /schema/index.html
     CLASS-METHODS index_html
       RETURNING VALUE(result) TYPE string.
+    "! /schema/mdx-format.js
+    CLASS-METHODS mdx_format_js
+      RETURNING VALUE(result) TYPE string.
     "! /schema/time.html
     CLASS-METHODS time_html
       RETURNING VALUE(result) TYPE string.
@@ -78,6 +81,8 @@ CLASS zzxxmla1_cl_web_app_files IMPLEMENTATION.
         result-content = console_js( ).
       WHEN `/schema/index.html`.
         result-content = index_html( ).
+      WHEN `/schema/mdx-format.js`.
+        result-content = mdx_format_js( ).
       WHEN `/schema/time.html`.
         result-content = time_html( ).
       WHEN `/schema/time.js`.
@@ -688,149 +693,155 @@ CLASS zzxxmla1_cl_web_app_files IMPLEMENTATION.
     DATA parts TYPE string_table.
     APPEND |// The MDX console: runs MDX statements against the XMLA endpoint this app is served by (ZZXXMLA1_MAIN_ENDPOINT, POST)\n// and shows the answer. A result of up to two axes is a gri| TO parts.
     APPEND |d (Axis0 the columns, Axis1 the rows), one of more axes\n// a flat table with a column per hierarchy of every axis and one row per cell. The cube browser on the left lists\n// the | TO parts.
-    APPEND |catalog's cubes, measures, hierarchies and levels from the schema rowsets; a click inserts a unique name.\n// No build step: Preact with htm, vendored as one ES module; this file i| TO parts.
-    APPEND |s what the server serves.\nimport \{ html, render, useState, useEffect, useRef, useCallback \} from './vendor/htm-preact-standalone.mjs';\n\n// beyond these the browser gets slow; | TO parts.
-    APPEND |the rest of the answer is counted, not shown\nconst MAX_GRID_ROWS = 2000;\nconst MAX_GRID_COLUMNS = 500;\nconst MAX_FLAT_ROWS = 10000;\nconst HISTORY_SIZE = 50;\n\n// -------------| TO parts.
-    APPEND |--------------------------------------------------------------------------------------------- XMLA\n\nconst client = new URLSearchParams(location.search).get('sap-client');\n// the| TO parts.
-    APPEND | app's folder is /schema/ below the ICF node, the node itself is the XMLA endpoint\nconst endpoint = location.pathname.replace(/\\/schema(\\/.*)?$/, '') \|\| '/';\n\nconst escapeXm| TO parts.
-    APPEND |l = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst propertyList = (props) => Object.entries(props).filter(([, v]) => v)\n  .map(([k, v]| TO parts.
-    APPEND |) => `<$\{k\}>$\{escapeXml(v)\}</$\{k\}>`).join('');\nconst envelope = (body) => '<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">'\n  + `<SOAP-ENV:Bo| TO parts.
-    APPEND |dy>$\{body\}</SOAP-ENV:Body></SOAP-ENV:Envelope>`;\n\n// the elements below el with this local name, in any namespace\nconst all = (el, name) => (el ? [...el.getElementsByTagNameNS| TO parts.
-    APPEND |('*', name)] : []);\nconst first = (el, name) => all(el, name)[0];\nconst children = (el, name) => (el ? [...el.children].filter((c) => c.localName === name) : []);\nconst text = (| TO parts.
-    APPEND |el, name) => first(el, name)?.textContent ?? '';\n\nasync function post(action, body) \{\n  const started = performance.now();\n  const response = await fetch(endpoint + (client ? | TO parts.
-    APPEND |`?sap-client=$\{encodeURIComponent(client)\}` : ''), \{\n    method: 'POST',\n    headers: \{ 'Content-Type': 'text/xml; charset=utf-8', SOAPAction: `"urn:schemas-microsoft-com:xml| TO parts.
-    APPEND |-analysis:$\{action\}"` \},\n    body: envelope(body),\n  \});\n  const raw = await response.text();\n  const ms = performance.now() - started;\n  const doc = new DOMParser().parse| TO parts.
-    APPEND |FromString(raw, 'application/xml');\n  if (doc.getElementsByTagName('parsererror')[0]) \{\n    throw Object.assign(new Error(`$\{response.status\} $\{response.statusText\}: the ans| TO parts.
-    APPEND |wer is not XML`), \{ raw, ms \});\n  \}\n  const fault = first(doc, 'Fault');\n  if (fault) \{\n    const description = first(fault, 'Error')?.getAttribute('Description');\n    thr| TO parts.
-    APPEND |ow Object.assign(new Error(description \|\| text(fault, 'faultstring') \|\| 'SOAP fault'), \{ raw, ms \});\n  \}\n  return \{ doc, raw, ms \};\n\}\n\nasync function discover(reques| TO parts.
-    APPEND |tType, restrictions = \{\}, properties = \{\}) \{\n  const \{ doc \} = await post('Discover', '<Discover xmlns="urn:schemas-microsoft-com:xml-analysis">'\n    + `<RequestType>$\{re| TO parts.
-    APPEND |questType\}</RequestType>`\n    + `<Restrictions><RestrictionList>$\{propertyList(restrictions)\}</RestrictionList></Restrictions>`\n    + `<Properties><PropertyList>$\{propertyLis| TO parts.
-    APPEND |t(\{ ...properties, Content: 'Data' \})\}</PropertyList></Properties>`\n    + '</Discover>');\n  return all(doc, 'row').map((row) => Object.fromEntries([...row.children].map((c) =>| TO parts.
-    APPEND | [c.localName, c.textContent])));\n\}\n\nfunction execute(statement, dataSource, catalog) \{\n  return post('Execute', '<Execute xmlns="urn:schemas-microsoft-com:xml-analysis">'\n | TO parts.
-    APPEND |   + `<Command><Statement>$\{escapeXml(statement)\}</Statement></Command>`\n    + `<Properties><PropertyList>$\{propertyList(\{ DataSourceInfo: dataSource, Catalog: catalog, Format| TO parts.
-    APPEND |: 'Multidimensional',\n      AxisFormat: 'TupleFormat', Content: 'Data' \})\}</PropertyList></Properties>`\n    + '</Execute>');\n\}\n\n// -----------------------------------------| TO parts.
-    APPEND |------------------------------------------------------------- cellset\n\n// The answer of an Execute as plain data: the axes (Axis0, Axis1, ... in order), the slicer and the cells | TO parts.
-    APPEND |by ordinal.\nfunction parseCellset(doc) \{\n  const info = new Map(all(doc, 'AxisInfo').map((a) => [a.getAttribute('name'),\n    children(a, 'HierarchyInfo').map((h) => h.getAttrib| TO parts.
-    APPEND |ute('name'))]));\n  const member = (m) => (\{\n    hierarchy: m.getAttribute('Hierarchy'),\n    uname: text(m, 'UName'),\n    caption: text(m, 'Caption'),\n    lnum: Number(text(m,| TO parts.
-    APPEND | 'LNum')) \|\| 0,\n  \});\n  const axisOf = (a) => \{\n    const name = a.getAttribute('name');\n    const tuples = all(a, 'Tuple').map((t) => children(t, 'Member').map(member));\n| TO parts.
-    APPEND |    return \{ name, tuples, hierarchies: info.get(name) \|\| (tuples[0] \|\| []).map((m) => m.hierarchy) \};\n  \};\n  const axes = all(doc, 'Axis').map(axisOf);\n  const slicer = | TO parts.
-    APPEND |axes.find((a) => a.name === 'SlicerAxis');\n  const data = axes.filter((a) => /^Axis\\d+$/.test(a.name));\n  // an axis the answer lists in AxesInfo but sends without tuples has no| TO parts.
-    APPEND |ne\n  for (const [name, hierarchies] of info) \{\n    if (/^Axis\\d+$/.test(name) && !data.some((a) => a.name === name)) data.push(\{ name, tuples: [], hierarchies \});\n  \}\n  da| TO parts.
-    APPEND |ta.sort((a, b) => a.name.slice(4) - b.name.slice(4));\n  const cells = new Map();\n  for (const c of all(doc, 'Cell')) \{\n    const value = children(c, 'Value')[0];\n    const err| TO parts.
-    APPEND |or = first(value, 'Error');\n    cells.set(Number(c.getAttribute('CellOrdinal')), \{\n      value: error ? '' : value?.textContent ?? '',\n      type: value?.getAttributeNS('http:/| TO parts.
-    APPEND |/www.w3.org/2001/XMLSchema-instance', 'type') \|\| '',\n      formatted: children(c, 'FmtValue')[0]?.textContent,\n      error: error ? text(error, 'Description') \|\| error.getAtt| TO parts.
-    APPEND |ribute('Description') \|\| '#ERR' : '',\n    \});\n  \}\n  const cube = text(first(doc, 'CubeInfo'), 'CubeName');\n  return \{ cube, axes: data, slicer, cells, size: data.reduce((n| TO parts.
-    APPEND |, a) => n * a.tuples.length, 1) \};\n\}\n\nconst NUMERIC = /^xsd:(double\|float\|decimal\|int\|integer\|long\|short\|byte\|unsigned\\w+)$/;\n\nfunction Cell(\{ cell \}) \{\n  if (!| TO parts.
-    APPEND |cell) return html`<td class="num"></td>`;\n  if (cell.error) return html`<td class="num cell-err" title=$\{cell.error\}>#ERR</td>`;\n  const shown = cell.formatted ?? cell.value;\n| TO parts.
-    APPEND |  const numeric = NUMERIC.test(cell.type) \|\| (!cell.type && shown !== '' && !isNaN(Number(cell.value)));\n  return html`<td class=$\{numeric ? 'num' : ''\} title=$\{cell.formatte| TO parts.
-    APPEND |d != null && cell.formatted !== cell.value ? cell.value : ''\}>$\{shown\}</td>`;\n\}\n\nconst samePrefix = (a, b, depth) => \{\n  for (let i = 0; i <= depth; i++) if (a[i]?.uname !| TO parts.
-    APPEND |== b[i]?.uname) return false;\n  return true;\n\};\nconst caption = (m) => m.caption \|\| m.uname;\nconst hierarchyLabel = (h) => h.replace(/^\\[\|\\]$/g, '').replace(/\\]\\.\\[/g,| TO parts.
-    APPEND | '.');\n\n// A grid for up to two axes: Axis0 the column headers (one header row per hierarchy, a member spans the columns it\n// shares with its neighbours), Axis1 the row headers| TO parts.
-    APPEND | (likewise, spanning rows). Zero axes: the one cell.\nfunction Grid(\{ result \}) \{\n  const [columnsAxis, rowsAxis] = result.axes;\n  if (!columnsAxis) return html`<table class="| TO parts.
-    APPEND |grid"><tbody><tr><$\{Cell\} cell=$\{result.cells.get(0)\} /></tr></tbody></table>`;\n  const columns = columnsAxis.tuples.slice(0, MAX_GRID_COLUMNS);\n  const rows = rowsAxis ? row| TO parts.
-    APPEND |sAxis.tuples.slice(0, MAX_GRID_ROWS) : [[]];\n  const columnDepth = columnsAxis.hierarchies.length;\n  const rowDepth = rowsAxis ? rowsAxis.hierarchies.length : 0;\n  const width =| TO parts.
-    APPEND | columnsAxis.tuples.length;\n\n  const headerRows = columnsAxis.hierarchies.map((h, depth) => \{\n    const spans = [];\n    for (let c = 0; c < columns.length;) \{\n      let span| TO parts.
-    APPEND | = 1;\n      while (c + span < columns.length && samePrefix(columns[c], columns[c + span], depth)) span++;\n      spans.push(\{ member: columns[c][depth], span \});\n      c += spa| TO parts.
-    APPEND |n;\n    \}\n    return spans;\n  \});\n  // rowSpans[r][depth]: the rows the member spans from row r, 0 where an upper row's span covers it\n  const rowSpans = rows.map((tuple, r) | TO parts.
-    APPEND |=> tuple.map((_, depth) => \{\n    if (r > 0 && samePrefix(rows[r - 1], tuple, depth)) return 0;\n    let span = 1;\n    while (r + span < rows.length && samePrefix(tuple, rows[r +| TO parts.
-    APPEND | span], depth)) span++;\n    return span;\n  \}));\n\n  return html`<table class="grid">\n    <thead>\n      $\{headerRows.map((spans, depth) => html`<tr>\n        $\{depth === 0 &| TO parts.
-    APPEND |& columnDepth > 1 && rowDepth > 0 && html`<th class="corner" colspan=$\{rowDepth\} rowspan=$\{columnDepth - 1\}></th>`\}\n        $\{depth === columnDepth - 1 && rowsAxis && rowsAx| TO parts.
-    APPEND |is.hierarchies.map((h) => html`<th class="corner" title=$\{h\}>$\{hierarchyLabel(h)\}</th>`)\}\n        $\{spans.map((\{ member, span \}) => html`<th class="member col-head" colspa| TO parts.
-    APPEND |n=$\{span\} title=$\{member?.uname\}>$\{member ? caption(member) : ''\}</th>`)\}\n      </tr>`)\}\n    </thead>\n    <tbody>\n      $\{!columns.length && html`<tr><td class="muted"| TO parts.
-    APPEND |>The column axis is empty.</td></tr>`\}\n      $\{rows.length === 0 && columns.length > 0 && html`<tr><td class="muted" colspan=$\{columns.length + rowDepth\}>The row axis is empty| TO parts.
-    APPEND |.</td></tr>`\}\n      $\{columns.length > 0 && rows.map((tuple, r) => html`<tr>\n        $\{tuple.map((member, depth) => rowSpans[r][depth] > 0 && html`<th class="member row-head" | TO parts.
-    APPEND |rowspan=$\{rowSpans[r][depth]\}\n          title=$\{member.uname\} style=$\{`padding-left: $\{8 + member.lnum * 14\}px`\}>$\{caption(member)\}</th>`)\}\n        $\{columns.map((_, | TO parts.
-    APPEND |c) => html`<$\{Cell\} cell=$\{result.cells.get(r * width + c)\} />`)\}\n      </tr>`)\}\n    </tbody>\n  </table>`;\n\}\n\n// A flat table for any number of axes: a column per hier| TO parts.
-    APPEND |archy of every axis, the highest axis first, and one row per\n// cell in the order of the cell ordinals (Axis0 changes fastest), so the leftmost column changes slowest.\nfunction F| TO parts.
-    APPEND |lat(\{ result, limit \}) \{\n  const axes = [...result.axes].reverse();\n  const sizes = result.axes.map((a) => a.tuples.length);\n  const strides = sizes.map((_, k) => sizes.slice| TO parts.
-    APPEND |(0, k).reduce((n, s) => n * s, 1));\n  const count = Math.min(result.size, limit);\n  const rows = [];\n  for (let ordinal = 0; ordinal < count; ordinal++) \{\n    const members = | TO parts.
-    APPEND |[];\n    for (let k = result.axes.length - 1; k >= 0; k--) \{\n      members.push(...result.axes[k].tuples[Math.floor(ordinal / strides[k]) % sizes[k]]);\n    \}\n    rows.push(htm| TO parts.
-    APPEND |l`<tr>\n      $\{members.map((m) => html`<td title=$\{m.uname\}>$\{caption(m)\}</td>`)\}\n      <$\{Cell\} cell=$\{result.cells.get(ordinal)\} />\n    </tr>`);\n  \}\n  return html| TO parts.
-    APPEND |`<table class="grid flat">\n    <thead><tr>\n      $\{axes.map((a) => a.hierarchies.map((h) => html`<th title=$\{`$\{a.name\}: $\{h\}`\} data-axis=$\{a.name\}>$\{hierarchyLabel(h)| TO parts.
-    APPEND |\}</th>`))\}\n      <th class="num">Value</th>\n    </tr></thead>\n    <tbody>$\{rows\}</tbody>\n  </table>`;\n\}\n\nfunction Result(\{ run, view, setView \}) \{\n  const tableRef | TO parts.
-    APPEND |= useRef(null);\n  const [copied, setCopied] = useState(false);\n  if (run.state === 'busy') return html`<div class="result-msg muted">Running{ cl_abap_conv_in_ce=>uccp( '2026' ) }| TO parts.
-    APPEND |</div>`;\n  if (run.state === 'err') \{\n    return html`<div class="result-msg"><div class="notice err">$\{run.message\}</div></div>`;\n  \}\n  const \{ result \} = run;\n  const | TO parts.
-    APPEND |grid = result.axes.length <= 2 && view !== 'flat';\n  const truncated = grid\n    ? (result.axes[0]?.tuples.length > MAX_GRID_COLUMNS \|\| result.axes[1]?.tuples.length > MAX_GRID_| TO parts.
-    APPEND |ROWS)\n    : result.size > MAX_FLAT_ROWS;\n  const copy = async () => \{\n    try \{\n      await navigator.clipboard.writeText(tableRef.current.innerText);\n      setCopied(true);| TO parts.
-    APPEND |\n      setTimeout(() => setCopied(false), 1500);\n    \} catch \{\n      setCopied(false);\n    \}\n  \};\n  const slicer = result.slicer?.tuples.flat() \|\| [];\n\n  return html`| TO parts.
-    APPEND |<div class="result">\n    <div class="result-bar">\n      <span class="muted small">\n        $\{result.cube && html`<span class="mono">$\{result.cube\}</span> | TO parts.
-    APPEND |{ cl_abap_conv_in_ce=>uccp( '00B7' ) } `\}\n        $\{`$\{result.axes.length\} $\{result.axes.length === 1 ? 'axis' : 'axes'\} ($\{result.axes.map((a) => a.tuples.length).join(' | TO parts.
-    APPEND |{ cl_abap_conv_in_ce=>uccp( '00D7' ) } ') \|\| '{ cl_abap_conv_in_ce=>uccp( '2013' ) }'\})`\n          + ` { cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{result.size.toLocaleString()\} | TO parts.
-    APPEND |cell$\{result.size === 1 ? '' : 's'\} { cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{Math.round(run.ms).toLocaleString()\} ms`\}\n      </span>\n      $\{slicer.length > 0 && html`<span| TO parts.
-    APPEND | class="small" title="The slicer (WHERE)">where $\{slicer.map((m, i) => html`$\{i > 0 && ', '\}<span\n        class="kind" title=$\{m.uname\}>$\{caption(m)\}</span>`)\}</span>`\}\n| TO parts.
-    APPEND |      <span class="spacer"></span>\n      $\{result.axes.length <= 2 && result.axes.length > 0 && html`<div class="segmented" role="group" aria-label="View">\n        <button class| TO parts.
-    APPEND |=$\{grid ? 'active' : ''\} onClick=$\{() => setView('grid')\}>Grid</button>\n        <button class=$\{grid ? '' : 'active'\} onClick=$\{() => setView('flat')\}>Table</button>\n    | TO parts.
-    APPEND |  </div>`\}\n      <button onClick=$\{copy\} title="Copy the table as tab-separated text">$\{copied ? 'Copied' : 'Copy'\}</button>\n    </div>\n    $\{truncated && html`<div class=| TO parts.
-    APPEND |"notice warn">The answer is too large to show in full: $\{grid\n      ? `the first $\{MAX_GRID_ROWS.toLocaleString()\} rows and $\{MAX_GRID_COLUMNS.toLocaleString()\} columns are s| TO parts.
-    APPEND |hown`\n      : `the first $\{MAX_FLAT_ROWS.toLocaleString()\} of $\{result.size.toLocaleString()\} rows are shown`\}.</div>`\}\n    <div class="result-table" ref=$\{tableRef\}>\n  | TO parts.
-    APPEND |    $\{grid ? html`<$\{Grid\} result=$\{result\} />` : html`<$\{Flat\} result=$\{result\} limit=$\{MAX_FLAT_ROWS\} />`\}\n    </div>\n  </div>`;\n\}\n\n// -------------------------| TO parts.
-    APPEND |------------------------------------------------------------------------- cube browser\n\nfunction Browser(\{ dataSource, catalog, onInsert \}) \{\n  const [cubes, setCubes] = useS| TO parts.
-    APPEND |tate(null);\n  const [open, setOpen] = useState(\{\});\n  const [content, setContent] = useState(\{\});\n  const [error, setError] = useState('');\n  useEffect(() => \{\n    setCub| TO parts.
-    APPEND |es(null);\n    setOpen(\{\});\n    setContent(\{\});\n    setError('');\n    if (!catalog) return;\n    discover('MDSCHEMA_CUBES', \{ CATALOG_NAME: catalog \}, \{ DataSourceInfo: d| TO parts.
-    APPEND |ataSource, Catalog: catalog \})\n      .then(setCubes, (e) => setError(e.message));\n  \}, [catalog]);\n\n  const loadCube = async (cube) => \{\n    const restrictions = \{ CATALOG| TO parts.
-    APPEND |_NAME: catalog, CUBE_NAME: cube \};\n    const properties = \{ DataSourceInfo: dataSource, Catalog: catalog \};\n    try \{\n      const [measures, hierarchies, levels] = await Pro| TO parts.
-    APPEND |mise.all([\n        discover('MDSCHEMA_MEASURES', restrictions, properties),\n        discover('MDSCHEMA_HIERARCHIES', restrictions, properties),\n        discover('MDSCHEMA_LEVELS| TO parts.
-    APPEND |', restrictions, properties),\n      ]);\n      const dimensions = [];\n      for (const h of hierarchies.filter((x) => x.DIMENSION_UNIQUE_NAME !== '[Measures]')) \{\n        let d| TO parts.
-    APPEND | = dimensions.find((x) => x.uname === h.DIMENSION_UNIQUE_NAME);\n        if (!d) dimensions.push(d = \{ uname: h.DIMENSION_UNIQUE_NAME, hierarchies: [] \});\n        d.hierarchies.| TO parts.
-    APPEND |push(\{\n          uname: h.HIERARCHY_UNIQUE_NAME,\n          caption: h.HIERARCHY_CAPTION \|\| h.HIERARCHY_NAME,\n          levels: levels.filter((l) => l.HIERARCHY_UNIQUE_NAME ==| TO parts.
-    APPEND |= h.HIERARCHY_UNIQUE_NAME && l.LEVEL_TYPE !== '1')\n            .sort((a, b) => a.LEVEL_NUMBER - b.LEVEL_NUMBER)\n            .map((l) => (\{ uname: l.LEVEL_UNIQUE_NAME, caption: l| TO parts.
-    APPEND |.LEVEL_CAPTION \|\| l.LEVEL_NAME \})),\n        \});\n      \}\n      setContent((c) => (\{\n        ...c,\n        [cube]: \{\n          measures: measures.map((m) => (\{ uname: m| TO parts.
-    APPEND |.MEASURE_UNIQUE_NAME, caption: m.MEASURE_CAPTION \|\| m.MEASURE_NAME \})),\n          dimensions,\n        \},\n      \}));\n    \} catch (e) \{\n      setContent((c) => (\{ ...c, | TO parts.
-    APPEND |[cube]: \{ error: e.message \} \}));\n    \}\n  \};\n  const toggle = (key, load) => \{\n    setOpen((o) => (\{ ...o, [key]: !o[key] \}));\n    if (load && !open[key]) load();\n  | TO parts.
-    APPEND |\};\n\n  const leaf = (uname, label, kind, depth) => html`<button class="item" style=$\{`padding-left: $\{14 + depth * 14\}px`\} draggable="true"\n    title=$\{`$\{uname\} | TO parts.
-    APPEND |{ cl_abap_conv_in_ce=>uccp( '2013' ) } click to insert, or drag`\} onClick=$\{() => onInsert(uname)\}\n    onDragStart=$\{(e) => e.dataTransfer.setData('text/plain', uname)\}>\n   | TO parts.
-    APPEND | <span class=$\{`glyph $\{kind\}`\}></span><span class="label">$\{label\}</span>\n  </button>`;\n  const node = (key, label, kind, depth, load, uname) => html`<button class="item" | TO parts.
-    APPEND |style=$\{`padding-left: $\{14 + depth * 14\}px`\}\n    onClick=$\{() => toggle(key, load)\} onDblClick=$\{() => uname && onInsert(uname)\} title=$\{uname ? `$\{uname\} | TO parts.
-    APPEND |{ cl_abap_conv_in_ce=>uccp( '2013' ) } double-click to insert` : ''\}\n    draggable=$\{!!uname\} onDragStart=$\{(e) => uname && e.dataTransfer.setData('text/plain', uname)\}>\n   | TO parts.
-    APPEND | <span class="twisty">$\{open[key] ? '{ cl_abap_conv_in_ce=>uccp( '25BE' ) }' : '{ cl_abap_conv_in_ce=>uccp( '25B8' ) }'\}</span><span class=$\{`glyph $\{kind\}`\}></span><span cla| TO parts.
-    APPEND |ss="label">$\{label\}</span>\n  </button>`;\n\n  return html`<nav class="tree browser" aria-label="Cubes">\n    <div class="group"><h3>Cubes</h3></div>\n    $\{error && html`<div c| TO parts.
-    APPEND |lass="notice err small" style="margin: 0 14px">$\{error\}</div>`\}\n    $\{!catalog ? html`<div class="muted small pad">No catalog.</div>` : cubes == null && !error ? html`<div cla| TO parts.
-    APPEND |ss="muted small pad">Loading{ cl_abap_conv_in_ce=>uccp( '2026' ) }</div>` : null\}\n    $\{(cubes \|\| []).map((cube) => \{\n      const name = cube.CUBE_NAME;\n      const c = con| TO parts.
-    APPEND |tent[name];\n      return html`\n        $\{node(name, html`<strong>$\{name\}</strong>$\{cube.CUBE_CAPTION && cube.CUBE_CAPTION !== name\n          && html` <span class="muted smal| TO parts.
-    APPEND |l">$\{cube.CUBE_CAPTION\}</span>`\}`, 'cube', 0, () => loadCube(name), `[$\{name\}]`)\}\n        $\{open[name] && (c == null ? html`<div class="muted small pad">Loading| TO parts.
-    APPEND |{ cl_abap_conv_in_ce=>uccp( '2026' ) }</div>`\n          : c.error ? html`<div class="notice err small" style="margin: 0 14px">$\{c.error\}</div>` : html`\n          $\{node(`$\{na| TO parts.
-    APPEND |me\}\|m`, 'Measures', 'folder', 1, null, '[Measures]')\}\n          $\{open[`$\{name\}\|m`] && c.measures.map((m) => leaf(m.uname, m.caption, 'measure', 2))\}\n          $\{c.dimen| TO parts.
-    APPEND |sions.map((d) => \{\n            const key = `$\{name\}\|$\{d.uname\}`;\n            // a dimension with one hierarchy of its name shows the levels right away\n            const si| TO parts.
-    APPEND |ngle = d.hierarchies.length === 1 && d.hierarchies[0].uname === d.uname;\n            return html`\n              $\{node(key, hierarchyLabel(d.uname), 'dimension', 1, null, d.unam| TO parts.
-    APPEND |e)\}\n              $\{open[key] && (single ? d.hierarchies[0].levels.map((l) => leaf(l.uname, l.caption, 'level', 2))\n                : d.hierarchies.map((h) => html`\n          | TO parts.
-    APPEND |        $\{node(`$\{key\}\|$\{h.uname\}`, h.caption, 'hierarchy', 2, null, h.uname)\}\n                  $\{open[`$\{key\}\|$\{h.uname\}`] && h.levels.map((l) => leaf(l.uname, l.ca| TO parts.
-    APPEND |ption, 'level', 3))\}`))\}`;\n          \})\}`)\}`;\n    \})\}\n  </nav>`;\n\}\n\n// -----------------------------------------------------------------------------------------------| TO parts.
-    APPEND |----------- app\n\nfunction load(key, fallback) \{\n  try \{\n    const value = localStorage.getItem(`olap4abap.console.$\{key\}`);\n    return value == null ? fallback : JSON.pars| TO parts.
-    APPEND |e(value);\n  \} catch \{\n    return fallback;\n  \}\n\}\nfunction save(key, value) \{\n  try \{\n    localStorage.setItem(`olap4abap.console.$\{key\}`, JSON.stringify(value));\n  | TO parts.
-    APPEND |\} catch \{\n    // private window or blocked storage: the console works without it\n  \}\n\}\n\n// A statement handed over in the URL's fragment (#statement=...&catalog=..., the t| TO parts.
-    APPEND |race page's "Open in MDX Console"):\n// read once, then removed from the address bar, so a reload shows what was typed since. The fragment is not sent to\n// the server, so a long | TO parts.
-    APPEND |statement fits.\nfunction handedOver() \{\n  const params = new URLSearchParams(location.hash.slice(1));\n  if (!params.has('statement')) return \{\};\n  history.replaceState(null,| TO parts.
-    APPEND | '', location.pathname + location.search);\n  return \{ statement: params.get('statement'), catalog: params.get('catalog') \|\| '' \};\n\}\n\nfunction App() \{\n  const [handed] = | TO parts.
-    APPEND |useState(handedOver);\n  const [sources, setSources] = useState(null);\n  const [catalogs, setCatalogs] = useState([]);\n  const [catalog, setCatalog] = useState(() => handed.catal| TO parts.
-    APPEND |og \|\| load('catalog', ''));\n  const [statement, setStatement] = useState(() => handed.statement ?? load('statement', ''));\n  const [history, setHistory] = useState(load('histor| TO parts.
-    APPEND |y', []));\n  const [run, setRun] = useState(null);\n  const [view, setView] = useState('grid');\n  const [error, setError] = useState('');\n  const editor = useRef(null);\n  const | TO parts.
-    APPEND |dataSource = sources?.[0]?.DataSourceName \|\| '';\n\n  useEffect(() => \{\n    (async () => \{\n      try \{\n        const ds = await discover('DISCOVER_DATASOURCES');\n        s| TO parts.
-    APPEND |etSources(ds);\n        const rows = await discover('DBSCHEMA_CATALOGS', \{\}, \{ DataSourceInfo: ds[0]?.DataSourceName \});\n        const names = rows.map((r) => r.CATALOG_NAME);| TO parts.
-    APPEND |\n        setCatalogs(names);\n        setCatalog((c) => (names.includes(c) ? c : names[0] \|\| ''));\n      \} catch (e) \{\n        setError(e.message);\n      \}\n    \})();\n  | TO parts.
-    APPEND |\}, []);\n  useEffect(() => save('catalog', catalog), [catalog]);\n  useEffect(() => save('statement', statement), [statement]);\n\n  const runStatement = useCallback(async () => | TO parts.
-    APPEND |\{\n    const area = editor.current;\n    const selected = area && area.selectionStart !== area.selectionEnd\n      ? area.value.slice(area.selectionStart, area.selectionEnd) : sta| TO parts.
-    APPEND |tement;\n    const mdx = selected.trim();\n    if (!mdx \|\| !catalog) return;\n    setRun(\{ state: 'busy' \});\n    try \{\n      const \{ doc, ms \} = await execute(mdx, dataSou| TO parts.
-    APPEND |rce, catalog);\n      setRun(\{ state: 'ok', result: parseCellset(doc), ms \});\n    \} catch (e) \{\n      setRun(\{ state: 'err', message: e.message, ms: e.ms \});\n    \}\n    s| TO parts.
-    APPEND |etHistory((h) => \{\n      const next = [mdx, ...h.filter((x) => x !== mdx)].slice(0, HISTORY_SIZE);\n      save('history', next);\n      return next;\n    \});\n  \}, [statement, | TO parts.
-    APPEND |catalog, dataSource]);\n\n  const insert = (piece) => \{\n    const area = editor.current;\n    const start = area ? area.selectionStart : statement.length;\n    const end = area ?| TO parts.
-    APPEND | area.selectionEnd : statement.length;\n    const next = statement.slice(0, start) + piece + statement.slice(end);\n    setStatement(next);\n    requestAnimationFrame(() => \{\n   | TO parts.
-    APPEND |   if (!area) return;\n      area.focus();\n      area.setSelectionRange(start + piece.length, start + piece.length);\n    \});\n  \};\n\n  const busy = run?.state === 'busy';\n  r| TO parts.
-    APPEND |eturn html`\n    <div class="topbar">\n      <div class="title"><h1>MDX Console</h1><span class="src">olap4abap</span></div>\n      <label class="inline">Catalog\n        <select v| TO parts.
-    APPEND |alue=$\{catalog\} onChange=$\{(e) => setCatalog(e.target.value)\} disabled=$\{!catalogs.length\}>\n          $\{!catalogs.length && html`<option value="">| TO parts.
-    APPEND |{ cl_abap_conv_in_ce=>uccp( '2013' ) }</option>`\}\n          $\{catalogs.map((c) => html`<option value=$\{c\}>$\{c\}</option>`)\}\n        </select>\n      </label>\n      <span c| TO parts.
-    APPEND |lass="spacer"></span>\n      <a href=$\{`./$\{location.search\}`\}>Schema Builder</a>\n      <a href=$\{`time.html$\{location.search\}`\}>Time Master Data</a>\n      <a href=$\{`tr| TO parts.
-    APPEND |ace.html$\{location.search\}`\}>Trace</a>\n    </div>\n    $\{error && html`<div class="banner" role="alert">$\{error\}</div>`\}\n    <div class="editor console">\n      <$\{Browse| TO parts.
-    APPEND |r\} dataSource=$\{dataSource\} catalog=$\{catalog\} onInsert=$\{insert\} />\n      <main class="main console-main">\n        <div class="query">\n          <textarea ref=$\{editor| TO parts.
-    APPEND |\} class="mdx" spellcheck="false" value=$\{statement\} aria-label="MDX statement"\n            placeholder=$\{'SELECT \{[Measures].Members\} ON COLUMNS\\nFROM [Cube]'\}\n          | TO parts.
-    APPEND |  onInput=$\{(e) => setStatement(e.target.value)\}\n            onKeyDown=$\{(e) => \{\n              if ((e.ctrlKey \|\| e.metaKey) && e.key === 'Enter') \{ e.preventDefault(); ru| TO parts.
-    APPEND |nStatement(); \}\n            \}\}></textarea>\n          <div class="row">\n            <button class="primary" disabled=$\{busy \|\| !catalog \|\| !statement.trim()\} onClick=$\{| TO parts.
-    APPEND |runStatement\}\n              title="Run the statement, or the selected part of it (Ctrl+Enter)">$\{busy ? 'Running{ cl_abap_conv_in_ce=>uccp( '2026' ) }' : 'Run'\}</button>\n     | TO parts.
-    APPEND |       <select value="" aria-label="History" disabled=$\{!history.length\} onChange=$\{(e) => \{\n              const i = e.target.value;\n              e.target.value = '';\n     | TO parts.
-    APPEND |         if (i !== '') setStatement(history[Number(i)]);\n            \}\}>\n              <option value="">History{ cl_abap_conv_in_ce=>uccp( '2026' ) }</option>\n              $| TO parts.
-    APPEND |\{history.map((h, i) => html`<option value=$\{i\}>$\{h.replace(/\\s+/g, ' ').slice(0, 90)\}</option>`)\}\n            </select>\n            <span class="muted small">Ctrl+Enter ru| TO parts.
-    APPEND |ns the statement or the selection; click a name on the left to insert it.</span>\n          </div>\n        </div>\n        $\{run ? html`<$\{Result\} run=$\{run\} view=$\{view\} s| TO parts.
-    APPEND |etView=$\{setView\} />`\n          : html`<div class="result-msg muted">Write a statement and run it. Up to two axes show as a grid, more as a table.</div>`\}\n      </main>\n    <| TO parts.
-    APPEND |/div>`;\n\}\n\nconst root = document.getElementById('app');\nroot.textContent = '';\nrender(html`<$\{App\} />`, root);\n| TO parts.
+    APPEND |catalog's cubes, measures, hierarchies and levels from the schema rowsets; a click inserts a unique name.\n// Format lays the statement out for reading (mdx-format.js).\n// No buil| TO parts.
+    APPEND |d step: Preact with htm, vendored as one ES module; this file is what the server serves.\nimport \{ html, render, useState, useEffect, useRef, useCallback \} from './vendor/htm-pre| TO parts.
+    APPEND |act-standalone.mjs';\nimport \{ formatMdx \} from './mdx-format.js';\n\n// beyond these the browser gets slow; the rest of the answer is counted, not shown\nconst MAX_GRID_ROWS = 2| TO parts.
+    APPEND |000;\nconst MAX_GRID_COLUMNS = 500;\nconst MAX_FLAT_ROWS = 10000;\nconst HISTORY_SIZE = 50;\n\n// ----------------------------------------------------------------------------------| TO parts.
+    APPEND |------------------------ XMLA\n\nconst client = new URLSearchParams(location.search).get('sap-client');\n// the app's folder is /schema/ below the ICF node, the node itself is the | TO parts.
+    APPEND |XMLA endpoint\nconst endpoint = location.pathname.replace(/\\/schema(\\/.*)?$/, '') \|\| '/';\n\nconst escapeXml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').rep| TO parts.
+    APPEND |lace(/>/g, '&gt;');\nconst propertyList = (props) => Object.entries(props).filter(([, v]) => v)\n  .map(([k, v]) => `<$\{k\}>$\{escapeXml(v)\}</$\{k\}>`).join('');\nconst envelope | TO parts.
+    APPEND |= (body) => '<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">'\n  + `<SOAP-ENV:Body>$\{body\}</SOAP-ENV:Body></SOAP-ENV:Envelope>`;\n\n// the elements| TO parts.
+    APPEND | below el with this local name, in any namespace\nconst all = (el, name) => (el ? [...el.getElementsByTagNameNS('*', name)] : []);\nconst first = (el, name) => all(el, name)[0];\nc| TO parts.
+    APPEND |onst children = (el, name) => (el ? [...el.children].filter((c) => c.localName === name) : []);\nconst text = (el, name) => first(el, name)?.textContent ?? '';\n\nasync function po| TO parts.
+    APPEND |st(action, body) \{\n  const started = performance.now();\n  const response = await fetch(endpoint + (client ? `?sap-client=$\{encodeURIComponent(client)\}` : ''), \{\n    method: | TO parts.
+    APPEND |'POST',\n    headers: \{ 'Content-Type': 'text/xml; charset=utf-8', SOAPAction: `"urn:schemas-microsoft-com:xml-analysis:$\{action\}"` \},\n    body: envelope(body),\n  \});\n  con| TO parts.
+    APPEND |st raw = await response.text();\n  const ms = performance.now() - started;\n  const doc = new DOMParser().parseFromString(raw, 'application/xml');\n  if (doc.getElementsByTagName('| TO parts.
+    APPEND |parsererror')[0]) \{\n    throw Object.assign(new Error(`$\{response.status\} $\{response.statusText\}: the answer is not XML`), \{ raw, ms \});\n  \}\n  const fault = first(doc, '| TO parts.
+    APPEND |Fault');\n  if (fault) \{\n    const description = first(fault, 'Error')?.getAttribute('Description');\n    throw Object.assign(new Error(description \|\| text(fault, 'faultstring'| TO parts.
+    APPEND |) \|\| 'SOAP fault'), \{ raw, ms \});\n  \}\n  return \{ doc, raw, ms \};\n\}\n\nasync function discover(requestType, restrictions = \{\}, properties = \{\}) \{\n  const \{ doc \} | TO parts.
+    APPEND |= await post('Discover', '<Discover xmlns="urn:schemas-microsoft-com:xml-analysis">'\n    + `<RequestType>$\{requestType\}</RequestType>`\n    + `<Restrictions><RestrictionList>$\{| TO parts.
+    APPEND |propertyList(restrictions)\}</RestrictionList></Restrictions>`\n    + `<Properties><PropertyList>$\{propertyList(\{ ...properties, Content: 'Data' \})\}</PropertyList></Properties>| TO parts.
+    APPEND |`\n    + '</Discover>');\n  return all(doc, 'row').map((row) => Object.fromEntries([...row.children].map((c) => [c.localName, c.textContent])));\n\}\n\nfunction execute(statement, | TO parts.
+    APPEND |dataSource, catalog) \{\n  return post('Execute', '<Execute xmlns="urn:schemas-microsoft-com:xml-analysis">'\n    + `<Command><Statement>$\{escapeXml(statement)\}</Statement></Comm| TO parts.
+    APPEND |and>`\n    + `<Properties><PropertyList>$\{propertyList(\{ DataSourceInfo: dataSource, Catalog: catalog, Format: 'Multidimensional',\n      AxisFormat: 'TupleFormat', Content: 'Dat| TO parts.
+    APPEND |a' \})\}</PropertyList></Properties>`\n    + '</Execute>');\n\}\n\n// ------------------------------------------------------------------------------------------------------ cellset| TO parts.
+    APPEND |\n\n// The answer of an Execute as plain data: the axes (Axis0, Axis1, ... in order), the slicer and the cells by ordinal.\nfunction parseCellset(doc) \{\n  const info = new Map(al| TO parts.
+    APPEND |l(doc, 'AxisInfo').map((a) => [a.getAttribute('name'),\n    children(a, 'HierarchyInfo').map((h) => h.getAttribute('name'))]));\n  const member = (m) => (\{\n    hierarchy: m.getAt| TO parts.
+    APPEND |tribute('Hierarchy'),\n    uname: text(m, 'UName'),\n    caption: text(m, 'Caption'),\n    lnum: Number(text(m, 'LNum')) \|\| 0,\n  \});\n  const axisOf = (a) => \{\n    const name| TO parts.
+    APPEND | = a.getAttribute('name');\n    const tuples = all(a, 'Tuple').map((t) => children(t, 'Member').map(member));\n    return \{ name, tuples, hierarchies: info.get(name) \|\| (tuples[| TO parts.
+    APPEND |0] \|\| []).map((m) => m.hierarchy) \};\n  \};\n  const axes = all(doc, 'Axis').map(axisOf);\n  const slicer = axes.find((a) => a.name === 'SlicerAxis');\n  const data = axes.filte| TO parts.
+    APPEND |r((a) => /^Axis\\d+$/.test(a.name));\n  // an axis the answer lists in AxesInfo but sends without tuples has none\n  for (const [name, hierarchies] of info) \{\n    if (/^Axis\\d+$| TO parts.
+    APPEND |/.test(name) && !data.some((a) => a.name === name)) data.push(\{ name, tuples: [], hierarchies \});\n  \}\n  data.sort((a, b) => a.name.slice(4) - b.name.slice(4));\n  const cells | TO parts.
+    APPEND |= new Map();\n  for (const c of all(doc, 'Cell')) \{\n    const value = children(c, 'Value')[0];\n    const error = first(value, 'Error');\n    cells.set(Number(c.getAttribute('Cel| TO parts.
+    APPEND |lOrdinal')), \{\n      value: error ? '' : value?.textContent ?? '',\n      type: value?.getAttributeNS('http://www.w3.org/2001/XMLSchema-instance', 'type') \|\| '',\n      formatt| TO parts.
+    APPEND |ed: children(c, 'FmtValue')[0]?.textContent,\n      error: error ? text(error, 'Description') \|\| error.getAttribute('Description') \|\| '#ERR' : '',\n    \});\n  \}\n  const cube| TO parts.
+    APPEND | = text(first(doc, 'CubeInfo'), 'CubeName');\n  return \{ cube, axes: data, slicer, cells, size: data.reduce((n, a) => n * a.tuples.length, 1) \};\n\}\n\nconst NUMERIC = /^xsd:(dou| TO parts.
+    APPEND |ble\|float\|decimal\|int\|integer\|long\|short\|byte\|unsigned\\w+)$/;\n\nfunction Cell(\{ cell \}) \{\n  if (!cell) return html`<td class="num"></td>`;\n  if (cell.error) return h| TO parts.
+    APPEND |tml`<td class="num cell-err" title=$\{cell.error\}>#ERR</td>`;\n  const shown = cell.formatted ?? cell.value;\n  const numeric = NUMERIC.test(cell.type) \|\| (!cell.type && shown !| TO parts.
+    APPEND |== '' && !isNaN(Number(cell.value)));\n  return html`<td class=$\{numeric ? 'num' : ''\} title=$\{cell.formatted != null && cell.formatted !== cell.value ? cell.value : ''\}>$\{sho| TO parts.
+    APPEND |wn\}</td>`;\n\}\n\nconst samePrefix = (a, b, depth) => \{\n  for (let i = 0; i <= depth; i++) if (a[i]?.uname !== b[i]?.uname) return false;\n  return true;\n\};\nconst caption = (| TO parts.
+    APPEND |m) => m.caption \|\| m.uname;\nconst hierarchyLabel = (h) => h.replace(/^\\[\|\\]$/g, '').replace(/\\]\\.\\[/g, '.');\n\n// A grid for up to two axes: Axis0 the column headers (one| TO parts.
+    APPEND | header row per hierarchy, a member spans the columns it\n// shares with its neighbours), Axis1 the row headers (likewise, spanning rows). Zero axes: the one cell.\nfunction Grid(| TO parts.
+    APPEND |\{ result \}) \{\n  const [columnsAxis, rowsAxis] = result.axes;\n  if (!columnsAxis) return html`<table class="grid"><tbody><tr><$\{Cell\} cell=$\{result.cells.get(0)\} /></tr></t| TO parts.
+    APPEND |body></table>`;\n  const columns = columnsAxis.tuples.slice(0, MAX_GRID_COLUMNS);\n  const rows = rowsAxis ? rowsAxis.tuples.slice(0, MAX_GRID_ROWS) : [[]];\n  const columnDepth = | TO parts.
+    APPEND |columnsAxis.hierarchies.length;\n  const rowDepth = rowsAxis ? rowsAxis.hierarchies.length : 0;\n  const width = columnsAxis.tuples.length;\n\n  const headerRows = columnsAxis.hier| TO parts.
+    APPEND |archies.map((h, depth) => \{\n    const spans = [];\n    for (let c = 0; c < columns.length;) \{\n      let span = 1;\n      while (c + span < columns.length && samePrefix(columns[| TO parts.
+    APPEND |c], columns[c + span], depth)) span++;\n      spans.push(\{ member: columns[c][depth], span \});\n      c += span;\n    \}\n    return spans;\n  \});\n  // rowSpans[r][depth]: the | TO parts.
+    APPEND |rows the member spans from row r, 0 where an upper row's span covers it\n  const rowSpans = rows.map((tuple, r) => tuple.map((_, depth) => \{\n    if (r > 0 && samePrefix(rows[r - | TO parts.
+    APPEND |1], tuple, depth)) return 0;\n    let span = 1;\n    while (r + span < rows.length && samePrefix(tuple, rows[r + span], depth)) span++;\n    return span;\n  \}));\n\n  return html`| TO parts.
+    APPEND |<table class="grid">\n    <thead>\n      $\{headerRows.map((spans, depth) => html`<tr>\n        $\{depth === 0 && columnDepth > 1 && rowDepth > 0 && html`<th class="corner" colspan| TO parts.
+    APPEND |=$\{rowDepth\} rowspan=$\{columnDepth - 1\}></th>`\}\n        $\{depth === columnDepth - 1 && rowsAxis && rowsAxis.hierarchies.map((h) => html`<th class="corner" title=$\{h\}>$\{hi| TO parts.
+    APPEND |erarchyLabel(h)\}</th>`)\}\n        $\{spans.map((\{ member, span \}) => html`<th class="member col-head" colspan=$\{span\} title=$\{member?.uname\}>$\{member ? caption(member) : '| TO parts.
+    APPEND |'\}</th>`)\}\n      </tr>`)\}\n    </thead>\n    <tbody>\n      $\{!columns.length && html`<tr><td class="muted">The column axis is empty.</td></tr>`\}\n      $\{rows.length === 0 | TO parts.
+    APPEND |&& columns.length > 0 && html`<tr><td class="muted" colspan=$\{columns.length + rowDepth\}>The row axis is empty.</td></tr>`\}\n      $\{columns.length > 0 && rows.map((tuple, r) =| TO parts.
+    APPEND |> html`<tr>\n        $\{tuple.map((member, depth) => rowSpans[r][depth] > 0 && html`<th class="member row-head" rowspan=$\{rowSpans[r][depth]\}\n          title=$\{member.uname\} s| TO parts.
+    APPEND |tyle=$\{`padding-left: $\{8 + member.lnum * 14\}px`\}>$\{caption(member)\}</th>`)\}\n        $\{columns.map((_, c) => html`<$\{Cell\} cell=$\{result.cells.get(r * width + c)\} />`)| TO parts.
+    APPEND |\}\n      </tr>`)\}\n    </tbody>\n  </table>`;\n\}\n\n// A flat table for any number of axes: a column per hierarchy of every axis, the highest axis first, and one row per\n// cel| TO parts.
+    APPEND |l in the order of the cell ordinals (Axis0 changes fastest), so the leftmost column changes slowest.\nfunction Flat(\{ result, limit \}) \{\n  const axes = [...result.axes].reverse| TO parts.
+    APPEND |();\n  const sizes = result.axes.map((a) => a.tuples.length);\n  const strides = sizes.map((_, k) => sizes.slice(0, k).reduce((n, s) => n * s, 1));\n  const count = Math.min(result| TO parts.
+    APPEND |.size, limit);\n  const rows = [];\n  for (let ordinal = 0; ordinal < count; ordinal++) \{\n    const members = [];\n    for (let k = result.axes.length - 1; k >= 0; k--) \{\n     | TO parts.
+    APPEND | members.push(...result.axes[k].tuples[Math.floor(ordinal / strides[k]) % sizes[k]]);\n    \}\n    rows.push(html`<tr>\n      $\{members.map((m) => html`<td title=$\{m.uname\}>$\{c| TO parts.
+    APPEND |aption(m)\}</td>`)\}\n      <$\{Cell\} cell=$\{result.cells.get(ordinal)\} />\n    </tr>`);\n  \}\n  return html`<table class="grid flat">\n    <thead><tr>\n      $\{axes.map((a) =| TO parts.
+    APPEND |> a.hierarchies.map((h) => html`<th title=$\{`$\{a.name\}: $\{h\}`\} data-axis=$\{a.name\}>$\{hierarchyLabel(h)\}</th>`))\}\n      <th class="num">Value</th>\n    </tr></thead>\n  | TO parts.
+    APPEND |  <tbody>$\{rows\}</tbody>\n  </table>`;\n\}\n\nfunction Result(\{ run, view, setView \}) \{\n  const tableRef = useRef(null);\n  const [copied, setCopied] = useState(false);\n  if| TO parts.
+    APPEND | (run.state === 'busy') return html`<div class="result-msg muted">Running{ cl_abap_conv_in_ce=>uccp( '2026' ) }</div>`;\n  if (run.state === 'err') \{\n    return html`<div class="| TO parts.
+    APPEND |result-msg"><div class="notice err">$\{run.message\}</div></div>`;\n  \}\n  const \{ result \} = run;\n  const grid = result.axes.length <= 2 && view !== 'flat';\n  const truncated| TO parts.
+    APPEND | = grid\n    ? (result.axes[0]?.tuples.length > MAX_GRID_COLUMNS \|\| result.axes[1]?.tuples.length > MAX_GRID_ROWS)\n    : result.size > MAX_FLAT_ROWS;\n  const copy = async () =>| TO parts.
+    APPEND | \{\n    try \{\n      await navigator.clipboard.writeText(tableRef.current.innerText);\n      setCopied(true);\n      setTimeout(() => setCopied(false), 1500);\n    \} catch \{\n | TO parts.
+    APPEND |     setCopied(false);\n    \}\n  \};\n  const slicer = result.slicer?.tuples.flat() \|\| [];\n\n  return html`<div class="result">\n    <div class="result-bar">\n      <span class| TO parts.
+    APPEND |="muted small">\n        $\{result.cube && html`<span class="mono">$\{result.cube\}</span> { cl_abap_conv_in_ce=>uccp( '00B7' ) } `\}\n        $\{`$\{result.axes.length\} $\{result| TO parts.
+    APPEND |.axes.length === 1 ? 'axis' : 'axes'\} ($\{result.axes.map((a) => a.tuples.length).join(' { cl_abap_conv_in_ce=>uccp( '00D7' ) } ') \|\| '{ cl_abap_conv_in_ce=>uccp( '2013' ) }'\})| TO parts.
+    APPEND |`\n          + ` { cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{result.size.toLocaleString()\} cell$\{result.size === 1 ? '' : 's'\} { cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{Math.round| TO parts.
+    APPEND |(run.ms).toLocaleString()\} ms`\}\n      </span>\n      $\{slicer.length > 0 && html`<span class="small" title="The slicer (WHERE)">where $\{slicer.map((m, i) => html`$\{i > 0 && '| TO parts.
+    APPEND |, '\}<span\n        class="kind" title=$\{m.uname\}>$\{caption(m)\}</span>`)\}</span>`\}\n      <span class="spacer"></span>\n      $\{result.axes.length <= 2 && result.axes.length| TO parts.
+    APPEND | > 0 && html`<div class="segmented" role="group" aria-label="View">\n        <button class=$\{grid ? 'active' : ''\} onClick=$\{() => setView('grid')\}>Grid</button>\n        <butt| TO parts.
+    APPEND |on class=$\{grid ? '' : 'active'\} onClick=$\{() => setView('flat')\}>Table</button>\n      </div>`\}\n      <button onClick=$\{copy\} title="Copy the table as tab-separated text">| TO parts.
+    APPEND |$\{copied ? 'Copied' : 'Copy'\}</button>\n    </div>\n    $\{truncated && html`<div class="notice warn">The answer is too large to show in full: $\{grid\n      ? `the first $\{MAX_| TO parts.
+    APPEND |GRID_ROWS.toLocaleString()\} rows and $\{MAX_GRID_COLUMNS.toLocaleString()\} columns are shown`\n      : `the first $\{MAX_FLAT_ROWS.toLocaleString()\} of $\{result.size.toLocaleSt| TO parts.
+    APPEND |ring()\} rows are shown`\}.</div>`\}\n    <div class="result-table" ref=$\{tableRef\}>\n      $\{grid ? html`<$\{Grid\} result=$\{result\} />` : html`<$\{Flat\} result=$\{result\} | TO parts.
+    APPEND |limit=$\{MAX_FLAT_ROWS\} />`\}\n    </div>\n  </div>`;\n\}\n\n// -------------------------------------------------------------------------------------------------- cube browser\n\n| TO parts.
+    APPEND |function Browser(\{ dataSource, catalog, onInsert \}) \{\n  const [cubes, setCubes] = useState(null);\n  const [open, setOpen] = useState(\{\});\n  const [content, setContent] = us| TO parts.
+    APPEND |eState(\{\});\n  const [error, setError] = useState('');\n  useEffect(() => \{\n    setCubes(null);\n    setOpen(\{\});\n    setContent(\{\});\n    setError('');\n    if (!catalog)| TO parts.
+    APPEND | return;\n    discover('MDSCHEMA_CUBES', \{ CATALOG_NAME: catalog \}, \{ DataSourceInfo: dataSource, Catalog: catalog \})\n      .then(setCubes, (e) => setError(e.message));\n  \},| TO parts.
+    APPEND | [catalog]);\n\n  const loadCube = async (cube) => \{\n    const restrictions = \{ CATALOG_NAME: catalog, CUBE_NAME: cube \};\n    const properties = \{ DataSourceInfo: dataSource,| TO parts.
+    APPEND | Catalog: catalog \};\n    try \{\n      const [measures, hierarchies, levels] = await Promise.all([\n        discover('MDSCHEMA_MEASURES', restrictions, properties),\n        disc| TO parts.
+    APPEND |over('MDSCHEMA_HIERARCHIES', restrictions, properties),\n        discover('MDSCHEMA_LEVELS', restrictions, properties),\n      ]);\n      const dimensions = [];\n      for (const h| TO parts.
+    APPEND | of hierarchies.filter((x) => x.DIMENSION_UNIQUE_NAME !== '[Measures]')) \{\n        let d = dimensions.find((x) => x.uname === h.DIMENSION_UNIQUE_NAME);\n        if (!d) dimension| TO parts.
+    APPEND |s.push(d = \{ uname: h.DIMENSION_UNIQUE_NAME, hierarchies: [] \});\n        d.hierarchies.push(\{\n          uname: h.HIERARCHY_UNIQUE_NAME,\n          caption: h.HIERARCHY_CAPTION| TO parts.
+    APPEND | \|\| h.HIERARCHY_NAME,\n          levels: levels.filter((l) => l.HIERARCHY_UNIQUE_NAME === h.HIERARCHY_UNIQUE_NAME && l.LEVEL_TYPE !== '1')\n            .sort((a, b) => a.LEVEL_NU| TO parts.
+    APPEND |MBER - b.LEVEL_NUMBER)\n            .map((l) => (\{ uname: l.LEVEL_UNIQUE_NAME, caption: l.LEVEL_CAPTION \|\| l.LEVEL_NAME \})),\n        \});\n      \}\n      setContent((c) => (| TO parts.
+    APPEND |\{\n        ...c,\n        [cube]: \{\n          measures: measures.map((m) => (\{ uname: m.MEASURE_UNIQUE_NAME, caption: m.MEASURE_CAPTION \|\| m.MEASURE_NAME \})),\n          dim| TO parts.
+    APPEND |ensions,\n        \},\n      \}));\n    \} catch (e) \{\n      setContent((c) => (\{ ...c, [cube]: \{ error: e.message \} \}));\n    \}\n  \};\n  const toggle = (key, load) => \{\n| TO parts.
+    APPEND |    setOpen((o) => (\{ ...o, [key]: !o[key] \}));\n    if (load && !open[key]) load();\n  \};\n\n  const leaf = (uname, label, kind, depth) => html`<button class="item" style=$\{`p| TO parts.
+    APPEND |adding-left: $\{14 + depth * 14\}px`\} draggable="true"\n    title=$\{`$\{uname\} { cl_abap_conv_in_ce=>uccp( '2013' ) } click to insert, or drag`\} onClick=$\{() => onInsert(uname| TO parts.
+    APPEND |)\}\n    onDragStart=$\{(e) => e.dataTransfer.setData('text/plain', uname)\}>\n    <span class=$\{`glyph $\{kind\}`\}></span><span class="label">$\{label\}</span>\n  </button>`;\n | TO parts.
+    APPEND | const node = (key, label, kind, depth, load, uname) => html`<button class="item" style=$\{`padding-left: $\{14 + depth * 14\}px`\}\n    onClick=$\{() => toggle(key, load)\} onDblC| TO parts.
+    APPEND |lick=$\{() => uname && onInsert(uname)\} title=$\{uname ? `$\{uname\} { cl_abap_conv_in_ce=>uccp( '2013' ) } double-click to insert` : ''\}\n    draggable=$\{!!uname\} onDragStart=| TO parts.
+    APPEND |$\{(e) => uname && e.dataTransfer.setData('text/plain', uname)\}>\n    <span class="twisty">$\{open[key] ? '{ cl_abap_conv_in_ce=>uccp( '25BE' ) }' : '| TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '25B8' ) }'\}</span><span class=$\{`glyph $\{kind\}`\}></span><span class="label">$\{label\}</span>\n  </button>`;\n\n  return html`<nav class="tree bro| TO parts.
+    APPEND |wser" aria-label="Cubes">\n    <div class="group"><h3>Cubes</h3></div>\n    $\{error && html`<div class="notice err small" style="margin: 0 14px">$\{error\}</div>`\}\n    $\{!catal| TO parts.
+    APPEND |og ? html`<div class="muted small pad">No catalog.</div>` : cubes == null && !error ? html`<div class="muted small pad">Loading{ cl_abap_conv_in_ce=>uccp( '2026' ) }</div>` : null| TO parts.
+    APPEND |\}\n    $\{(cubes \|\| []).map((cube) => \{\n      const name = cube.CUBE_NAME;\n      const c = content[name];\n      return html`\n        $\{node(name, html`<strong>$\{name\}</s| TO parts.
+    APPEND |trong>$\{cube.CUBE_CAPTION && cube.CUBE_CAPTION !== name\n          && html` <span class="muted small">$\{cube.CUBE_CAPTION\}</span>`\}`, 'cube', 0, () => loadCube(name), `[$\{name| TO parts.
+    APPEND |\}]`)\}\n        $\{open[name] && (c == null ? html`<div class="muted small pad">Loading{ cl_abap_conv_in_ce=>uccp( '2026' ) }</div>`\n          : c.error ? html`<div class="notice| TO parts.
+    APPEND | err small" style="margin: 0 14px">$\{c.error\}</div>` : html`\n          $\{node(`$\{name\}\|m`, 'Measures', 'folder', 1, null, '[Measures]')\}\n          $\{open[`$\{name\}\|m`] | TO parts.
+    APPEND |&& c.measures.map((m) => leaf(m.uname, m.caption, 'measure', 2))\}\n          $\{c.dimensions.map((d) => \{\n            const key = `$\{name\}\|$\{d.uname\}`;\n            // a di| TO parts.
+    APPEND |mension with one hierarchy of its name shows the levels right away\n            const single = d.hierarchies.length === 1 && d.hierarchies[0].uname === d.uname;\n            return| TO parts.
+    APPEND | html`\n              $\{node(key, hierarchyLabel(d.uname), 'dimension', 1, null, d.uname)\}\n              $\{open[key] && (single ? d.hierarchies[0].levels.map((l) => leaf(l.unam| TO parts.
+    APPEND |e, l.caption, 'level', 2))\n                : d.hierarchies.map((h) => html`\n                  $\{node(`$\{key\}\|$\{h.uname\}`, h.caption, 'hierarchy', 2, null, h.uname)\}\n     | TO parts.
+    APPEND |             $\{open[`$\{key\}\|$\{h.uname\}`] && h.levels.map((l) => leaf(l.uname, l.caption, 'level', 3))\}`))\}`;\n          \})\}`)\}`;\n    \})\}\n  </nav>`;\n\}\n\n// -------| TO parts.
+    APPEND |--------------------------------------------------------------------------------------------------- app\n\nfunction load(key, fallback) \{\n  try \{\n    const value = localStorage| TO parts.
+    APPEND |.getItem(`olap4abap.console.$\{key\}`);\n    return value == null ? fallback : JSON.parse(value);\n  \} catch \{\n    return fallback;\n  \}\n\}\nfunction save(key, value) \{\n  tr| TO parts.
+    APPEND |y \{\n    localStorage.setItem(`olap4abap.console.$\{key\}`, JSON.stringify(value));\n  \} catch \{\n    // private window or blocked storage: the console works without it\n  \}\n| TO parts.
+    APPEND |\}\n\n// A statement handed over in the URL's fragment (#statement=...&catalog=..., the trace page's "Open in MDX Console"):\n// read once, then removed from the address bar, so a | TO parts.
+    APPEND |reload shows what was typed since. The fragment is not sent to\n// the server, so a long statement fits.\nfunction handedOver() \{\n  const params = new URLSearchParams(location.ha| TO parts.
+    APPEND |sh.slice(1));\n  if (!params.has('statement')) return \{\};\n  history.replaceState(null, '', location.pathname + location.search);\n  return \{ statement: params.get('statement'),| TO parts.
+    APPEND | catalog: params.get('catalog') \|\| '' \};\n\}\n\nfunction App() \{\n  const [handed] = useState(handedOver);\n  const [sources, setSources] = useState(null);\n  const [catalogs, | TO parts.
+    APPEND |setCatalogs] = useState([]);\n  const [catalog, setCatalog] = useState(() => handed.catalog \|\| load('catalog', ''));\n  const [statement, setStatement] = useState(() => handed.st| TO parts.
+    APPEND |atement ?? load('statement', ''));\n  const [history, setHistory] = useState(load('history', []));\n  const [run, setRun] = useState(null);\n  const [view, setView] = useState('gri| TO parts.
+    APPEND |d');\n  const [error, setError] = useState('');\n  const editor = useRef(null);\n  const dataSource = sources?.[0]?.DataSourceName \|\| '';\n\n  useEffect(() => \{\n    (async () =| TO parts.
+    APPEND |> \{\n      try \{\n        const ds = await discover('DISCOVER_DATASOURCES');\n        setSources(ds);\n        const rows = await discover('DBSCHEMA_CATALOGS', \{\}, \{ DataSourc| TO parts.
+    APPEND |eInfo: ds[0]?.DataSourceName \});\n        const names = rows.map((r) => r.CATALOG_NAME);\n        setCatalogs(names);\n        setCatalog((c) => (names.includes(c) ? c : names[0] | TO parts.
+    APPEND |\|\| ''));\n      \} catch (e) \{\n        setError(e.message);\n      \}\n    \})();\n  \}, []);\n  useEffect(() => save('catalog', catalog), [catalog]);\n  useEffect(() => save('| TO parts.
+    APPEND |statement', statement), [statement]);\n\n  const runStatement = useCallback(async () => \{\n    const area = editor.current;\n    const selected = area && area.selectionStart !== a| TO parts.
+    APPEND |rea.selectionEnd\n      ? area.value.slice(area.selectionStart, area.selectionEnd) : statement;\n    const mdx = selected.trim();\n    if (!mdx \|\| !catalog) return;\n    setRun(| TO parts.
+    APPEND |\{ state: 'busy' \});\n    try \{\n      const \{ doc, ms \} = await execute(mdx, dataSource, catalog);\n      setRun(\{ state: 'ok', result: parseCellset(doc), ms \});\n    \} cat| TO parts.
+    APPEND |ch (e) \{\n      setRun(\{ state: 'err', message: e.message, ms: e.ms \});\n    \}\n    setHistory((h) => \{\n      const next = [mdx, ...h.filter((x) => x !== mdx)].slice(0, HISTO| TO parts.
+    APPEND |RY_SIZE);\n      save('history', next);\n      return next;\n    \});\n  \}, [statement, catalog, dataSource]);\n\n  const insert = (piece) => \{\n    const area = editor.current;| TO parts.
+    APPEND |\n    const start = area ? area.selectionStart : statement.length;\n    const end = area ? area.selectionEnd : statement.length;\n    const next = statement.slice(0, start) + piece| TO parts.
+    APPEND | + statement.slice(end);\n    setStatement(next);\n    requestAnimationFrame(() => \{\n      if (!area) return;\n      area.focus();\n      area.setSelectionRange(start + piece.len| TO parts.
+    APPEND |gth, start + piece.length);\n    \});\n  \};\n\n  // formats the selection, or the statement; typed into the textarea, so Ctrl+Z undoes it\n  const format = () => \{\n    const are| TO parts.
+    APPEND |a = editor.current;\n    if (!area) return;\n    const selected = area.selectionStart !== area.selectionEnd;\n    const start = selected ? area.selectionStart : 0;\n    const end =| TO parts.
+    APPEND | selected ? area.selectionEnd : area.value.length;\n    const formatted = formatMdx(area.value.slice(start, end));\n    if (formatted === area.value.slice(start, end)) return;\n   | TO parts.
+    APPEND | area.focus();\n    area.setSelectionRange(start, end);\n    if (!document.execCommand('insertText', false, formatted)) \{\n      setStatement(area.value.slice(0, start) + formatte| TO parts.
+    APPEND |d + area.value.slice(end));\n    \}\n  \};\n\n  const busy = run?.state === 'busy';\n  return html`\n    <div class="topbar">\n      <div class="title"><h1>MDX Console</h1><span cl| TO parts.
+    APPEND |ass="src">olap4abap</span></div>\n      <label class="inline">Catalog\n        <select value=$\{catalog\} onChange=$\{(e) => setCatalog(e.target.value)\} disabled=$\{!catalogs.leng| TO parts.
+    APPEND |th\}>\n          $\{!catalogs.length && html`<option value="">{ cl_abap_conv_in_ce=>uccp( '2013' ) }</option>`\}\n          $\{catalogs.map((c) => html`<option value=$\{c\}>$\{c\}<| TO parts.
+    APPEND |/option>`)\}\n        </select>\n      </label>\n      <span class="spacer"></span>\n      <a href=$\{`./$\{location.search\}`\}>Schema Builder</a>\n      <a href=$\{`time.html$\{l| TO parts.
+    APPEND |ocation.search\}`\}>Time Master Data</a>\n      <a href=$\{`trace.html$\{location.search\}`\}>Trace</a>\n    </div>\n    $\{error && html`<div class="banner" role="alert">$\{error| TO parts.
+    APPEND |\}</div>`\}\n    <div class="editor console">\n      <$\{Browser\} dataSource=$\{dataSource\} catalog=$\{catalog\} onInsert=$\{insert\} />\n      <main class="main console-main">\n| TO parts.
+    APPEND |        <div class="query">\n          <textarea ref=$\{editor\} class="mdx" spellcheck="false" value=$\{statement\} aria-label="MDX statement"\n            placeholder=$\{'SELECT | TO parts.
+    APPEND |\{[Measures].Members\} ON COLUMNS\\nFROM [Cube]'\}\n            onInput=$\{(e) => setStatement(e.target.value)\}\n            onKeyDown=$\{(e) => \{\n              if ((e.ctrlKey | TO parts.
+    APPEND |\|\| e.metaKey) && e.key === 'Enter') \{ e.preventDefault(); runStatement(); \}\n              if (e.shiftKey && e.altKey && e.code === 'KeyF') \{ e.preventDefault(); format(); \}| TO parts.
+    APPEND |\n            \}\}></textarea>\n          <div class="row">\n            <button class="primary" disabled=$\{busy \|\| !catalog \|\| !statement.trim()\} onClick=$\{runStatement\}\n| TO parts.
+    APPEND |              title="Run the statement, or the selected part of it (Ctrl+Enter)">$\{busy ? 'Running{ cl_abap_conv_in_ce=>uccp( '2026' ) }' : 'Run'\}</button>\n            <button d| TO parts.
+    APPEND |isabled=$\{!statement.trim()\} onClick=$\{format\}\n              title="Lay out the statement, or the selected part of it, for reading (Shift+Alt+F)">Format</button>\n            | TO parts.
+    APPEND |<select value="" aria-label="History" disabled=$\{!history.length\} onChange=$\{(e) => \{\n              const i = e.target.value;\n              e.target.value = '';\n            | TO parts.
+    APPEND |  if (i !== '') setStatement(history[Number(i)]);\n            \}\}>\n              <option value="">History{ cl_abap_conv_in_ce=>uccp( '2026' ) }</option>\n              $\{histor| TO parts.
+    APPEND |y.map((h, i) => html`<option value=$\{i\}>$\{h.replace(/\\s+/g, ' ').slice(0, 90)\}</option>`)\}\n            </select>\n            <span class="muted small">Ctrl+Enter runs the s| TO parts.
+    APPEND |tatement or the selection, Shift+Alt+F formats it; click a name on the left to insert it.</span>\n          </div>\n        </div>\n        $\{run ? html`<$\{Result\} run=$\{run\} | TO parts.
+    APPEND |view=$\{view\} setView=$\{setView\} />`\n          : html`<div class="result-msg muted">Write a statement and run it. Up to two axes show as a grid, more as a table.</div>`\}\n    | TO parts.
+    APPEND |  </main>\n    </div>`;\n\}\n\nconst root = document.getElementById('app');\nroot.textContent = '';\nrender(html`<$\{App\} />`, root);\n| TO parts.
     result = concat_lines_of( parts ).
   ENDMETHOD.
 
@@ -839,6 +850,73 @@ CLASS zzxxmla1_cl_web_app_files IMPLEMENTATION.
     APPEND |<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="utf-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1">\n  <title>Schema Builder</title>\n  <lin| TO parts.
     APPEND |k rel="stylesheet" href="app.css">\n  <script type="module" src="app.js"></script>\n</head>\n<body>\n  <div id="app"><p class="boot">Loading{ cl_abap_conv_in_ce=>uccp( '2026' ) }</| TO parts.
     APPEND |p></div>\n  <noscript>The schema builder needs JavaScript.</noscript>\n</body>\n</html>\n| TO parts.
+    result = concat_lines_of( parts ).
+  ENDMETHOD.
+
+  METHOD mdx_format_js.
+    DATA parts TYPE string_table.
+    APPEND |// Formats an MDX statement for reading: each clause (WITH, its MEMBER and SET, SELECT, FROM, WHERE, CELL PROPERTIES)\n// on a line of its own, one axis per line, a bracket group t| TO parts.
+    APPEND |hat does not fit in the line broken into one item per\n// line, keywords in upper case. Only white space and the case of keywords change, never identifiers, strings or\n// comments| TO parts.
+    APPEND |, so the statement means the same. The formula of a calculated member or named set in single quotes\n// (AS '...') is formatted as well. Text it cannot tokenize (an unclosed string| TO parts.
+    APPEND |, unbalanced brackets) is returned as\n// it is. The tokens are those of the reference's grammar, MdxParser.jj.\n\nconst WIDTH = 100;\n\nconst KEYWORDS = new Set(['AND', 'AS', 'AXI| TO parts.
+    APPEND |S', 'BEGIN', 'BY', 'CASE', 'CAST', 'CELL', 'CHAPTERS', 'CREATE', 'COLUMNS',\n  'COMMIT', 'CUBE', 'DIMENSION', 'DRILLTHROUGH', 'ELSE', 'EMPTY', 'END', 'EXPLAIN', 'FIRSTROWSET', 'FOR| TO parts.
+    APPEND |', 'FROM', 'IN',\n  'IS', 'MATCHES', 'MAXROWS', 'MEMBER', 'NON', 'NOT', 'NULL', 'ON', 'OR', 'PAGES', 'PLAN', 'PROPERTIES', 'REFRESH',\n  'RETURN', 'ROLLBACK', 'ROWS', 'SECTIONS', '| TO parts.
+    APPEND |SELECT', 'SESSION', 'SET', 'THEN', 'TRAN', 'TRANSACTION', 'UPDATE',\n  'WHEN', 'WHERE', 'XOR', 'WITH', 'EXISTING']);\n// keywords written like a function, without a space before th| TO parts.
+    APPEND |eir parenthesis\nconst CALL_KEYWORDS = new Set(['AXIS', 'CAST']);\nconst OPERATORS = ['\|\|', '<>', '<=', '>=', '=', '<', '>', '+', '-', '*', '/'];\nconst OPEN = \{ '(': ')', '\{':| TO parts.
+    APPEND | '\}' \};\n\nclass Unformattable extends Error \{\}\n\n// ---------------------------------------------------------------------------------------------------------- tokens\n\nfunct| TO parts.
+    APPEND |ion tokenize(text) \{\n  const tokens = [];\n  let i = 0;\n  const push = (kind, end) => \{\n    tokens.push(\{ kind, text: text.slice(i, end) \});\n    i = end;\n  \};\n  const cl| TO parts.
+    APPEND |osing = (quote, from) => \{\n    // a quote is escaped by doubling it\n    for (let j = from; j < text.length; j++) \{\n      if (text[j] === quote) \{\n        if (text[j + 1] ===| TO parts.
+    APPEND | quote) j++;\n        else return j + 1;\n      \}\n    \}\n    throw new Unformattable();\n  \};\n  while (i < text.length) \{\n    const c = text[i];\n    const rest = text.slice| TO parts.
+    APPEND |(i);\n    if (/\\s/.test(c)) \{\n      i++;\n    \} else if (rest.startsWith('--') \|\| rest.startsWith('//')) \{\n      const end = text.indexOf('\\n', i);\n      push('line-comme| TO parts.
+    APPEND |nt', end < 0 ? text.length : end);\n      tokens[tokens.length - 1].text = tokens[tokens.length - 1].text.trimEnd();\n    \} else if (rest.startsWith('/*')) \{\n      const end = t| TO parts.
+    APPEND |ext.indexOf('*/', i + 2);\n      if (end < 0) throw new Unformattable();\n      push('comment', end + 2);\n    \} else if (c === '[' \|\| (c === '&' && text[i + 1] === '[')) \{\n  | TO parts.
+    APPEND |    const end = closing(']', i + (c === '&' ? 2 : 1));\n      push('id', end);\n    \} else if (c === "'" \|\| c === '"') \{\n      push('string', closing(c, i + 1));\n    \} else | TO parts.
+    APPEND |if (/[0-9]/.test(c) \|\| (c === '.' && /[0-9]/.test(text[i + 1]))) \{\n      push('number', i + /^(\\d*\\.?\\d*)([eE][+-]?\\d+)?/.exec(rest)[0].length);\n    \} else if (/[A-Za-z_$| TO parts.
+    APPEND |]/.test(c)) \{\n      const word = /^[A-Za-z_$][A-Za-z0-9_$]*/.exec(rest)[0];\n      const after = tokens[tokens.length - 1];\n      // a name after a dot (.Members, .Dimension) is| TO parts.
+    APPEND | a function or member name, even where it spells a keyword\n      const keyword = KEYWORDS.has(word.toUpperCase()) && !(after && after.text === '.');\n      tokens.push(\{ kind: ke| TO parts.
+    APPEND |yword ? 'keyword' : 'word', text: keyword ? word.toUpperCase() : word \});\n      i += word.length;\n    \} else \{\n      const op = OPERATORS.find((o) => rest.startsWith(o));\n  | TO parts.
+    APPEND |    push(op ? 'operator' : 'punct', i + (op ? op.length : 1));\n    \}\n  \}\n  tokens.forEach((t, k) => \{\n    // a sign: + or - where no operand precedes it\n    const before = | TO parts.
+    APPEND |tokens[k - 1];\n    t.unary = (t.text === '-' \|\| t.text === '+') && (!before \|\| before.kind === 'operator' \|\| before.kind === 'keyword'\n      \|\| ['(', '\{', ','].includes(| TO parts.
+    APPEND |before.text));\n  \});\n  return tokens;\n\}\n\n// The tokens as a tree: a bracket group is \{ open, close, items \}.\nfunction nest(tokens) \{\n  const stack = [\{ items: [] \}];| TO parts.
+    APPEND |\n  for (const t of tokens) \{\n    if (OPEN[t.text]) \{\n      stack.push(\{ open: t, close: null, items: [] \});\n    \} else if (t.text === ')' \|\| t.text === '\}') \{\n      c| TO parts.
+    APPEND |onst group = stack.pop();\n      if (!group.open \|\| OPEN[group.open.text] !== t.text) throw new Unformattable();\n      group.close = t;\n      stack[stack.length - 1].items.push| TO parts.
+    APPEND |(group);\n    \} else \{\n      stack[stack.length - 1].items.push(t);\n    \}\n  \}\n  if (stack.length !== 1) throw new Unformattable();\n  return stack[0].items;\n\}\n\nconst fi| TO parts.
+    APPEND |rstToken = (node) => (node.open ? node.open : node);\nconst lastToken = (node) => (node.close ? node.close : node);\nconst isKeyword = (node, ...words) => node && node.kind === 'ke| TO parts.
+    APPEND |yword' && (!words.length \|\| words.includes(node.text));\nconst hasLineComment = (nodes) => nodes.some((n) => (n.items ? hasLineComment(n.items) : n.kind === 'line-comment'));\nco| TO parts.
+    APPEND |nst isQuery = (group) => group.open && group.open.text === '(' && isKeyword(group.items[0], 'SELECT', 'WITH');\n\nfunction spaced(prev, next) \{\n  if (!prev) return false;\n  cons| TO parts.
+    APPEND |t p = lastToken(prev);\n  const n = firstToken(next);\n  if (p.text === '(' \|\| p.text === '\{' \|\| p.unary) return false;\n  if ([')', '\}', ','].includes(n.text)) return false;| TO parts.
+    APPEND |\n  if (['.', ':', '!'].includes(p.text) \|\| ['.', ':', '!'].includes(n.text)) return false;\n  if (n.text.startsWith('&') \|\| p.text === '@' \|\| n.text === '@') return false;\n| TO parts.
+    APPEND |  if (n.text === '(' && (p.kind === 'word' \|\| (p.kind === 'keyword' && CALL_KEYWORDS.has(p.text)))) return false;\n  return true;\n\}\n\n// Splits nodes at their top-level commas| TO parts.
+    APPEND |; the commas are dropped.\nfunction splitCommas(nodes) \{\n  const parts = [[]];\n  for (const n of nodes) \{\n    if (n.text === ',') parts.push([]);\n    else parts[parts.length | TO parts.
+    APPEND |- 1].push(n);\n  \}\n  return parts;\n\}\n\n// ---------------------------------------------------------------------------------------------------------- layout\n\nclass Writer \{| TO parts.
+    APPEND |\n  constructor() \{\n    this.lines = [''];\n    this.escape = (s) => s;\n  \}\n  get column() \{\n    return this.lines[this.lines.length - 1].length;\n  \}\n  write(s) \{\n    t| TO parts.
+    APPEND |his.lines[this.lines.length - 1] += s;\n  \}\n  newline(indent) \{\n    // a line still empty (after a line comment) takes the new indent instead of staying blank\n    if (this.atL| TO parts.
+    APPEND |ineStart() && this.lines.length > 1) this.lines[this.lines.length - 1] = ' '.repeat(indent);\n    else this.lines.push(' '.repeat(indent));\n  \}\n  atLineStart() \{\n    return th| TO parts.
+    APPEND |is.lines[this.lines.length - 1].trim() === '';\n  \}\n  text() \{\n    return this.lines.map((l) => l.trimEnd()).join('\\n').trim();\n  \}\n\}\n\nfunction flatText(nodes, escape) | TO parts.
+    APPEND |\{\n  let s = '';\n  let prev = null;\n  for (const n of nodes) \{\n    if (spaced(prev, n)) s += ' ';\n    s += n.items ? escape(n.open.text) + flatText(n.items, escape) + escape(| TO parts.
+    APPEND |n.close.text) : escape(n.text);\n    prev = n;\n  \}\n  return s;\n\}\n\n// Writes nodes of an expression, breaking the bracket groups that do not fit.\nfunction writeSeq(w, nodes,| TO parts.
+    APPEND | indent) \{\n  let prev = null;\n  for (const n of nodes) \{\n    if (spaced(prev, n) && !w.atLineStart()) w.write(' ');\n    writeNode(w, n, indent, prev);\n    prev = n;\n  \}\n| TO parts.
+    APPEND |\}\n\nfunction writeNode(w, n, indent, prev) \{\n  if (n.items) \{\n    if (isQuery(n)) \{\n      w.write(w.escape(n.open.text));\n      w.newline(indent + 2);\n      writeQuery(w,| TO parts.
+    APPEND | n.items, indent + 2);\n      w.newline(indent);\n      w.write(w.escape(n.close.text));\n    \} else if (!hasLineComment(n.items) && w.column + flatText([n], w.escape).length <= W| TO parts.
+    APPEND |IDTH) \{\n      w.write(flatText([n], w.escape));\n    \} else \{\n      w.write(w.escape(n.open.text));\n      const parts = splitCommas(n.items);\n      parts.forEach((part, k) =| TO parts.
+    APPEND |> \{\n        w.newline(indent + 2);\n        writeSeq(w, part, indent + 2);\n        if (k < parts.length - 1) w.write(',');\n      \});\n      w.newline(indent);\n      w.write(w| TO parts.
+    APPEND |.escape(n.close.text));\n    \}\n  \} else if (n.kind === 'string' && n.text[0] === "'" && isKeyword(prev, 'AS')) \{\n    writeFormula(w, n, indent);\n  \} else \{\n    w.write(w.e| TO parts.
+    APPEND |scape(n.text));\n    if (n.kind === 'line-comment') w.newline(indent);\n  \}\n\}\n\n// A formula in single quotes: its text formatted as an expression, its quotes doubled again.\nf| TO parts.
+    APPEND |unction writeFormula(w, n, indent) \{\n  let nodes;\n  try \{\n    nodes = nest(tokenize(n.text.slice(1, -1).replace(/''/g, "'")));\n  \} catch (e) \{\n    if (!(e instanceof Unfor| TO parts.
+    APPEND |mattable)) throw e;\n    return w.write(n.text);\n  \}\n  const outer = w.escape;\n  w.escape = (s) => outer(s.replace(/'/g, "''"));\n  w.write(outer("'"));\n  writeSeq(w, nodes, i| TO parts.
+    APPEND |ndent);\n  w.write(outer("'"));\n  w.escape = outer;\n\}\n\n// Splits a statement's top-level nodes into clauses, each starting at one of the words.\nfunction clauses(nodes, starts| TO parts.
+    APPEND |Clause) \{\n  const result = [];\n  nodes.forEach((n, k) => \{\n    if (!result.length \|\| startsClause(n, nodes[k + 1], nodes[k - 1])) result.push([]);\n    result[result.length | TO parts.
+    APPEND |- 1].push(n);\n  \});\n  return result;\n\}\n\nconst TOP_CLAUSES = ['WITH', 'SELECT', 'FROM', 'WHERE', 'DRILLTHROUGH', 'RETURN', 'EXPLAIN'];\n\nfunction writeQuery(w, nodes, indent| TO parts.
+    APPEND |) \{\n  const top = clauses(nodes, (n, next) => isKeyword(n, ...TOP_CLAUSES)\n    \|\| (isKeyword(n, 'CELL') && isKeyword(next, 'PROPERTIES')));\n  top.forEach((clause, k) => \{\n | TO parts.
+    APPEND |   if (k > 0) w.newline(indent);\n    const head = clause[0];\n    if (isKeyword(head, 'WITH')) \{\n      w.write('WITH');\n      // a calculated member, named set or cell calculat| TO parts.
+    APPEND |ion each on a line, its properties below it\n      for (const definition of clauses(clause.slice(1), (n) => isKeyword(n, 'MEMBER', 'SET', 'CELL'))) \{\n        w.newline(indent + 2| TO parts.
+    APPEND |);\n        const parts = splitCommas(definition);\n        parts.forEach((part, p) => \{\n          if (p > 0) \{\n            w.write(',');\n            w.newline(indent + 4);\n | TO parts.
+    APPEND |         \}\n          writeSeq(w, part, indent + 4);\n        \});\n      \}\n    \} else if (isKeyword(head, 'SELECT')) \{\n      const axes = splitCommas(clause.slice(1));\n    | TO parts.
+    APPEND |  w.write('SELECT');\n      if (axes.length === 1 && axes[0].length === 0) return;\n      if (axes.length === 1 && !hasLineComment(axes[0])\n        && w.column + 1 + flatText(axes| TO parts.
+    APPEND |[0], w.escape).length <= WIDTH) \{\n        w.write(' ');\n        writeSeq(w, axes[0], indent + 2);\n        return;\n      \}\n      axes.forEach((axis, a) => \{\n        w.newli| TO parts.
+    APPEND |ne(indent + 2);\n        writeSeq(w, axis, indent + 2);\n        if (a < axes.length - 1) w.write(',');\n      \});\n    \} else \{\n      writeSeq(w, clause, indent);\n    \}\n  | TO parts.
+    APPEND |\});\n\}\n\n/** The statement formatted; the text as it is where it cannot be tokenized. */\nexport function formatMdx(text) \{\n  try \{\n    const w = new Writer();\n    writeQue| TO parts.
+    APPEND |ry(w, nest(tokenize(text)), 0);\n    return w.text();\n  \} catch (e) \{\n    if (e instanceof Unformattable) return text;\n    throw e;\n  \}\n\}\n| TO parts.
     result = concat_lines_of( parts ).
   ENDMETHOD.
 

@@ -2,8 +2,10 @@
 // and shows the answer. A result of up to two axes is a grid (Axis0 the columns, Axis1 the rows), one of more axes
 // a flat table with a column per hierarchy of every axis and one row per cell. The cube browser on the left lists
 // the catalog's cubes, measures, hierarchies and levels from the schema rowsets; a click inserts a unique name.
+// Format lays the statement out for reading (mdx-format.js).
 // No build step: Preact with htm, vendored as one ES module; this file is what the server serves.
 import { html, render, useState, useEffect, useRef, useCallback } from './vendor/htm-preact-standalone.mjs';
+import { formatMdx } from './mdx-format.js';
 
 // beyond these the browser gets slow; the rest of the answer is counted, not shown
 const MAX_GRID_ROWS = 2000;
@@ -433,6 +435,22 @@ function App() {
     });
   };
 
+  // formats the selection, or the statement; typed into the textarea, so Ctrl+Z undoes it
+  const format = () => {
+    const area = editor.current;
+    if (!area) return;
+    const selected = area.selectionStart !== area.selectionEnd;
+    const start = selected ? area.selectionStart : 0;
+    const end = selected ? area.selectionEnd : area.value.length;
+    const formatted = formatMdx(area.value.slice(start, end));
+    if (formatted === area.value.slice(start, end)) return;
+    area.focus();
+    area.setSelectionRange(start, end);
+    if (!document.execCommand('insertText', false, formatted)) {
+      setStatement(area.value.slice(0, start) + formatted + area.value.slice(end));
+    }
+  };
+
   const busy = run?.state === 'busy';
   return html`
     <div class="topbar">
@@ -458,10 +476,13 @@ function App() {
             onInput=${(e) => setStatement(e.target.value)}
             onKeyDown=${(e) => {
               if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); runStatement(); }
+              if (e.shiftKey && e.altKey && e.code === 'KeyF') { e.preventDefault(); format(); }
             }}></textarea>
           <div class="row">
             <button class="primary" disabled=${busy || !catalog || !statement.trim()} onClick=${runStatement}
               title="Run the statement, or the selected part of it (Ctrl+Enter)">${busy ? 'Running…' : 'Run'}</button>
+            <button disabled=${!statement.trim()} onClick=${format}
+              title="Lay out the statement, or the selected part of it, for reading (Shift+Alt+F)">Format</button>
             <select value="" aria-label="History" disabled=${!history.length} onChange=${(e) => {
               const i = e.target.value;
               e.target.value = '';
@@ -470,7 +491,7 @@ function App() {
               <option value="">History…</option>
               ${history.map((h, i) => html`<option value=${i}>${h.replace(/\s+/g, ' ').slice(0, 90)}</option>`)}
             </select>
-            <span class="muted small">Ctrl+Enter runs the statement or the selection; click a name on the left to insert it.</span>
+            <span class="muted small">Ctrl+Enter runs the statement or the selection, Shift+Alt+F formats it; click a name on the left to insert it.</span>
           </div>
         </div>
         ${run ? html`<${Result} run=${run} view=${view} setView=${setView} />`

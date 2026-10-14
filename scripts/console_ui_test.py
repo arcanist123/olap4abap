@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Drives the MDX console (/zzxxmla1/schema/console.html, web/schema/console.js) in a headless browser against SAP:
-the cube browser, a grid of two axes, a flat table of three, a statement without axes and an error. Reads only.
+the cube browser, a grid of two axes, Format, a flat table of three, a statement without axes and an error. Reads
+only.
 
     pip install playwright && playwright install chromium-headless-shell
     python scripts/console_ui_test.py
@@ -75,9 +76,20 @@ def main():
         check("two axes as a table", ["Drink", "USA", "Store Sales", "48,836.21"] in rows, rows)
         page.click(".segmented button:has-text('Grid')")
 
-        # three axes: a flat table, the highest axis first
-        run(page, "select {[Measures].[Unit Sales]} on 0, {[Product].[Product Family].Members} on 1,"
-                  " {[Store].[Store Country].Members} on 2 from [ZFMSALES]")
+        # Format lays the statement out, Ctrl+Z takes it back; three axes: a flat table, the highest axis first
+        three = ("select {[Measures].[Unit Sales]} on 0, {[Product].[Product Family].Members} on 1,"
+                 " {[Store].[Store Country].Members} on 2 from [ZFMSALES]")
+        page.fill("textarea.mdx", three)
+        page.click("button:has-text('Format')")
+        formatted = ("SELECT\n  {[Measures].[Unit Sales]} ON 0,\n  {[Product].[Product Family].Members} ON 1,\n"
+                     "  {[Store].[Store Country].Members} ON 2\nFROM [ZFMSALES]")
+        check("format", page.input_value("textarea.mdx") == formatted, page.input_value("textarea.mdx"))
+        page.keyboard.press("Control+z")
+        check("format undone", page.input_value("textarea.mdx") == three, page.input_value("textarea.mdx"))
+        page.keyboard.press("Shift+Alt+f")
+        check("format by key", page.input_value("textarea.mdx") == formatted, page.input_value("textarea.mdx"))
+        page.click("button:has-text('Run')")
+        page.wait_for_selector(".result, .result-msg .notice", timeout=RUN)
         rows = table(page)
         check("flat header", rows[0] == ["Store", "Product", "Measures", "Value"], rows[:1])
         check("flat rows", len(rows) == 13 and ["USA", "Food", "Unit Sales", "191,940"] in rows, rows)
