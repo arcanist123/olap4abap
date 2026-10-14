@@ -17,6 +17,12 @@ CLASS zzxxmla1_cl_xmla_mddataset DEFINITION
   CREATE PUBLIC.
 
   PUBLIC SECTION.
+    "! The answer in UTF-8, in parts the endpoint appends to the response one after the other.
+    TYPES ty_t_part TYPE STANDARD TABLE OF xstring WITH EMPTY KEY.
+
+    "! The answer in UTF-8 parts: the head with the axes, the cells by c_cells_per_part, the tail. A grid's answer has
+    "! some hundred megabytes; joined into one string it would be copied and converted to UTF-8 as a whole.
+    "! @parameter session | the Session element of the SOAP header (ZZXXMLA1_CL_XMLA_HANDLER), empty for none
     "! @parameter with_schema | true for Content SchemaData (the default), false for Data
     "! @parameter excel | true if the client is Excel: an Integer cell is xsd:int, as the reference's release writes it
     "!   (Excel drops the filter of Keep Only Selected Items after an xsd:integer child count of its item path query);
@@ -25,7 +31,8 @@ CLASS zzxxmla1_cl_xmla_mddataset DEFINITION
       IMPORTING result        TYPE zzxxmla1_cl_mdx_engine=>ty_result
                 with_schema   TYPE abap_bool
                 excel         TYPE abap_bool DEFAULT abap_false
-      RETURNING VALUE(xml)    TYPE string.
+                session       TYPE string OPTIONAL
+      RETURNING VALUE(parts)  TYPE ty_t_part.
     "! The element name of a property or a column (XmlaUtil.ElementNameEncoder, encodeElementName): every character
     "! that the pattern of a valid first character of an XML name does not match becomes _xHHHH_ (a space _x0020_).
     CLASS-METHODS element_name
@@ -34,6 +41,11 @@ CLASS zzxxmla1_cl_xmla_mddataset DEFINITION
 
   PRIVATE SECTION.
     CONSTANTS c_ns_xmla TYPE string VALUE `urn:schemas-microsoft-com:xml-analysis`.
+    "! the cells converted to UTF-8 together (docs/query-planning.md, Cells first: 10,000 measured fastest)
+    CONSTANTS c_cells_per_part TYPE i VALUE 10000.
+    CLASS-METHODS utf8
+      IMPORTING value         TYPE string
+      RETURNING VALUE(result) TYPE xstring.
     CLASS-METHODS text
       IMPORTING value         TYPE string
       RETURNING VALUE(result) TYPE string.
@@ -112,17 +124,28 @@ CLASS zzxxmla1_cl_xmla_mddataset IMPLEMENTATION.
       axes_info = axes_info && `          <AxisInfo name="SlicerAxis"/>` && nl.
     ENDIF.
 
-    " the pieces are joined once, the cells' lines between the head and the tail: appending a method's result to a
-    " string copies the string every time, and a grid's answer has some hundred megabytes
+    " the cells' lines are joined and converted to UTF-8 by c_cells_per_part: appending to a string copies the string
+    " every time, and a grid's answer has some hundred megabytes
     DATA(cell_lines) = VALUE string_table( ).
+    DATA(cell_parts) = VALUE ty_t_part( ).
+    DATA(has_cells) = abap_false.
     DATA(codes) = cell_codes( result-cell_properties ).
     LOOP AT result-cells ASSIGNING FIELD-SYMBOL(<cell>).
       " the cube's annotation olap4abap.omitEmptyCells (our extension): only the cells with a value, and the first
       IF result-omit_empty_cells = abap_true AND <cell>-empty = abap_true AND <cell>-ordinal <> 0.
         CONTINUE.
       ENDIF.
+      has_cells = abap_true.
       APPEND cell_xml( cell = <cell> codes = codes excel = excel ) TO cell_lines.
+      IF lines( cell_lines ) = c_cells_per_part.
+        APPEND utf8( concat_lines_of( cell_lines ) ) TO cell_parts.
+        CLEAR cell_lines.
+      ENDIF.
     ENDLOOP.
+    IF cell_lines IS NOT INITIAL.
+      APPEND utf8( concat_lines_of( cell_lines ) ) TO cell_parts.
+      CLEAR cell_lines.
+    ENDIF.
     DATA(cell_info) = VALUE string( ).
     LOOP AT result-cell_properties INTO DATA(cell_property_name).
       cell_property( EXPORTING name = cell_property_name IMPORTING element = DATA(element) type = DATA(type) ).
@@ -136,7 +159,7 @@ CLASS zzxxmla1_cl_xmla_mddataset IMPLEMENTATION.
       `<?xml version="1.0" encoding="UTF-8"?>` && nl &&
       `<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">` && nl &&
       `<SOAP-ENV:Header>` && nl &&
-      `</SOAP-ENV:Header>` && nl &&
+      session && `</SOAP-ENV:Header>` && nl &&
       `<SOAP-ENV:Body>` && nl &&
       `<ExecuteResponse xmlns="` && c_ns_xmla && `">` && nl &&
       `  <return>` && nl &&
@@ -159,18 +182,22 @@ CLASS zzxxmla1_cl_xmla_mddataset IMPLEMENTATION.
       `      </OlapInfo>` && nl &&
       COND string( WHEN axes_data IS INITIAL THEN `      <Axes/>` && nl
                    ELSE `      <Axes>` && nl && axes_data && `      </Axes>` && nl ) &&
-      COND string( WHEN cell_lines IS INITIAL THEN `      <CellData/>` && nl
+      COND string( WHEN has_cells = abap_false THEN `      <CellData/>` && nl
                    ELSE `      <CellData>` && nl ).
     DATA(tail) =
-      COND string( WHEN cell_lines IS NOT INITIAL THEN `      </CellData>` && nl ) &&
+      COND string( WHEN has_cells = abap_true THEN `      </CellData>` && nl ) &&
       `    </root>` && nl &&
       `  </return>` && nl &&
       `</ExecuteResponse>` && nl &&
       `</SOAP-ENV:Body>` && nl &&
       `</SOAP-ENV:Envelope>` && nl.
-    INSERT head INTO cell_lines INDEX 1.
-    APPEND tail TO cell_lines.
-    xml = concat_lines_of( cell_lines ).
+    APPEND utf8( head ) TO parts.
+    APPEND LINES OF cell_parts TO parts.
+    APPEND utf8( tail ) TO parts.
+  ENDMETHOD.
+
+  METHOD utf8.
+    result = cl_abap_codepage=>convert_to( value ).
   ENDMETHOD.
 
   METHOD text.
@@ -330,7 +357,7 @@ CLASS zzxxmla1_cl_xmla_mddataset IMPLEMENTATION.
     " the values of the asked properties that the cell has: no Value for an empty cell, an empty FmtValue, the format
     " string, font flags 0; LANGUAGE, BACK_COLOR and FORE_COLOR have none. A cell with none of them is left out, except
     " the first. An unknown cell property is left out (the reference's writer fails on one).
-    DATA(nl) = cl_abap_char_utilities=>newline.
+    " one string template per element: a grid writes some hundred thousand cells, and each piece appended is a copy
     DATA(elements) = VALUE string( ).
     DATA(any) = abap_false.
     LOOP AT codes INTO DATA(code).
@@ -340,21 +367,29 @@ CLASS zzxxmla1_cl_xmla_mddataset IMPLEMENTATION.
             DATA(value_type) = COND string( WHEN excel = abap_true AND cell-value_type = `xsd:integer` THEN `xsd:int`
                                             ELSE cell-value_type ).
             " a number's text has nothing to escape
-            elements = elements && |          <Value xsi:type="{ value_type }">| &&
-                       COND string( WHEN value_type = `xsd:double` THEN cell-value ELSE text( cell-value ) ) &&
-                       `</Value>` && nl.
+            IF value_type = `xsd:double`.
+              elements = |{ elements }          <Value xsi:type="xsd:double">{ cell-value }</Value>\n|.
+            ELSE.
+              elements = |{ elements }          <Value xsi:type="{ value_type }">{ text( cell-value ) }</Value>\n|.
+            ENDIF.
             any = abap_true.
           ENDIF.
         WHEN 2.
-          elements = elements && COND string( WHEN cell-empty = abap_true THEN `          <FmtValue/>`
-                                              ELSE |          <FmtValue>{ text( cell-formatted ) }</FmtValue>| ) && nl.
+          IF cell-empty = abap_true.
+            elements = |{ elements }          <FmtValue/>\n|.
+          ELSE.
+            elements = |{ elements }          <FmtValue>{ text( cell-formatted ) }</FmtValue>\n|.
+          ENDIF.
           any = abap_true.
         WHEN 3.
-          elements = elements && COND string( WHEN cell-format_string IS INITIAL THEN `          <FormatString/>`
-                                              ELSE |          <FormatString>{ text( cell-format_string ) }</FormatString>| ) && nl.
+          IF cell-format_string IS INITIAL.
+            elements = |{ elements }          <FormatString/>\n|.
+          ELSE.
+            elements = |{ elements }          <FormatString>{ text( cell-format_string ) }</FormatString>\n|.
+          ENDIF.
           any = abap_true.
         WHEN 4.
-          elements = elements && `          <FontFlags>0</FontFlags>` && nl.
+          elements = |{ elements }          <FontFlags>0</FontFlags>\n|.
           any = abap_true.
       ENDCASE.
     ENDLOOP.
@@ -362,9 +397,9 @@ CLASS zzxxmla1_cl_xmla_mddataset IMPLEMENTATION.
       RETURN.
     ENDIF.
     IF elements IS INITIAL.
-      result = |        <Cell CellOrdinal="{ cell-ordinal }"/>| && nl.
+      result = |        <Cell CellOrdinal="{ cell-ordinal }"/>\n|.
     ELSE.
-      result = |        <Cell CellOrdinal="{ cell-ordinal }">| && nl && elements && `        </Cell>` && nl.
+      result = |        <Cell CellOrdinal="{ cell-ordinal }">\n{ elements }        </Cell>\n|.
     ENDIF.
   ENDMETHOD.
 

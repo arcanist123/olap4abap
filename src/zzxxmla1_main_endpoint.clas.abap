@@ -82,12 +82,19 @@ CLASS zzxxmla1_main_endpoint IMPLEMENTATION.
             forced         = xsdbool( to_lower( server->request->get_header_field( 'x-olap4abap-trace' ) ) = `true` ) ).
         DATA(result) = NEW zzxxmla1_cl_xmla_handler( )->handle( request = body url = url ).
         IF trace IS BOUND.
-          trace->finish( status = result-status response = result-body ).
+          trace->finish( status = result-status response = result-body parts = result-parts ).
           server->response->set_header_field( name = 'X-olap4abap-Trace-Id' value = |{ trace->trace_id }| ).
         ENDIF.
         server->response->set_status( code = result-status reason = COND #( WHEN result-status = 200 THEN 'OK' ELSE 'Internal Server Error' ) ).
         server->response->set_content_type( 'text/xml; charset=utf-8' ).
-        server->response->set_cdata( result-body ).
+        IF result-parts IS INITIAL.
+          server->response->set_cdata( result-body ).
+        ELSE.
+          " an Execute's answer: UTF-8 already, a part at a time (a grid's has some hundred megabytes)
+          LOOP AT result-parts INTO DATA(part).
+            server->response->append_data( part ).
+          ENDLOOP.
+        ENDIF.
 
       WHEN OTHERS.
         server->response->set_status( code = 405 reason = 'Method Not Allowed' ).

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Measures query planning on SAP (docs/query-planning.md, Verification): switches the trace on for the endpoint's user,
 sends each statement a few times and prints, per run, the runtime and the SQL statements with their time as the trace
-recorded them (ZZXXMLA1_TRACE: runtime_ms, sql_count, sql_ms), then the best run. The statements:
+recorded them (ZZXXMLA1_TRACE: runtime_ms, sql_count, sql_ms), then the best run, and the best wall time of the client
+(request sent to response read: also what the trace's runtime leaves out, sending the answer). The statements:
 
     filter_list  Excel's filter list of Store on ZFOODMART (the statement of query-planning.md)
     pivot        an Excel pivot on ZFOODMART: products drilled to Drink's children by customer countries, Store Cost
@@ -14,6 +15,7 @@ recorded them (ZZXXMLA1_TRACE: runtime_ms, sql_count, sql_ms), then the best run
 import argparse
 import json
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -78,9 +80,12 @@ def main():
     for name in args.case or CASES:
         catalog, statement = CASES[name]
         known = {c["id"] for c in api("GET", "trace", filter=user, method="execute", max="50")["calls"]}
+        walls = []
         for _ in range(args.runs):
             escaped = statement.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            started = time.perf_counter()
             status, text, _ = http("POST", xmla, SOAP.format(escaped, catalog))
+            walls.append(round((time.perf_counter() - started) * 1000))
             if status != 200 or "Fault>" in text:
                 sys.exit(f"{name}: {status} {text[:500]}")
         calls = [c for c in api("GET", "trace", filter=user, method="execute", max="50")["calls"]
@@ -90,7 +95,8 @@ def main():
                          for c in calls)
         best = min(calls, key=lambda c: c["runtimeMs"])
         print(f"{name:12} best {best['runtimeMs']:>6} ms, {best.get('sqlCount', '?')} SQL "
-              f"{best.get('sqlMs', '?')} ms, {best['responseLength']:,} characters   runs: {runs}")
+              f"{best.get('sqlMs', '?')} ms, {best['responseLength']:,} characters, wall best {min(walls):,} ms"
+              f"   runs: {runs}; wall: {', '.join(f'{w:,} ms' for w in walls)}")
 
 
 if __name__ == "__main__":

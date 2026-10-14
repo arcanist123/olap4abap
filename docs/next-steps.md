@@ -71,8 +71,12 @@ keeps the answers: both test suites give the same answers with planning on and o
 4. Cells first (decided with the user 2026-10-14, `query-planning.md`, Cells first): a query whose NON EMPTY axes
    depend on the facts only (Excel's grid of two characteristics) is one fact statement; its axes are built from the
    result (positions from the keys, totals summed), its cells written from the rows in ordinal order, without the
-   axis reads, the group cache and the cell table. First a benchmark of the answer's text (string templates joined
-   once, the sXML writer, a simple transformation, the response in parts). Target: the 1,001 x 1,001 grid in about
+   axis reads, the group cache and the cell table. The answer's text is benchmarked (`scripts/answer_text_probe.py`,
+   `query-planning.md`, Cells first): one string template per cell, UTF-8 in parts of 10,000 cells appended to the
+   response (2.2 s to about 1 s for 633,830 cells; no simple transformation: the cell properties are dynamic and
+   sapcli cannot sync one). Part 1 done (2026-10-14): the answer is UTF-8 parts from the writer to the response, the
+   grid 13.4 to 12.2 s runtime (15.0 to 14.3 s wall); `xmla_test.py` 272 of 274, `compare-applicable.py` 394 of 395
+   (#64). Part 2: the cells-first path. Target: the 1,001 x 1,001 grid in about
    3 s (15.7 s since 229d1cf). Filters and ranks later (they are most likely SQL too).
 5. Mixed queries: the relational inputs of computed nodes read as one batch before the first pass.
 6. More set nodes relational: `Filter` on a stored measure (`RolapNativeFilter`), `NonEmpty` with a second set.

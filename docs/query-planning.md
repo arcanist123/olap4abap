@@ -277,12 +277,40 @@ The plan of such a query (planner and engine):
   distinct amount (as now). With `ORDER BY` the second axis' position, then the first's, the rows come in
   `CellOrdinal` order and are written as they are read.
 
-The answer's text is measured before it is chosen: today `cell_xml` builds each cell from string pieces, the lines are
-joined once (`build`), and `set_cdata` converts the 119 MB string to UTF-8. Candidates: one string template per cell
-into a table joined once (the current shape, leaner), the sXML writer (`CL_SXML_STRING_WRITER`, UTF-8 directly into
-an xstring), a simple transformation (`CALL TRANSFORMATION`, the kernel serializes a table of cells), and appending
-to the response in parts (`append_cdata`). A benchmark of 633,830 cells decides; the handler then returns the
-answer as UTF-8 (`set_data`) if that is the faster form.
+The answer's text (measured 2026-10-14 with `python scripts/answer_text_probe.py`: 633,830 cells with Excel's cell
+properties, made up in the program, each variant giving the UTF-8 bytes of `CellData`; best of 2 to 3):
+
+| variant                                                                  | time     | bytes  |
+| ------------------------------------------------------------------------ | -------- | ------ |
+| today's `cell_xml` (pieces), lines joined once, converted to UTF-8       | 2,168 ms | 119.7 M |
+| one string template per cell, joined once, converted                     | 1,420 ms | 119.7 M |
+| one template per cell, joined and converted per 10,000 cells, xstrings appended | 1,218 ms | 119.7 M |
+| as before, the parts kept in a table of xstrings                         | 889-1,151 ms | 119.7 M |
+| sXML writer (`CL_SXML_STRING_WRITER`, token calls, no indentation)       | 2,877 ms | 87.3 M |
+| simple transformation in the answer's shape (a throwaway one in `$TMP`)  | 524 ms   | 121.6 M |
+| `CALL TRANSFORMATION id` of the cell table (asXML, a bound only)         | 142-201 ms | 37.3 M |
+
+Decided (2026-10-14): one string template per cell, converted to UTF-8 in parts of 10,000 cells, the parts a table
+of xstrings that the endpoint appends to the response (`append_data`), nothing joined. The simple transformation
+saves some 0.4 s of 13.8 s, but the cell properties are dynamic (which elements, the value type, empty cells: a
+`tt:cond` for each), and sapcli's checkout and checkin know no transformations, so it would be an object the sync
+cannot carry. The sXML writer is the slowest.
+
+Done (part 1, 2026-10-14): `ZZXXMLA1_CL_XMLA_MDDATASET=>build` returns the answer as UTF-8 parts (the head with the
+Session element the handler gives it, the cells by 10,000, the tail), each cell's elements one template each; the
+handler passes them on in `ty_result-parts`, the endpoint appends them (`append_data`), the trace gzips them as
+binary. Not one string of the whole answer any more, so no `set_cdata` conversion and no `with_session` replace over
+it. `planning_measure.py` (best of 3, the trace's runtime and the client's wall time, which also has the trace's gzip
+and the transfer):
+
+| statement   | before (runtime, wall) | after (runtime, wall) |
+| ----------- | ---------------------- | --------------------- |
+| filter list | 214 ms, 245 ms         | 200 ms, 221 ms        |
+| pivot       | 244 ms, 285 ms         | 233 ms, 262 ms        |
+| grid        | 13,438 ms, 15,015 ms   | 12,171 ms, 14,348 ms  |
+
+The runtime now includes the conversion to UTF-8, which `set_cdata` did after it before. Part 2 is the cells-first
+path itself: rows to positions and ordinals, without the group cache and the cell table.
 
 ## Semantics that must not change
 

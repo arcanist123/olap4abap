@@ -18,6 +18,9 @@ CLASS zzxxmla1_cl_xmla_handler DEFINITION
       BEGIN OF ty_result,
         status TYPE i,
         body   TYPE string,
+        "! instead of body: the answer in UTF-8 parts, appended to the response one after the other (an Execute's
+        "! multidimensional answer, ZZXXMLA1_CL_XMLA_MDDATASET)
+        parts  TYPE zzxxmla1_cl_xmla_mddataset=>ty_t_part,
       END OF ty_result.
     " What the client asked (see ZZXXMLA1_CL_XMLA_REQUEST): the RequestType, the Restrictions (filters on the rows) and
     " the Properties.
@@ -293,6 +296,12 @@ CLASS zzxxmla1_cl_xmla_handler DEFINITION
       IMPORTING body          TYPE string
                 request       TYPE ty_request
       RETURNING VALUE(result) TYPE string.
+    "! The Session header element of the request's session; empty if it has none.
+    METHODS session_element
+      IMPORTING request       TYPE ty_request
+      RETURNING VALUE(result) TYPE string.
+    "! the answer of an Execute in UTF-8 parts (ty_result-parts), set by process, which then returns no text
+    DATA parts TYPE zzxxmla1_cl_xmla_mddataset=>ty_t_part.
     METHODS xml_text
       IMPORTING value         TYPE string
       RETURNING VALUE(result) TYPE string.
@@ -326,6 +335,12 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
         schema = zzxxmla1_cl_schema=>get( ).
         data_source = repository->data_source( VALUE #( parsed-properties[ name = 'DataSourceInfo' ]-value OPTIONAL ) ).
         result = VALUE #( status = 200 body = process( request = parsed url = url ) ).
+        IF parts IS NOT INITIAL.
+          " the Session element is in the parts' head already
+          result-parts = parts.
+          CLEAR parts.
+          RETURN.
+        ENDIF.
         IF cache_key IS NOT INITIAL.
           zzxxmla1_cl_discover_cache=>write( key          = cache_key
                                              request_type = parsed-type
@@ -357,6 +372,17 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
     " The reference answers a session header element with the session: a new id for BeginSession, the client's for Session
     " and EndSession. Nothing is stored (see ZZXXMLA1_CL_XMLA_REQUEST=>CHECK_HEADER), so a new id is just unique.
     result = body.
+    DATA(session) = session_element( request ).
+    IF session IS INITIAL.
+      RETURN.
+    ENDIF.
+    result = replace(
+      val  = body
+      sub  = `<SOAP-ENV:Header>` && cl_abap_char_utilities=>newline && `</SOAP-ENV:Header>`
+      with = `<SOAP-ENV:Header>` && cl_abap_char_utilities=>newline && session && `</SOAP-ENV:Header>` ).
+  ENDMETHOD.
+
+  METHOD session_element.
     DATA(session_id) = request-session_id.
     CASE request-session_state.
       WHEN `BEGIN`.
@@ -369,12 +395,8 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
       WHEN OTHERS.
         RETURN.
     ENDCASE.
-    result = replace(
-      val  = body
-      sub  = `<SOAP-ENV:Header>` && cl_abap_char_utilities=>newline && `</SOAP-ENV:Header>`
-      with = `<SOAP-ENV:Header>` && cl_abap_char_utilities=>newline &&
-             `<Session SessionId="` && escape( val = session_id format = cl_abap_format=>e_xml_attr ) &&
-             `" xmlns="` && c_ns_xmla && `" /></SOAP-ENV:Header>` ).
+    result = `<Session SessionId="` && escape( val = session_id format = cl_abap_format=>e_xml_attr ) &&
+             `" xmlns="` && c_ns_xmla && `" />`.
   ENDMETHOD.
 
   METHOD process.
@@ -422,10 +444,12 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
       DATA(engine) = NEW zzxxmla1_cl_mdx_engine( default_catalog( request ) ).
       DATA(content) = VALUE string( request-properties[ name = 'Content' ]-value OPTIONAL ).
       DATA(application) = VALUE string( request-properties[ name = 'SspropInitAppName' ]-value OPTIONAL ).
-      result = zzxxmla1_cl_xmla_mddataset=>build(
+      " the answer is UTF-8 in parts (handle passes them on); the text result stays empty
+      parts = zzxxmla1_cl_xmla_mddataset=>build(
         result      = engine->execute( query )
         with_schema = xsdbool( content IS INITIAL OR content = `SchemaData` OR content = `Schema` )
-        excel       = xsdbool( application = `Excel` ) ).
+        excel       = xsdbool( application = `Excel` )
+        session     = session_element( request ) ).
       RETURN.
     ENDIF.
 

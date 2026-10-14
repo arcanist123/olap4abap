@@ -35,6 +35,8 @@ CLASS zzxxmla1_cl_trace DEFINITION
     CONSTANTS c_active_hours TYPE i VALUE 2.
     "! how many of the SQL statements of a call are kept
     CONSTANTS c_sql_kept TYPE i VALUE 10000.
+    "! a response in UTF-8 parts (ZZXXMLA1_CL_XMLA_MDDATASET's answer)
+    TYPES ty_t_part TYPE STANDARD TABLE OF xstring WITH EMPTY KEY.
     TYPES:
       "! a user with the trace on: since when, who switched it on and until when it is on
       BEGIN OF ty_user,
@@ -150,9 +152,11 @@ CLASS zzxxmla1_cl_trace DEFINITION
     "! themselves, and commits.
     "! @parameter status | the HTTP status
     "! @parameter response | the SOAP response
+    "! @parameter parts | instead of response: the SOAP response in UTF-8 parts (an Execute's answer)
     METHODS finish
       IMPORTING status   TYPE i
-                response TYPE string.
+                response TYPE string OPTIONAL
+                parts    TYPE ty_t_part OPTIONAL.
   PROTECTED SECTION.
   PRIVATE SECTION.
     "! the length of the column USER_AGENT
@@ -175,6 +179,10 @@ CLASS zzxxmla1_cl_trace DEFINITION
     "! The text gzipped as UTF-8; empty for an empty text or if it cannot be compressed.
     CLASS-METHODS compress
       IMPORTING !text         TYPE string
+      RETURNING VALUE(result) TYPE xstring.
+    "! UTF-8 gzipped, as compress gives a text; empty for empty data or if it cannot be compressed.
+    CLASS-METHODS compress_utf8
+      IMPORTING !data         TYPE xstring
       RETURNING VALUE(result) TYPE xstring.
     "! The text of gzipped UTF-8; empty for empty data or if it cannot be unzipped.
     CLASS-METHODS decompress
@@ -270,9 +278,19 @@ CLASS zzxxmla1_cl_trace IMPLEMENTATION.
   METHOD finish.
     GET RUN TIME FIELD DATA(now).
     DATA(runtime_ms) = ( now - started ) DIV 1000.
-    DATA(fault) = is_fault( response ).
-    DATA(response_length) = strlen( response ).
-    DATA(zipped) = compress( response ).
+    IF parts IS INITIAL.
+      DATA(fault) = is_fault( response ).
+      DATA(response_length) = strlen( response ).
+      DATA(zipped) = compress( response ).
+    ELSE.
+      " an Execute's answer has no fault (a fault is a text); its length is in bytes, the same for ASCII
+      DATA(bytes) = VALUE xstring( ).
+      LOOP AT parts INTO DATA(part).
+        CONCATENATE bytes part INTO bytes IN BYTE MODE.
+      ENDLOOP.
+      response_length = xstrlen( bytes ).
+      zipped = compress_utf8( bytes ).
+    ENDIF.
     DATA(sql_count) = zzxxmla1_cl_sql=>statement_count.
     DATA(sql_ms) = CONV i( zzxxmla1_cl_sql=>statement_time DIV 1000 ).
     DATA(sql_log) = serialize_sql( statements = CORRESPONDING #( zzxxmla1_cl_sql=>statement_log )
@@ -372,6 +390,18 @@ CLASS zzxxmla1_cl_trace IMPLEMENTATION.
                                                conversion = 'UTF-8'
                                      IMPORTING gzip_out   = result ).
       CATCH cx_parameter_invalid_range cx_sy_buffer_overflow cx_sy_conversion_codepage cx_sy_compression_error.
+        CLEAR result.
+    ENDTRY.
+  ENDMETHOD.
+
+  METHOD compress_utf8.
+    IF data IS INITIAL.
+      RETURN.
+    ENDIF.
+    TRY.
+        cl_abap_gzip=>compress_binary( EXPORTING raw_in   = data
+                                       IMPORTING gzip_out = result ).
+      CATCH cx_parameter_invalid_range cx_sy_buffer_overflow cx_sy_compression_error.
         CLEAR result.
     ENDTRY.
   ENDMETHOD.
