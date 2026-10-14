@@ -909,112 +909,120 @@ CLASS zzxxmla1_cl_web_app_files IMPLEMENTATION.
     DATA parts TYPE string_table.
     APPEND |// The trace of the XMLA endpoint (ZZXXMLA1_CL_TRACE): switched on per SAP user for two hours (GET api/trace, POST\n// api/trace/on, trace/off; switching on deletes the calls older| TO parts.
     APPEND | than seven days), every call of a user with the trace on is listed with its SOAP request, the MDX statement of an Execute\n// and the SOAP response (GET api/trace/entry, the whole| TO parts.
-    APPEND | response as sent from api/trace/response).\n// No build step: Preact with htm, vendored as one ES module; this file is what the server serves.\nimport \{ html, render, useState, u| TO parts.
-    APPEND |seEffect, useRef \} from './vendor/htm-preact-standalone.mjs';\n\nconst client = new URLSearchParams(location.search).get('sap-client');\nconst REFRESH_MS = 5000;\nconst MAX_CHOICE| TO parts.
-    APPEND |S = [50, 200, 500, 1000, 5000, 10000];\nconst MAX_KEY = 'olap4abap.trace.max';\n// the number of calls listed is remembered per browser; storage may be unavailable (private windows| TO parts.
-    APPEND |)\nconst storedMax = () => \{\n  try \{\n    const n = Number(localStorage.getItem(MAX_KEY));\n    return MAX_CHOICES.includes(n) ? n : 200;\n  \} catch \{\n    return 200;\n  \}\n| TO parts.
-    APPEND |\};\n\nconst apiUrl = (resource, params = \{\}) => \{\n  const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v));\n  if (client) query.set('sap-client', clie| TO parts.
-    APPEND |nt);\n  return `api/$\{resource\}?$\{query\}`;\n\};\n\nasync function api(method, resource, params = \{\}) \{\n  const response = await fetch(apiUrl(resource, params), \{ method \}| TO parts.
-    APPEND |);\n  let data;\n  try \{\n    data = await response.json();\n  \} catch \{\n    throw new Error(`$\{response.status\} $\{response.statusText\}`);\n  \}\n  if (!response.ok) throw | TO parts.
-    APPEND |new Error(data.error \|\| `$\{response.status\} $\{response.statusText\}`);\n  return data;\n\}\n\nconst time = (iso) => iso ? new Date(iso).toLocaleString() : '';\nconst size = (n| TO parts.
-    APPEND |) => n >= 1048576 ? `$\{(n / 1048576).toFixed(1)\} MB` : n >= 1024 ? `$\{(n / 1024).toFixed(1)\} KB` : `$\{n\} B`;\nconst what = (c) => c.method === 'EXECUTE' ? 'Execute' : c.metho| TO parts.
-    APPEND |d === 'DISCOVER' ? 'Discover' : '(no XMLA)';\nconst firstLine = (s) => s.replace(/\\s+/g, ' ').trim();\n\n// XML indented for reading; the text as it is if it does not parse (or is| TO parts.
-    APPEND | too large to do it quickly)\nfunction prettyXml(text) \{\n  if (!text \|\| text.length > 5000000) return text;\n  const doc = new DOMParser().parseFromString(text, 'application/xm| TO parts.
-    APPEND |l');\n  if (doc.getElementsByTagName('parsererror').length) return text;\n  const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n  const out = | TO parts.
-    APPEND |[];\n  const walk = (node, depth) => \{\n    const pad = '  '.repeat(depth);\n    if (node.nodeType === Node.ELEMENT_NODE) \{\n      const attrs = [...node.attributes].map((a) => `| TO parts.
-    APPEND | $\{a.name\}="$\{esc(a.value).replace(/"/g, '&quot;')\}"`).join('');\n      const kids = [...node.childNodes].filter((c) => c.nodeType !== Node.TEXT_NODE \|\| c.nodeValue.trim());| TO parts.
-    APPEND |\n      if (!kids.length) out.push(`$\{pad\}<$\{node.nodeName\}$\{attrs\}/>`);\n      else if (kids.length === 1 && kids[0].nodeType === Node.TEXT_NODE) \{\n        out.push(`$\{pa| TO parts.
-    APPEND |d\}<$\{node.nodeName\}$\{attrs\}>$\{esc(kids[0].nodeValue)\}</$\{node.nodeName\}>`);\n      \} else \{\n        out.push(`$\{pad\}<$\{node.nodeName\}$\{attrs\}>`);\n        kids.fo| TO parts.
-    APPEND |rEach((c) => walk(c, depth + 1));\n        out.push(`$\{pad\}</$\{node.nodeName\}>`);\n      \}\n    \} else if (node.nodeType === Node.TEXT_NODE) out.push(pad + esc(node.nodeValue| TO parts.
-    APPEND |.trim()));\n    else if (node.nodeType === Node.CDATA_SECTION_NODE) out.push(`$\{pad\}<![CDATA[$\{node.nodeValue\}]]>`);\n    else if (node.nodeType === Node.COMMENT_NODE) out.push| TO parts.
-    APPEND |(`$\{pad\}<!--$\{node.nodeValue\}-->`);\n  \};\n  [...doc.childNodes].forEach((n) => walk(n, 0));\n  return out.join('\\n');\n\}\n\n// navigator.clipboard exists only on HTTPS and | TO parts.
-    APPEND |localhost; the endpoint is often plain HTTP, so a hidden textarea and\n// execCommand('copy') are the fallback\nasync function copyText(text) \{\n  try \{\n    if (navigator.clipbo| TO parts.
-    APPEND |ard && window.isSecureContext) \{\n      await navigator.clipboard.writeText(text);\n      return true;\n    \}\n  \} catch \{ /* the fallback below */ \}\n  const area = Object.as| TO parts.
-    APPEND |sign(document.createElement('textarea'), \{ value: text, readOnly: true \});\n  area.style.cssText = 'position:fixed;top:0;left:0;opacity:0';\n  document.body.appendChild(area);\n | TO parts.
-    APPEND | area.select();\n  let copied = false;\n  try \{ copied = document.execCommand('copy'); \} catch \{ copied = false; \}\n  area.remove();\n  return copied;\n\}\n\n// the Catalog pro| TO parts.
-    APPEND |perty of an Execute request, initial if it names none\nfunction requestCatalog(xml) \{\n  const doc = new DOMParser().parseFromString(xml \|\| '', 'application/xml');\n  const elem| TO parts.
-    APPEND |ent = doc.getElementsByTagNameNS('*', 'Catalog')[0];\n  return element ? element.textContent.trim() : '';\n\}\n\n// the MDX console with the statement and the catalog of a traced E| TO parts.
-    APPEND |xecute (console.js reads the fragment)\nconst consoleUrl = (entry) => \{\n  const fragment = new URLSearchParams(\{ statement: entry.mdx \});\n  const catalog = requestCatalog(entr| TO parts.
-    APPEND |y.request);\n  if (catalog) fragment.set('catalog', catalog);\n  return `console.html$\{location.search\}#$\{fragment\}`;\n\};\n\nconst download = (text, name) => \{\n  const url =| TO parts.
-    APPEND | URL.createObjectURL(new Blob([text], \{ type: 'text/xml' \}));\n  const a = Object.assign(document.createElement('a'), \{ href: url, download: name \});\n  a.click();\n  setTimeou| TO parts.
-    APPEND |t(() => URL.revokeObjectURL(url), 1000);\n\};\n\nfunction Users(\{ state, onSwitch, busy \}) \{\n  const [user, setUser] = useState('');\n  const name = (user \|\| state.user).trim| TO parts.
-    APPEND |().toUpperCase();\n  const on = state.users.some((u) => u.user === name);\n  return html`<section class="section">\n    <header><h2>Traced users</h2><span class="spacer"></span>\n | TO parts.
-    APPEND |     <span class="muted small">a trace switches itself off after $\{state.activeHours\} hours; calls are kept $\{state.retentionDays\} days</span></header>\n    <div class="body">| TO parts.
-    APPEND |\n      <div class="row">\n        <label class="muted" for="user">User</label>\n        <input id="user" type="text" maxlength="12" placeholder=$\{state.user\} value=$\{user\}\n  | TO parts.
-    APPEND |        onInput=$\{(e) => setUser(e.target.value)\} onKeyDown=$\{(e) => e.key === 'Enter' && onSwitch('on', name)\} />\n        <button class="primary" disabled=$\{busy \|\| !name| TO parts.
-    APPEND |\} onClick=$\{() => onSwitch('on', name)\}\n          title=$\{`On for $\{state.activeHours\} hours from now`\}>$\{on ? `Switch on again for $\{state.activeHours\} hours` : 'Switch| TO parts.
-    APPEND | trace on'\}</button>\n        $\{on && html`<span class="status ok">on</span>`\}\n      </div>\n      $\{state.users.length ? html`<table>\n        <thead><tr><th>User</th><th>Sin| TO parts.
-    APPEND |ce</th><th>On until</th><th>Switched on by</th><th></th></tr></thead>\n        <tbody>$\{state.users.map((u) => html`<tr>\n          <td><strong class="mono">$\{u.user\}</strong>$| TO parts.
-    APPEND |\{u.user === state.user && html` <span class="muted small">(this page's user)</span>`\}</td>\n          <td>$\{time(u.since)\}</td><td>$\{time(u.until)\}</td><td class="mono">$\{u.| TO parts.
-    APPEND |by\}</td>\n          <td class="actions"><button disabled=$\{busy\} onClick=$\{() => onSwitch('off', u.user)\}>Switch off</button></td>\n        </tr>`)\}</tbody>\n      </table>` | TO parts.
-    APPEND |: html`<div class="muted">The trace is off for every user.</div>`\}\n      <div class="notice info small">A call is traced under the SAP user it runs as. This page runs as$\{' '\}| TO parts.
-    APPEND |\n        <span class="mono">$\{state.user\}</span>; while the ICF node <span class="mono">/zzxxmla1</span> logs on anonymously,\n        every XMLA call runs as that user too. The| TO parts.
-    APPEND | client's address and User-Agent tell the callers apart.</div>\n    </div>\n  </section>`;\n\}\n\nfunction Detail(\{ id, onClose \}) \{\n  const [entry, setEntry] = useState(null);| TO parts.
-    APPEND |\n  const [error, setError] = useState('');\n  const [tab, setTab] = useState('');\n  const [pretty, setPretty] = useState(true);\n  const [copied, setCopied] = useState('');  // t| TO parts.
-    APPEND |he feedback of Copy, for a moment\n  useEffect(() => \{\n    if (!copied) return undefined;\n    const timer = setTimeout(() => setCopied(''), 2000);\n    return () => clearTimeout| TO parts.
-    APPEND |(timer);\n  \}, [copied]);\n  useEffect(() => \{\n    setEntry(null);\n    setError('');\n    api('GET', 'trace/entry', \{ id \}).then((e) => \{\n      setEntry(e);\n      setTab((| TO parts.
-    APPEND |t) => (t === 'mdx' && !e.mdx) \|\| !t ? (e.mdx ? 'mdx' : 'request') : t);\n    \}, (e) => setError(e.message));\n  \}, [id]);\n  if (error) return html`<section class="section deta| TO parts.
-    APPEND |il"><div class="body"><div class="notice err">$\{error\}</div></div></section>`;\n  if (!entry) return html`<section class="section detail"><div class="body muted">Reading the call| TO parts.
-    APPEND |{ cl_abap_conv_in_ce=>uccp( '2026' ) }</div></section>`;\n\n  const raw = tab === 'mdx' ? entry.mdx : tab === 'request' ? entry.request : entry.response;\n  const shown = tab === '| TO parts.
-    APPEND |mdx' \|\| !pretty ? raw : prettyXml(raw);\n  // what is shown (indented or not) is what is copied\n  const copy = () => copyText(shown).then((ok) => setCopied(ok ? 'Copied' : 'Copy| TO parts.
-    APPEND | failed: select the text and press Ctrl+C'));\n  const save = () => tab === 'response' && entry.responseTruncated\n    ? window.open(apiUrl('trace/response', \{ id \}), '_blank')\n| TO parts.
-    APPEND |    : download(raw, `$\{entry.id\}-$\{tab\}.$\{tab === 'mdx' ? 'mdx' : 'xml'\}`);\n  return html`<section class="section detail">\n    <header><h2>$\{what(entry)\}$\{entry.type && | TO parts.
-    APPEND |html` <span class="mono">$\{entry.type\}</span>`\}</h2>\n      <span class="muted small">$\{time(entry.at)\} { cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{entry.user\} | TO parts.
-    APPEND |{ cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{entry.client\}$\{entry.status ? ` { cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{entry.runtimeMs\} ms { cl_abap_conv_in_ce=>uccp( '00B7' ) } $| TO parts.
-    APPEND |\{entry.sqlCount\} SQL statements, $\{entry.sqlMs\} ms` : ''\}</span>\n      <span class="spacer"></span>\n      $\{entry.mdx && html`<a class="button" href=$\{consoleUrl(entry)\} | TO parts.
-    APPEND |target="_blank" rel="noopener"\n        title=$\{`Open the statement in the MDX console$\{requestCatalog(entry.request) ? ` on catalog $\{requestCatalog(entry.request)\}` : ''\}`\}| TO parts.
-    APPEND |>Open in MDX Console</a>`\}\n      <button class="link" onClick=$\{onClose\}>Close</button></header>\n    <div class="tabs" role="tablist">\n      $\{entry.mdx && html`<button role| TO parts.
-    APPEND |="tab" class=$\{tab === 'mdx' ? 'active' : ''\} onClick=$\{() => setTab('mdx')\}>MDX statement</button>`\}\n      <button role="tab" class=$\{tab === 'request' ? 'active' : ''\} on| TO parts.
-    APPEND |Click=$\{() => setTab('request')\}>SOAP request <span class="muted small">$\{size(entry.requestLength)\}</span></button>\n      <button role="tab" class=$\{tab === 'response' ? 'ac| TO parts.
-    APPEND |tive' : ''\} onClick=$\{() => setTab('response')\}>SOAP response <span class="muted small">$\{entry.status ? size(entry.responseLength) : 'none'\}</span></button>\n    </div>\n    | TO parts.
-    APPEND |<div class="body">\n      <div class="row">\n        $\{tab !== 'mdx' && html`<label class="inline"><input type="checkbox" checked=$\{pretty\} onChange=$\{(e) => setPretty(e.target| TO parts.
-    APPEND |.checked)\} /> Indent XML</label>`\}\n        <span class="spacer"></span>\n        $\{copied && html`<span class=$\{`status $\{copied === 'Copied' ? 'ok' : 'err'\}`\} role="status| TO parts.
-    APPEND |">$\{copied\}</span>`\}\n        <button onClick=$\{copy\} disabled=$\{!raw\}>Copy</button>\n        <button onClick=$\{save\} disabled=$\{!raw\}>Download</button>\n      </div>\n | TO parts.
-    APPEND |     $\{tab === 'response' && !entry.status && html`<div class="notice warn">No response: the call is still running, or it was aborted (a short dump, ST22).</div>`\}\n      $\{tab | TO parts.
-    APPEND |=== 'response' && entry.responseTruncated && html`<div class="notice warn">The response has $\{size(entry.responseLength)\}; the first million characters are shown, Download gives | TO parts.
-    APPEND |all of it.</div>`\}\n      $\{tab === 'response' && entry.fault && html`<div class="notice err">The answer is a SOAP fault.</div>`\}\n      <textarea class="trace" readonly spellch| TO parts.
-    APPEND |eck="false" value=$\{shown\} aria-label=$\{tab\}></textarea>\n      $\{entry.userAgent && html`<div class="muted small">User-Agent: <span class="mono">$\{entry.userAgent\}</span></| TO parts.
-    APPEND |div>`\}\n    </div>\n  </section>`;\n\}\n\nfunction App() \{\n  const [state, setState] = useState(null);       // the answer of GET trace\n  const [filter, setFilter] = useState('| TO parts.
-    APPEND |');\n  const [kinds, setKinds] = useState(\{ DISCOVER: true, EXECUTE: true \});  // the toggles: which calls are listed\n  const [max, setMax] = useState(storedMax);\n  const [sele| TO parts.
-    APPEND |cted, setSelected] = useState('');\n  const [auto, setAuto] = useState(false);\n  const [busy, setBusy] = useState('');\n  const [error, setError] = useState('');\n  const filterRe| TO parts.
-    APPEND |f = useRef(filter);\n  filterRef.current = filter;\n  // one toggle on: the server lists only that method (its newest 200); both on: every call; both off: none\n  const method = ki| TO parts.
-    APPEND |nds.DISCOVER === kinds.EXECUTE ? '' : kinds.DISCOVER ? 'DISCOVER' : 'EXECUTE';\n  const methodRef = useRef(method);\n  methodRef.current = method;\n  const maxRef = useRef(max);\n | TO parts.
-    APPEND | maxRef.current = max;\n  const chooseMax = (n) => \{\n    setMax(n);\n    try \{ localStorage.setItem(MAX_KEY, String(n)); \} catch \{ /* not remembered */ \}\n  \};\n  const none| TO parts.
-    APPEND | = !kinds.DISCOVER && !kinds.EXECUTE;\n\n  const load = (quiet) => \{\n    if (!quiet) setBusy('Reading the trace{ cl_abap_conv_in_ce=>uccp( '2026' ) }');\n    return api('GET', 't| TO parts.
-    APPEND |race', \{ filter: filterRef.current, method: methodRef.current, max: maxRef.current \})\n      .then((data) => \{ setState(data); setError(''); \}, (e) => setError(e.message))\n   | TO parts.
-    APPEND |   .finally(() => quiet \|\| setBusy(''));\n  \};\n  useEffect(() => \{ load(); \}, [filter, method, max]);\n  useEffect(() => \{\n    if (!auto) return undefined;\n    const timer| TO parts.
-    APPEND | = setInterval(() => load(true), REFRESH_MS);\n    return () => clearInterval(timer);\n  \}, [auto]);\n\n  const post = (resource, params, message) => \{\n    if (message && !confi| TO parts.
-    APPEND |rm(message)) return;\n    setBusy('Saving{ cl_abap_conv_in_ce=>uccp( '2026' ) }');\n    api('POST', resource, \{ ...params, filter, method, max \})\n      .then((data) => \{ setSta| TO parts.
-    APPEND |te(data); setError(''); \}, (e) => setError(e.message))\n      .finally(() => setBusy(''));\n  \};\n  const onSwitch = (how, user) => post(`trace/$\{how\}`, \{ user \});\n  const c| TO parts.
-    APPEND |lear = (user) => \{\n    post('trace/clear', \{ user \}, user ? `Delete the traced calls of $\{user\}?` : 'Delete all traced calls of every user?');\n    setSelected('');\n  \};\n| TO parts.
-    APPEND |\n  const userNames = state ? [...new Set([...state.users.map((u) => u.user), ...state.calls.map((c) => c.user), filter].filter(Boolean))].sort() : [];\n  return html`\n    <div cl| TO parts.
-    APPEND |ass="topbar"><h1>XMLA Trace</h1><span class="muted">the calls of the XMLA endpoint, per user</span>\n      <span class="spacer"></span><a href=$\{`./$\{location.search\}`\}>Schema | TO parts.
-    APPEND |Builder</a><a href=$\{`console.html$\{location.search\}`\}>MDX Console</a>\n      <a href=$\{`time.html$\{location.search\}`\}>Time Master Data</a></div>\n    <div class="page"><di| TO parts.
-    APPEND |v class="pane wide">\n      $\{error && html`<div class="notice err">$\{error\}</div>`\}\n      $\{state && html`<$\{Users\} state=$\{state\} onSwitch=$\{onSwitch\} busy=$\{!!busy| TO parts.
-    APPEND |\} />`\}\n      <div class=$\{selected ? 'trace-split' : ''\}>\n      <section class="section">\n        <header><h2>Calls</h2>\n          <select value=$\{filter\} onChange=$\{(e)| TO parts.
-    APPEND | => \{ setFilter(e.target.value); setSelected(''); \}\} aria-label="User">\n            <option value="">All users</option>\n            $\{userNames.map((u) => html`<option value=| TO parts.
-    APPEND |$\{u\}>$\{u\}</option>`)\}\n          </select>\n          <div class="segmented" role="group" aria-label="Calls">\n            $\{[['DISCOVER', 'Discover'], ['EXECUTE', 'Execute']| TO parts.
-    APPEND |].map(([k, label]) => html`<button\n              class=$\{kinds[k] ? 'active' : ''\} aria-pressed=$\{kinds[k]\} title=$\{`Show the $\{label\} calls`\}\n              onClick=$\{()| TO parts.
-    APPEND | => \{ setKinds((s) => (\{ ...s, [k]: !s[k] \})); setSelected(''); \}\}>$\{label\}</button>`)\}\n          </div>\n          <label class="inline">Show\n            <select value=$| TO parts.
-    APPEND |\{max\} onChange=$\{(e) => chooseMax(Number(e.target.value))\} aria-label="Calls shown">\n              $\{MAX_CHOICES.map((n) => html`<option value=$\{n\}>$\{n.toLocaleString()\}<| TO parts.
-    APPEND |/option>`)\}\n            </select> newest</label>\n          <span class="spacer"></span>\n          $\{busy && html`<span class="status busy">$\{busy\}</span>`\}\n          <labe| TO parts.
-    APPEND |l class="inline"><input type="checkbox" checked=$\{auto\} onChange=$\{(e) => setAuto(e.target.checked)\} /> Refresh every 5 s</label>\n          <button onClick=$\{() => load()\} d| TO parts.
-    APPEND |isabled=$\{!!busy\}>Refresh</button>\n          $\{filter && html`<button class="danger" onClick=$\{() => clear(filter)\} disabled=$\{!!busy \|\| !state?.calls.length\}>Delete $\{f| TO parts.
-    APPEND |ilter\}'s calls</button>`\}\n          <button class="danger" onClick=$\{() => clear('')\} disabled=$\{!!busy\}>Delete all</button></header>\n        <div class="scroll-x">$\{!stat| TO parts.
-    APPEND |e ? html`<div class="body muted">$\{busy \|\| 'No data.'\}</div>`\n          : none ? html`<div class="body muted">Switch Discover or Execute on to list calls.</div>`\n          : | TO parts.
-    APPEND |!state.calls.length ? html`<div class="body muted">No traced $\{method ? `$\{what(\{ method \})\} ` : ''\}calls$\{filter ? ` of $\{filter\}` : ''\}.</div>` : html`\n          <tabl| TO parts.
-    APPEND |e>\n            <thead><tr><th>Time</th><th class="wide-only">User</th><th>Call</th><th>Statement or rowset</th><th>Status</th>\n              <th class="num">ms</th><th class="num| TO parts.
-    APPEND |" title="SQL statements and their milliseconds">SQL</th><th class="num">Response</th><th class="wide-only">Client</th></tr></thead>\n            <tbody>$\{state.calls.map((c) => ht| TO parts.
-    APPEND |ml`\n              <tr class=$\{`clickable$\{c.id === selected ? ' selected' : ''\}`\} onClick=$\{() => setSelected(c.id === selected ? '' : c.id)\}>\n                <td class="sm| TO parts.
-    APPEND |all">$\{time(c.at)\}</td>\n                <td class="mono wide-only">$\{c.user\}</td>\n                <td>$\{what(c)\}</td>\n                <td class="mono small statement" titl| TO parts.
-    APPEND |e=$\{c.mdx\}>$\{c.mdx ? firstLine(c.mdx) : c.type\}</td>\n                <td>$\{!c.status ? html`<span class="status warn">no answer</span>`\n                  : c.fault ? html`<s| TO parts.
-    APPEND |pan class="status err">fault</span>`\n                  : c.status === 200 ? html`<span class="status ok">ok</span>` : html`<span class="status err">$\{c.status\}</span>`\}</td>\n | TO parts.
-    APPEND |               <td class="num">$\{c.status ? c.runtimeMs : ''\}</td>\n                <td class="num" title="SQL statements, their milliseconds">$\{c.status ? `$\{c.sqlCount\} | TO parts.
-    APPEND |{ cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{c.sqlMs\}` : ''\}</td>\n                <td class="num">$\{c.status ? size(c.responseLength) : ''\}</td>\n                <td class="mono | TO parts.
-    APPEND |small wide-only">$\{c.client\}</td>\n              </tr>`)\}\n            </tbody>\n          </table>`\}\n        </div>\n        $\{state && !none && state.calls.length >= state.| TO parts.
-    APPEND |max && html`<div class="body muted small">The newest $\{state.max.toLocaleString()\} calls are shown; choose more next to Show.</div>`\}\n      </section>\n      $\{selected && htm| TO parts.
-    APPEND |l`<$\{Detail\} id=$\{selected\} onClose=$\{() => setSelected('')\} />`\}\n      </div>\n    </div></div>`;\n\}\n\nconst root = document.getElementById('app');\nroot.textContent = '| TO parts.
-    APPEND |';\nrender(html`<$\{App\} />`, root);\n| TO parts.
+    APPEND | response as sent from api/trace/response), and the SQL\n// statements the call ran with their rows, time and error.\n// No build step: Preact with htm, vendored as one ES module; | TO parts.
+    APPEND |this file is what the server serves.\nimport \{ html, render, useState, useEffect, useRef \} from './vendor/htm-preact-standalone.mjs';\n\nconst client = new URLSearchParams(locati| TO parts.
+    APPEND |on.search).get('sap-client');\nconst REFRESH_MS = 5000;\nconst MAX_CHOICES = [50, 200, 500, 1000, 5000, 10000];\nconst MAX_KEY = 'olap4abap.trace.max';\n// the number of calls list| TO parts.
+    APPEND |ed is remembered per browser; storage may be unavailable (private windows)\nconst storedMax = () => \{\n  try \{\n    const n = Number(localStorage.getItem(MAX_KEY));\n    return M| TO parts.
+    APPEND |AX_CHOICES.includes(n) ? n : 200;\n  \} catch \{\n    return 200;\n  \}\n\};\n\nconst apiUrl = (resource, params = \{\}) => \{\n  const query = new URLSearchParams(Object.entries(p| TO parts.
+    APPEND |arams).filter(([, v]) => v));\n  if (client) query.set('sap-client', client);\n  return `api/$\{resource\}?$\{query\}`;\n\};\n\nasync function api(method, resource, params = \{\}) | TO parts.
+    APPEND |\{\n  const response = await fetch(apiUrl(resource, params), \{ method \});\n  let data;\n  try \{\n    data = await response.json();\n  \} catch \{\n    throw new Error(`$\{respon| TO parts.
+    APPEND |se.status\} $\{response.statusText\}`);\n  \}\n  if (!response.ok) throw new Error(data.error \|\| `$\{response.status\} $\{response.statusText\}`);\n  return data;\n\}\n\nconst ti| TO parts.
+    APPEND |me = (iso) => iso ? new Date(iso).toLocaleString() : '';\nconst size = (n) => n >= 1048576 ? `$\{(n / 1048576).toFixed(1)\} MB` : n >= 1024 ? `$\{(n / 1024).toFixed(1)\} KB` : `$\{| TO parts.
+    APPEND |n\} B`;\nconst what = (c) => c.method === 'EXECUTE' ? 'Execute' : c.method === 'DISCOVER' ? 'Discover' : '(no XMLA)';\nconst firstLine = (s) => s.replace(/\\s+/g, ' ').trim();\ncon| TO parts.
+    APPEND |st ms = (us) => (us / 1000).toFixed(1);\n\n// the SQL statements of a call as one script: each statement after a comment with its number, rows and time\nconst sqlScript = (statemen| TO parts.
+    APPEND |ts) => statements.map((s, i) => `-- $\{i + 1\}: $\{s.error ? `failed: $\{s.error.replace(/\\s+/g, ' ')\}`\n  : `$\{s.rows\} $\{s.rows === 1 ? 'row' : 'rows'\}`\}, $\{ms(s.us)\} ms| TO parts.
+    APPEND |\\n$\{s.sql.trim()\};`).join('\\n\\n');\n\n// XML indented for reading; the text as it is if it does not parse (or is too large to do it quickly)\nfunction prettyXml(text) \{\n  if| TO parts.
+    APPEND | (!text \|\| text.length > 5000000) return text;\n  const doc = new DOMParser().parseFromString(text, 'application/xml');\n  if (doc.getElementsByTagName('parsererror').length) ret| TO parts.
+    APPEND |urn text;\n  const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n  const out = [];\n  const walk = (node, depth) => \{\n    const pad = '  '.r| TO parts.
+    APPEND |epeat(depth);\n    if (node.nodeType === Node.ELEMENT_NODE) \{\n      const attrs = [...node.attributes].map((a) => ` $\{a.name\}="$\{esc(a.value).replace(/"/g, '&quot;')\}"`).join| TO parts.
+    APPEND |('');\n      const kids = [...node.childNodes].filter((c) => c.nodeType !== Node.TEXT_NODE \|\| c.nodeValue.trim());\n      if (!kids.length) out.push(`$\{pad\}<$\{node.nodeName\}$| TO parts.
+    APPEND |\{attrs\}/>`);\n      else if (kids.length === 1 && kids[0].nodeType === Node.TEXT_NODE) \{\n        out.push(`$\{pad\}<$\{node.nodeName\}$\{attrs\}>$\{esc(kids[0].nodeValue)\}</$| TO parts.
+    APPEND |\{node.nodeName\}>`);\n      \} else \{\n        out.push(`$\{pad\}<$\{node.nodeName\}$\{attrs\}>`);\n        kids.forEach((c) => walk(c, depth + 1));\n        out.push(`$\{pad\}</| TO parts.
+    APPEND |$\{node.nodeName\}>`);\n      \}\n    \} else if (node.nodeType === Node.TEXT_NODE) out.push(pad + esc(node.nodeValue.trim()));\n    else if (node.nodeType === Node.CDATA_SECTION_N| TO parts.
+    APPEND |ODE) out.push(`$\{pad\}<![CDATA[$\{node.nodeValue\}]]>`);\n    else if (node.nodeType === Node.COMMENT_NODE) out.push(`$\{pad\}<!--$\{node.nodeValue\}-->`);\n  \};\n  [...doc.child| TO parts.
+    APPEND |Nodes].forEach((n) => walk(n, 0));\n  return out.join('\\n');\n\}\n\n// navigator.clipboard exists only on HTTPS and localhost; the endpoint is often plain HTTP, so a hidden textar| TO parts.
+    APPEND |ea and\n// execCommand('copy') are the fallback\nasync function copyText(text) \{\n  try \{\n    if (navigator.clipboard && window.isSecureContext) \{\n      await navigator.clipbo| TO parts.
+    APPEND |ard.writeText(text);\n      return true;\n    \}\n  \} catch \{ /* the fallback below */ \}\n  const area = Object.assign(document.createElement('textarea'), \{ value: text, readOn| TO parts.
+    APPEND |ly: true \});\n  area.style.cssText = 'position:fixed;top:0;left:0;opacity:0';\n  document.body.appendChild(area);\n  area.select();\n  let copied = false;\n  try \{ copied = docum| TO parts.
+    APPEND |ent.execCommand('copy'); \} catch \{ copied = false; \}\n  area.remove();\n  return copied;\n\}\n\n// the Catalog property of an Execute request, initial if it names none\nfunction| TO parts.
+    APPEND | requestCatalog(xml) \{\n  const doc = new DOMParser().parseFromString(xml \|\| '', 'application/xml');\n  const element = doc.getElementsByTagNameNS('*', 'Catalog')[0];\n  return | TO parts.
+    APPEND |element ? element.textContent.trim() : '';\n\}\n\n// the MDX console with the statement and the catalog of a traced Execute (console.js reads the fragment)\nconst consoleUrl = (ent| TO parts.
+    APPEND |ry) => \{\n  const fragment = new URLSearchParams(\{ statement: entry.mdx \});\n  const catalog = requestCatalog(entry.request);\n  if (catalog) fragment.set('catalog', catalog);\n| TO parts.
+    APPEND |  return `console.html$\{location.search\}#$\{fragment\}`;\n\};\n\nconst download = (text, name) => \{\n  const url = URL.createObjectURL(new Blob([text], \{ type: 'text/xml' \}));| TO parts.
+    APPEND |\n  const a = Object.assign(document.createElement('a'), \{ href: url, download: name \});\n  a.click();\n  setTimeout(() => URL.revokeObjectURL(url), 1000);\n\};\n\nfunction Users| TO parts.
+    APPEND |(\{ state, onSwitch, busy \}) \{\n  const [user, setUser] = useState('');\n  const name = (user \|\| state.user).trim().toUpperCase();\n  const on = state.users.some((u) => u.user | TO parts.
+    APPEND |=== name);\n  return html`<section class="section">\n    <header><h2>Traced users</h2><span class="spacer"></span>\n      <span class="muted small">a trace switches itself off afte| TO parts.
+    APPEND |r $\{state.activeHours\} hours; calls are kept $\{state.retentionDays\} days</span></header>\n    <div class="body">\n      <div class="row">\n        <label class="muted" for="use| TO parts.
+    APPEND |r">User</label>\n        <input id="user" type="text" maxlength="12" placeholder=$\{state.user\} value=$\{user\}\n          onInput=$\{(e) => setUser(e.target.value)\} onKeyDown=$| TO parts.
+    APPEND |\{(e) => e.key === 'Enter' && onSwitch('on', name)\} />\n        <button class="primary" disabled=$\{busy \|\| !name\} onClick=$\{() => onSwitch('on', name)\}\n          title=$\{`| TO parts.
+    APPEND |On for $\{state.activeHours\} hours from now`\}>$\{on ? `Switch on again for $\{state.activeHours\} hours` : 'Switch trace on'\}</button>\n        $\{on && html`<span class="status| TO parts.
+    APPEND | ok">on</span>`\}\n      </div>\n      $\{state.users.length ? html`<table>\n        <thead><tr><th>User</th><th>Since</th><th>On until</th><th>Switched on by</th><th></th></tr></t| TO parts.
+    APPEND |head>\n        <tbody>$\{state.users.map((u) => html`<tr>\n          <td><strong class="mono">$\{u.user\}</strong>$\{u.user === state.user && html` <span class="muted small">(this | TO parts.
+    APPEND |page's user)</span>`\}</td>\n          <td>$\{time(u.since)\}</td><td>$\{time(u.until)\}</td><td class="mono">$\{u.by\}</td>\n          <td class="actions"><button disabled=$\{busy| TO parts.
+    APPEND |\} onClick=$\{() => onSwitch('off', u.user)\}>Switch off</button></td>\n        </tr>`)\}</tbody>\n      </table>` : html`<div class="muted">The trace is off for every user.</div>`| TO parts.
+    APPEND |\}\n      <div class="notice info small">A call is traced under the SAP user it runs as. This page runs as$\{' '\}\n        <span class="mono">$\{state.user\}</span>; while the ICF| TO parts.
+    APPEND | node <span class="mono">/zzxxmla1</span> logs on anonymously,\n        every XMLA call runs as that user too. The client's address and User-Agent tell the callers apart.</div>\n  | TO parts.
+    APPEND |  </div>\n  </section>`;\n\}\n\nfunction Detail(\{ id, onClose \}) \{\n  const [entry, setEntry] = useState(null);\n  const [error, setError] = useState('');\n  const [tab, setTab]| TO parts.
+    APPEND | = useState('');\n  const [pretty, setPretty] = useState(true);\n  const [copied, setCopied] = useState('');  // the feedback of Copy, for a moment\n  useEffect(() => \{\n    if (!| TO parts.
+    APPEND |copied) return undefined;\n    const timer = setTimeout(() => setCopied(''), 2000);\n    return () => clearTimeout(timer);\n  \}, [copied]);\n  useEffect(() => \{\n    setEntry(nul| TO parts.
+    APPEND |l);\n    setError('');\n    api('GET', 'trace/entry', \{ id \}).then((e) => \{\n      setEntry(e);\n      setTab((t) => (t === 'mdx' && !e.mdx) \|\| !t ? (e.mdx ? 'mdx' : 'request'| TO parts.
+    APPEND |) : t);\n    \}, (e) => setError(e.message));\n  \}, [id]);\n  if (error) return html`<section class="section detail"><div class="body"><div class="notice err">$\{error\}</div></di| TO parts.
+    APPEND |v></section>`;\n  if (!entry) return html`<section class="section detail"><div class="body muted">Reading the call{ cl_abap_conv_in_ce=>uccp( '2026' ) }</div></section>`;\n\n  cons| TO parts.
+    APPEND |t sql = entry.sql \|\| [];\n  const raw = tab === 'mdx' ? entry.mdx : tab === 'request' ? entry.request : tab === 'sql' ? sqlScript(sql) : entry.response;\n  const xml = tab === 'r| TO parts.
+    APPEND |equest' \|\| tab === 'response';\n  const shown = !xml \|\| !pretty ? raw : prettyXml(raw);\n  // what is shown (indented or not) is what is copied\n  const copy = () => copyText(s| TO parts.
+    APPEND |hown).then((ok) => setCopied(ok ? 'Copied' : 'Copy failed: select the text and press Ctrl+C'));\n  const save = () => tab === 'response' && entry.responseTruncated\n    ? window.op| TO parts.
+    APPEND |en(apiUrl('trace/response', \{ id \}), '_blank')\n    : download(raw, `$\{entry.id\}-$\{tab\}.$\{xml ? 'xml' : tab\}`);\n  return html`<section class="section detail">\n    <header| TO parts.
+    APPEND |><h2>$\{what(entry)\}$\{entry.type && html` <span class="mono">$\{entry.type\}</span>`\}</h2>\n      <span class="muted small">$\{time(entry.at)\} | TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{entry.user\} { cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{entry.client\}$\{entry.status ? ` { cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{entry.r| TO parts.
+    APPEND |untimeMs\} ms { cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{entry.sqlCount\} SQL statements, $\{entry.sqlMs\} ms` : ''\}</span>\n      <span class="spacer"></span>\n      $\{entry.mdx | TO parts.
+    APPEND |&& html`<a class="button" href=$\{consoleUrl(entry)\} target="_blank" rel="noopener"\n        title=$\{`Open the statement in the MDX console$\{requestCatalog(entry.request) ? ` on| TO parts.
+    APPEND | catalog $\{requestCatalog(entry.request)\}` : ''\}`\}>Open in MDX Console</a>`\}\n      <button class="link" onClick=$\{onClose\}>Close</button></header>\n    <div class="tabs" ro| TO parts.
+    APPEND |le="tablist">\n      $\{entry.mdx && html`<button role="tab" class=$\{tab === 'mdx' ? 'active' : ''\} onClick=$\{() => setTab('mdx')\}>MDX statement</button>`\}\n      <button role| TO parts.
+    APPEND |="tab" class=$\{tab === 'request' ? 'active' : ''\} onClick=$\{() => setTab('request')\}>SOAP request <span class="muted small">$\{size(entry.requestLength)\}</span></button>\n    | TO parts.
+    APPEND |  <button role="tab" class=$\{tab === 'response' ? 'active' : ''\} onClick=$\{() => setTab('response')\}>SOAP response <span class="muted small">$\{entry.status ? size(entry.respon| TO parts.
+    APPEND |seLength) : 'none'\}</span></button>\n      <button role="tab" class=$\{tab === 'sql' ? 'active' : ''\} onClick=$\{() => setTab('sql')\}>SQL statements <span class="muted small">$| TO parts.
+    APPEND |\{entry.status ? entry.sqlCount : 'none'\}</span></button>\n    </div>\n    <div class="body">\n      <div class="row">\n        $\{xml && html`<label class="inline"><input type="c| TO parts.
+    APPEND |heckbox" checked=$\{pretty\} onChange=$\{(e) => setPretty(e.target.checked)\} /> Indent XML</label>`\}\n        <span class="spacer"></span>\n        $\{copied && html`<span class=| TO parts.
+    APPEND |$\{`status $\{copied === 'Copied' ? 'ok' : 'err'\}`\} role="status">$\{copied\}</span>`\}\n        <button onClick=$\{copy\} disabled=$\{!raw\}>Copy</button>\n        <button onCli| TO parts.
+    APPEND |ck=$\{save\} disabled=$\{!raw\}>Download</button>\n      </div>\n      $\{tab === 'response' && !entry.status && html`<div class="notice warn">No response: the call is still runnin| TO parts.
+    APPEND |g, or it was aborted (a short dump, ST22).</div>`\}\n      $\{tab === 'response' && entry.responseTruncated && html`<div class="notice warn">The response has $\{size(entry.response| TO parts.
+    APPEND |Length)\}; the first million characters are shown, Download gives all of it.</div>`\}\n      $\{tab === 'response' && entry.fault && html`<div class="notice err">The answer is a SO| TO parts.
+    APPEND |AP fault.</div>`\}\n      $\{tab === 'sql' && !entry.status && html`<div class="notice warn">No statements: the call is still running, or it was aborted (a short dump, ST22).</div>| TO parts.
+    APPEND |`\}\n      $\{tab === 'sql' && entry.status > 0 && sql.length < entry.sqlCount && html`<div class="notice warn">$\{sql.length\n        ? `The first $\{sql.length.toLocaleString()\}| TO parts.
+    APPEND | of $\{entry.sqlCount.toLocaleString()\} statements are kept.`\n        : 'The statements were not recorded: the call was traced before the trace kept them.'\}</div>`\}\n      $\{t| TO parts.
+    APPEND |ab === 'sql' && sql.some((s) => s.error) && html`<div class="notice err">A statement failed; its error is in the comment above it.</div>`\}\n      <textarea class="trace" readonly | TO parts.
+    APPEND |spellcheck="false" value=$\{shown\} aria-label=$\{tab\}></textarea>\n      $\{entry.userAgent && html`<div class="muted small">User-Agent: <span class="mono">$\{entry.userAgent\}</| TO parts.
+    APPEND |span></div>`\}\n    </div>\n  </section>`;\n\}\n\nfunction App() \{\n  const [state, setState] = useState(null);       // the answer of GET trace\n  const [filter, setFilter] = use| TO parts.
+    APPEND |State('');\n  const [kinds, setKinds] = useState(\{ DISCOVER: true, EXECUTE: true \});  // the toggles: which calls are listed\n  const [max, setMax] = useState(storedMax);\n  cons| TO parts.
+    APPEND |t [selected, setSelected] = useState('');\n  const [auto, setAuto] = useState(false);\n  const [busy, setBusy] = useState('');\n  const [error, setError] = useState('');\n  const f| TO parts.
+    APPEND |ilterRef = useRef(filter);\n  filterRef.current = filter;\n  // one toggle on: the server lists only that method (its newest 200); both on: every call; both off: none\n  const meth| TO parts.
+    APPEND |od = kinds.DISCOVER === kinds.EXECUTE ? '' : kinds.DISCOVER ? 'DISCOVER' : 'EXECUTE';\n  const methodRef = useRef(method);\n  methodRef.current = method;\n  const maxRef = useRef(m| TO parts.
+    APPEND |ax);\n  maxRef.current = max;\n  const chooseMax = (n) => \{\n    setMax(n);\n    try \{ localStorage.setItem(MAX_KEY, String(n)); \} catch \{ /* not remembered */ \}\n  \};\n  con| TO parts.
+    APPEND |st none = !kinds.DISCOVER && !kinds.EXECUTE;\n\n  const load = (quiet) => \{\n    if (!quiet) setBusy('Reading the trace{ cl_abap_conv_in_ce=>uccp( '2026' ) }');\n    return api('G| TO parts.
+    APPEND |ET', 'trace', \{ filter: filterRef.current, method: methodRef.current, max: maxRef.current \})\n      .then((data) => \{ setState(data); setError(''); \}, (e) => setError(e.message| TO parts.
+    APPEND |))\n      .finally(() => quiet \|\| setBusy(''));\n  \};\n  useEffect(() => \{ load(); \}, [filter, method, max]);\n  useEffect(() => \{\n    if (!auto) return undefined;\n    cons| TO parts.
+    APPEND |t timer = setInterval(() => load(true), REFRESH_MS);\n    return () => clearInterval(timer);\n  \}, [auto]);\n\n  const post = (resource, params, message) => \{\n    if (message &&| TO parts.
+    APPEND | !confirm(message)) return;\n    setBusy('Saving{ cl_abap_conv_in_ce=>uccp( '2026' ) }');\n    api('POST', resource, \{ ...params, filter, method, max \})\n      .then((data) => \{| TO parts.
+    APPEND | setState(data); setError(''); \}, (e) => setError(e.message))\n      .finally(() => setBusy(''));\n  \};\n  const onSwitch = (how, user) => post(`trace/$\{how\}`, \{ user \});\n  | TO parts.
+    APPEND |const clear = (user) => \{\n    post('trace/clear', \{ user \}, user ? `Delete the traced calls of $\{user\}?` : 'Delete all traced calls of every user?');\n    setSelected('');\n | TO parts.
+    APPEND | \};\n\n  const userNames = state ? [...new Set([...state.users.map((u) => u.user), ...state.calls.map((c) => c.user), filter].filter(Boolean))].sort() : [];\n  return html`\n    <| TO parts.
+    APPEND |div class="topbar"><h1>XMLA Trace</h1><span class="muted">the calls of the XMLA endpoint, per user</span>\n      <span class="spacer"></span><a href=$\{`./$\{location.search\}`\}>S| TO parts.
+    APPEND |chema Builder</a><a href=$\{`console.html$\{location.search\}`\}>MDX Console</a>\n      <a href=$\{`time.html$\{location.search\}`\}>Time Master Data</a></div>\n    <div class="pag| TO parts.
+    APPEND |e"><div class="pane wide">\n      $\{error && html`<div class="notice err">$\{error\}</div>`\}\n      $\{state && html`<$\{Users\} state=$\{state\} onSwitch=$\{onSwitch\} busy=$\{!| TO parts.
+    APPEND |!busy\} />`\}\n      <div class=$\{selected ? 'trace-split' : ''\}>\n      <section class="section">\n        <header><h2>Calls</h2>\n          <select value=$\{filter\} onChange=$| TO parts.
+    APPEND |\{(e) => \{ setFilter(e.target.value); setSelected(''); \}\} aria-label="User">\n            <option value="">All users</option>\n            $\{userNames.map((u) => html`<option v| TO parts.
+    APPEND |alue=$\{u\}>$\{u\}</option>`)\}\n          </select>\n          <div class="segmented" role="group" aria-label="Calls">\n            $\{[['DISCOVER', 'Discover'], ['EXECUTE', 'Exec| TO parts.
+    APPEND |ute']].map(([k, label]) => html`<button\n              class=$\{kinds[k] ? 'active' : ''\} aria-pressed=$\{kinds[k]\} title=$\{`Show the $\{label\} calls`\}\n              onClick=| TO parts.
+    APPEND |$\{() => \{ setKinds((s) => (\{ ...s, [k]: !s[k] \})); setSelected(''); \}\}>$\{label\}</button>`)\}\n          </div>\n          <label class="inline">Show\n            <select va| TO parts.
+    APPEND |lue=$\{max\} onChange=$\{(e) => chooseMax(Number(e.target.value))\} aria-label="Calls shown">\n              $\{MAX_CHOICES.map((n) => html`<option value=$\{n\}>$\{n.toLocaleString| TO parts.
+    APPEND |()\}</option>`)\}\n            </select> newest</label>\n          <span class="spacer"></span>\n          $\{busy && html`<span class="status busy">$\{busy\}</span>`\}\n          | TO parts.
+    APPEND |<label class="inline"><input type="checkbox" checked=$\{auto\} onChange=$\{(e) => setAuto(e.target.checked)\} /> Refresh every 5 s</label>\n          <button onClick=$\{() => load(| TO parts.
+    APPEND |)\} disabled=$\{!!busy\}>Refresh</button>\n          $\{filter && html`<button class="danger" onClick=$\{() => clear(filter)\} disabled=$\{!!busy \|\| !state?.calls.length\}>Delete| TO parts.
+    APPEND | $\{filter\}'s calls</button>`\}\n          <button class="danger" onClick=$\{() => clear('')\} disabled=$\{!!busy\}>Delete all</button></header>\n        <div class="scroll-x">$\{| TO parts.
+    APPEND |!state ? html`<div class="body muted">$\{busy \|\| 'No data.'\}</div>`\n          : none ? html`<div class="body muted">Switch Discover or Execute on to list calls.</div>`\n       | TO parts.
+    APPEND |   : !state.calls.length ? html`<div class="body muted">No traced $\{method ? `$\{what(\{ method \})\} ` : ''\}calls$\{filter ? ` of $\{filter\}` : ''\}.</div>` : html`\n          | TO parts.
+    APPEND |<table>\n            <thead><tr><th>Time</th><th class="wide-only">User</th><th>Call</th><th>Statement or rowset</th><th>Status</th>\n              <th class="num">ms</th><th class| TO parts.
+    APPEND |="num" title="SQL statements and their milliseconds">SQL</th><th class="num">Response</th><th class="wide-only">Client</th></tr></thead>\n            <tbody>$\{state.calls.map((c) | TO parts.
+    APPEND |=> html`\n              <tr class=$\{`clickable$\{c.id === selected ? ' selected' : ''\}`\} onClick=$\{() => setSelected(c.id === selected ? '' : c.id)\}>\n                <td clas| TO parts.
+    APPEND |s="small">$\{time(c.at)\}</td>\n                <td class="mono wide-only">$\{c.user\}</td>\n                <td>$\{what(c)\}</td>\n                <td class="mono small statement"| TO parts.
+    APPEND | title=$\{c.mdx\}>$\{c.mdx ? firstLine(c.mdx) : c.type\}</td>\n                <td>$\{!c.status ? html`<span class="status warn">no answer</span>`\n                  : c.fault ? ht| TO parts.
+    APPEND |ml`<span class="status err">fault</span>`\n                  : c.status === 200 ? html`<span class="status ok">ok</span>` : html`<span class="status err">$\{c.status\}</span>`\}</t| TO parts.
+    APPEND |d>\n                <td class="num">$\{c.status ? c.runtimeMs : ''\}</td>\n                <td class="num" title="SQL statements, their milliseconds">$\{c.status ? `$\{c.sqlCount\}| TO parts.
+    APPEND | { cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{c.sqlMs\}` : ''\}</td>\n                <td class="num">$\{c.status ? size(c.responseLength) : ''\}</td>\n                <td class="mono| TO parts.
+    APPEND | small wide-only">$\{c.client\}</td>\n              </tr>`)\}\n            </tbody>\n          </table>`\}\n        </div>\n        $\{state && !none && state.calls.length >= state| TO parts.
+    APPEND |.max && html`<div class="body muted small">The newest $\{state.max.toLocaleString()\} calls are shown; choose more next to Show.</div>`\}\n      </section>\n      $\{selected && ht| TO parts.
+    APPEND |ml`<$\{Detail\} id=$\{selected\} onClose=$\{() => setSelected('')\} />`\}\n      </div>\n    </div></div>`;\n\}\n\nconst root = document.getElementById('app');\nroot.textContent = | TO parts.
+    APPEND |'';\nrender(html`<$\{App\} />`, root);\n| TO parts.
     result = concat_lines_of( parts ).
   ENDMETHOD.
 

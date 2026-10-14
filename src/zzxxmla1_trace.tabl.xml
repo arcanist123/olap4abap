@@ -163,6 +163,14 @@
      <DATATYPE>RSTR</DATATYPE>
      <MASK>  RSTR</MASK>
     </DD03P>
+    <DD03P>
+     <FIELDNAME>SQL_LOG</FIELDNAME>
+     <ADMINFIELD>0</ADMINFIELD>
+     <INTTYPE>y</INTTYPE>
+     <INTLEN>000008</INTLEN>
+     <DATATYPE>RSTR</DATATYPE>
+     <MASK>  RSTR</MASK>
+    </DD03P>
    </DD03P_TABLE>
   </asx:values>
  </asx:abap>

@@ -25,13 +25,15 @@ CLASS zzxxmla1_cl_sql DEFINITION
     "! call records them, ZZXXMLA1_CL_TRACE).
     CLASS-DATA statement_count TYPE i READ-ONLY.
     CLASS-DATA statement_time TYPE int8 READ-ONLY.
-    "! Set: query keeps each statement with its rows and microseconds in statement_log (for measurements).
+    "! Set: query keeps each statement with its rows and microseconds in statement_log (for measurements and the
+    "! trace of a call), a statement that fails with its error and no rows.
     CLASS-DATA log_statements TYPE abap_bool.
     TYPES:
       BEGIN OF ty_logged,
-        sql  TYPE string,
-        rows TYPE i,
-        time TYPE int8,
+        sql   TYPE string,
+        rows  TYPE i,
+        time  TYPE int8,
+        error TYPE string,
       END OF ty_logged.
     CLASS-DATA statement_log TYPE STANDARD TABLE OF ty_logged WITH EMPTY KEY READ-ONLY.
 
@@ -92,6 +94,10 @@ CLASS zzxxmla1_cl_sql IMPLEMENTATION.
         result_set->next_package( ).
         result_set->close( ).
       CATCH cx_sql_exception INTO DATA(error).
+        IF log_statements = abap_true.
+          GET RUN TIME FIELD DATA(failed).
+          APPEND VALUE #( sql = sql time = failed - started error = error->get_text( ) ) TO statement_log.
+        ENDIF.
         RAISE EXCEPTION TYPE zzxxmla1_cx_sql
           EXPORTING
             statement     = sql

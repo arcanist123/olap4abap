@@ -90,6 +90,10 @@ def main():
               and entry["request"] == EXECUTE.format(escaped, args.catalog), entry.get("request", entry)[:300])
         check("trace/entry: the response unzipped", entry.get("response") == execute_response
               and entry.get("responseTruncated") is False, entry.get("response", "")[:300])
+        sql = entry.get("sql") or []
+        check("trace/entry: the SQL statements, as many as counted", len(sql) == execute["sqlCount"] > 0
+              and all(s["sql"] and s["rows"] >= 0 and s["us"] >= 0 and s["error"] == "" for s in sql),
+              f"{execute['sqlCount']} counted, {sql[:2]}")
         status, raw = api("GET", "trace/response", id=execute["id"])
         check("trace/response: the response as XML", status == 200 and raw == execute_response, str(raw)[:300])
 

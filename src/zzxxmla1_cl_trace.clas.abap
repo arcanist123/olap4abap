@@ -13,8 +13,9 @@
 "! users whose calls are traced, table ZZXXMLA1_TRACE a row per call of such a user (sy-uname, the logon of the ICF
 "! node: while the node logs on anonymously every caller is its service user, told apart by the client's address and
 "! User-Agent). A row has the SOAP request, what it asks (Discover and its rowset, Execute and its MDX statement), the
-"! HTTP status, whether the answer is a SOAP fault, the runtime and the SOAP response, gzipped (Excel's grids are
-"! megabytes of XML). The row is written and committed before the call is handled, so a call that dumps is in the
+"! HTTP status, whether the answer is a SOAP fault, the runtime, the SOAP response, gzipped (Excel's grids are
+"! megabytes of XML), and the SQL statements the call ran with their rows, time and error (ZZXXMLA1_CL_SQL's
+"! statement_log, gzipped XML; the first c_sql_kept of them). The row is written and committed before the call is handled, so a call that dumps is in the
 "! trace too, with status 0 and no response; the answer is added when it is there. A trace switches itself off
 "! c_active_hours after it was switched on (switching it on again starts the hours anew). Whenever a trace is switched
 "! on, the calls older than c_retention_days and the switched-off users' rows are deleted. The trace page (web/schema/trace.js) reads and switches the trace through
@@ -29,6 +30,8 @@ CLASS zzxxmla1_cl_trace DEFINITION
     CONSTANTS c_retention_days TYPE i VALUE 7.
     "! how long a trace stays on after it was switched on
     CONSTANTS c_active_hours TYPE i VALUE 2.
+    "! how many of the SQL statements of a call are kept
+    CONSTANTS c_sql_kept TYPE i VALUE 10000.
     TYPES:
       "! a user with the trace on: since when, who switched it on and until when it is on
       BEGIN OF ty_user,
@@ -67,10 +70,21 @@ CLASS zzxxmla1_cl_trace DEFINITION
       END OF ty_entry,
       ty_t_entry TYPE STANDARD TABLE OF ty_entry WITH EMPTY KEY.
     TYPES:
+      "! a SQL statement a call ran (ZZXXMLA1_CL_SQL=>ty_logged): its rows, its time and the error it failed with
+      BEGIN OF ty_statement,
+        sql   TYPE string,
+        rows  TYPE i,
+        time  TYPE int8,          " microseconds
+        error TYPE string,
+      END OF ty_statement,
+      ty_t_statement TYPE STANDARD TABLE OF ty_statement WITH EMPTY KEY.
+    TYPES:
       BEGIN OF ty_detail,
         entry    TYPE ty_entry,
         request  TYPE string,
         response TYPE string,
+        "! the SQL statements in the order they ran (the first c_sql_kept)
+        sql      TYPE ty_t_statement,
       END OF ty_detail.
 
     "! Whether the calls of a user are traced: the trace was switched on less than c_active_hours ago.
@@ -104,7 +118,8 @@ CLASS zzxxmla1_cl_trace DEFINITION
                 xmla_method   TYPE string OPTIONAL
                 !max          TYPE i DEFAULT 200
       RETURNING VALUE(result) TYPE ty_t_entry.
-    "! A traced call with its request and its response, unzipped; its trace_id is initial if there is none.
+    "! A traced call with its request, its response and its SQL statements, unzipped; its trace_id is initial if
+    "! there is none.
     CLASS-METHODS read
       IMPORTING trace_id      TYPE sysuuid_c32
       RETURNING VALUE(result) TYPE ty_detail.
@@ -118,7 +133,8 @@ CLASS zzxxmla1_cl_trace DEFINITION
       IMPORTING request       TYPE string
       RETURNING VALUE(result) TYPE ty_call.
 
-    "! Adds the answer to the call's row, with the SQL statements run since start and their time, and commits.
+    "! Adds the answer to the call's row, with the SQL statements run since start, their time and the statements
+    "! themselves, and commits.
     "! @parameter status | the HTTP status
     "! @parameter response | the SOAP response
     METHODS finish
@@ -152,6 +168,14 @@ CLASS zzxxmla1_cl_trace DEFINITION
     CLASS-METHODS decompress
       IMPORTING !data         TYPE xstring
       RETURNING VALUE(result) TYPE string.
+    "! The statements as gzipped XML (the first c_sql_kept); empty for none.
+    CLASS-METHODS serialize_sql
+      IMPORTING statements    TYPE ty_t_statement
+      RETURNING VALUE(result) TYPE xstring.
+    "! The statements of serialize_sql; none for empty data or data that cannot be read.
+    CLASS-METHODS deserialize_sql
+      IMPORTING !data         TYPE xstring
+      RETURNING VALUE(result) TYPE ty_t_statement.
     "! Whether a SOAP response is a fault.
     CLASS-METHODS is_fault
       IMPORTING response      TYPE string
@@ -212,6 +236,7 @@ CLASS zzxxmla1_cl_trace IMPLEMENTATION.
     result->trace_id = row-trace_id.
     GET RUN TIME FIELD result->started.
     zzxxmla1_cl_sql=>reset_statistics( ).
+    zzxxmla1_cl_sql=>log_statements = abap_true.
     DATA(call) = describe( request ).
     row-user_name = sy-uname.
     row-xmla_method = call-xmla_method.
@@ -235,6 +260,8 @@ CLASS zzxxmla1_cl_trace IMPLEMENTATION.
     DATA(zipped) = compress( response ).
     DATA(sql_count) = zzxxmla1_cl_sql=>statement_count.
     DATA(sql_ms) = CONV i( zzxxmla1_cl_sql=>statement_time DIV 1000 ).
+    DATA(sql_log) = serialize_sql( CORRESPONDING #( zzxxmla1_cl_sql=>statement_log ) ).
+    zzxxmla1_cl_sql=>log_statements = abap_false.
     UPDATE zzxxmla1_trace
       SET status          = @status,
           fault           = @fault,
@@ -242,7 +269,8 @@ CLASS zzxxmla1_cl_trace IMPLEMENTATION.
           response_length = @response_length,
           sql_count       = @sql_count,
           sql_ms          = @sql_ms,
-          response        = @zipped
+          response        = @zipped,
+          sql_log         = @sql_log
       WHERE trace_id = @trace_id.
     COMMIT WORK.
   ENDMETHOD.
@@ -276,6 +304,7 @@ CLASS zzxxmla1_cl_trace IMPLEMENTATION.
     result-entry = CORRESPONDING #( row ).
     result-request = row-request.
     result-response = decompress( row-response ).
+    result-sql = deserialize_sql( row-sql_log ).
   ENDMETHOD.
 
   METHOD clear.
@@ -337,6 +366,35 @@ CLASS zzxxmla1_cl_trace IMPLEMENTATION.
                                                  conversion = 'UTF-8'
                                        IMPORTING text_out   = result ).
       CATCH cx_parameter_invalid_range cx_sy_buffer_overflow cx_sy_conversion_codepage cx_sy_compression_error.
+        CLEAR result.
+    ENDTRY.
+  ENDMETHOD.
+
+  METHOD serialize_sql.
+    IF statements IS INITIAL.
+      RETURN.
+    ENDIF.
+    DATA(kept) = statements.
+    IF lines( kept ) > c_sql_kept.
+      DELETE kept FROM c_sql_kept + 1.
+    ENDIF.
+    DATA xml TYPE string.
+    TRY.
+        CALL TRANSFORMATION id SOURCE sql = kept RESULT XML xml.
+      CATCH cx_transformation_error.
+        RETURN.
+    ENDTRY.
+    result = compress( xml ).
+  ENDMETHOD.
+
+  METHOD deserialize_sql.
+    DATA(xml) = decompress( data ).
+    IF xml IS INITIAL.
+      RETURN.
+    ENDIF.
+    TRY.
+        CALL TRANSFORMATION id SOURCE XML xml RESULT sql = result.
+      CATCH cx_transformation_error.
         CLEAR result.
     ENDTRY.
   ENDMETHOD.

@@ -73,8 +73,9 @@
 "! - GET trace[?filter=U][&method=DISCOVER|EXECUTE][&max=N]: the trace of the XMLA endpoint (ZZXXMLA1_CL_TRACE): the
 "!   current user, the users with the trace on and the newest N traced calls (200 without max, at most 10,000; of user
 "!   U, of that method), newest first, without request and response;
-"! - GET trace/entry?id=X: a traced call with its SOAP request, its MDX and its SOAP response (unzipped, the first
-"!   million characters; responseTruncated if there are more); GET trace/response?id=X: all of the response, text/xml;
+"! - GET trace/entry?id=X: a traced call with its SOAP request, its MDX, its SOAP response (unzipped, the first
+"!   million characters; responseTruncated if there are more) and its SQL statements (sql: text, rows, microseconds,
+"!   error); GET trace/response?id=X: all of the response, text/xml;
 "! - POST trace/on?user=U (for ZZXXMLA1_CL_TRACE=>C_ACTIVE_HOURS from now, deleting the calls older than its
 "!   C_RETENTION_DAYS), trace/off?user=U (without user the current one), trace/clear[?user=U] (without user everyone's
 "!   calls): committed, answered as GET trace.
@@ -233,8 +234,8 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
       IMPORTING request       TYPE ty_request
       RETURNING VALUE(result) TYPE string
       RAISING   zzxxmla1_cx_api_refused.
-    "! GET trace/entry?id=X: a traced call with its SOAP request and its SOAP response, unzipped (the first
-    "! c_trace_shown characters of it); refused (404) if there is none.
+    "! GET trace/entry?id=X: a traced call with its SOAP request, its SOAP response, unzipped (the first
+    "! c_trace_shown characters of it), and its SQL statements; refused (404) if there is none.
     METHODS trace_entry
       IMPORTING request       TYPE ty_request
       RETURNING VALUE(result) TYPE string
@@ -962,8 +963,11 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     DATA(truncated) = xsdbool( strlen( call-response ) > c_trace_shown ).
     DATA(shown) = COND string( WHEN truncated = abap_true THEN substring( val = call-response len = c_trace_shown )
                                ELSE call-response ).
+    DATA(statements) = VALUE string_table( FOR s IN call-sql
+      ( |\{"sql":{ json( s-sql ) },"rows":{ s-rows },"us":{ s-time },"error":{ json( s-error ) }\}| ) ).
     result = |\{{ trace_entry_json( call-entry ) },"request":{ json( call-request ) },| &&
-             |"response":{ json( shown ) },"responseTruncated":{ json_bool( truncated ) }\}|.
+             |"response":{ json( shown ) },"responseTruncated":{ json_bool( truncated ) },| &&
+             |"sql":[{ concat_lines_of( table = statements sep = `,` ) }]\}|.
   ENDMETHOD.
 
   METHOD trace_response.

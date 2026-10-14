@@ -1,6 +1,7 @@
 // The trace of the XMLA endpoint (ZZXXMLA1_CL_TRACE): switched on per SAP user for two hours (GET api/trace, POST
 // api/trace/on, trace/off; switching on deletes the calls older than seven days), every call of a user with the trace on is listed with its SOAP request, the MDX statement of an Execute
-// and the SOAP response (GET api/trace/entry, the whole response as sent from api/trace/response).
+// and the SOAP response (GET api/trace/entry, the whole response as sent from api/trace/response), and the SQL
+// statements the call ran with their rows, time and error.
 // No build step: Preact with htm, vendored as one ES module; this file is what the server serves.
 import { html, render, useState, useEffect, useRef } from './vendor/htm-preact-standalone.mjs';
 
@@ -40,6 +41,11 @@ const time = (iso) => iso ? new Date(iso).toLocaleString() : '';
 const size = (n) => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : n >= 1024 ? `${(n / 1024).toFixed(1)} KB` : `${n} B`;
 const what = (c) => c.method === 'EXECUTE' ? 'Execute' : c.method === 'DISCOVER' ? 'Discover' : '(no XMLA)';
 const firstLine = (s) => s.replace(/\s+/g, ' ').trim();
+const ms = (us) => (us / 1000).toFixed(1);
+
+// the SQL statements of a call as one script: each statement after a comment with its number, rows and time
+const sqlScript = (statements) => statements.map((s, i) => `-- ${i + 1}: ${s.error ? `failed: ${s.error.replace(/\s+/g, ' ')}`
+  : `${s.rows} ${s.rows === 1 ? 'row' : 'rows'}`}, ${ms(s.us)} ms\n${s.sql.trim()};`).join('\n\n');
 
 // XML indented for reading; the text as it is if it does not parse (or is too large to do it quickly)
 function prettyXml(text) {
@@ -163,13 +169,15 @@ function Detail({ id, onClose }) {
   if (error) return html`<section class="section detail"><div class="body"><div class="notice err">${error}</div></div></section>`;
   if (!entry) return html`<section class="section detail"><div class="body muted">Reading the call…</div></section>`;
 
-  const raw = tab === 'mdx' ? entry.mdx : tab === 'request' ? entry.request : entry.response;
-  const shown = tab === 'mdx' || !pretty ? raw : prettyXml(raw);
+  const sql = entry.sql || [];
+  const raw = tab === 'mdx' ? entry.mdx : tab === 'request' ? entry.request : tab === 'sql' ? sqlScript(sql) : entry.response;
+  const xml = tab === 'request' || tab === 'response';
+  const shown = !xml || !pretty ? raw : prettyXml(raw);
   // what is shown (indented or not) is what is copied
   const copy = () => copyText(shown).then((ok) => setCopied(ok ? 'Copied' : 'Copy failed: select the text and press Ctrl+C'));
   const save = () => tab === 'response' && entry.responseTruncated
     ? window.open(apiUrl('trace/response', { id }), '_blank')
-    : download(raw, `${entry.id}-${tab}.${tab === 'mdx' ? 'mdx' : 'xml'}`);
+    : download(raw, `${entry.id}-${tab}.${xml ? 'xml' : tab}`);
   return html`<section class="section detail">
     <header><h2>${what(entry)}${entry.type && html` <span class="mono">${entry.type}</span>`}</h2>
       <span class="muted small">${time(entry.at)} · ${entry.user} · ${entry.client}${entry.status ? ` · ${entry.runtimeMs} ms · ${entry.sqlCount} SQL statements, ${entry.sqlMs} ms` : ''}</span>
@@ -181,10 +189,11 @@ function Detail({ id, onClose }) {
       ${entry.mdx && html`<button role="tab" class=${tab === 'mdx' ? 'active' : ''} onClick=${() => setTab('mdx')}>MDX statement</button>`}
       <button role="tab" class=${tab === 'request' ? 'active' : ''} onClick=${() => setTab('request')}>SOAP request <span class="muted small">${size(entry.requestLength)}</span></button>
       <button role="tab" class=${tab === 'response' ? 'active' : ''} onClick=${() => setTab('response')}>SOAP response <span class="muted small">${entry.status ? size(entry.responseLength) : 'none'}</span></button>
+      <button role="tab" class=${tab === 'sql' ? 'active' : ''} onClick=${() => setTab('sql')}>SQL statements <span class="muted small">${entry.status ? entry.sqlCount : 'none'}</span></button>
     </div>
     <div class="body">
       <div class="row">
-        ${tab !== 'mdx' && html`<label class="inline"><input type="checkbox" checked=${pretty} onChange=${(e) => setPretty(e.target.checked)} /> Indent XML</label>`}
+        ${xml && html`<label class="inline"><input type="checkbox" checked=${pretty} onChange=${(e) => setPretty(e.target.checked)} /> Indent XML</label>`}
         <span class="spacer"></span>
         ${copied && html`<span class=${`status ${copied === 'Copied' ? 'ok' : 'err'}`} role="status">${copied}</span>`}
         <button onClick=${copy} disabled=${!raw}>Copy</button>
@@ -193,6 +202,11 @@ function Detail({ id, onClose }) {
       ${tab === 'response' && !entry.status && html`<div class="notice warn">No response: the call is still running, or it was aborted (a short dump, ST22).</div>`}
       ${tab === 'response' && entry.responseTruncated && html`<div class="notice warn">The response has ${size(entry.responseLength)}; the first million characters are shown, Download gives all of it.</div>`}
       ${tab === 'response' && entry.fault && html`<div class="notice err">The answer is a SOAP fault.</div>`}
+      ${tab === 'sql' && !entry.status && html`<div class="notice warn">No statements: the call is still running, or it was aborted (a short dump, ST22).</div>`}
+      ${tab === 'sql' && entry.status > 0 && sql.length < entry.sqlCount && html`<div class="notice warn">${sql.length
+        ? `The first ${sql.length.toLocaleString()} of ${entry.sqlCount.toLocaleString()} statements are kept.`
+        : 'The statements were not recorded: the call was traced before the trace kept them.'}</div>`}
+      ${tab === 'sql' && sql.some((s) => s.error) && html`<div class="notice err">A statement failed; its error is in the comment above it.</div>`}
       <textarea class="trace" readonly spellcheck="false" value=${shown} aria-label=${tab}></textarea>
       ${entry.userAgent && html`<div class="muted small">User-Agent: <span class="mono">${entry.userAgent}</span></div>`}
     </div>

@@ -142,8 +142,9 @@ Read before designing anything:
 - Trace: `/zzxxmla1/schema/trace.html` (`web/schema/trace.js`) switches the trace of XMLA calls on and off per SAP
   user (table `ZZXXMLA1_TRCUSR`) and lists the traced calls (table `ZZXXMLA1_TRACE`, `ZZXXMLA1_CL_TRACE`): per call
   the SOAP request, Discover with its rowset or Execute with its MDX statement, status, fault, runtime, the SQL
-  statements it ran and their time (`ZZXXMLA1_CL_SQL`'s statistics), client address and User-Agent, and the SOAP
-  response gzipped (`cl_abap_gzip`). `ZZXXMLA1_MAIN_ENDPOINT` writes and commits the row
+  statements it ran and their time (`ZZXXMLA1_CL_SQL`'s statistics), client address and User-Agent, the SOAP
+  response gzipped (`cl_abap_gzip`) and the statements themselves with their rows, time and error (`statement_log`,
+  gzipped XML, the first 10,000; the call's tab "SQL statements"). `ZZXXMLA1_MAIN_ENDPOINT` writes and commits the row
   before the handler runs (a call that dumps is traced without response) and adds the answer after it. A trace is
   on for 2 hours after it is switched on (`c_active_hours`); switching one on deletes the calls older than 7 days
   (`c_retention_days`) and the expired users' rows. "Delete all" on the page deletes every traced call. The list is the newest calls, filtered on the server by user,
