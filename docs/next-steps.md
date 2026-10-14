@@ -83,7 +83,12 @@ keeps the answers: both test suites give the same answers with planning on and o
    (#64; #46 differed once in the parallel run, the same alone and with its neighbours). Left over: crossjoins and
    `Descendants` on an axis, NON EMPTY axes with a non-All member, filters and ranks (`query-planning.md`, Cells
    first, Open).
-5. Mixed queries: the relational inputs of computed nodes read as one batch before the first pass.
+5. Done (2026-10-15): mixed queries (`query-planning.md`, Mixed queries): `load_aggregations` reads a pass's misses
+   with one `load_sets` call, widened (the computed grid's cells statement 16.8 to 0.9 s), and `prefetch_cells` reads
+   the cells' stored inputs in their own context with one `cross_groups` call before the first pass, so that pass is
+   the only one. The 1,001 x 1,001 grid with a calculated measure 232 to 108 s, the rest the evaluator's pass per
+   cell; `xmla_test.py` 272 of 274, `compare-applicable.py` 394 of 395 (#64). Left over: formulas per group instead of
+   per cell, the NON EMPTY filter by the evaluator with a calculated measure.
 6. More set nodes relational: `Filter` on a stored measure (`RolapNativeFilter`), `NonEmpty` with a second set.
 
 ## Paused: fixed selections

@@ -414,6 +414,16 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
         keep TYPE ty_t_flag,
       END OF ty_kept,
       ty_t_kept TYPE STANDARD TABLE OF ty_kept WITH EMPTY KEY.
+    "! A mixed plan (docs/query-planning.md, step 5): the cells that computed cells read in their own context, read as
+    "! one batch before the first pass. Per combination of a pattern of each axis the groups of its tuples' stored
+    "! members with the context's (ZZXXMLA1_CL_MDX_FACTS=>cross_groups, one statement for all), so that a cell whose
+    "! formula reads stored measures of its context finds them in the first pass. A tuple with a calculated or null
+    "! member other than a measure is left out, and everything when the context or the slicer has one; what a formula
+    "! reads elsewhere (navigation) is still missed and read between the passes.
+    METHODS prefetch_cells
+      IMPORTING evaluator TYPE ty_evaluator
+                axes      TYPE ty_t_axis
+                slicer    TYPE ty_tuple.
     "! Our shortcut of the cells (the reference evaluates every cell, executeStripe, and reads the cells a pass missed
     "! before the next): when no member of the context, the slicer or the axes is calculated or null, a cell is the
     "! stored measure of its context aggregated over the facts of its non-All members (evaluate_current). The cells are
@@ -1984,6 +1994,10 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         ENDLOOP.
       ELSE.
         filter_by_evaluator( EXPORTING evaluator = evaluator indexes = relational_filter CHANGING axes = result-axes ).
+        " a mixed plan: the cells read in their own context, read before the first pass
+        IF planning = abap_true.
+          prefetch_cells( evaluator = evaluator axes = result-axes slicer = slicer_context ).
+        ENDIF.
         DATA(body) = evaluator->savepoint( ).
         attempt = 0.
         DO.
@@ -3459,6 +3473,128 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       ENDLOOP.
     ENDIF.
     evaluator->restore( savepoint ).
+  ENDMETHOD.
+
+  METHOD prefetch_cells.
+    TYPES:
+      "! the tuples of an axis with one pattern: their filters and per filter the paths of its members
+      BEGIN OF ty_prefetch_pattern,
+        pattern TYPE string,
+        filters TYPE zzxxmla1_cl_mdx_facts=>ty_t_filter,
+        paths   TYPE zzxxmla1_cl_mdx_facts=>ty_t_paths,
+      END OF ty_prefetch_pattern,
+      ty_t_prefetch_pattern TYPE STANDARD TABLE OF ty_prefetch_pattern WITH EMPTY KEY,
+      "! a filter of a combination: its hierarchy and its position among the combination's filters
+      BEGIN OF ty_prefetch_order,
+        hierarchy TYPE i,
+        index     TYPE i,
+      END OF ty_prefetch_order,
+      ty_t_prefetch_order TYPE STANDARD TABLE OF ty_prefetch_order WITH EMPTY KEY.
+    DATA axis_patterns TYPE STANDARD TABLE OF ty_t_prefetch_pattern WITH EMPTY KEY.
+    DATA slicer_hierarchies TYPE SORTED TABLE OF i WITH UNIQUE KEY table_line.
+    DATA axis_hierarchies TYPE SORTED TABLE OF i WITH UNIQUE KEY table_line.
+    DATA patterns TYPE zzxxmla1_cl_mdx_facts=>ty_t_cross_pattern.
+
+    DATA(context) = evaluator->get_members( ).
+    DATA(plain) = context.
+    APPEND LINES OF slicer TO plain.
+    LOOP AT plain TRANSPORTING NO FIELDS WHERE hier_id <> zzxxmla1_if_mdx_schema_reader=>c_measures
+                                           AND ( calculated = abap_true OR is_null = abap_true ).
+      RETURN.
+    ENDLOOP.
+    LOOP AT slicer INTO DATA(member).
+      INSERT member-hier_id INTO TABLE slicer_hierarchies.
+    ENDLOOP.
+
+    " the axes' tuples by pattern (the slicer sets its hierarchies last, as in execute_stripe)
+    LOOP AT axes INTO DATA(axis).
+      DATA(prefetch_patterns) = VALUE ty_t_prefetch_pattern( ).
+      LOOP AT axis-tuples INTO DATA(tuple).
+        DATA(filters) = VALUE zzxxmla1_cl_mdx_facts=>ty_t_filter( ).
+        DATA(plain_tuple) = abap_true.
+        LOOP AT tuple INTO member WHERE hier_id <> zzxxmla1_if_mdx_schema_reader=>c_measures.
+          IF member-calculated = abap_true OR member-is_null = abap_true.
+            plain_tuple = abap_false.
+            EXIT.
+          ENDIF.
+          IF line_exists( slicer_hierarchies[ table_line = member-hier_id ] ).
+            CONTINUE.
+          ENDIF.
+          INSERT member-hier_id INTO TABLE axis_hierarchies.
+          IF member-key_level > 0.
+            APPEND VALUE #( hierarchy = member-hier_id level = member-key_level path = member-path ) TO filters.
+          ENDIF.
+        ENDLOOP.
+        IF plain_tuple = abap_false.
+          CONTINUE.
+        ENDIF.
+        SORT filters BY hierarchy ASCENDING.
+        DATA(pattern) = concat_lines_of( table = VALUE string_table( FOR f IN filters ( |{ f-hierarchy }:{ f-level }| ) )
+                                         sep   = `,` ).
+        ASSIGN prefetch_patterns[ pattern = pattern ] TO FIELD-SYMBOL(<pattern>).
+        IF sy-subrc <> 0.
+          APPEND VALUE #( pattern = pattern filters = filters paths = VALUE #( FOR g IN filters ( ) ) )
+                 TO prefetch_patterns ASSIGNING <pattern>.
+        ENDIF.
+        LOOP AT filters INTO DATA(filter).
+          ASSIGN <pattern>-paths[ sy-tabix ] TO FIELD-SYMBOL(<filter_paths>).
+          APPEND filter-path TO <filter_paths>.
+        ENDLOOP.
+      ENDLOOP.
+      " no plain tuple: every cell has a calculated member, nothing to read for it
+      IF prefetch_patterns IS INITIAL.
+        RETURN.
+      ENDIF.
+      LOOP AT prefetch_patterns ASSIGNING <pattern>.
+        LOOP AT <pattern>-paths ASSIGNING FIELD-SYMBOL(<paths>).
+          SORT <paths> ASCENDING.
+          DELETE ADJACENT DUPLICATES FROM <paths>.
+        ENDLOOP.
+      ENDLOOP.
+      APPEND prefetch_patterns TO axis_patterns.
+    ENDLOOP.
+
+    " the context's filters: its non-All members of the hierarchies no axis sets
+    DATA(base_filters) = VALUE zzxxmla1_cl_mdx_facts=>ty_t_filter( ).
+    LOOP AT context INTO member WHERE hier_id <> zzxxmla1_if_mdx_schema_reader=>c_measures AND key_level > 0.
+      IF NOT line_exists( axis_hierarchies[ table_line = member-hier_id ] ).
+        APPEND VALUE #( hierarchy = member-hier_id level = member-key_level path = member-path ) TO base_filters.
+      ENDIF.
+    ENDLOOP.
+
+    " each combination of a pattern of each axis
+    DATA(choice) = VALUE zzxxmla1_cl_mdx_facts=>ty_t_index( FOR a = 1 WHILE a <= lines( axis_patterns ) ( 1 ) ).
+    DO.
+      DATA(cross) = VALUE zzxxmla1_cl_mdx_facts=>ty_cross_pattern( ).
+      LOOP AT base_filters INTO filter.
+        APPEND filter TO cross-filters.
+        APPEND VALUE #( ( filter-path ) ) TO cross-paths.
+      ENDLOOP.
+      LOOP AT axis_patterns ASSIGNING FIELD-SYMBOL(<axis_patterns>).
+        ASSIGN <axis_patterns>[ choice[ sy-tabix ] ] TO <pattern>.
+        APPEND LINES OF <pattern>-filters TO cross-filters.
+        APPEND LINES OF <pattern>-paths TO cross-paths.
+      ENDLOOP.
+      " the filters by hierarchy, their paths with them
+      DATA(order) = VALUE ty_t_prefetch_order( FOR h IN cross-filters INDEX INTO i ( hierarchy = h-hierarchy index = i ) ).
+      SORT order BY hierarchy ASCENDING.
+      APPEND VALUE #( filters = VALUE #( FOR o IN order ( cross-filters[ o-index ] ) )
+                      paths   = VALUE #( FOR o IN order ( cross-paths[ o-index ] ) ) ) TO patterns.
+
+      DATA(next) = abap_false.
+      LOOP AT choice ASSIGNING FIELD-SYMBOL(<choice>).
+        IF <choice> < lines( axis_patterns[ sy-tabix ] ).
+          <choice> = <choice> + 1.
+          next = abap_true.
+          EXIT.
+        ENDIF.
+        <choice> = 1.
+      ENDLOOP.
+      IF next = abap_false.
+        EXIT.
+      ENDIF.
+    ENDDO.
+    fact_reader->cross_groups( patterns ).
   ENDMETHOD.
 
   METHOD fast_cells.

@@ -317,7 +317,21 @@ CLASS ltc_engine IMPLEMENTATION.
       ( `SELECT NON EMPTY [Customers].[State Province].Members ON COLUMNS, NON EMPTY [Time].[Quarter].Members ON ROWS `
      && `FROM [ZFMSALES] WHERE [Measures].[Fact Count]` )
       ( `SELECT NON EMPTY [Product].[All Products].Children ON COLUMNS FROM [ZFMSALES] `
-     && `WHERE ([Store].[USA].[CA], [Time].[1997].[Q1])` ) ).
+     && `WHERE ([Store].[USA].[CA], [Time].[1997].[Q1])` )
+      " mixed: a calculated measure on a crossjoin with its All member (the cells it reads in its own context read
+      " before the first pass), one that also reads elsewhere (Q1 for every quarter, missed and read between the
+      " passes), a calculated member on the rows (its tuples left out of the read)
+      ( `WITH MEMBER [Measures].[Profit] AS [Measures].[Store Sales] - [Measures].[Store Cost] `
+     && `SELECT {[Measures].[Profit], [Measures].[Unit Sales]} ON COLUMNS, `
+     && `{[Product].[All Products], [Product].[Product Family].Members} * [Store].[Store Country].Members `
+     && `ON ROWS FROM [ZFMSALES]` )
+      ( `WITH MEMBER [Measures].[Growth] AS [Measures].[Unit Sales] - ([Measures].[Unit Sales], [Time].[1997].[Q1]) `
+     && `SELECT {[Measures].[Growth]} ON COLUMNS, NON EMPTY [Time].[1997].Children * [Store].[Store State].Members `
+     && `ON ROWS `
+     && `FROM [ZFMSALES]` )
+      ( `WITH MEMBER [Product].[Rest] AS Aggregate({[Product].[Food], [Product].[Non-Consumable]}) `
+     && `SELECT {[Measures].[Unit Sales]} ON COLUMNS, {[Product].[Drink], [Product].[Rest]} ON ROWS `
+     && `FROM [ZFMSALES] WHERE [Store].[USA].[CA]` ) ).
     LOOP AT statements INTO DATA(statement).
       zzxxmla1_cl_mdx_engine=>planning = abap_true.
       DATA(planned) = execute( statement ).
@@ -354,6 +368,16 @@ CLASS ltc_engine IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = tuples( planned )
                                         exp = VALUE string_table( ( `[Store].[All Stores]` ) ( `[Store].[USA]` ) ) ).
     cl_abap_unit_assert=>assert_equals( act = values( planned ) exp = VALUE string_table( ( `266773` ) ( `266773` ) ) ).
+    " the mixed grid: its cells, of two patterns, from one read of the facts
+    zzxxmla1_cl_sql=>reset_statistics( ).
+    zzxxmla1_cl_sql=>log_statements = abap_true.
+    execute( statements[ 10 ] ).
+    zzxxmla1_cl_sql=>log_statements = abap_false.
+    DATA(mixed_reads) = 0.
+    LOOP AT zzxxmla1_cl_sql=>statement_log INTO DATA(mixed_logged) WHERE sql CS `/BIC/FZFMSALES`.
+      mixed_reads = mixed_reads + 1.
+    ENDLOOP.
+    cl_abap_unit_assert=>assert_equals( act = mixed_reads exp = 1 ).
   ENDMETHOD.
 
   METHOD compound_slicer.

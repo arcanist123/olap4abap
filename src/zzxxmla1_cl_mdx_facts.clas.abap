@@ -721,12 +721,36 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
     IF dirty = abap_false.
       RETURN.
     ENDIF.
+    " the batches no finer entry answers are read together (load_sets: one statement, GROUPING SETS for several), a
+    " column constrained to every key of its level with facts not constrained (widen)
+    DATA(patterns) = VALUE ty_t_cross_pattern( ).
+    DATA(constraints) = VALUE ty_t_segment( ).
+    DATA(indexes) = VALUE ty_t_index( ).
     LOOP AT cache ASSIGNING FIELD-SYMBOL(<entry>) WHERE has_pending = abap_true.
       IF roll_up( entry = REF #( <entry> ) constraint = <entry>-pending ) = abap_false.
-        load_segment( entry = REF #( <entry> ) constraint = <entry>-pending ).
+        DATA(constraint) = <entry>-pending.
+        widen( EXPORTING filters = <entry>-filters CHANGING constraint = constraint ).
+        APPEND VALUE #( filters = <entry>-filters ) TO patterns.
+        APPEND constraint TO constraints.
+        APPEND lines( patterns ) TO indexes.
       ENDIF.
       CLEAR: <entry>-pending, <entry>-has_pending, <entry>-pending_keys.
     ENDLOOP.
+    IF indexes IS NOT INITIAL.
+      DATA(read) = load_sets( patterns = patterns constraints = constraints indexes = indexes slicer = VALUE #( ) ).
+      LOOP AT read ASSIGNING FIELD-SYMBOL(<read>).
+        DATA(entry) = cache_entry( patterns[ <read>-pattern ]-filters ).
+        IF entry->groups IS INITIAL.
+          entry->groups = <read>-groups.
+        ELSE.
+          LOOP AT <read>-groups INTO DATA(group).
+            " a group read before by another segment is the same
+            INSERT group INTO TABLE entry->groups.
+          ENDLOOP.
+        ENDIF.
+        APPEND <read>-segment TO entry->segments.
+      ENDLOOP.
+    ENDIF.
     dirty = abap_false.
     result = abap_true.
   ENDMETHOD.

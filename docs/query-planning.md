@@ -348,6 +348,36 @@ and cells phases (phase `Cells first` in the trace and the console's query plan)
   per axis in the statement for array positions (HANA 1.25 s instead of 0.72 s, more than the reads it saves), and
   numeric keys as array indexes (150 ms against 221 ms for 633,830 hashed reads; not worth a special case).
 
+### Mixed queries (step 5, done 2026-10-15)
+
+A query with a calculated measure or member keeps the evaluator for its cells (`execute_stripe`), pass after pass
+until a pass misses no cell (`phase`). Measured on Excel's 1,001 x 1,001 grid of `ZXMLWIDEA` with a calculated
+measure as the slicer (`WITH MEMBER [Measures].[Double] AS [Measures].[ZXMLAKF] * 2 ... WHERE [Measures].[Double]`):
+232 s, of which 16.8 s the cells statement (both `IN` lists of 1,000 keys: `load_aggregations` did not `widen`) and
+the rest two evaluator passes over 1,002,001 cells, the first of which only recorded the misses.
+
+- **The misses as one batch.** `ZZXXMLA1_CL_MDX_FACTS=>load_aggregations` reads the batches of a pass that no finer
+  entry rolls up with one `load_sets` call (one statement, `GROUPING SETS` for several patterns), each constraint
+  widened first (`widen`), as `cross_groups` reads; before, a statement per pattern with every key.
+- **The direct inputs before the first pass.** `ZZXXMLA1_CL_MDX_ENGINE=>prefetch_cells`, before the first pass of
+  the evaluator's cells (planning on): per combination of a pattern of each axis the groups of its tuples' stored
+  members with the context's non-All members, all with one `cross_groups` call. A group holds every measure's sum,
+  so a formula that reads stored measures of its own cell (`[Store Sales] - [Store Cost]`, `[ZXMLAKF] * 2`) finds
+  them in the first pass, which is then the only one. Tuples with a calculated or null member other than a measure
+  are left out (an `Aggregate` member reads its children), and nothing is read when the context or the slicer has
+  one (a compound slicer's placeholders). What a formula reads elsewhere (`([Unit Sales], [Time].[1997].[Q1])`,
+  navigation) is still missed and read between the passes, as one batch. The read is not exact: a formula that
+  never reads its own cell makes it a read too many; accepted, a grouped read is cheap next to a pass.
+- Not changed: the NON EMPTY axes of a query with a calculated measure are still filtered by the evaluator
+  (`filter_by_evaluator`, its own passes), and the axes' computed sets (`Filter` on a value) are evaluated as before.
+
+Measured (the trace's runtime, one run): the grid 232 s (8 statements, 17.0 s SQL) to 108 s (8 statements, 1.0 s
+SQL). The 107 s left are the evaluator's single pass, about 100 µs per cell (savepoints, the formula, each stored
+measure's group key and lookup, the format string, the double written, a row of the cell table): computing such a
+formula per group instead of per cell is a step of its own (Open). Tests: `planning_on_and_off` compares three
+mixed statements with planning on and off and reads the mixed grid's facts once; `xmla_test.py` 272 of 274 (the
+two datasources cases), `compare-applicable.py` 394 of 395 (#64), SAP 242 s in total, the slowest 8.3 s.
+
 ## Semantics that must not change
 
 - Empty is "no group", not 0: a stored measure whose group sums to 0 is a cell with 0, written, and `NON EMPTY` keeps
@@ -393,7 +423,8 @@ and cells phases (phase `Cells first` in the trace and the console's query plan)
 4. Done (2026-10-14) for two axes of a level each: a query whose NON EMPTY axes depend on the facts only is one fact
    statement, its axes built from the result and its cells written from the rows, without the axis reads, the group
    cache, the cell table. The 1,001 x 1,001 grid 3.5 s (13.8 s). See Cells first (step 4) above.
-5. Mixed queries: the relational inputs of computed nodes read as one batch before the first pass.
+5. Done (2026-10-15): mixed queries: the misses of a pass read as one batch (widened), the cells' inputs in their own
+   context read before the first pass. See Mixed queries (step 5) above.
 6. More set nodes relational: `Filter` on a stored measure (`RolapNativeFilter`), `NonEmpty` with a second set.
 
 ## GROUPING SETS on HANA
@@ -424,7 +455,10 @@ plain `GROUP BY`. Not to be revisited before a real provider shows it matters.
 
 ## Open
 
-- Mixed plans and the batching passes: how much of `phase` remains once the relational inputs are read first.
+- Mixed plans (after step 5): a calculated measure whose formula is arithmetic of stored measures of its own cell is
+  still evaluated per cell (the computed grid's 107 s); it could be computed per group, in ABAP from the groups or as
+  a SQL expression of the grouped statement. The NON EMPTY filter of a query with a calculated measure still runs
+  the evaluator.
 - Cells first beyond a level per axis: crossjoins of levels (Excel's rows of two characteristics), `Descendants`, a
   NON EMPTY axis of a non-All member's children, and an axis without NON EMPTY (its members without facts from the
   dimension). The grid's remaining 3.5 s: the statement 0.8 s, rows to cells 1.1 s, the writer 1.2 s.
