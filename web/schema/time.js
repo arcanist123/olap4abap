@@ -20,7 +20,10 @@ async function api(method, resource, params = {}) {
   return data;
 }
 
-const complete = (c) => c.missingSids === 0 && c.missingAttributes === 0;
+// a characteristic without SID table is not active in BW: it cannot be filled; without attribute table only its SIDs
+const inactive = (c) => c.missingTables.includes(c.sidTable);
+const hasAttributes = (c) => c.attributeTable && !c.missingTables.includes(c.attributeTable);
+const complete = (c) => !inactive(c) && c.missingSids === 0 && c.missingAttributes === 0;
 
 function App() {
   const [state, setState] = useState(null);       // the answer of GET time (or of the last fill)
@@ -44,7 +47,7 @@ function App() {
   useEffect(() => { load(); }, []);
   // what is incomplete is selected when the state arrives the first time
   useEffect(() => {
-    if (state && !selected.size && !filled) setSelected(new Set(state.characteristics.filter((c) => !complete(c)).map((c) => c.name)));
+    if (state && !selected.size && !filled) setSelected(new Set(state.characteristics.filter((c) => !complete(c) && !inactive(c)).map((c) => c.name)));
   }, [state]);
 
   const toggle = (name) => setSelected((s) => {
@@ -89,15 +92,17 @@ function App() {
             <thead><tr><th></th><th>Characteristic</th><th>Tables</th><th class="num">With SID</th><th class="num">In interval</th>
               <th class="num">Missing SIDs</th><th class="num">Attribute rows</th><th class="num">Missing rows</th><th>Values with SID</th></tr></thead>
             <tbody>${state.characteristics.map((c) => html`
-              <tr class="clickable" onClick=${() => toggle(c.name)}>
-                <td><input type="checkbox" checked=${selected.has(c.name)} onClick=${(e) => e.stopPropagation()} onChange=${() => toggle(c.name)}
-                  aria-label=${`Select ${c.name}`} /></td>
-                <td><strong class="mono">${c.name}</strong>${complete(c) && html` <span class="status ok">complete</span>`}</td>
-                <td class="mono small">${c.sidTable}${c.attributeTable && html`<br />${c.attributeTable}`}</td>
-                <td class="num">${c.sids}</td>
+              <tr class=${inactive(c) ? '' : 'clickable'} onClick=${() => !inactive(c) && toggle(c.name)}>
+                <td><input type="checkbox" checked=${selected.has(c.name)} disabled=${inactive(c)} onClick=${(e) => e.stopPropagation()}
+                  onChange=${() => toggle(c.name)} aria-label=${`Select ${c.name}`} /></td>
+                <td><strong class="mono">${c.name}</strong>${complete(c) && html` <span class="status ok">complete</span>`}
+                  ${inactive(c) && html` <span class="status err">not active</span>`}</td>
+                <td class="mono small">${[c.sidTable, c.attributeTable].filter(Boolean).map((t, i) => html`${i ? html`<br />` : ''}${t}${
+                  c.missingTables.includes(t) ? html` <span class="status err" title="no such table in this system">missing</span>` : ''}`)}</td>
+                <td class="num">${inactive(c) ? '' : c.sids}</td>
                 <td class="num">${c.expected}</td>
                 <td class="num">${c.missingSids || ''}</td>
-                <td class="num">${c.attributeTable ? c.attributes : html`<span class="muted">none</span>`}</td>
+                <td class="num">${hasAttributes(c) ? c.attributes : html`<span class="muted">none</span>`}</td>
                 <td class="num">${c.missingAttributes || ''}</td>
                 <td class="mono small">${c.first && `${c.first} … ${c.last}`}</td>
               </tr>`)}
@@ -108,13 +113,14 @@ function App() {
       ${filled && html`<section class="section">
         <header><h2>Last fill</h2></header>
         <div class="body">${filled.map((f) => html`<div class=${`notice ${f.error ? 'err' : 'ok'}`}>
-          <span class="mono">${f.name}</span>: ${f.error || `${f.createdSids} SIDs created, ${f.attributeRows} attribute rows written`}</div>`)}
+          <span class="mono">${f.name}</span>: ${f.error || `${f.createdSids} SIDs created, ${f.attributeRows} attribute rows written${f.warning ? `; ${f.warning}` : ''}`}</div>`)}
         </div>
       </section>`}
       <p class="muted small">0FISCYEAR and 0FISCPER are filled for the fiscal year variant K4, as 0CALYEAR and 0CALMONTH: its
         years and its periods 001 to 012 (the months); BW adds period 000 and the special periods of a year with its first
         period. 0CALDAY is not filled here.
-        Values with a SID outside the interval get their attribute rows too.</p>
+        Values with a SID outside the interval get their attribute rows too. A characteristic whose SID table this
+        system does not have is not active in BW and cannot be filled; one without attribute table gets its SIDs only.</p>
     </div></div>`;
 }
 

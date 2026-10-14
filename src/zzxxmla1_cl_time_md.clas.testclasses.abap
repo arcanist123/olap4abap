@@ -35,6 +35,10 @@ CLASS ltc_time_md DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHOR
     METHODS no_fiscal_period FOR TESTING.
     "! a fiscal value is the variant and the key, shown with a /
     METHODS fiscal_value_text FOR TESTING.
+    "! a table the system does not have is missing, one it has is not
+    METHODS missing_tables FOR TESTING.
+    "! a characteristic without SID table is not filled: an error, nothing written
+    METHODS fill_without_tables FOR TESTING.
 ENDCLASS.
 
 CLASS zzxxmla1_cl_time_md DEFINITION LOCAL FRIENDS ltc_time_md.
@@ -184,6 +188,20 @@ CLASS ltc_time_md IMPLEMENTATION.
     DATA(calyear) = characteristics[ name = `0CALYEAR` ].
     cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_time_md=>display( characteristic = calyear value = '1997' )
                                         exp = `1997` ).
+  ENDMETHOD.
+
+  METHOD missing_tables.
+    DATA(missing) = NEW zzxxmla1_cl_time_md( )->missing_tables(
+      VALUE #( name = `0CALYEAR` sid_table = `/BI0/SCALYEAR` attribute_table = `ZZXXMLA1_NO_SUCH_TABLE` ) ).
+    cl_abap_unit_assert=>assert_equals( act = missing exp = VALUE string_table( ( `ZZXXMLA1_NO_SUCH_TABLE` ) ) ).
+  ENDMETHOD.
+
+  METHOD fill_without_tables.
+    DATA(result) = NEW zzxxmla1_cl_time_md( )->fill_characteristic(
+      characteristic = VALUE #( name = `0CALYEAR` sid_table = `ZZXXMLA1_NO_SUCH_TABLE` key_field = `CALYEAR` length = 4 )
+      interval       = VALUE #( from = '19970101' to = '19971231' calendar = '01' ) ).
+    cl_abap_unit_assert=>assert_char_cp( act = result-error exp = `*ZZXXMLA1_NO_SUCH_TABLE does not exist*` ).
+    cl_abap_unit_assert=>assert_equals( act = result-created_sids exp = 0 ).
   ENDMETHOD.
 
 ENDCLASS.

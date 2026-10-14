@@ -936,42 +936,46 @@ CLASS zzxxmla1_cl_web_app_files IMPLEMENTATION.
     APPEND |nt = new URLSearchParams(location.search).get('sap-client');\n\nasync function api(method, resource, params = \{\}) \{\n  const query = new URLSearchParams(Object.entries(params).f| TO parts.
     APPEND |ilter(([, v]) => v));\n  if (client) query.set('sap-client', client);\n  const response = await fetch(`api/$\{resource\}?$\{query\}`, \{ method \});\n  let data;\n  try \{\n    dat| TO parts.
     APPEND |a = await response.json();\n  \} catch \{\n    throw new Error(`$\{response.status\} $\{response.statusText\}`);\n  \}\n  if (!response.ok) throw new Error(data.error \|\| `$\{resp| TO parts.
-    APPEND |onse.status\} $\{response.statusText\}`);\n  return data;\n\}\n\nconst complete = (c) => c.missingSids === 0 && c.missingAttributes === 0;\n\nfunction App() \{\n  const [state, set| TO parts.
-    APPEND |State] = useState(null);       // the answer of GET time (or of the last fill)\n  const [from, setFrom] = useState('');\n  const [to, setTo] = useState('');\n  const [selected, set| TO parts.
-    APPEND |Selected] = useState(new Set());\n  const [busy, setBusy] = useState('');\n  const [error, setError] = useState('');\n  const [filled, setFilled] = useState(null);\n\n  const show | TO parts.
-    APPEND |= (data) => \{\n    setState(data);\n    setFrom(data.from);\n    setTo(data.to);\n  \};\n  const load = (params = \{\}) => \{\n    setBusy('Reading the tables| TO parts.
-    APPEND |{ cl_abap_conv_in_ce=>uccp( '2026' ) }');\n    setError('');\n    return api('GET', 'time', params).then(show, (e) => setError(e.message)).finally(() => setBusy(''));\n  \};\n  use| TO parts.
-    APPEND |Effect(() => \{ load(); \}, []);\n  // what is incomplete is selected when the state arrives the first time\n  useEffect(() => \{\n    if (state && !selected.size && !filled) setSe| TO parts.
-    APPEND |lected(new Set(state.characteristics.filter((c) => !complete(c)).map((c) => c.name)));\n  \}, [state]);\n\n  const toggle = (name) => setSelected((s) => \{\n    const next = new Se| TO parts.
-    APPEND |t(s);\n    if (next.has(name)) next.delete(name); else next.add(name);\n    return next;\n  \});\n  const fill = () => \{\n    const names = state.characteristics.map((c) => c.name| TO parts.
-    APPEND |).filter((n) => selected.has(n));\n    if (!confirm(`Create the SIDs and attribute rows of $\{names.join(', ')\} for $\{from\} to $\{to\}?\\n\\n`\n      + 'Every view on these tabl| TO parts.
-    APPEND |es then has the new periods as members.')) return;\n    setBusy('Filling{ cl_abap_conv_in_ce=>uccp( '2026' ) }');\n    setError('');\n    api('POST', 'time/fill', \{ from, to, char| TO parts.
-    APPEND |acteristics: names.join(',') \})\n      .then((data) => \{ setFilled(data.filled); show(data); \}, (e) => setError(e.message))\n      .finally(() => setBusy(''));\n  \};\n\n  const| TO parts.
-    APPEND | changed = state && (from !== state.from \|\| to !== state.to);\n  return html`\n    <div class="topbar"><h1>Time Master Data</h1><span class="muted">SIDs and attributes of BW's ti| TO parts.
-    APPEND |me characteristics</span>\n      <span class="spacer"></span><a href=$\{`./$\{location.search\}`\}>Schema Builder</a><a href=$\{`console.html$\{location.search\}`\}>MDX Console</a>| TO parts.
-    APPEND |<a href=$\{`trace.html$\{location.search\}`\}>Trace</a></div>\n    <div class="page"><div class="pane">\n      $\{error && html`<div class="notice err">$\{error\}</div>`\}\n      <| TO parts.
-    APPEND |section class="section">\n        <header><h2>Interval</h2><span class="spacer"></span>\n          <span class="muted small">default: BW's interval of the virtual time hierarchies | TO parts.
-    APPEND |(RSRHIERARCHYVIRT)</span></header>\n        <div class="body"><div class="row">\n          <label class="muted" for="from">From</label><input id="from" type="date" value=$\{from\} | TO parts.
-    APPEND |onInput=$\{(e) => setFrom(e.target.value)\} />\n          <label class="muted" for="to">to</label><input id="to" type="date" value=$\{to\} onInput=$\{(e) => setTo(e.target.value)\}| TO parts.
-    APPEND | />\n          <button onClick=$\{() => load(\{ from, to \})\} disabled=$\{!!busy\}>$\{changed ? 'Show for this interval' : 'Refresh'\}</button>\n          $\{state && html`<span c| TO parts.
-    APPEND |lass="muted small">working days: factory calendar <span class="mono">$\{state.calendar\}</span></span>`\}\n        </div></div>\n      </section>\n      <section class="section">\n| TO parts.
-    APPEND |        <header><h2>Characteristics</h2><span class="spacer"></span>\n          $\{busy && html`<span class="status busy">$\{busy\}</span>`\}\n          <button class="primary" onC| TO parts.
-    APPEND |lick=$\{fill\} disabled=$\{!!busy \|\| !state \|\| !selected.size \|\| changed\}\n            title=$\{changed ? 'Show the state for this interval first' : ''\}>Fill selected</butt| TO parts.
-    APPEND |on></header>\n        <div class="scroll-x">$\{!state ? html`<div class="body muted">$\{busy \|\| 'No data.'\}</div>` : html`\n          <table>\n            <thead><tr><th></th><t| TO parts.
-    APPEND |h>Characteristic</th><th>Tables</th><th class="num">With SID</th><th class="num">In interval</th>\n              <th class="num">Missing SIDs</th><th class="num">Attribute rows</th| TO parts.
-    APPEND |><th class="num">Missing rows</th><th>Values with SID</th></tr></thead>\n            <tbody>$\{state.characteristics.map((c) => html`\n              <tr class="clickable" onClick=$| TO parts.
-    APPEND |\{() => toggle(c.name)\}>\n                <td><input type="checkbox" checked=$\{selected.has(c.name)\} onClick=$\{(e) => e.stopPropagation()\} onChange=$\{() => toggle(c.name)\}\n| TO parts.
-    APPEND |                  aria-label=$\{`Select $\{c.name\}`\} /></td>\n                <td><strong class="mono">$\{c.name\}</strong>$\{complete(c) && html` <span class="status ok">complet| TO parts.
-    APPEND |e</span>`\}</td>\n                <td class="mono small">$\{c.sidTable\}$\{c.attributeTable && html`<br />$\{c.attributeTable\}`\}</td>\n                <td class="num">$\{c.sids\}| TO parts.
-    APPEND |</td>\n                <td class="num">$\{c.expected\}</td>\n                <td class="num">$\{c.missingSids \|\| ''\}</td>\n                <td class="num">$\{c.attributeTable ? | TO parts.
-    APPEND |c.attributes : html`<span class="muted">none</span>`\}</td>\n                <td class="num">$\{c.missingAttributes \|\| ''\}</td>\n                <td class="mono small">$\{c.firs| TO parts.
-    APPEND |t && `$\{c.first\} { cl_abap_conv_in_ce=>uccp( '2026' ) } $\{c.last\}`\}</td>\n              </tr>`)\}\n            </tbody>\n          </table>`\}\n        </div>\n      </section| TO parts.
-    APPEND |>\n      $\{filled && html`<section class="section">\n        <header><h2>Last fill</h2></header>\n        <div class="body">$\{filled.map((f) => html`<div class=$\{`notice $\{f.er| TO parts.
-    APPEND |ror ? 'err' : 'ok'\}`\}>\n          <span class="mono">$\{f.name\}</span>: $\{f.error \|\| `$\{f.createdSids\} SIDs created, $\{f.attributeRows\} attribute rows written`\}</div>`)| TO parts.
-    APPEND |\}\n        </div>\n      </section>`\}\n      <p class="muted small">0FISCYEAR and 0FISCPER are filled for the fiscal year variant K4, as 0CALYEAR and 0CALMONTH: its\n        year| TO parts.
-    APPEND |s and its periods 001 to 012 (the months); BW adds period 000 and the special periods of a year with its first\n        period. 0CALDAY is not filled here.\n        Values with a S| TO parts.
-    APPEND |ID outside the interval get their attribute rows too.</p>\n    </div></div>`;\n\}\n\nconst root = document.getElementById('app');\nroot.textContent = '';\nrender(html`<$\{App\} />`| TO parts.
-    APPEND |, root);\n| TO parts.
+    APPEND |onse.status\} $\{response.statusText\}`);\n  return data;\n\}\n\n// a characteristic without SID table is not active in BW: it cannot be filled; without attribute table only its SI| TO parts.
+    APPEND |Ds\nconst inactive = (c) => c.missingTables.includes(c.sidTable);\nconst hasAttributes = (c) => c.attributeTable && !c.missingTables.includes(c.attributeTable);\nconst complete = (| TO parts.
+    APPEND |c) => !inactive(c) && c.missingSids === 0 && c.missingAttributes === 0;\n\nfunction App() \{\n  const [state, setState] = useState(null);       // the answer of GET time (or of the| TO parts.
+    APPEND | last fill)\n  const [from, setFrom] = useState('');\n  const [to, setTo] = useState('');\n  const [selected, setSelected] = useState(new Set());\n  const [busy, setBusy] = useStat| TO parts.
+    APPEND |e('');\n  const [error, setError] = useState('');\n  const [filled, setFilled] = useState(null);\n\n  const show = (data) => \{\n    setState(data);\n    setFrom(data.from);\n    s| TO parts.
+    APPEND |etTo(data.to);\n  \};\n  const load = (params = \{\}) => \{\n    setBusy('Reading the tables{ cl_abap_conv_in_ce=>uccp( '2026' ) }');\n    setError('');\n    return api('GET', 'tim| TO parts.
+    APPEND |e', params).then(show, (e) => setError(e.message)).finally(() => setBusy(''));\n  \};\n  useEffect(() => \{ load(); \}, []);\n  // what is incomplete is selected when the state arr| TO parts.
+    APPEND |ives the first time\n  useEffect(() => \{\n    if (state && !selected.size && !filled) setSelected(new Set(state.characteristics.filter((c) => !complete(c) && !inactive(c)).map((c)| TO parts.
+    APPEND | => c.name)));\n  \}, [state]);\n\n  const toggle = (name) => setSelected((s) => \{\n    const next = new Set(s);\n    if (next.has(name)) next.delete(name); else next.add(name);\n| TO parts.
+    APPEND |    return next;\n  \});\n  const fill = () => \{\n    const names = state.characteristics.map((c) => c.name).filter((n) => selected.has(n));\n    if (!confirm(`Create the SIDs and| TO parts.
+    APPEND | attribute rows of $\{names.join(', ')\} for $\{from\} to $\{to\}?\\n\\n`\n      + 'Every view on these tables then has the new periods as members.')) return;\n    setBusy('Filling| TO parts.
+    APPEND |{ cl_abap_conv_in_ce=>uccp( '2026' ) }');\n    setError('');\n    api('POST', 'time/fill', \{ from, to, characteristics: names.join(',') \})\n      .then((data) => \{ setFilled(dat| TO parts.
+    APPEND |a.filled); show(data); \}, (e) => setError(e.message))\n      .finally(() => setBusy(''));\n  \};\n\n  const changed = state && (from !== state.from \|\| to !== state.to);\n  retur| TO parts.
+    APPEND |n html`\n    <div class="topbar"><h1>Time Master Data</h1><span class="muted">SIDs and attributes of BW's time characteristics</span>\n      <span class="spacer"></span><a href=$\{| TO parts.
+    APPEND |`./$\{location.search\}`\}>Schema Builder</a><a href=$\{`console.html$\{location.search\}`\}>MDX Console</a><a href=$\{`trace.html$\{location.search\}`\}>Trace</a></div>\n    <div | TO parts.
+    APPEND |class="page"><div class="pane">\n      $\{error && html`<div class="notice err">$\{error\}</div>`\}\n      <section class="section">\n        <header><h2>Interval</h2><span class="| TO parts.
+    APPEND |spacer"></span>\n          <span class="muted small">default: BW's interval of the virtual time hierarchies (RSRHIERARCHYVIRT)</span></header>\n        <div class="body"><div class| TO parts.
+    APPEND |="row">\n          <label class="muted" for="from">From</label><input id="from" type="date" value=$\{from\} onInput=$\{(e) => setFrom(e.target.value)\} />\n          <label class="| TO parts.
+    APPEND |muted" for="to">to</label><input id="to" type="date" value=$\{to\} onInput=$\{(e) => setTo(e.target.value)\} />\n          <button onClick=$\{() => load(\{ from, to \})\} disabled=| TO parts.
+    APPEND |$\{!!busy\}>$\{changed ? 'Show for this interval' : 'Refresh'\}</button>\n          $\{state && html`<span class="muted small">working days: factory calendar <span class="mono">$\{| TO parts.
+    APPEND |state.calendar\}</span></span>`\}\n        </div></div>\n      </section>\n      <section class="section">\n        <header><h2>Characteristics</h2><span class="spacer"></span>\n  | TO parts.
+    APPEND |        $\{busy && html`<span class="status busy">$\{busy\}</span>`\}\n          <button class="primary" onClick=$\{fill\} disabled=$\{!!busy \|\| !state \|\| !selected.size \|\| c| TO parts.
+    APPEND |hanged\}\n            title=$\{changed ? 'Show the state for this interval first' : ''\}>Fill selected</button></header>\n        <div class="scroll-x">$\{!state ? html`<div class=| TO parts.
+    APPEND |"body muted">$\{busy \|\| 'No data.'\}</div>` : html`\n          <table>\n            <thead><tr><th></th><th>Characteristic</th><th>Tables</th><th class="num">With SID</th><th cla| TO parts.
+    APPEND |ss="num">In interval</th>\n              <th class="num">Missing SIDs</th><th class="num">Attribute rows</th><th class="num">Missing rows</th><th>Values with SID</th></tr></thead>| TO parts.
+    APPEND |\n            <tbody>$\{state.characteristics.map((c) => html`\n              <tr class=$\{inactive(c) ? '' : 'clickable'\} onClick=$\{() => !inactive(c) && toggle(c.name)\}>\n    | TO parts.
+    APPEND |            <td><input type="checkbox" checked=$\{selected.has(c.name)\} disabled=$\{inactive(c)\} onClick=$\{(e) => e.stopPropagation()\}\n                  onChange=$\{() => togg| TO parts.
+    APPEND |le(c.name)\} aria-label=$\{`Select $\{c.name\}`\} /></td>\n                <td><strong class="mono">$\{c.name\}</strong>$\{complete(c) && html` <span class="status ok">complete</sp| TO parts.
+    APPEND |an>`\}\n                  $\{inactive(c) && html` <span class="status err">not active</span>`\}</td>\n                <td class="mono small">$\{[c.sidTable, c.attributeTable].filte| TO parts.
+    APPEND |r(Boolean).map((t, i) => html`$\{i ? html`<br />` : ''\}$\{t\}$\{\n                  c.missingTables.includes(t) ? html` <span class="status err" title="no such table in this syste| TO parts.
+    APPEND |m">missing</span>` : ''\}`)\}</td>\n                <td class="num">$\{inactive(c) ? '' : c.sids\}</td>\n                <td class="num">$\{c.expected\}</td>\n                <td c| TO parts.
+    APPEND |lass="num">$\{c.missingSids \|\| ''\}</td>\n                <td class="num">$\{hasAttributes(c) ? c.attributes : html`<span class="muted">none</span>`\}</td>\n                <td c| TO parts.
+    APPEND |lass="num">$\{c.missingAttributes \|\| ''\}</td>\n                <td class="mono small">$\{c.first && `$\{c.first\} { cl_abap_conv_in_ce=>uccp( '2026' ) } $\{c.last\}`\}</td>\n   | TO parts.
+    APPEND |           </tr>`)\}\n            </tbody>\n          </table>`\}\n        </div>\n      </section>\n      $\{filled && html`<section class="section">\n        <header><h2>Last fil| TO parts.
+    APPEND |l</h2></header>\n        <div class="body">$\{filled.map((f) => html`<div class=$\{`notice $\{f.error ? 'err' : 'ok'\}`\}>\n          <span class="mono">$\{f.name\}</span>: $\{f.er| TO parts.
+    APPEND |ror \|\| `$\{f.createdSids\} SIDs created, $\{f.attributeRows\} attribute rows written$\{f.warning ? `; $\{f.warning\}` : ''\}`\}</div>`)\}\n        </div>\n      </section>`\}\n  | TO parts.
+    APPEND |    <p class="muted small">0FISCYEAR and 0FISCPER are filled for the fiscal year variant K4, as 0CALYEAR and 0CALMONTH: its\n        years and its periods 001 to 012 (the months); | TO parts.
+    APPEND |BW adds period 000 and the special periods of a year with its first\n        period. 0CALDAY is not filled here.\n        Values with a SID outside the interval get their attribute| TO parts.
+    APPEND | rows too. A characteristic whose SID table this\n        system does not have is not active in BW and cannot be filled; one without attribute table gets its SIDs only.</p>\n    </| TO parts.
+    APPEND |div></div>`;\n\}\n\nconst root = document.getElementById('app');\nroot.textContent = '';\nrender(html`<$\{App\} />`, root);\n| TO parts.
     result = concat_lines_of( parts ).
   ENDMETHOD.
 

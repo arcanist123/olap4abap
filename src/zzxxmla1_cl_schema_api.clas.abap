@@ -66,7 +66,8 @@
 "!   restricts members not on a BW provider's facts) is an entry with error and no cubes, the others are probed;
 "! - GET time?from=YYYY-MM-DD&to=YYYY-MM-DD: the master data of the calendar time characteristics
 "!   (ZZXXMLA1_CL_TIME_MD): the interval (without from and to BW's, the one of RSRHIERARCHYVIRT) and, per
-"!   characteristic, its values with SID and with attributes and those of the interval that are missing;
+"!   characteristic, its values with SID and with attributes and those of the interval that are missing, and its
+"!   tables the system does not have (missingTables: no SID table, the characteristic is not active);
 "! - POST time/fill?from=...&to=...&characteristics=0CALMONTH,0CALYEAR: makes the SIDs of the interval's values and
 "!   writes the attribute rows (without characteristics all of them), committed per characteristic. Answers what was
 "!   done and the state afterwards.
@@ -917,7 +918,9 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     LOOP AT time_md->fill( interval = interval names = names ) INTO DATA(entry).
       APPEND |\{"name":{ json( entry-name ) },"createdSids":{ entry-created_sids },| &&
              |"attributeRows":{ entry-attribute_rows },| &&
-             |"error":{ COND string( WHEN entry-error IS INITIAL THEN `null` ELSE json( entry-error ) ) }\}| TO filled.
+             |"error":{ COND string( WHEN entry-error IS INITIAL THEN `null` ELSE json( entry-error ) ) },| &&
+             |"warning":{ COND string( WHEN entry-warning IS INITIAL THEN `null` ELSE json( entry-warning ) ) }\}|
+        TO filled.
     ENDLOOP.
     result = |\{"filled":{ json_array( filled ) },{ time_status_json( time_md = time_md interval = interval ) }\}|.
   ENDMETHOD.
@@ -1074,7 +1077,9 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
                                                ELSE json( entry-characteristic-attribute_table ) ) },| &&
              |"sids":{ entry-sids },"attributes":{ entry-attributes },"expected":{ entry-expected },| &&
              |"missingSids":{ entry-missing_sids },"missingAttributes":{ entry-missing_attributes },| &&
-             |"first":{ json( entry-first ) },"last":{ json( entry-last ) }\}| TO entries.
+             |"first":{ json( entry-first ) },"last":{ json( entry-last ) },| &&
+             |"missingTables":{ json_array( VALUE #( FOR table IN entry-missing_tables ( json( table ) ) ) ) }\}|
+        TO entries.
     ENDLOOP.
     result = |"from":{ json_date( interval-from ) },"to":{ json_date( interval-to ) },| &&
              |"calendar":{ json( interval-calendar ) },"characteristics":{ json_array( entries ) }|.

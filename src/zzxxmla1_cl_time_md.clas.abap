@@ -61,6 +61,9 @@ CLASS zzxxmla1_cl_time_md DEFINITION
         missing_attributes TYPE i,       " values of the interval or with a SID, without attribute row
         first              TYPE string,  " the smallest value with a SID (K4/2024001 for a fiscal one)
         last               TYPE string,  " the largest
+        "! its tables this system does not have: without SID table the characteristic is not active, nothing is
+        "! read or filled; without attribute table only the SIDs
+        missing_tables     TYPE string_table,
       END OF ty_status,
       ty_t_status TYPE STANDARD TABLE OF ty_status WITH EMPTY KEY.
     TYPES:
@@ -69,6 +72,7 @@ CLASS zzxxmla1_cl_time_md DEFINITION
         created_sids   TYPE i,
         attribute_rows TYPE i,       " written (inserted or replaced)
         error          TYPE string,  " the characteristic was not (completely) filled
+        warning        TYPE string,  " filled, but not all of it (no attribute table)
       END OF ty_fill_result,
       ty_t_fill_result TYPE STANDARD TABLE OF ty_fill_result WITH EMPTY KEY.
 
@@ -153,6 +157,11 @@ CLASS zzxxmla1_cl_time_md DEFINITION
                 !to           TYPE d
                 !calendar     TYPE c
       RETURNING VALUE(result) TYPE i.
+    "! The tables of the characteristic (SID and attribute table) that are not active transparent tables of the
+    "! dictionary: a characteristic that is not active in BW has neither, not every system has all of them.
+    METHODS missing_tables
+      IMPORTING characteristic TYPE ty_characteristic
+      RETURNING VALUE(result)  TYPE string_table.
     "! The non-initial values of the SID table.
     METHODS sid_values
       IMPORTING characteristic TYPE ty_characteristic
@@ -221,10 +230,17 @@ CLASS zzxxmla1_cl_time_md IMPLEMENTATION.
   METHOD status.
     LOOP AT characteristics( ) INTO DATA(characteristic).
       DATA(expected) = values( name = characteristic-name interval = interval ).
+      DATA(missing) = missing_tables( characteristic ).
+      IF line_exists( missing[ table_line = characteristic-sid_table ] ).
+        APPEND VALUE #( characteristic = characteristic expected = lines( expected ) missing_tables = missing )
+          TO result.
+        CONTINUE.
+      ENDIF.
       DATA(sids) = sid_values( characteristic ).
       DATA(entry) = VALUE ty_status( characteristic = characteristic
                                      sids           = lines( sids )
-                                     expected       = lines( expected ) ).
+                                     expected       = lines( expected )
+                                     missing_tables = missing ).
       LOOP AT expected INTO DATA(value).
         IF NOT line_exists( sids[ table_line = value ] ).
           entry-missing_sids = entry-missing_sids + 1.
@@ -234,7 +250,8 @@ CLASS zzxxmla1_cl_time_md IMPLEMENTATION.
         entry-first = display( characteristic = characteristic value = sids[ 1 ] ).
         entry-last = display( characteristic = characteristic value = sids[ lines( sids ) ] ).
       ENDIF.
-      IF characteristic-attribute_table IS NOT INITIAL.
+      IF characteristic-attribute_table IS NOT INITIAL
+         AND NOT line_exists( missing[ table_line = characteristic-attribute_table ] ).
         DATA(attributes) = attribute_values( characteristic ).
         entry-attributes = lines( attributes ).
         DATA(wanted) = sids.
@@ -270,25 +287,37 @@ CLASS zzxxmla1_cl_time_md IMPLEMENTATION.
 
   METHOD fill_characteristic.
     result-name = characteristic-name.
-    DATA(sids) = sid_values( characteristic ).
-    DATA missing TYPE ty_t_value.
+    DATA(missing) = missing_tables( characteristic ).
+    IF line_exists( missing[ table_line = characteristic-sid_table ] ).
+      result-error = |{ characteristic-name } is not active in this system: table { characteristic-sid_table } | &&
+                     |does not exist|.
+      RETURN.
+    ENDIF.
+    " without attribute table it is filled as a characteristic without master data: SIDs only, unchecked
+    DATA(usable) = characteristic.
+    IF usable-attribute_table IS NOT INITIAL AND line_exists( missing[ table_line = usable-attribute_table ] ).
+      result-warning = |no attribute rows written: table { usable-attribute_table } does not exist|.
+      CLEAR usable-attribute_table.
+    ENDIF.
+    DATA(sids) = sid_values( usable ).
+    DATA without_sid TYPE ty_t_value.
     LOOP AT values( name = characteristic-name interval = interval ) INTO DATA(value).
       IF NOT line_exists( sids[ table_line = value ] ).
-        INSERT value INTO TABLE missing.
+        INSERT value INTO TABLE without_sid.
       ENDIF.
     ENDLOOP.
-    IF missing IS NOT INITIAL.
-      result-error = create_sids( characteristic = characteristic values = missing ).
+    IF without_sid IS NOT INITIAL.
+      result-error = create_sids( characteristic = usable values = without_sid ).
       IF result-error IS NOT INITIAL.
         ROLLBACK WORK.
         RETURN.
       ENDIF.
-      result-created_sids = lines( missing ).
+      result-created_sids = lines( without_sid ).
     ENDIF.
-    IF characteristic-attribute_table IS NOT INITIAL.
+    IF usable-attribute_table IS NOT INITIAL.
       " every value with a SID, also one loaded outside the interval
-      result-attribute_rows = write_attributes( characteristic = characteristic
-                                                values         = sid_values( characteristic )
+      result-attribute_rows = write_attributes( characteristic = usable
+                                                values         = sid_values( usable )
                                                 calendar       = interval-calendar ).
     ENDIF.
     COMMIT WORK.
@@ -417,6 +446,24 @@ CLASS zzxxmla1_cl_time_md IMPLEMENTATION.
       MODIFY (characteristic-attribute_table) FROM TABLE <rows>.
       result = lines( <rows> ).
     ENDIF.
+  ENDMETHOD.
+
+  METHOD missing_tables.
+    DATA(tables) = VALUE string_table( ( characteristic-sid_table ) ).
+    IF characteristic-attribute_table IS NOT INITIAL.
+      APPEND characteristic-attribute_table TO tables.
+    ENDIF.
+    LOOP AT tables INTO DATA(table).
+      SELECT SINGLE tabname
+        FROM dd02l
+        WHERE tabname = @table
+          AND as4local = 'A'
+          AND tabclass = 'TRANSP'
+        INTO @DATA(found).
+      IF sy-subrc <> 0.
+        APPEND table TO result.
+      ENDIF.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD sid_values.

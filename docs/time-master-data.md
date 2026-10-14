@@ -71,6 +71,12 @@ the initial row. Their SID tables hold the values that FoodMart, the clinic demo
   periods (`olap4abap.members.0FISCPER`, the proposal's default). Period 000 and the special periods have no dates of
   their own: their attribute rows have the year and `FISCPER3`, no dates, 0 days. `0FISCPER3` and the other fiscal
   characteristics are not filled.
+- **Tables the system does not have** (added 2026-10-14): not every system has the tables above (a characteristic
+  that was never activated has none). Before reading or writing, each table is looked up as an active transparent
+  table in the dictionary (`DD02L`, `missing_tables`). Without its SID table a characteristic is not active. The
+  page shows it as "not active" and cannot select it, and a fill of it is an error that writes nothing. Without its
+  attribute table it is filled like a characteristic without master data: SIDs only (not checked), and the fill
+  answers a warning. `GET time` lists both cases per characteristic as `missingTables`.
 - Not filled: `0CALDAY` (no SID table of its own that the views use, `docs/schema-generator.md`).
 
 **Filling changes the cubes' members.** Every view on these tables (the schemas of `ZFMSALESA`, the clinic demo,
