@@ -374,7 +374,7 @@ the rest two evaluator passes over 1,002,001 cells, the first of which only reco
 Measured (the trace's runtime, one run): the grid 232 s (8 statements, 17.0 s SQL) to 108 s (8 statements, 1.0 s
 SQL). The 107 s left are the evaluator's single pass, about 100 µs per cell (savepoints, the formula, each stored
 measure's group key and lookup, the format string, the double written, a row of the cell table): computing such a
-formula per group instead of per cell is a step of its own (Open). Tests: `planning_on_and_off` compares three
+formula per group instead of per cell is step 7. Tests: `planning_on_and_off` compares three
 mixed statements with planning on and off and reads the mixed grid's facts once; `xmla_test.py` 272 of 274 (the
 two datasources cases), `compare-applicable.py` 394 of 395 (#64), SAP 242 s in total, the slowest 8.3 s.
 
@@ -426,6 +426,8 @@ two datasources cases), `compare-applicable.py` 394 of 395 (#64), SAP 242 s in t
 5. Done (2026-10-15): mixed queries: the misses of a pass read as one batch (widened), the cells' inputs in their own
    context read before the first pass. See Mixed queries (step 5) above.
 6. More set nodes relational: `Filter` on a stored measure (`RolapNativeFilter`), `NonEmpty` with a second set.
+7. Formulas per group: a calculated measure of arithmetic on stored measures of its own cell computed per group,
+   first in ABAP from the groups, later as SQL for the simple operators (`next-steps.md`, query planning step 7).
 
 ## GROUPING SETS on HANA
 

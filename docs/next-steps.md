@@ -89,7 +89,18 @@ keeps the answers: both test suites give the same answers with planning on and o
    the only one. The 1,001 x 1,001 grid with a calculated measure 232 to 108 s, the rest the evaluator's pass per
    cell; `xmla_test.py` 272 of 274, `compare-applicable.py` 394 of 395 (#64). Left over: formulas per group instead of
    per cell, the NON EMPTY filter by the evaluator with a calculated measure.
-6. More set nodes relational: `Filter` on a stored measure (`RolapNativeFilter`), `NonEmpty` with a second set.
+6. Next (priority before step 7, the user 2026-10-15): more set nodes relational: `Filter` on a stored measure
+   (`RolapNativeFilter`), `NonEmpty` with a second set.
+7. Formulas per group (after step 6, decided with the user 2026-10-15): a calculated measure whose formula is
+   arithmetic of stored measures of its own cell (`[Store Sales] - [Store Cost]`, `[ZXMLAKF] * 2`; no navigation, no
+   other member) is computed once per group from the groups the cells' statement read, not by the evaluator per cell
+   (the 1,001 x 1,001 grid with such a measure: 108 s, nearly all of it the evaluator's pass at about 100 µs per
+   cell; the stored measure's grid 3.5 s). First in ABAP from the groups: `ZZXXMLA1_CL_MDX_FORMAT` stays the one
+   formatter, and empty cells, division by zero and errors keep the reference's semantics. Later, for the simple
+   operators, as a SQL expression of the grouped statement in HANA, once the mapping of MDX's empty and number
+   semantics to SQL is settled. Also: the NON EMPTY filter of a query with such a measure from the groups, not by
+   the evaluator (`filter_by_evaluator`). Tests: the computed grid measured with `planning_measure.py`, mixed
+   statements of `planning_on_and_off`, both suites.
 
 ## Paused: fixed selections
 
