@@ -4,7 +4,9 @@ A demo data set for trying the schema builder and the engine on a wide model: on
 (one of 100,000 members, the others of 1,000) and 1,000,000 records. It is made up by `ZZXXMLA1_CL_BW_WIDE_GEN` (a seeded pseudo-random generator,
 the same records on every run), so it carries no third-party data and is under the project's license.
 
-Run program `ZZXXMLA1_SETUP` with the checkbox "Also generate the wide demo". "Wide demo: records" (`run( records = ...
+Run program `ZZXXMLA1_SETUP` with the checkbox "Also generate the wide demo"; "Demos: create the InfoCube" and
+"Demos: create the aDSO" (`run( cube = ... adso = ... )`) choose the providers it creates and loads (it deletes both
+either way). "Wide demo: records" (`run( records = ...
 )` of the class) sets the number of records in each provider; 0 (the default) is 1,000,000. A run with 1,000 records takes
 about four minutes, most of it for creating and activating the objects. A run with many records takes longer than a
 dialog work process may: start the program in the background (F9). A run with 1,000,000 records (2026-10-13, job

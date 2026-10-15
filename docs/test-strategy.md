@@ -108,14 +108,12 @@ without members with facts); accepted into the test catalog `ZZFISCTEST` its per
 `Lag`/`Lead` step over the special periods; then the catalog is removed. It needs the fiscal time master data filled
 (`time-master-data.md`).
 `python scripts/fixed_selection_test.py` does change it: for the clinic demo's `ZCLVISIT` and `ZCLVISITA` it first
-queries the demo's catalogs, the plain one as oracle (the visits under `[ZCLFISCVR].[K4]`, the periods
-`K1/2024001` ...) and the one with the fiscal year variant fixed to K4 (`ZCLVISIT_K4`; `bw-schema-design-guide.md`,
-section 3.8: the same visits, the periods and years by their own key, the variant with the one member K4). Then the
+queries the demo's catalogs as oracle (the visits under `[ZCLFISCVR].[K4]`, the periods `K1/2024001` ...). Then the
 schema builder's way: it fixes the plain proposal with `POST fix` (`fixed.ZCLFISCVR=K4`, annotated
-`olap4abap.filter.ZCLFISCVR` = `I EQ 'K4'`; the schema names the demo's
-views filtered on K4, no placeholders), accepts it into a test catalog, checks its visits, periods and variant,
-un-fixes the accepted schema (the plain proposal's tables come back) and removes it, checking that the filtered views
-stay (the demo's K4 catalog names them). `schema_api_test.py` checks the refusals of `POST fix` and
+`olap4abap.filter.ZCLFISCVR` = `I EQ 'K4'`; four tables replaced: facts, variant, year and period), accepts it into a
+test catalog and checks it as `bw-schema-design-guide.md`, section 3.8 has it (the same visits, the periods and years
+by their own key adding up to them, the variant with the one member K4), un-fixes the accepted schema (the plain
+proposal's tables come back) and removes it, checking that its filtered views are deleted with it. `schema_api_test.py` checks the refusals of `POST fix` and
 `schema_ui_test.py` fixes, undoes, refuses and un-fixes on the dimension's pane, and edits selections there (a
 restrict-members range the facts contradict refused with its values, a filter range applied and removed, the fiscal
 defaults' twelve rows removed and restored by the preset). The unit tests of `ZZXXMLA1_CL_SCHEMA_API` cover the same plus adding a catalog to

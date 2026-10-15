@@ -204,8 +204,8 @@ def main():
     status, body, _ = call(args.url, args.client, "POST", "probe")
     catalogs = {c["catalog"]: c for c in body.get("catalogs", [])}
     check("probe of all catalogs", status == 200 and isinstance(body.get("runtime"), int)
-          and catalogs.get("ZCLVISIT_K4", {}).get("ok") is True
-          and catalogs["ZCLVISIT_K4"].get("cubes", [{}])[0].get("cube") == "ZCLVISIT_K4", body)
+          and catalogs.get("ZCLVISIT", {}).get("ok") is True
+          and catalogs["ZCLVISIT"].get("cubes", [{}])[0].get("cube") == "ZCLVISIT", body)
     status, body, _ = call(args.url, args.client, "POST", "probe", {"catalog": "ZCLVISITA"})
     check("probe of one catalog", status == 200 and [c["catalog"] for c in body.get("catalogs", [])] == ["ZCLVISITA"],
           body)

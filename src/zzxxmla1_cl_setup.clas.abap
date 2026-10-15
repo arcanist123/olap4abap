@@ -27,11 +27,15 @@ CLASS zzxxmla1_cl_setup DEFINITION
     INTERFACES if_oo_adt_classrun.
 
     "! Sets up the server; the log of the run.
+    "! @parameter cube | the demos create their InfoCube (they delete all their objects either way)
+    "! @parameter adso | the demos create their aDSO
     METHODS run
       IMPORTING clinic            TYPE abap_bool DEFAULT abap_false
                 clinic_max_visits TYPE i DEFAULT 0
                 wide              TYPE abap_bool DEFAULT abap_false
                 wide_records      TYPE i DEFAULT 0
+                cube              TYPE abap_bool DEFAULT abap_true
+                adso              TYPE abap_bool DEFAULT abap_true
       RETURNING VALUE(result)     TYPE string_table.
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -56,10 +60,14 @@ CLASS zzxxmla1_cl_setup IMPLEMENTATION.
     APPEND LINES OF write_datasources( ) TO result.
     COMMIT WORK.
     IF clinic = abap_true.
-      APPEND LINES OF NEW zzxxmla1_cl_bw_clinic_gen( )->run( clinic_max_visits ) TO result.
+      APPEND LINES OF NEW zzxxmla1_cl_bw_clinic_gen( )->run( max_visits = clinic_max_visits
+                                                             cube       = cube
+                                                             adso       = adso ) TO result.
     ENDIF.
     IF wide = abap_true.
-      APPEND LINES OF NEW zzxxmla1_cl_bw_wide_gen( )->run( wide_records ) TO result.
+      APPEND LINES OF NEW zzxxmla1_cl_bw_wide_gen( )->run( records = wide_records
+                                                           cube    = cube
+                                                           adso    = adso ) TO result.
     ENDIF.
   ENDMETHOD.
 

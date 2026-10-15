@@ -2,19 +2,16 @@
 """Tests fixed selections (docs/bw-schema-design-guide.md, section 3.8) end to end on the clinic demo against SAP.
 
 The clinic demo (docs/clinic-demo.md) books each visit under one of the fiscal year variants K1, K2 and K4 and
-deploys, per provider (the cube ZCLVISIT, the aDSO ZCLVISITA), a plain catalog and one that fixes the variant to K4:
-- the plain catalog is the oracle: the variant a dimension, the years and periods compounded with it (K1/2024001,
-  ..., K4/2025012), the visits under [ZCLFISCVR].[K4];
-- the K4 catalog (ZCLVISIT_K4, ZCLVISITA_K4) has the variant as a dimension with the one member K4, its visits are
-  those under K4, its years 2024 and 2025 and its periods 2024001 to 2025012 by their own key, and they add up to
-  its visits.
+deploys, per provider (the cube ZCLVISIT, the aDSO ZCLVISITA), the plain proposal as a catalog: the oracle, with the
+variant a dimension, the years and periods compounded with it (K1/2024001, ..., K4/2025012) and the visits under
+[ZCLFISCVR].[K4].
 Then the way of the schema builder's UI, the API: the plain proposal is fixed as an edit (POST fix, fixed.ZCLFISCVR=K4):
-the cube is annotated olap4abap.filter.ZCLFISCVR (I EQ 'K4'), keeps the dimension ZCLFISCVR and names the periods by their own key
-(no COMPOUND_KEY), on the views filtered on K4 (the fact view, ZCLFISCVR, ZCLFISCYR and ZCLFISCPR: the demo's own,
-which the provider read finds and accept reuses); accepted into a test catalog it has the K4 visits and the one
-variant; fixing it again with nothing (un-fixing) gives the plain proposal's tables back; removing the catalog keeps
-the filtered views, as the demo's K4 catalog names them. It changes the server: it writes and removes the catalog
-ZZFIXTEST_<provider>, whose cube is named as the catalog (the demo's catalogs have the providers' names).
+the cube is annotated olap4abap.filter.ZCLFISCVR (I EQ 'K4'), keeps the dimension ZCLFISCVR and names the periods by
+their own key (no COMPOUND_KEY), on the views filtered on K4 (the fact view, ZCLFISCVR, ZCLFISCYR and ZCLFISCPR, which
+accept generates); accepted into a test catalog it has the K4 visits, its periods 2024001 to 2025012 and years by
+their own key, the periods adding up to its visits, and the one variant; fixing it again with nothing (un-fixing)
+gives the plain proposal's tables back; removing the catalog deletes the filtered views, which no other catalog names.
+It changes the server: it writes and removes the catalog ZZFIXTEST_<provider>, whose cube is named as the catalog.
 
     python scripts/fixed_selection_test.py
     python scripts/fixed_selection_test.py --url http://localhost:50000/zzxxmla1 --client 001
@@ -106,24 +103,6 @@ def main():
         if expected is None:
             continue
 
-        # the demo's K4 catalog
-        catalog = f"{provider}_K4"
-        _, values, error = run(catalog, f"SELECT {VISITS} ON 0 FROM {catalog}")
-        check(f"{catalog}: the cube's visits are the K4 ones ({expected:.0f})",
-              error is None and values and abs(float(values[0]) - expected) < 0.5, error or values)
-        captions, values, error = run(catalog, f"SELECT {VISITS} ON 0, "
-                                               f"NON EMPTY [ZCLFISCPR].[ZCLFISCPR].Members ON 1 FROM {catalog}")
-        check(f"{catalog}: periods by their own key, 2024001 to 2025012", error is None and captions == PERIODS,
-              error or captions)
-        check(f"{catalog}: the periods add up to the cube's visits",
-              error is None and values and abs(sum(float(v) for v in values) - expected) < 0.5, values)
-        captions, _, error = run(catalog, f"SELECT {VISITS} ON 0, "
-                                          f"NON EMPTY [ZCLFISCYR].[ZCLFISCYR].Members ON 1 FROM {catalog}")
-        check(f"{catalog}: years by their own key", error is None and captions == YEARS, error or captions)
-        captions, _, error = run(catalog, f"SELECT {VISITS} ON 0, "
-                                          f"[ZCLFISCVR].[ZCLFISCVR].Members ON 1 FROM {catalog}")
-        check(f"{catalog}: the variant has one member, K4", error is None and captions == ["K4"], error or captions)
-
         # the API, as the schema builder uses it: the plain proposal, fixed as an edit
         test = f"ZZFIXTEST_{provider}"
         status, proposal = api(args.url, args.client, "GET", "proposal", {"provider": provider})
@@ -147,18 +126,14 @@ def main():
               listed.get("ZCLFISCVR", {}).get("fixed") is True and listed["ZCLFISCVR"].get("value") == "K4"
               and listed["ZCLFISCVR"].get("mode") == "filter" and listed["ZCLFISCVR"].get("selection") == "I EQ 'K4'"
               and listed["ZCLFISCVR"].get("dimension") == "ZCLFISCVR", fixed.get("characteristics"))
-        # the views filtered on K4 exist (the demo's K4 catalog uses them), so the fixed schema names them
-        tables = {}
-        for name in (provider, catalog):
-            _, schema = api(args.url, args.client, "GET", "schema", {"catalog": name})
-            tables[name] = set(re.findall(r'(?:<Table name|table)="([^"]+)"', schema.get("xml", "")))
-        filtered = tables[catalog] - tables[provider]
+        # the facts, the variant, the year and the period on their views filtered on K4 (or their placeholders)
+        _, schema = api(args.url, args.client, "GET", "schema", {"catalog": provider})
+        plain_named = set(re.findall(r'(?:<Table name|table)="([^"]+)"', schema.get("xml", "")))
         named = set(re.findall(r'(?:<Table name|table)="([^"]+)"', xml))
-        check(f"{test}: the fixed schema names the demo's views filtered on K4 (facts, variant, year, period)",
-              len(filtered) == 4 and filtered <= named and "ZZXXMLA1_F_" not in xml and "ZZXXMLA1_C_" not in xml,
-              {"filtered": filtered, "named": named})
         replaced = {(t["from"], t["to"]) for t in fixed.get("tables", [])}
-        check(f"{test}: the answer lists the tables replaced", {t for _, t in replaced} == filtered, replaced)
+        filtered = {t for _, t in replaced}
+        check(f"{test}: the fixed schema names four tables for K4 (facts, variant, year, period)",
+              len(replaced) == 4 and filtered <= named and not filtered & plain_named, replaced)
         xml = xml.replace(f'<Cube name="{provider}"', f'<Cube name="{test}"', 1)
         status, accepted = api(args.url, args.client, "POST", "accept", {"catalog": test}, xml)
         check(f"{test}: accepted", status == 200, accepted)
@@ -169,10 +144,15 @@ def main():
             _, values, error = run(test, f"SELECT [Measures].[ZCLVISNO] ON 0 FROM {test}")
             check(f"{test}: the cube's visits are the K4 ones ({expected:.0f})",
                   error is None and values and abs(float(values[0]) - expected) < 0.5, error or values)
-            captions, _, error = run(test, f"SELECT [Measures].[ZCLVISNO] ON 0, "
-                                           f"NON EMPTY [ZCLFISCPR].[ZCLFISCPR].Members ON 1 FROM {test}")
+            captions, values, error = run(test, f"SELECT [Measures].[ZCLVISNO] ON 0, "
+                                                f"NON EMPTY [ZCLFISCPR].[ZCLFISCPR].Members ON 1 FROM {test}")
             check(f"{test}: periods by their own key, 2024001 to 2025012", error is None and captions == PERIODS,
                   error or captions)
+            check(f"{test}: the periods add up to the cube's visits",
+                  error is None and values and abs(sum(float(v) for v in values) - expected) < 0.5, values)
+            captions, _, error = run(test, f"SELECT [Measures].[ZCLVISNO] ON 0, "
+                                           f"NON EMPTY [ZCLFISCYR].[ZCLFISCYR].Members ON 1 FROM {test}")
+            check(f"{test}: years by their own key", error is None and captions == YEARS, error or captions)
             captions, _, error = run(test, f"SELECT [Measures].[ZCLVISNO] ON 0, "
                                            f"[ZCLFISCVR].[ZCLFISCVR].Members ON 1 FROM {test}")
             check(f"{test}: the variant has one member, K4", error is None and captions == ["K4"], error or captions)
@@ -189,8 +169,9 @@ def main():
             status, removed = api(args.url, args.client, "POST", "remove", {"catalog": test})
             check(f"{test}: removed", status == 200, removed)
             deleted = [html.unescape(v) for v in removed.get("deletedViews", [])]
-            check(f"{test}: the views of the selection stay, {catalog} names them",
-                  not set(filtered) & set(deleted), {"deleted": deleted, "filtered": filtered})
+            views = {v["viewName"] for v in accepted.get("views", []) if v.get("selection")}
+            check(f"{test}: the views filtered on K4 are deleted with it, no other catalog names them",
+                  len(views) == 4 and views <= set(deleted), {"deleted": deleted, "views": views})
 
     print(f"\n{len(failures)} failure(s)" if failures else "\nall passed")
     sys.exit(1 if failures else 0)

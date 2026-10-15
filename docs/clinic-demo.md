@@ -10,6 +10,11 @@ Run program `ZZXXMLA1_SETUP` with the checkbox "Also generate the clinic demo", 
 `ZCLINIC`'s objects (the demo's catalogs, the aDSO, the cube, the views of its characteristics and the InfoObjects
 `ZCL*`); the views of the time characteristics `0CAL*` are shared with other providers and only generated again.
 
+The checkboxes "Demos: create the InfoCube" and "Demos: create the aDSO" (both on by default; `run( cube = ...
+adso = ... )` of the class) choose the providers the run creates, loads and deploys a catalog for. It deletes all the
+demo's objects and catalogs either way, and always creates the InfoObjects with their master data, texts and
+hierarchies. The checkboxes apply to the wide demo too.
+
 "Clinic demo: max. visits" (`run( max_visits = ... )` of the class) caps the number of visits for a smaller demo, e.g.
 on a test system: the visits are thinned evenly over the days, so every day keeps its share; 0 (the default) keeps all
 33,956. Patients, physicians and diagnoses stay the same.
@@ -34,8 +39,8 @@ on a test system: the visits are thinned evenly over the days, so every day keep
   the variant. Each visit is booked under one variant, by its number (K1, K2, K4 in turn); all three follow the
   calendar (the period is the month), so `2024001` exists under each, and without a fixed variant the periods are
   members `K1/2024001` ... `K4/2025012`. A cube that fixes `ZCLFISCVR = K4` (`docs/bw-schema-design-guide.md`,
-  section 3.8) has a third of the visits (11,318), its periods named `2024001` ... `2025012`: the catalogs
-  `ZCLVISIT_K4` and `ZCLVISITA_K4` (below, `scripts/fixed_selection_test.py`). They are the demo's own
+  section 3.8) has a third of the visits (11,318), its periods named `2024001` ... `2025012`: the schema builder
+  makes one with "Fixed value" (`scripts/fixed_selection_test.py` does it through the API). They are the demo's own
   characteristics, not BW's `0FISC*`: BW checks those against the fiscal year variants of the source system's
   customizing, which a warehouse does not maintain. Their SIDs come with the loads (no master data).
 - The physician `ZCLDOC` is **authorization relevant** and has two hierarchies, `ZCLDOC_ORG` and `ZCLDOC_SITE`, and
@@ -55,12 +60,9 @@ on a test system: the visits are thinned evenly over the days, so every day keep
   (`ZZXXMLA1_CL_BW_VIEW_GEN`): the schema files `/WEB-INF/schema/ZCLVISIT.xml` and `/WEB-INF/schema/ZCLVISITA.xml` and
   a catalog for each in `/WEB-INF/datasources.xml` (the setup writes the data sources file if there is none); see The
   schemas below.
-- The same with the fiscal year variant fixed to K4 (`docs/bw-schema-design-guide.md`, section 3.8): the catalogs
-  `ZCLVISIT_K4` and `ZCLVISITA_K4` (cubes named as the catalogs, `/WEB-INF/schema/ZCLVISIT_K4.xml`, ...), on the views
-  filtered on K4 that accepting them generates: a fact view per provider (on the InfoCube too, its fact table joined to
-  the variant's SID table) and the views of the variant (one row, K4), the fiscal year and period. A run deletes all of
-  them with the views of the characteristics and the providers' fact views, also views whose row of `ZZXXMLA1_VIEW` is
-  lost (found by their description): BW refuses to delete a characteristic a view still uses.
+- A run deletes the views of the characteristics and the providers' fact views (also filtered ones, and views whose
+  row of `ZZXXMLA1_VIEW` is lost, found by their description: BW refuses to delete a characteristic a view still
+  uses), and the demo's catalogs, also the K4 ones (`ZCLVISIT_K4`, `ZCLVISITA_K4`) that earlier runs deployed.
 
 ## The hierarchies of the physicians
 
@@ -152,17 +154,15 @@ random number and the visits stay as they were; a visit without physician has ne
 The schemas are the schema generator's (`docs/schema-generator.md`): per provider the run proposes the schema as
 `GET proposal` does (the fiscal defaults, which concern only BW's `0FISC*`, then `ZZXXMLA1_CL_SCHEMA_PROPOSAL`) and
 accepts it through the schema API (`POST accept`, catalog = provider: the views generated, the schema file written,
-the catalog added); then it fixes the same proposal to K4 as `POST fix` does (`ZZXXMLA1_CL_SCHEMA_FIX`), names the
-schema and the cube as the catalog (`ZCLVISIT_K4`, caption "Clinic Visits (K4)") and accepts that. Before it deletes
-anything, the run removes the four catalogs through the API (`POST remove`, with their files and filtered views).
+the catalog added). Before it deletes anything, the run removes the demo's catalogs through the API (`POST remove`,
+with their files and filtered views).
 
 So the schemas follow `docs/bw-schema-design-guide.md`: a dimension per characteristic named by its technical name and
 captioned by its text (`[ZCLPAT]`, "Patient"), one flat hierarchy with an All member (`All Patient`) and one level
 (`[ZCLPAT].[ZCLPAT]`), members named by the key as BW holds it (`[ZCLPAT].[002000]`; on the cube keyed by the SID, on
 the aDSO by the value), the text and the display attributes (each with its text) as member properties; measures by
 their technical names (`[Measures].[ZCLVISNO]`, the default measure). The room, the fiscal year and the fiscal period
-are compounded: keyed by the SID on both providers, named by `COMPOUND_KEY` (`NORTH/R01`, `K4/2024001`); in the K4
-catalogs the year and period are named by their own key (`2024001`). The cube has the date `ZCLDATE`, the aDSO BW's
+are compounded: keyed by the SID on both providers, named by `COMPOUND_KEY` (`NORTH/R01`, `K4/2024001`). The cube has the date `ZCLDATE`, the aDSO BW's
 `0CALWEEK`, `0CALMONTH`, `0CALQUARTER` and `0CALYEAR` (`0CALDAY` has no SID table). The proposal makes no user
 hierarchies (Region > City > Patient and the like are for the UI to add) and marks no dimension as time.
 
@@ -180,4 +180,4 @@ Examples:
     FROM ZCLVISIT
 
     SELECT [Measures].[ZCLVISNO] ON 0, NON EMPTY [ZCLFISCPR].[ZCLFISCPR].Members ON 1
-    FROM ZCLVISITA_K4
+    FROM ZCLVISITA WHERE [ZCLFISCVR].[K4]

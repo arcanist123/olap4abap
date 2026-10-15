@@ -36,10 +36,15 @@ CLASS zzxxmla1_cl_bw_wide_gen DEFINITION
     CONSTANTS c_adso     TYPE rsoadsonm VALUE 'ZXMLWIDEA'.
     CONSTANTS c_records  TYPE i VALUE 1000000.
 
-    "! Generates everything; the log of the run.
+    "! Deletes everything and generates the InfoObjects with their master data, and the providers asked for with
+    "! their data; the log of the run.
     "! @parameter records | the records in each provider; 0: c_records
+    "! @parameter cube | the InfoCube ZXMLWIDE
+    "! @parameter adso | the aDSO ZXMLWIDEA
     METHODS run
       IMPORTING records       TYPE i DEFAULT 0
+                cube          TYPE abap_bool DEFAULT abap_true
+                adso          TYPE abap_bool DEFAULT abap_true
       RETURNING VALUE(result) TYPE string_table.
 
   PROTECTED SECTION.
@@ -150,16 +155,22 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
     ENDLOOP.
     create_key_figure( ).
     activate_infoobjects( ).
-    create_cube( ).
-    activate_cube( ).
+    IF cube = abap_true.
+      create_cube( ).
+      activate_cube( ).
+    ENDIF.
     LOOP AT characteristics( ) INTO iobjnm.
       load_master_data( iobjnm ).
     ENDLOOP.
-    load_cube( count ).
-    verify( source = |/BIC/F{ c_cube }| records = count ).
-    create_adso( ).
-    load_adso( count ).
-    verify( source = adso_table( cl_rsdso_constants=>n_c_viewtype_reporting ) records = count ).
+    IF cube = abap_true.
+      load_cube( count ).
+      verify( source = |/BIC/F{ c_cube }| records = count ).
+    ENDIF.
+    IF adso = abap_true.
+      create_adso( ).
+      load_adso( count ).
+      verify( source = adso_table( cl_rsdso_constants=>n_c_viewtype_reporting ) records = count ).
+    ENDIF.
     result = log.
   ENDMETHOD.
 

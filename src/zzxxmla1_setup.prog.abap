@@ -15,7 +15,8 @@
 * ZCLVISITA with their InfoObjects, with at most p_maxvis visits if that is not 0; with the other checkbox the wide
 * demo (ZZXXMLA1_CL_BW_WIDE_GEN), which deletes and creates InfoArea ZXMLWIDE's InfoCube ZXMLWIDE and aDSO ZXMLWIDEA
 * with the characteristics ZXMLAD00 to ZXMLAD99, with p_wrecs records (0: 1,000,000). Many records take longer than a
-* dialog step may: then run it in the background (F9).
+* dialog step may: then run it in the background (F9). A demo always deletes all its objects, and creates its InfoCube
+* only with p_cube and its aDSO only with p_adso.
 REPORT zzxxmla1_setup.
 
 SELECTION-SCREEN BEGIN OF LINE.
@@ -34,17 +35,29 @@ SELECTION-SCREEN BEGIN OF LINE.
 SELECTION-SCREEN COMMENT 1(35) t_wrecs FOR FIELD p_wrecs.
 PARAMETERS p_wrecs TYPE i.
 SELECTION-SCREEN END OF LINE.
+SELECTION-SCREEN BEGIN OF LINE.
+PARAMETERS p_cube AS CHECKBOX DEFAULT 'X'.
+SELECTION-SCREEN COMMENT 4(70) t_cube FOR FIELD p_cube.
+SELECTION-SCREEN END OF LINE.
+SELECTION-SCREEN BEGIN OF LINE.
+PARAMETERS p_adso AS CHECKBOX DEFAULT 'X'.
+SELECTION-SCREEN COMMENT 4(70) t_adso FOR FIELD p_adso.
+SELECTION-SCREEN END OF LINE.
 
 INITIALIZATION.
   t_clinic = 'Also generate the clinic demo (BW objects, data, schemas, catalogs)'.
   t_maxvis = 'Clinic demo: max. visits (0: all)'.
   t_wide = 'Also generate the wide demo (100 characteristics, BW objects, data)'.
   t_wrecs = 'Wide demo: records (0: 1,000,000)'.
+  t_cube = 'Demos: create the InfoCube (all objects are deleted either way)'.
+  t_adso = 'Demos: create the aDSO (all objects are deleted either way)'.
 
 START-OF-SELECTION.
   LOOP AT NEW zzxxmla1_cl_setup( )->run( clinic            = p_clinic
                                          clinic_max_visits = p_maxvis
                                          wide              = p_wide
-                                         wide_records      = p_wrecs ) INTO DATA(line).
+                                         wide_records      = p_wrecs
+                                         cube              = p_cube
+                                         adso              = p_adso ) INTO DATA(line).
     WRITE / line.
   ENDLOOP.

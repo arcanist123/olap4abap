@@ -311,8 +311,7 @@ Read before designing anything:
   `/WEB-INF/datasources.xml` without catalogs; with its checkbox also the clinic demo (`docs/clinic-demo.md`): InfoCube
   `ZCLVISIT` and aDSO `ZCLVISITA` with made-up visits of patients to a clinic (every characteristic with EN texts),
   their schemas and catalogs (`ZZXXMLA1_CL_BW_CLINIC_GEN`; the schema generator's proposals, accepted through the schema
-  API), and per provider a catalog with the fiscal year variant fixed to K4 (`POST fix`; `ZCLVISIT_K4`,
-  `ZCLVISITA_K4`, the variant a dimension with one member); its room `ZCLROOM` is compounded with the site `ZCLSITE`, its fiscal year and period with the
+  API; the InfoCube, the aDSO or both, as its checkboxes ask: a run deletes all of the demo either way); its room `ZCLROOM` is compounded with the site `ZCLSITE`, its fiscal year and period with the
   variant `ZCLFISCVR`. 300 of its patients are registered without a visit, and its schemas annotate every
   dimension `olap4abap.membersWithFacts` (the proposal marks none as time). The clinic demo is the
   project's own demo data; FoodMart stays the test source.

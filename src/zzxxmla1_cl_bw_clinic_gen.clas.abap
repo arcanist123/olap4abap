@@ -27,10 +27,10 @@
 "!   source system's fiscal year variants,
 "! - the cube-type aDSO ZCLVISITA with the same visits and BW's standard time characteristics in place of the date,
 "!   read through its fact view (the SID of the room, ZZXXMLA1_CL_BW_VIEW_GEN),
-"! loads both and deploys per provider the schema the schema generator proposes (docs/schema-generator.md) and the
-"! same with the fiscal year variant fixed to K4 (ZCLVISIT_K4, ZCLVISITA_K4), each accepted through the schema API as
-"! the UI accepts it: the views generated (ZZXXMLA1_CL_BW_VIEW_GEN), the schema file written and its catalog added to
-"! /WEB-INF/datasources.xml.
+"! loads them and deploys per provider the schema the schema generator proposes (docs/schema-generator.md), accepted
+"! through the schema API as the UI accepts it: the views generated (ZZXXMLA1_CL_BW_VIEW_GEN), the schema file written
+"! and its catalog added to /WEB-INF/datasources.xml. A run deletes everything and creates the InfoCube, the aDSO or
+"! both, as asked.
 "! Every characteristic has language-dependent texts (short, medium and long) and the run loads EN texts for all its
 "! values, so the views and BW's own front ends show a text next to every key.
 "! The data comes from a seeded pseudo-random generator: every run gives the same visits. BW's blank member (the initial
@@ -53,13 +53,16 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     CONSTANTS c_hierarchy_org  TYPE rshienm VALUE 'ZCLDOC_ORG'.
     CONSTANTS c_hierarchy_site TYPE rshienm VALUE 'ZCLDOC_SITE'.
     CONSTANTS c_hierarchy_diag TYPE rshienm VALUE 'ZCLDIAG_ICD'.
-    "! the fiscal year variant the K4 schemas fix (docs/bw-schema-design-guide.md, section 3.8)
-    CONSTANTS c_fixed_variant TYPE string VALUE `K4`.
 
-    "! Generates everything; the log of the run.
+    "! Deletes everything and generates the InfoObjects with their master data and hierarchies, and the providers
+    "! asked for with their data, schemas and catalogs; the log of the run.
     "! @parameter max_visits | at most this many visits, spread evenly over the days; 0: all of them
+    "! @parameter cube | the InfoCube ZCLVISIT and its catalog
+    "! @parameter adso | the aDSO ZCLVISITA and its catalog
     METHODS run
       IMPORTING max_visits    TYPE i DEFAULT 0
+                cube          TYPE abap_bool DEFAULT abap_true
+                adso          TYPE abap_bool DEFAULT abap_true
       RETURNING VALUE(result) TYPE string_table.
 
   PROTECTED SECTION.
@@ -366,18 +369,11 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     "! Counts the rows of a fact table or view and sums the duration.
     METHODS verify IMPORTING source TYPE csequence.
 
-    "! The selection of the K4 schemas: ZCLFISCVR fixed to K4, filter the cube with I EQ K4.
-    METHODS k4
-      RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_view_gen=>ty_t_selection.
-    "! The schema's name and its catalog's: the provider, with _K4 for the one that fixes the variant.
-    METHODS catalog_name
-      IMPORTING adso          TYPE abap_bool
-                fixed         TYPE abap_bool
-      RETURNING VALUE(result) TYPE string.
     "! Per provider the schema the proposal makes (as GET proposal of the schema API: the fiscal defaults, then the
-    "! proposal) and the same with the fiscal year variant fixed to K4 (as POST fix), each accepted as the UI accepts it
-    "! (POST accept: the views generated, the schema file written, the catalog added).
-    METHODS deploy_schemas.
+    "! proposal), accepted as the UI accepts it (POST accept: the views generated, the schema file written, the catalog
+    "! added).
+    METHODS deploy_schemas
+      IMPORTING providers TYPE string_table.
     "! The proposal for a provider.
     METHODS propose
       IMPORTING provider      TYPE csequence
@@ -389,7 +385,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
       IMPORTING catalog TYPE csequence
                 !schema TYPE zzxxmla1_cl_schema_def=>ty_schema.
     "! Removes the catalogs of the demo's schemas (and their files and views) through the schema API, so that accept
-    "! checks no catalog on the views a run deletes.
+    "! checks no catalog on the views a run deletes; also those a run did not create (one provider only, or K4).
     METHODS remove_catalogs.
 
     "! The field of an InfoObject in BW's generated tables (RSD_FIELDNM_GET_FROM_IOBJNM), checked against the structure;
@@ -437,8 +433,10 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       create_key_figure( kyf ).
     ENDLOOP.
     activate_infoobjects( ).
-    create_cube( ).
-    activate_cube( ).
+    IF cube = abap_true.
+      create_cube( ).
+      activate_cube( ).
+    ENDIF.
     LOOP AT master_data( ) INTO DATA(md).
       load_master_data( md ).
     ENDLOOP.
@@ -449,13 +447,20 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     LOOP AT hierarchies( ) INTO DATA(hierarchy).
       load_hierarchy( hierarchy ).
     ENDLOOP.
-    load_cube( ).
-    verify( |/BIC/F{ c_cube }| ).
-    create_adso( ).
-    load_adso( ).
-    verify( adso_table( cl_rsdso_constants=>n_c_viewtype_reporting ) ).
+    DATA providers TYPE string_table.
+    IF cube = abap_true.
+      load_cube( ).
+      verify( |/BIC/F{ c_cube }| ).
+      APPEND CONV #( c_cube ) TO providers.
+    ENDIF.
+    IF adso = abap_true.
+      create_adso( ).
+      load_adso( ).
+      verify( adso_table( cl_rsdso_constants=>n_c_viewtype_reporting ) ).
+      APPEND CONV #( c_adso ) TO providers.
+    ENDIF.
 
-    deploy_schemas( ).
+    deploy_schemas( providers ).
     result = log.
   ENDMETHOD.
 
@@ -2036,19 +2041,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
-  METHOD k4.
-    result = VALUE #( ( iobjnm = 'ZCLFISCVR'
-                        mode   = zzxxmla1_cl_bw_selection=>c_mode-filter
-                        rows   = zzxxmla1_cl_bw_selection=>equals( c_fixed_variant ) ) ).
-  ENDMETHOD.
-
-  METHOD catalog_name.
-    result = |{ COND string( WHEN adso = abap_true THEN c_adso ELSE c_cube ) }| &&
-             |{ COND string( WHEN fixed = abap_true THEN |_{ c_fixed_variant }| ) }|.
-  ENDMETHOD.
-
   METHOD deploy_schemas.
-    LOOP AT VALUE string_table( ( CONV #( c_cube ) ) ( CONV #( c_adso ) ) ) INTO DATA(provider).
+    LOOP AT providers INTO DATA(provider).
       DATA(schema) = VALUE zzxxmla1_cl_schema_def=>ty_schema( ).
       TRY.
           schema = propose( provider ).
@@ -2060,21 +2054,6 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
           CONTINUE.
       ENDTRY.
       accept( catalog = provider schema = schema ).
-
-      " the variant fixed to K4: the facts and the fiscal time on views filtered on it; the cube named as its catalog
-      DATA(fixed) = catalog_name( adso = xsdbool( provider = c_adso ) fixed = abap_true ).
-      TRY.
-          NEW zzxxmla1_cl_schema_fix( )->fix( EXPORTING cube      = schema-cubes[ 1 ]-name
-                                                        selection = k4( )
-                                              CHANGING  schema    = schema ).
-        CATCH zzxxmla1_cx_bw_provider INTO error.
-          write( |fix of { fixed }: FAILED, { error->get_text( ) }| ).
-          CONTINUE.
-      ENDTRY.
-      schema-name = fixed.
-      schema-cubes[ 1 ]-name = fixed.
-      schema-cubes[ 1 ]-caption = |{ schema-cubes[ 1 ]-caption } ({ c_fixed_variant })|.
-      accept( catalog = fixed schema = schema ).
     ENDLOOP.
   ENDMETHOD.
 
@@ -2101,10 +2080,9 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
   METHOD remove_catalogs.
     DATA(datasources) = zzxxmla1_cl_files=>read( zzxxmla1_cl_files=>c_datasources )-content.
     DATA(api) = NEW zzxxmla1_cl_schema_api( ).
-    LOOP AT VALUE string_table( ( catalog_name( adso = abap_false fixed = abap_false ) )
-                                ( catalog_name( adso = abap_true fixed = abap_false ) )
-                                ( catalog_name( adso = abap_false fixed = abap_true ) )
-                                ( catalog_name( adso = abap_true fixed = abap_true ) ) ) INTO DATA(catalog).
+    " the catalogs of both providers, and the ones fixing the fiscal year variant to K4 that earlier runs deployed
+    LOOP AT VALUE string_table( ( CONV #( c_cube ) ) ( CONV #( c_adso ) ) ( |{ c_cube }_K4| ) ( |{ c_adso }_K4| ) )
+         INTO DATA(catalog).
       IF datasources NS |<Catalog name="{ catalog }">|.
         CONTINUE.
       ENDIF.
