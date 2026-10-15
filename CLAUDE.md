@@ -35,8 +35,7 @@ Read before designing anything:
   be stale after multi-step edits; a small re-save of the changed line forces a resync.
 - **No local includes in classes:** a class has only its global source and, if it has tests, its test include
   (`.clas.testclasses.abap`); no local definitions/implementations (`locals_def`/`locals_imp`). A helper class, an
-  exception or a type a class needs is a global object of its own. `scripts/sap-sync.sh pull` refuses a local include
-  with code.
+  exception or a type a class needs is a global object of its own.
 - **No circular dependencies** between classes and interfaces (abaplint's `cyclic_oo`, run by `scripts/abaplint.sh`):
   a class defines the structures and tables it needs itself, even as a copy of another class's (structurally equal
   types are compatible); a call back goes through an interface, where the reference has one its port (`Evaluator`,
@@ -306,7 +305,7 @@ Read before designing anything:
   holds the BW tables).
 - Setup: program `ZZXXMLA1_SETUP` (`ZZXXMLA1_CL_SETUP`) makes a system ready after the package is imported (the table
   `ZZXXMLA1_FILE` comes with it, `src/zzxxmla1_file.tabl.xml`, and so do `ZZXXMLA1_VIEW`, `ZZXXMLA1_TRACE`,
-  `ZZXXMLA1_TRCUSR` and `ZZXXMLA1_DSCACHE`, which sapcli neither exports nor imports): it deletes
+  `ZZXXMLA1_TRCUSR` and `ZZXXMLA1_DSCACHE`, which `pull` exports and sapcli's `push` does not import): it deletes
   the schema builder's old copies below `/schema/` and, if there is none, writes a
   `/WEB-INF/datasources.xml` without catalogs; with its checkbox also the clinic demo (`docs/clinic-demo.md`): InfoCube
   `ZCLVISIT` and aDSO `ZCLVISITA` with made-up visits of patients to a clinic (every characteristic with EN texts),
@@ -328,8 +327,9 @@ Read before designing anything:
 ## Syncing ABAP code with git
 
 `src/` (abapGit file format) mirrors package `$ZZXXMLA1`; only this local repo writes to the git remote, SAP is where
-the code runs. `scripts/sap-sync.sh pull` exports SAP -> `src/` (then review and commit), `scripts/sap-sync.sh push`
-imports `src/` -> SAP (creates the package if missing, activates). Changed classes go to SAP with
+the code runs. `scripts/sap-sync.sh pull` exports SAP -> `src/` with vsp (`vsp export`: abapGit's serializer on the
+system, so `src/` is what abapGit writes; then review and commit), `scripts/sap-sync.sh push` imports `src/` -> SAP
+with sapcli (creates the package if missing, activates). Changed classes go to SAP with
 `scripts/sap-write.py <class>...` (also interfaces and programs) run in sapcli's Python (one session per class, closed afterwards; the older
 `sap-write.ps1`/`sap-write.sh` leave a session per include open in SM04): one class at a time, no retry loops
 (`docs/environment.md`, work processes in PRIV mode). Logon data goes in the git-ignored `.env.sap`

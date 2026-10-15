@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
-# Sync the ABAP package between an SAP system and this repository using sapcli (ADT, no SAP GUI, no abapGit).
+# Sync the ABAP package between an SAP system and this repository.
 #
 #   scripts/sap-sync.sh ping    check connection and show the package
-#   scripts/sap-sync.sh pull    SAP -> repo: export the package into src/ (abapGit file format) - overwrites src/
-#   scripts/sap-sync.sh push    repo -> SAP: create the package if missing, import src/ and activate - overwrites objects
+#   scripts/sap-sync.sh pull    SAP -> repo: export the package into src/ with vsp (abapGit's own serializer on the
+#                               system) - overwrites src/
+#   scripts/sap-sync.sh push    repo -> SAP: create the package if missing, import src/ with sapcli and activate -
+#                               overwrites objects
 #
-# sapcli has no DDIC tables: their files (*.tabl.xml, for abapGit) are kept by pull and left out by push, so a table
-# is changed in SAP by hand (SE11) and in its file.
+# push uses sapcli, which has no DDIC tables: the *.tabl.xml files are left out, so a table is changed in SAP by hand
+# (SE11) and pulled.
 #
 # Git is the only thing that writes to the remote: after `pull`, review `git diff` and commit from here.
 # Connection settings come from .env.sap (git-ignored, see .env.sap.example) or the environment.
-# Needs: bash (Git Bash on Windows), sapcli on PATH.
+# Needs: bash (Git Bash on Windows), vsp and unzip (pull), sapcli (ping, push) on PATH.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -37,7 +39,7 @@ PACKAGE="${SAP_PACKAGE:-$PACKAGE_DEFAULT}"
 SOFTWARE_COMPONENT="${SAP_SOFTWARE_COMPONENT:-LOCAL}"   # LOCAL = local ($) package, not transportable
 SRC_DIR="src"
 
-command -v sapcli >/dev/null || die "sapcli not found on PATH"
+[ "${1:-}" = pull ] || command -v sapcli >/dev/null || die "sapcli not found on PATH"
 
 SAPCLI=(sapcli --ashost "$SAP_ASHOST" --client "$SAP_CLIENT" --user "$SAP_USER")
 [ -n "${SAP_PORT:-}" ] && SAPCLI+=(--port "$SAP_PORT")
@@ -49,57 +51,27 @@ cmd_ping() {
 }
 
 cmd_pull() {
+  command -v vsp >/dev/null || die "vsp not found on PATH"
+  command -v unzip >/dev/null || die "unzip not found on PATH"
   local tmp
   tmp="$(mktemp -d)"
   trap 'rm -rf "$tmp"' RETURN
-  # export into a temp dir first, so a failed export never wipes the existing src/
-  "${SAPCLI[@]}" checkout package "$PACKAGE" "$tmp/pkg"
-  [ -f "$tmp/pkg/.abapgit.xml" ] || die "export has no .abapgit.xml, nothing copied"
-  [ -d "$tmp/pkg/$SRC_DIR" ]    || die "export has no $SRC_DIR/ folder (check .abapgit.xml STARTING_FOLDER), nothing copied"
-  # classes have no local includes (CLAUDE.md): sapcli writes SAP's template of every class's local definitions and
-  # implementations, which are dropped; one with code is refused
-  local locals include with_code=()
-  for locals in "$tmp/pkg/$SRC_DIR"/*.clas.locals_def.abap "$tmp/pkg/$SRC_DIR"/*.clas.locals_imp.abap; do
-    [ -e "$locals" ] || continue
-    if grep -Eqv '^[[:space:]]*(\*.*|".*)?[[:space:]]*$' "$locals"; then
-      with_code+=("$(basename "$locals")")
-    else
-      rm "$locals"
-    fi
-  done
-  [ ${#with_code[@]} -eq 0 ] || die "local includes with code (move them into global classes), nothing copied: ${with_code[*]}"
-  # a test include that is only SAP's template is dropped as well
-  for include in "$tmp/pkg/$SRC_DIR"/*.clas.testclasses.abap; do
-    [ -e "$include" ] || continue
-    grep -Eqv '^[[:space:]]*(\*.*|".*)?[[:space:]]*$' "$include" || rm "$include"
-  done
-  # sapcli writes a source without its last newline; editors and the other scripts write it, so every source gets
-  # one, with the line ending of the file's other lines (CRLF on Windows), and a pull does not change files whose
-  # code did not
-  local source
-  for source in "$tmp/pkg/$SRC_DIR"/*.abap; do
-    [ -s "$source" ] || continue
-    [ "$(tail -c1 "$source" | od -An -c | tr -d ' ')" = '\n' ] && continue
-    # (tr, not grep: Git Bash's grep drops the CRs)
-    if [ "$(tr -cd '\r' <"$source" | head -c1 | wc -c)" -gt 0 ]; then printf '\r\n' >>"$source"; else printf '\n' >>"$source"; fi
-  done
-  # sapcli exports no tables: their files stay as they are
-  local table
-  for table in "$ROOT/$SRC_DIR"/*.tabl.xml; do
-    [ -e "$table" ] || continue
-    cp "$table" "$tmp/pkg/$SRC_DIR/"
-  done
+  # export into a temp dir first, so a failed export never wipes the existing src/; vsp serializes with the abapGit
+  # installed on the system (needs abapGit's developer edition and ZADT_VSP there, docs/environment.md), so the files
+  # are the ones abapGit writes
+  local scheme=http
+  [ "${SAP_USE_SSL:-false}" = "true" ] && scheme=https
+  SAP_URL="$scheme://$SAP_ASHOST${SAP_PORT:+:$SAP_PORT}/" vsp export "$PACKAGE" --subpackages=false -o "$tmp/pkg.zip"
+  mkdir "$tmp/pkg"
+  unzip -q "$tmp/pkg.zip" -d "$tmp/pkg"
+  # vsp puts the package's files into a folder named after it; with FOLDER_LOGIC FULL the root package is the
+  # starting folder itself
+  local pkg_dir
+  pkg_dir="$tmp/pkg/$SRC_DIR/$(echo "$PACKAGE" | tr '[:upper:]' '[:lower:]')"
+  [ -d "$pkg_dir" ] || pkg_dir="$tmp/pkg/$SRC_DIR"
+  ls "$pkg_dir"/*.xml >/dev/null 2>&1 || die "export has no files in $pkg_dir, nothing copied"
   rm -rf "$ROOT/$SRC_DIR"
-  cp "$tmp/pkg/.abapgit.xml" "$ROOT/.abapgit.xml"
-  cp -r "$tmp/pkg/$SRC_DIR" "$ROOT/$SRC_DIR"
-  # sapcli writes an interface's metadata as <name>.prog.xml; abapGit expects <name>.intf.xml
-  local xml
-  for xml in "$ROOT/$SRC_DIR"/*.prog.xml; do
-    [ -e "$xml" ] || continue
-    if grep -q 'serializer="LCL_OBJECT_INTF"' "$xml"; then
-      mv "$xml" "${xml%.prog.xml}.intf.xml"
-    fi
-  done
+  cp -r "$pkg_dir" "$ROOT/$SRC_DIR"
   echo "exported $PACKAGE into $SRC_DIR/ - review with: git status && git diff"
 }
 
