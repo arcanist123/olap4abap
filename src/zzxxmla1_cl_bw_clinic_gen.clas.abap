@@ -19,7 +19,8 @@
 "!   group > diagnosis), for authorizations that combine both characteristics,
 "! - on the patient ZCLPAT the plain hierarchy ZCLPAT_PRG (care programs > program > patient) with link nodes: a
 "!   patient in two programs is a leaf in both (a duplicate node, or a link node), the heart program is under chronic
-"!   care and under senior care, and senior care with it under prevention (link nodes),
+"!   care and under senior care, and senior care with it under prevention (link nodes), and parents with their
+"!   children below them in family care (postable nodes),
 "! - the service ZCLSERV (52 services by a four-digit code, a dimension of both providers), with the plain hierarchy
 "!   ZCLSERV_CAT (all services > category > ranges of codes) of intervals: overlapping ones, a linked text node with its
 "!   range and a linked range,
@@ -323,7 +324,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     "! The nodes of ZCLDIAG_ICD: all diagnoses > chapter > group > diagnosis.
     METHODS diagnosis_nodes RETURNING VALUE(result) TYPE ty_t_hie_node.
     "! The nodes of ZCLPAT_PRG: all care programs > area > program > patient; a program under a second parent is a link
-    "! node, a patient in a second program a duplicate node or a link node.
+    "! node, a patient in a second program a duplicate node or a link node; in family care a parent is a postable node
+    "! with their children below them.
     METHODS care_program_nodes RETURNING VALUE(result) TYPE ty_t_hie_node.
     "! The nodes of ZCLSERV_CAT: all services > category > interval of codes, and care pathways with overlapping
     "! intervals, a linked category and a linked interval.
@@ -1011,7 +1013,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       ( name = `FALLS`       parent = `SENIOR`     text = `Fall Prevention` )
       ( name = `PREVENTION`  parent = `PROGRAMS`   text = `Prevention` )
       ( name = `SENIOR`      parent = `PREVENTION` text = `Senior Care` link = abap_true )
-      ( name = `CHILD`       parent = `PREVENTION` text = `Child Health` ) ).
+      ( name = `CHILD`       parent = `PREVENTION` text = `Child Health` )
+      ( name = `FAMILY`      parent = `PREVENTION` text = `Family Care` ) ).
     " By age group and number, no random draw (the visits stay as they were); the patients without a visit too. Most
     " patients are in no program (BW's not assigned).
     LOOP AT patients INTO DATA(patient).
@@ -1029,6 +1032,25 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
                         parent = program
                         link   = xsdbool( program = `FALLS` AND line_exists( programs[ table_line = `HEART` ] ) ) )
                TO result.
+      ENDLOOP.
+    ENDLOOP.
+    " Family care: a parent and below them up to three children of the same city among the next 40 patients, so the
+    " parent is a postable node (a value with children and visits of its own). Parents are 18 to 39, in no other
+    " program, so a postable node is in the hierarchy once; a child in child health too is a duplicate leaf.
+    LOOP AT patients INTO DATA(guardian) WHERE age_group = `18-39`.
+      IF guardian-id MOD 50 <> 7.
+        CONTINUE.
+      ENDIF.
+      DATA(last) = guardian-id + 40.
+      DATA(children) = VALUE ty_t_patient( FOR c IN patients WHERE ( age_group = `0-17` AND city = guardian-city
+                                                                     AND id > guardian-id AND id <= last ) ( c ) ).
+      IF children IS INITIAL.
+        CONTINUE.
+      ENDIF.
+      DATA(guardian_key) = |{ guardian-id WIDTH = 6 ALIGN = RIGHT PAD = '0' }|.
+      APPEND VALUE #( name = guardian_key parent = `FAMILY` ) TO result.
+      LOOP AT children INTO DATA(child) TO 3.
+        APPEND VALUE #( name = |{ child-id WIDTH = 6 ALIGN = RIGHT PAD = '0' }| parent = guardian_key ) TO result.
       ENDLOOP.
     ENDLOOP.
   ENDMETHOD.

@@ -62,7 +62,8 @@ Decided with the user 2026-10-15:
   refused.
 - **Postable nodes** (an inner node that is a value of the characteristic and has facts of its own): the sync adds an
   extra leaf occurrence under it, named as the node, with its own facts (SSAS's `NonLeafDataVisible`), so that the
-  children add up to their parent.
+  children add up to their parent. BW's `/BIC/I` does the same: the node gets a negative node SID and its value is
+  its first leaf, before the children (`ZCLPAT_PRG`, Family Care).
 - **Order:** BW's, from `LISTNO`; a shared subtree keeps its original's order. Members are never read as a whole
   hierarchy into ABAP (Member decision in `mvp-scope.md`): children by parent, descendants by the depth-first
   range, a level by depth, all in SQL on the node table, ordered by the stored number.
@@ -83,13 +84,14 @@ Decided with the user 2026-10-15:
 - **Portable SQL:** no HANA-only features (BW's cached column hierarchy views, hierarchy functions, CDS
   hierarchies): plain tables and standard SQL, so that the engine can later run on another database (Later: DuckDB).
 - **Demo:** the clinic demo gets a hierarchy with shared nodes (link nodes, recursively), a postable node and an
-  interval leaf. Done: the shared nodes (`ZCLPAT_PRG` on the patient) and intervals, overlapping and linked
-  (`ZCLSERV_CAT` on the service); not yet: the postable node.
+  interval leaf. Done: the shared nodes and postable nodes (`ZCLPAT_PRG` on the patient) and intervals,
+  overlapping and linked (`ZCLSERV_CAT` on the service).
 
 Open:
 
 1. Answered 2026-10-15 on `ZCLPAT_PRG`: `/BIC/I` holds the shared subtrees expanded, every occurrence with its own
-   `LISTNO` (613 nodes, 1,072 numbered rows), so the closure is one statement.
+   `LISTNO` (613 nodes, 1,072 numbered rows; with the postable nodes since, 626 and 1,090), so the closure is one
+   statement.
 2. The schema: `parentColumn` with `<Closure>` as the reference models it, with our extensions (the closure's child
    is the SID, members are occurrences); `ZZXXMLA1_CL_SCHEMA` refuses both today. The reference can be the oracle
    for single-parent hierarchies only; for shared nodes, BW's own MDX (`ZZXXMLA1_BW_AUTH_PROBE`).

@@ -153,7 +153,8 @@ All Care Programs  PROGRAMS
 │   └── Fall Prevention  FALLS             87 patients (39 links: also in Heart; 21 duplicates)
 └── Prevention  PREVENTION
     ├── Senior Care  SENIOR               link: Senior Care's subtree, with its link to HEART (recursive)
-    └── Child Health  CHILD                85 patients
+    ├── Child Health  CHILD                85 patients
+    └── Family Care  FAMILY                5 parents (postable nodes), each with their 1 or 2 children below
 ```
 
 So the heart program's patients are in the hierarchy three times (Chronic Care, Senior Care, Prevention > Senior
@@ -165,10 +166,20 @@ Diabetes 40 and older, number divisible by 9; Heart 65 and older divisible by 4,
 and older, number ending in 4; Fall Prevention 65 and older divisible by 6; Child Health under 18 divisible by 5. The
 patients without a visit are in it too; the other patients (most of them) are not assigned.
 
-The hierarchy table has 613 nodes (2 linked text nodes, 39 linked and 96 duplicate patients); BW's SID structure
-`/BIC/IZCLPAT` holds every occurrence, the linked subtrees expanded, each with its own `LISTNO`: 1,072 rows numbered 1 to 1,072 (613, plus
-the heart program's 185 patients under Senior Care, plus Senior Care's 274 nodes under Prevention), and the
-not-assigned node at 999999998/999999999.
+Family Care has **postable nodes**: a parent (18 to 39, number ending in 07 or 57) is a node of the patient with up
+to three children below them (under 18, the same city, among the next 40 numbers), so the node is a value of the
+characteristic with children and with visits of its own (5 to 13). Five parents have such children (`000007` with
+`000011` and `000015`, `001257`, `001357`, `001407`, `001657`; 7 children). No parent is in another program (they
+are 18 to 39), so a postable node is in the hierarchy once and has one shape; a child in Child Health too (`000015`)
+is a duplicate leaf.
+
+The hierarchy table has 626 nodes (2 linked text nodes, 39 linked and 96 duplicate patients, 5 postable nodes);
+BW's SID structure `/BIC/IZCLPAT` holds every occurrence, the linked subtrees expanded, each with its own `LISTNO`:
+1,090 rows numbered 1 to 1,090 (626, plus the heart program's 185 patients under Senior Care, plus Senior Care's 274
+nodes under Prevention, plus a leaf per postable node), and the not-assigned node at 999999998/999999999. A postable
+node is a node of its own there, with a negative SID as a text node has but the patient's node type, and the
+patient's value is its first leaf, one level deeper and before the children (`000007`: node `-19` at level 4, then
+`000007`, `000011`, `000015` at level 5): BW splits the node's own facts off into a leaf.
 
 ## The hierarchy of the services
 
