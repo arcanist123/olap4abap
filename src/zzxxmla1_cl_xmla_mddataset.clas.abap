@@ -94,12 +94,34 @@ CLASS zzxxmla1_cl_xmla_mddataset DEFINITION
                 properties       TYPE string_table OPTIONAL
                 level_properties TYPE zzxxmla1_cl_mdx_engine=>ty_t_level_property OPTIONAL
       RETURNING VALUE(result) TYPE string.
-    "! The value of a property of a level carries the XML schema type of the property (writeMember).
-    CLASS-METHODS tuple_xml
-      IMPORTING tuple            TYPE zzxxmla1_cl_mdx_engine=>ty_tuple
-                properties       TYPE string_table OPTIONAL
-                values           TYPE zzxxmla1_cl_mdx_engine=>ty_t_property_value OPTIONAL
-                level_properties TYPE zzxxmla1_cl_mdx_engine=>ty_t_level_property OPTIONAL
+    TYPES:
+      "! A dimension property of an axis with its element name (element_name, once per axis)
+      BEGIN OF ty_property_element,
+        name    TYPE string,
+        element TYPE string,
+      END OF ty_property_element,
+      ty_t_property_element TYPE STANDARD TABLE OF ty_property_element WITH EMPTY KEY.
+    TYPES:
+      "! The Member element of a member of an axis, by everything it is written from: a member is in many tuples of a
+      "! crossjoin, and its element is written once
+      BEGIN OF ty_member_xml,
+        hierarchy    TYPE string,
+        unique_name  TYPE string,
+        caption      TYPE string,
+        level_name   TYPE string,
+        level_number TYPE i,
+        display_info TYPE i,
+        xml          TYPE string,
+      END OF ty_member_xml,
+      ty_t_member_xml TYPE HASHED TABLE OF ty_member_xml
+        WITH UNIQUE KEY hierarchy unique_name caption level_name level_number display_info.
+    "! The Member element of a member of a tuple; the value of a property of a level carries the XML schema type of
+    "! the property (writeMember).
+    CLASS-METHODS member_xml
+      IMPORTING member           TYPE zzxxmla1_cl_mdx_engine=>ty_member
+                properties       TYPE ty_t_property_element
+                values           TYPE zzxxmla1_cl_mdx_engine=>ty_t_property_value
+                level_properties TYPE zzxxmla1_cl_mdx_engine=>ty_t_level_property
       RETURNING VALUE(result) TYPE string.
     CLASS-METHODS axis_xml
       IMPORTING name             TYPE string
@@ -278,36 +300,32 @@ CLASS zzxxmla1_cl_xmla_mddataset IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
-  METHOD tuple_xml.
+  METHOD member_xml.
     DATA(nl) = cl_abap_char_utilities=>newline.
-    result = `            <Tuple>` && nl.
-    LOOP AT tuple INTO DATA(member).
-      result = result &&
-        |              <Member Hierarchy="{ text( member-hierarchy ) }">| && nl &&
-        |                <UName>{ text( member-unique_name ) }</UName>| && nl &&
-        |                <Caption>{ text( member-caption ) }</Caption>| && nl &&
-        |                <LName>{ text( member-level_name ) }</LName>| && nl &&
-        |                <LNum>{ member-level_number }</LNum>| && nl &&
-        |                <DisplayInfo>{ member-display_info }</DisplayInfo>| && nl.
-      " the dimension properties with a value; DISPLAY_INFO is the one of the member in this tuple
-      LOOP AT properties INTO DATA(property).
-        IF property = `DISPLAY_INFO`.
-          DATA(value) = CONV string( member-display_info ).
-        ELSE.
-          READ TABLE values INTO DATA(entry) WITH TABLE KEY member = member-unique_name name = property.
-          IF sy-subrc <> 0.
-            CONTINUE.
-          ENDIF.
-          value = entry-value.
+    result =
+      |              <Member Hierarchy="{ text( member-hierarchy ) }">| && nl &&
+      |                <UName>{ text( member-unique_name ) }</UName>| && nl &&
+      |                <Caption>{ text( member-caption ) }</Caption>| && nl &&
+      |                <LName>{ text( member-level_name ) }</LName>| && nl &&
+      |                <LNum>{ member-level_number }</LNum>| && nl &&
+      |                <DisplayInfo>{ member-display_info }</DisplayInfo>| && nl.
+    " the dimension properties with a value; DISPLAY_INFO is the one of the member in this tuple
+    LOOP AT properties INTO DATA(property).
+      IF property-name = `DISPLAY_INFO`.
+        DATA(value) = CONV string( member-display_info ).
+      ELSE.
+        READ TABLE values INTO DATA(entry) WITH TABLE KEY member = member-unique_name name = property-name.
+        IF sy-subrc <> 0.
+          CONTINUE.
         ENDIF.
-        DATA(element) = element_name( property ).
-        READ TABLE level_properties INTO DATA(level_property) WITH KEY name = property hierarchy = member-hierarchy.
-        DATA(type) = COND string( WHEN sy-subrc = 0 THEN | xsi:type="{ level_property-xsd_type }"| ).
-        result = result && |                <{ element }{ type }>{ text( value ) }</{ element }>| && nl.
-      ENDLOOP.
-      result = result && `              </Member>` && nl.
+        value = entry-value.
+      ENDIF.
+      READ TABLE level_properties INTO DATA(level_property)
+           WITH KEY name = property-name hierarchy = member-hierarchy.
+      DATA(type) = COND string( WHEN sy-subrc = 0 THEN | xsi:type="{ level_property-xsd_type }"| ).
+      result = result && |                <{ property-element }{ type }>{ text( value ) }</{ property-element }>| && nl.
     ENDLOOP.
-    result = result && `            </Tuple>` && nl.
+    result = result && `              </Member>` && nl.
   ENDMETHOD.
 
   METHOD element_name.
@@ -447,10 +465,34 @@ CLASS zzxxmla1_cl_xmla_mddataset IMPLEMENTATION.
       result = result && `          <Tuples/>` && nl.
     ELSE.
       " the pieces are joined once: appending a method's result to a string copies the string every time
+      DATA(elements) = VALUE ty_t_property_element( FOR property IN properties
+                                                    ( name = property element = element_name( property ) ) ).
+      DATA members TYPE ty_t_member_xml.
       DATA(tuple_lines) = VALUE string_table( ).
-      LOOP AT tuples INTO DATA(tuple).
-        APPEND tuple_xml( tuple = tuple properties = properties values = values
-                          level_properties = level_properties ) TO tuple_lines.
+      LOOP AT tuples ASSIGNING FIELD-SYMBOL(<tuple>).
+        APPEND `            <Tuple>` && nl TO tuple_lines.
+        LOOP AT <tuple> ASSIGNING FIELD-SYMBOL(<member>).
+          READ TABLE members ASSIGNING FIELD-SYMBOL(<member_xml>)
+               WITH TABLE KEY hierarchy    = <member>-hierarchy
+                              unique_name  = <member>-unique_name
+                              caption      = <member>-caption
+                              level_name   = <member>-level_name
+                              level_number = <member>-level_number
+                              display_info = <member>-display_info.
+          IF sy-subrc <> 0.
+            INSERT VALUE #( hierarchy    = <member>-hierarchy
+                            unique_name  = <member>-unique_name
+                            caption      = <member>-caption
+                            level_name   = <member>-level_name
+                            level_number = <member>-level_number
+                            display_info = <member>-display_info
+                            xml          = member_xml( member = <member> properties = elements values = values
+                                                       level_properties = level_properties ) )
+                   INTO TABLE members ASSIGNING <member_xml>.
+          ENDIF.
+          APPEND <member_xml>-xml TO tuple_lines.
+        ENDLOOP.
+        APPEND `            </Tuple>` && nl TO tuple_lines.
       ENDLOOP.
       result = result && `          <Tuples>` && nl && concat_lines_of( tuple_lines ) && `          </Tuples>` && nl.
     ENDIF.

@@ -660,10 +660,14 @@ evaluation (`MemberArrayValueCalc`; before, `([Measures].[Foo], [Time].CurrentMe
   Patient]},,,INCLUDE_CALC_MEMBERS)}))` on COLUMNS of `ZCLVISITA`, with the 26 `DIMENSION PROPERTIES` of both
   characteristics (Patient's attributes and texts, Diagnosis's), takes 11.9 s, of which its 9 SQL statements take
   0.2 s; the answer is 26,512 tuples and 75 MB, 70 MB of it axis members, each patient's properties written once per
-  tuple. The same cells with Patient on COLUMNS and Diagnosis on ROWS take 1.36 s (8 MB). First find where the
-  11.6 s in ABAP go with a method trace (axis, `axis_properties`, `ZZXXMLA1_CL_XMLA_MDDATASET`'s writing), then make
-  that part linear in the answer's size. Excel shows at most 16,384 columns, so the layout is unusual, but a crossjoin
-  of two characteristics on rows is not.
+  tuple. The same cells with Patient on COLUMNS and Diagnosis on ROWS take 1.36 s (8 MB). Done (2026-10-15): the
+  method trace showed the writer's `tuple_xml` 10.7 of 15.6 s (traced), `element_name` alone 7.5 s (672,612 calls,
+  6.9 million `uccpi`); `axis_xml` now encodes the property names once per axis and writes each distinct member's
+  `Member` element once (2,053 for the 26,512 tuples), the same answer byte for byte: 12.0 to 3.7 s runtime (13.5 to
+  5.1 s wall; `python scripts/planning_measure.py --case properties_axis`). Left: the engine about 2 s (native
+  crossjoin, `fast_cells`, `set_display_info`, `axis_properties`), the 70 MB of axes copied as strings in `build`
+  about 1.2 s (they could go to the parts as the cells do), sending 0.5 s. Excel shows at most 16,384 columns, so the
+  layout is unusual, but a crossjoin of two characteristics on rows is not.
 - The result limit is a class attribute; a setting (per system, like Mondrian's property file) would let it be changed
   without a transport.
 - Done: the native NON EMPTY crossjoin. Not yet: its context constraint with calculated members (Aggregate members

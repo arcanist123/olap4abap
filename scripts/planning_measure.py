@@ -11,6 +11,9 @@ recorded them (ZZXXMLA1_TRACE: runtime_ms, sql_count, sql_ms), then the best run
     filter, filter_wide, non_empty
                  Filter on a stored measure of FoodMart's customers and of ZXMLAD00's 100,000 members, NonEmpty of
                  the customers with a second set (step 6); each *_evaluated the same answer by the evaluator
+    properties_axis
+                 Excel's crossjoin of Diagnosis and Patient on COLUMNS of ZCLVISITA with PARENT_UNIQUE_NAME and the
+                 24 member properties of both (docs/next-steps.md, Later: a large axis with member properties)
 
     python scripts/planning_measure.py                       # every statement, 3 runs each
     python scripts/planning_measure.py --case pivot --runs 5
@@ -29,6 +32,34 @@ SOAP = ('<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/enve
         '<Properties><PropertyList><Catalog>{}</Catalog><Format>Multidimensional</Format></PropertyList></Properties>'
         '</Execute></SOAP-ENV:Body></SOAP-ENV:Envelope>')
 EXCEL_CELLS = "CELL PROPERTIES VALUE, FORMAT_STRING, LANGUAGE, BACK_COLOR, FORE_COLOR, FONT_FLAGS"
+
+# the member properties of Patient and Diagnosis in the clinic demo, as Excel asks for them
+PATIENT_DIAGNOSIS_PROPERTIES = [
+    "[ZCLPAT].[ZCLPAT].[Text]",
+    "[ZCLPAT].[ZCLPAT].[ZCLPNAME]",
+    "[ZCLPAT].[ZCLPAT].[ZCLPNAME Text]",
+    "[ZCLPAT].[ZCLPAT].[ZCLSEX]",
+    "[ZCLPAT].[ZCLPAT].[ZCLSEX Text]",
+    "[ZCLPAT].[ZCLPAT].[ZCLBYEAR]",
+    "[ZCLPAT].[ZCLPAT].[ZCLBYEAR Text]",
+    "[ZCLPAT].[ZCLPAT].[ZCLAGEGR]",
+    "[ZCLPAT].[ZCLPAT].[ZCLAGEGR Text]",
+    "[ZCLPAT].[ZCLPAT].[ZCLBLOOD]",
+    "[ZCLPAT].[ZCLPAT].[ZCLBLOOD Text]",
+    "[ZCLPAT].[ZCLPAT].[ZCLINSUR]",
+    "[ZCLPAT].[ZCLPAT].[ZCLINSUR Text]",
+    "[ZCLPAT].[ZCLPAT].[ZCLCITY]",
+    "[ZCLPAT].[ZCLPAT].[ZCLCITY Text]",
+    "[ZCLPAT].[ZCLPAT].[ZCLREGIO]",
+    "[ZCLPAT].[ZCLPAT].[ZCLREGIO Text]",
+    "[ZCLDIAG].[ZCLDIAG].[Text]",
+    "[ZCLDIAG].[ZCLDIAG].[ZCLDTEXT]",
+    "[ZCLDIAG].[ZCLDIAG].[ZCLDTEXT Text]",
+    "[ZCLDIAG].[ZCLDIAG].[ZCLDGRP]",
+    "[ZCLDIAG].[ZCLDIAG].[ZCLDGRP Text]",
+    "[ZCLDIAG].[ZCLDIAG].[ZCLDCHAP]",
+    "[ZCLDIAG].[ZCLDIAG].[ZCLDCHAP Text]",
+]
 
 # name -> (catalog, statement)
 CASES = {
@@ -71,6 +102,11 @@ CASES = {
                             "WITH MEMBER [Measures].[U] AS [Measures].[Unit Sales] SELECT {[Measures].[Unit Sales]} "
                             "ON COLUMNS, NonEmpty([Customers].[Name].Members, {([Product].[Drink].[Dairy], "
                             "[Measures].[U])}) ON ROWS FROM [ZFMSALES]"),
+    "properties_axis": ("ZCLVISITA",
+                        "SELECT NON EMPTY CrossJoin(Hierarchize({DrilldownLevel({[ZCLDIAG].[All Diagnosis]},,,"
+                        "INCLUDE_CALC_MEMBERS)}), Hierarchize({DrilldownLevel({[ZCLPAT].[All Patient]},,,"
+                        "INCLUDE_CALC_MEMBERS)})) DIMENSION PROPERTIES PARENT_UNIQUE_NAME, "
+                        + ", ".join(PATIENT_DIAGNOSIS_PROPERTIES) + " ON COLUMNS FROM [ZCLVISITA] " + EXCEL_CELLS),
 }
 
 
