@@ -20,6 +20,10 @@ CLASS zzxxmla1_cl_sql DEFINITION
 
   PUBLIC SECTION.
     TYPES ty_t_row TYPE STANDARD TABLE OF string_table WITH EMPTY KEY.
+    "! The values bound to the parameters (?) of a statement, one per parameter in their order. HANA reuses a plan
+    "! only for the same statement text, so a statement run often with other single values binds them
+    "! (docs/next-steps.md, Statements and HANA's plan cache).
+    TYPES ty_t_param TYPE STANDARD TABLE OF REF TO data WITH EMPTY KEY.
 
     "! The statements query has run since the last reset_statistics, and their time in microseconds (the trace of a
     "! call records them, ZZXXMLA1_CL_TRACE).
@@ -49,14 +53,22 @@ CLASS zzxxmla1_cl_sql DEFINITION
     CLASS-METHODS query
       IMPORTING !sql          TYPE string
                 !columns      TYPE i
+                !params       TYPE ty_t_param OPTIONAL
       RETURNING VALUE(result) TYPE ty_t_row.
     "! Fetches the rows of a query into a standard table of a structure with a component per column, in their order
     "! (ADBC converts each value to its component's type): a reader of many rows (a grid's statement has some hundred
     "! thousand) reads them typed, not copied into a table per row as query gives them. A database error raises
     "! ZZXXMLA1_CX_SQL (unchecked).
     CLASS-METHODS fetch
-      IMPORTING !sql  TYPE string
-                !rows TYPE REF TO data.
+      IMPORTING !sql    TYPE string
+                !rows   TYPE REF TO data
+                !params TYPE ty_t_param OPTIONAL.
+    "! Runs a statement that changes data (INSERT, UPDATE, DELETE) and returns the number of rows it changed; the
+    "! caller commits. A database error raises ZZXXMLA1_CX_SQL (unchecked).
+    CLASS-METHODS execute
+      IMPORTING !sql          TYPE string
+                !params       TYPE ty_t_param OPTIONAL
+      RETURNING VALUE(result) TYPE i.
     "! Sets statement_count and statement_time to 0, empties statement_log and clears log_phase and log_node.
     CLASS-METHODS reset_statistics.
     "! An identifier as a quoted SQL identifier, e.g. "/BIC/FZFMSALES".
@@ -82,6 +94,18 @@ CLASS zzxxmla1_cl_sql DEFINITION
 
   PROTECTED SECTION.
   PRIVATE SECTION.
+    "! The statement as statement_log keeps it: with the bound values after it (/* ? = -2, 5 */).
+    CLASS-METHODS logged_text
+      IMPORTING !sql          TYPE string
+                !params       TYPE ty_t_param
+      RETURNING VALUE(result) TYPE string.
+    "! Records a statement that ran: statement_count, statement_time and, while statements are logged, statement_log.
+    CLASS-METHODS record
+      IMPORTING !sql    TYPE string
+                !params TYPE ty_t_param
+                !rows   TYPE i
+                !time   TYPE int8
+                !error  TYPE string OPTIONAL.
 ENDCLASS.
 
 
@@ -97,7 +121,7 @@ CLASS zzxxmla1_cl_sql IMPLEMENTATION.
     DATA(table_type) = cl_abap_tabledescr=>create( cl_abap_structdescr=>create( components ) ).
     DATA rows TYPE REF TO data.
     CREATE DATA rows TYPE HANDLE table_type.
-    fetch( sql = sql rows = rows ).
+    fetch( sql = sql rows = rows params = params ).
     FIELD-SYMBOLS <rows> TYPE STANDARD TABLE.
     ASSIGN rows->* TO <rows>.
     " each row's values appended to its line of the result in place, not to a table of its own copied there
@@ -117,29 +141,73 @@ CLASS zzxxmla1_cl_sql IMPLEMENTATION.
     GET RUN TIME FIELD DATA(started).
     TRY.
         DATA(statement) = NEW cl_sql_statement( ).
+        LOOP AT params INTO DATA(param).
+          statement->set_param( param ).
+        ENDLOOP.
         DATA(result_set) = statement->execute_query( sql ).
         result_set->set_param_table( rows ).
         result_set->next_package( ).
         result_set->close( ).
       CATCH cx_sql_exception INTO DATA(error).
-        IF log_statements = abap_true.
-          GET RUN TIME FIELD DATA(failed).
-          APPEND VALUE #( sql = sql time = failed - started error = error->get_text( ) phase = log_phase node = log_node )
-                 TO statement_log.
-        ENDIF.
+        GET RUN TIME FIELD DATA(failed).
+        record( sql = sql params = params rows = 0 time = failed - started error = error->get_text( ) ).
         RAISE EXCEPTION TYPE zzxxmla1_cx_sql
           EXPORTING
-            statement     = sql
+            statement     = logged_text( sql = sql params = params )
             error_message = error->get_text( )
             previous      = error.
     ENDTRY.
     GET RUN TIME FIELD DATA(stopped).
-    statement_count = statement_count + 1.
-    statement_time = statement_time + stopped - started.
-    IF log_statements = abap_true.
-      APPEND VALUE #( sql = sql rows = lines( <rows> ) time = stopped - started phase = log_phase node = log_node )
-             TO statement_log.
+    record( sql = sql params = params rows = lines( <rows> ) time = stopped - started ).
+  ENDMETHOD.
+
+  METHOD execute.
+    GET RUN TIME FIELD DATA(started).
+    TRY.
+        DATA(statement) = NEW cl_sql_statement( ).
+        LOOP AT params INTO DATA(param).
+          statement->set_param( param ).
+        ENDLOOP.
+        result = statement->execute_update( sql ).
+      CATCH cx_sql_exception INTO DATA(error).
+        GET RUN TIME FIELD DATA(failed).
+        record( sql = sql params = params rows = 0 time = failed - started error = error->get_text( ) ).
+        RAISE EXCEPTION TYPE zzxxmla1_cx_sql
+          EXPORTING
+            statement     = logged_text( sql = sql params = params )
+            error_message = error->get_text( )
+            previous      = error.
+    ENDTRY.
+    GET RUN TIME FIELD DATA(stopped).
+    record( sql = sql params = params rows = result time = stopped - started ).
+  ENDMETHOD.
+
+  METHOD record.
+    IF error IS INITIAL.
+      statement_count = statement_count + 1.
+      statement_time = statement_time + time.
     ENDIF.
+    IF log_statements = abap_true.
+      APPEND VALUE #( sql   = logged_text( sql = sql params = params )
+                      rows  = rows
+                      time  = time
+                      error = error
+                      phase = log_phase
+                      node  = log_node ) TO statement_log.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD logged_text.
+    IF params IS INITIAL.
+      result = sql.
+      RETURN.
+    ENDIF.
+    DATA(values) = VALUE string_table( ).
+    LOOP AT params INTO DATA(param).
+      ASSIGN param->* TO FIELD-SYMBOL(<value>).
+      APPEND |{ <value> }| TO values.
+    ENDLOOP.
+    result = |{ sql } /* ? = { concat_lines_of( table = values sep = `, ` ) } */|.
   ENDMETHOD.
 
   METHOD reset_statistics.

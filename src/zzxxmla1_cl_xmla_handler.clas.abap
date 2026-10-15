@@ -354,6 +354,11 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
         result = fault_result( zzxxmla1_cx_xmla=>of_code(
           kind = `Server` code = `00UE001` text = `Internal Error`
           description = |olap4abap Error:Internal error: { sql_error->get_text( ) }| ) ).
+      CATCH zzxxmla1_cx_bw_hierarchy INTO DATA(hierarchy_error).
+        " a BW hierarchy olap4abap refuses or cannot copy (ZZXXMLA1_CL_BW_HIERARCHY_COPY) fails the query
+        result = fault_result( zzxxmla1_cx_xmla=>of_code(
+          kind = `Server` code = `00UE001` text = `Internal Error`
+          description = |olap4abap Error:{ hierarchy_error->get_text( ) }| ) ).
     ENDTRY.
     result-body = with_session( body = result-body request = parsed ).
   ENDMETHOD.

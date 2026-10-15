@@ -142,10 +142,33 @@ Decided with the user 2026-10-15:
   interval leaf. Done: the shared nodes and postable nodes (`ZCLPAT_PRG` on the patient) and intervals,
   overlapping and linked (`ZCLSERV_CAT` on the service).
 
-Part one (agreed with the user 2026-10-15, next): the copies. The node, closure and directory tables (created on
+Part one (agreed with the user 2026-10-15): the copies. The node, closure and directory tables (created on
 accept), their refill from `/BIC/I` and `/BIC/K` on a stale `RSRHIEDIR_OLAP` row under the lock, the refusals, and
-the not-assigned view as the hierarchy's BW setting says; everything the queries need to read a hierarchy
+the not-assigned values as the hierarchy's BW setting says; everything the queries need to read a hierarchy
 consistently. The schema, the names, the engine and the UI (open 2 to 5) build on it.
+
+Done (2026-10-15): `ZZXXMLA1_CL_BW_HIERARCHY_COPY` (`create_tables`, `current`, `values_of`), the directory
+`ZZXXMLA1_HIEDIR` (a row per hierarchy, keyed by BW's `HIEID`) and the registry `ZZXXMLA1_HIETAB` (an InfoObject's
+tables `ZZXXMLA1H` and `ZZXXMLA1C` followed by the same 7 digits, and its last version), bound parameters in
+`ZZXXMLA1_CL_SQL` (`params`, `execute`), the fault `ZZXXMLA1_CX_BW_HIERARCHY`. `python
+scripts/hierarchy_copy_test.py`: the four plain hierarchies of the clinic demo copy and pass the cross-check with
+BW, a second run refills none (a query's check of a current copy: 4 to 9 ms), and node rows and not-assigned values
+are the members BW's MDX shows. Settled while implementing:
+- `VERSION` is numbered per InfoObject, so it also tells the hierarchy: it takes the place of the node table's
+  `ROOT_SID` column (children `VERSION = ? AND PARENT_SID = ?`, a level `VERSION = ? AND DEPTH = ?`, descendants
+  `VERSION = ? AND POS BETWEEN ? AND ?`).
+- The closure has rows of inner node occurrences only: a leaf member is its SID, so the facts need no closure for it.
+- The not-assigned values are no database object but a statement of the class (`values_of` the `RESTTOPSID`): the
+  SID table's values under no leaf, `NOT EXISTS` in the root's closure rows. While the hierarchy shows them, the All
+  member is every value of the SID table; while it suppresses them (`RSHIEDIR-NORESTNODES`), its closure rows. BW
+  writes the setting into the SID structure too: switching it makes a new `SVER` (`COPY_OF_ZCLSERV_CAT`: `SVER` 3
+  without the rows of `LISTNO` 999999998 and 999999999), so the staleness check catches it. `RSRHIEDIR_OLAP-CARDREST`
+  is no count of them (0 on `ZCLSERV_CAT`, where BW's MDX shows `#` under REST_H as the copy does).
+- BW's correction rows are cumulative: a node's distinct values are its leaf rows plus the factors of the correction
+  rows of the node and of every inner node below it (`ZCLPAT_PRG`'s PROGRAMS: 1,071 rows, -439 at it, -154 below,
+  478 values). The virtual root has none, so it is not cross-checked.
+- Accept does not create the tables yet: the schema does not name BW hierarchies before open 2; until then the test
+  creates them.
 
 Open:
 

@@ -177,6 +177,15 @@ not-assigned node, whose values BW puts on its deepest level. `--names` accepts 
 as caption (while olap4abap has no texts), `--with-facts` compares only the members with a value (for dimensions with
 members with facts). What BW shows is in `next-steps.md`, time-independent BW hierarchies.
 
+The copies themselves (`ZZXXMLA1_CL_BW_HIERARCHY_COPY`, `next-steps.md`, part one) are tested by
+
+    python scripts/hierarchy_copy_test.py
+
+which runs the class twice (it creates the tables of `ZCLDIAG`, `ZCLPAT` and `ZCLSERV` if they have none and copies
+their plain hierarchies, each checked against BW's rows and correction factors): every copy must pass, the second run
+refill none, and per hierarchy the node rows but the virtual root and the not-assigned values must be the members BW's
+MDX shows before and below REST_H.
+
 ## Mondrian's own tests against our schema
 
 The eMondrian container serves only our reference catalog `ZFOODMART` (`scripts/deploy-reference-schema.sh`, installs
