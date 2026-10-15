@@ -467,6 +467,40 @@ Design in `schema-generator.md`. Order:
    throwaway catalog). One cube per catalog for the MVP (`mvp-scope.md`, Catalog decision).
    Open: an accept through the UI checked by hand (the API's accept was); calculated members of the schema (the
    reader ignores them) and aggregators other than `sum`/`count` (the engine sums them) are not offered.
+## Next: texts
+
+How members show BW's texts. Order:
+
+1. Next (asked 2026-10-15, not started): `captionColumn` in the engine. A level's key column joins and groups, its
+   `nameColumn` names the member (unique name, MDX lookup), its `captionColumn` is only shown (`MEMBER_CAPTION`); so a
+   text caption joins nothing, and texts that are not unique do not clash. Today `ZZXXMLA1_CL_SCHEMA` refuses
+   `captionColumn` (and `caption` expressions) and a member's caption is its name. To do:
+   - read the caption column with the members (one more column of the same view in every member read of
+     `ZZXXMLA1_CL_MODEL=>read_members`, the native reads and `cells_first` included);
+   - keep every MDX lookup on the name: the schema reader compares captions in places
+     (`ZZXXMLA1_CL_MDX_SCHEMA_READER`, child lookup), which is the same only while caption = name;
+   - make `Caption` mean the caption column where the engine filters on it: the subcube's label predicates
+     (`label_predicate`, Excel's label filters) and the native label filter (`get_level_members_where`), `.Caption`;
+   - check against eMondrian with a FoodMart level given a `captionColumn` (a test catalog, like `ZFMDRILL`).
+2. Then: `captionColumn` in the proposals. The proposal (`ZZXXMLA1_CL_SCHEMA_PROPOSAL`) gives each characteristic's
+   level the text column as `captionColumn` (Excel shows "Dr. Amelia Hart" instead of `001`), the name stays the key
+   and the key stays available as a property; a characteristic without text keeps the key as caption. The schema
+   editor switches a dimension's caption between key and text (BW's key/text display). Open: a "key - text" column of
+   the view as a third choice.
+3. Then: configurable texts. Today the views carry one text per characteristic (and
+   per attribute with texts), `coalesce( text, key )` of whichever text BW's text table has (`schema-generator.md`,
+   Implementation). Instead:
+   - `ZZXXMLA1_CL_BW_VIEW_GEN` puts every text BW has into the dimension view: short, medium and long (`TXTSH`,
+     `TXTMD`, `TXTLG` of the text table, as far as the characteristic has them), each its own column, for the
+     characteristic and for every attribute with texts.
+   - The proposal's default text (the `Text` property, the drill-through `... (Text)` column) is the medium text; if
+     the characteristic has none, the long one; if it has none either, the short one; it is also the caption column
+     where step 2 shows the text.
+   - The schema editor lists a dimension's text fields with a checkbox each, enabled or disabled: an enabled text is
+     in the schema (a member property), a disabled one is left out of it; the view keeps all of them, so switching one
+     on needs no new view. Open: the property names when several are enabled (`Text` for the default one and
+     `Short Text`, `Long Text` for the others, or one name per length), and whether the switches are an annotation,
+     like `olap4abap.membersWithFacts`, or only the schema's properties as the UI edits them.
 
 ## Done: compounded characteristics
 
