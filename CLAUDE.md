@@ -109,7 +109,9 @@ Read before designing anything:
   `ZZXXMLA1_CL_SCHEMA_FIX`) rewrites the cube's tables and columns for the new selection and leaves the user's work;
   the proposal restricts nothing but its fiscal defaults (`ZZXXMLA1_CL_SCHEMA_DEFAULTS`, called by `GET proposal`): a
   provider with `0FISCYEAR` or `0FISCPER` gets `0FISCVARNT` filtered on `I EQ 'K4'`, `0FISCPER` restricted to the
-  regular periods (`I CP '*001'` ... `'*012'`) and both as time dimensions; if the probe finds period 000 or special
+  regular periods and the members of both to BW's interval of RSRHIERARCHYVIRT (`RSADMINS`; time dimensions cannot
+  have members with facts), `I BT '1995' '2029'`, `I BT '1995010' '2029012'` with `E CP '*000'`, `'*013'` ... `'*016'`,
+  and both as time dimensions (facts outside the interval leave a member restriction out, with a note); if the probe finds period 000 or special
   periods in the facts, the period is neither restricted nor time (a note: `0CALMONTH` is the time there)
   (`bw-schema-design-guide.md`, section 3.8, Fiscal time; `scripts/fiscal_default_test.py`). The cube is annotated `olap4abap.filter.<characteristic>` or
   `olap4abap.members.<characteristic>` with the rows (`olap4abap.fixed.<characteristic>` = `v` of older schemas is

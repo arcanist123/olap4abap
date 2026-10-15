@@ -51,7 +51,8 @@ the initial row. Their SID tables hold the values that FoodMart, the clinic demo
 | `0FISCPER` | under K4, every month of the interval as period 001 to 012, as `0CALMONTH` | the month's dates and days, `FISCYEAR`, `FISCPER3`; period 000 and the special periods only `FISCYEAR` and `FISCPER3` |
 
 - The interval is the one in `RSADMINS` (above) unless the request gives `from` and `to`. Nothing is written to
-  `RSADMINS`; change BW's interval in RSRHIERARCHYVIRT.
+  `RSADMINS`; change BW's interval in RSRHIERARCHYVIRT. The schema proposal restricts the members of its time
+  dimensions `0FISCYEAR` and `0FISCPER` to the same interval (`bw-schema-design-guide.md`, section 3.8, Fiscal time).
 - The SIDs are made by BW (`RRSI_VAL_SID_CONVERT`, as `CL_RS_TIME_SERVICE` makes them: checked values for the
   characteristics with master data). The attribute rows are written here (`MODIFY` of the active version), and the
   values are computed as `CL_RS_TIME_SERVICE` computes them. `NUMWDAY` is the number of working days in the

@@ -19,13 +19,24 @@ CLASS ltc_defaults DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHO
     METHODS no_fiscal_time FOR TESTING.
     "! I CP '*001' to I CP '*012'
     METHODS regular_period_rows FOR TESTING RAISING zzxxmla1_cx_bw_provider.
+    "! with BW's interval: the members of year and period restricted to it, the period's to its regular periods
+    METHODS fiscal_interval FOR TESTING.
+    "! the years and the regular periods of the interval, a range table the selection class accepts
+    METHODS interval_period_rows FOR TESTING RAISING zzxxmla1_cx_bw_provider.
     "! a provider of characteristics: the variant and the fiscal ones compounded with it
     METHODS provider
       IMPORTING iobjnms       TYPE string_table
       RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_provider=>ty_provider.
+    "! BW's interval of the development system: 1995-10-01 to 2029-12-31
+    CLASS-METHODS interval
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_time_md=>ty_interval.
 ENDCLASS.
 
 CLASS ltc_defaults IMPLEMENTATION.
+
+  METHOD interval.
+    result = VALUE #( from = '19951001' to = '20291231' calendar = '01' ).
+  ENDMETHOD.
 
   METHOD provider.
     result-name = `ZTEST`.
@@ -74,6 +85,38 @@ CLASS ltc_defaults IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = rows[ 12 ]-low exp = `*012` ).
     " a range table the selection class accepts
     zzxxmla1_cl_bw_selection=>check( characteristic = `0FISCPER` rows = rows ).
+  ENDMETHOD.
+
+  METHOD fiscal_interval.
+    DATA(defaults) = zzxxmla1_cl_schema_defaults=>fiscal_defaults(
+      provider = provider( VALUE #( ( `0FISCVARNT` ) ( `0FISCYEAR` ) ( `0FISCPER` ) ) )
+      interval = interval( ) ).
+    cl_abap_unit_assert=>assert_equals( act = lines( defaults-selection ) exp = 3 ).
+    DATA(year) = defaults-selection[ iobjnm = '0FISCYEAR' ].
+    cl_abap_unit_assert=>assert_equals( act = year-mode exp = zzxxmla1_cl_bw_selection=>c_mode-members ).
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_bw_selection=>rows_text( year-rows )
+                                        exp = `I BT '1995' '2029'` ).
+    DATA(period) = defaults-selection[ iobjnm = '0FISCPER' ].
+    cl_abap_unit_assert=>assert_equals( act = period-mode exp = zzxxmla1_cl_bw_selection=>c_mode-members ).
+    cl_abap_unit_assert=>assert_equals(
+      act = period-rows
+      exp = zzxxmla1_cl_schema_defaults=>interval_rows( iobjnm = `0FISCPER` interval = interval( ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = defaults-time exp = VALUE string_table( ( `0FISCYEAR` ) ( `0FISCPER` ) ) ).
+  ENDMETHOD.
+
+  METHOD interval_period_rows.
+    DATA(rows) = zzxxmla1_cl_schema_defaults=>interval_rows( iobjnm = `0FISCPER` interval = interval( ) ).
+    cl_abap_unit_assert=>assert_equals(
+      act = zzxxmla1_cl_bw_selection=>rows_text( rows )
+      exp = `E CP '*000';E CP '*013';E CP '*014';E CP '*015';E CP '*016';I BT '1995010' '2029012'` ).
+    zzxxmla1_cl_bw_selection=>check( characteristic = `0FISCPER` rows = rows ).
+    zzxxmla1_cl_bw_selection=>check(
+      characteristic = `0FISCYEAR`
+      rows           = zzxxmla1_cl_schema_defaults=>interval_rows( iobjnm = `0FISCYEAR` interval = interval( ) ) ).
+    cl_abap_unit_assert=>assert_initial(
+      zzxxmla1_cl_schema_defaults=>interval_rows( iobjnm = `0CALMONTH` interval = interval( ) ) ).
+    cl_abap_unit_assert=>assert_initial(
+      zzxxmla1_cl_schema_defaults=>interval_rows( iobjnm = `0FISCPER` interval = VALUE #( ) ) ).
   ENDMETHOD.
 
 ENDCLASS.

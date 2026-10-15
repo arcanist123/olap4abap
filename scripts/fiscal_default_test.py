@@ -2,12 +2,14 @@
 """Tests the fiscal defaults of a proposal (ZZXXMLA1_CL_SCHEMA_DEFAULTS, docs/bw-schema-design-guide.md, section 3.8,
 fiscal time) end to end against SAP, on BW's technical content cube 0TSC0T001, which has 0FISCVARNT, 0FISCYEAR and
 0FISCPER (no facts are needed: the members come from the views):
-- the proposal fixes the fiscal year variant to K4 (olap4abap.filter.0FISCVARNT = I EQ 'K4'), restricts the period's
-  members to the regular periods (olap4abap.members.0FISCPER = I CP '*001' ... I CP '*012'), names year and period by
-  their own keys and makes both time dimensions (TimeYears, TimeMonths), without members with facts;
-- accepted into a test catalog, the period has the twelve regular periods of every fiscal year with a SID (no 000, no
-  013 to 016, which BW's SID table holds), so Lag(1) of 2025001 is 2024012 and Lag(12) is 2024001; the year has the
-  fiscal years. The fiscal time master data must be filled (time.html, POST time/fill?characteristics=0FISCYEAR,
+- the proposal fixes the fiscal year variant to K4 (olap4abap.filter.0FISCVARNT = I EQ 'K4'), restricts the members
+  of year and period to BW's interval of RSRHIERARCHYVIRT (GET time) and the period's to the regular periods
+  (olap4abap.members.0FISCYEAR = I BT '1995' '2029', olap4abap.members.0FISCPER = I BT '1995010' '2029012' without
+  E CP '*000', '*013' ... '*016'), names year and period by their own keys and makes both time dimensions (TimeYears,
+  TimeMonths), without members with facts;
+- accepted into a test catalog, the period has the twelve regular periods of every fiscal year of the interval with a
+  SID (no 000, no 013 to 016, which BW's SID table holds), so Lag(1) of 2025001 is 2024012 and Lag(12) is 2024001;
+  the year has the fiscal years of the interval. The fiscal time master data must be filled (time.html, POST time/fill?characteristics=0FISCYEAR,
   0FISCPER; docs/time-master-data.md): every year of BW's interval then has its periods.
 It changes the server: it writes and removes the catalog ZZFISCTEST, whose cube is named as the catalog.
 
@@ -95,10 +97,19 @@ def main():
     check("the variant is fixed to K4 (filter the cube)",
           re.search(rf'<Annotation name="olap4abap\.filter\.0FISCVARNT">\s*I EQ {QUOTE}K4{QUOTE}\s*</Annotation>', xml)
           is not None, xml[:600])
+    status, time = api(args.url, args.client, "GET", "time")
+    check("BW's interval is read", status == 200, time)
+    first, last = (time["from"][:4], time["from"][5:7]), (time["to"][:4], time["to"][5:7])
     members = re.search(r'<Annotation name="olap4abap\.members\.0FISCPER">([^<]*)</Annotation>', xml)
-    rows = re.findall(rf"I CP {QUOTE}\*(\d{{3}}){QUOTE}", members.group(1)) if members else []
-    check("the period's members are restricted to the regular periods 001 to 012",
-          rows == [f"{p:03d}" for p in range(1, 13)], members.group(1) if members else "no annotation")
+    rows = html.unescape(members.group(1)).strip().replace("'", "") if members else "no annotation"
+    check("the period's members are restricted to the regular periods of BW's interval",
+          rows == f"E CP *000;E CP *013;E CP *014;E CP *015;E CP *016;"
+                  f"I BT {first[0]}0{first[1]} {last[0]}0{last[1]}", rows)
+    members = re.search(r'<Annotation name="olap4abap\.members\.0FISCYEAR">([^<]*)</Annotation>', xml)
+    rows = html.unescape(members.group(1)).strip().replace("'", "") if members else "no annotation"
+    check("the year's members are restricted to BW's interval", rows == f"I BT {first[0]} {last[0]}", rows)
+    # the regular periods of the interval: its months
+    months = (int(last[0]) - int(first[0])) * 12 + int(last[1]) - int(first[1]) + 1
     for name, level_type in (("0FISCPER", "TimeMonths"), ("0FISCYEAR", "TimeYears")):
         dim = dimension(xml, name)
         level = re.search(r'<Level [^>]*>', dim)
@@ -112,7 +123,8 @@ def main():
           'type="TimeDimension"' not in dimension(xml, "0FISCVARNT") and "membersWithFacts" in usage(xml, "0FISCVARNT"))
     notes = {n["iobjnm"]: n["reason"] for n in proposal.get("notes", [])}
     check("the notes say what the defaults did", "K4" in notes.get("0FISCVARNT", "")
-          and "regular periods" in notes.get("0FISCPER", ""), notes)
+          and "regular periods" in notes.get("0FISCPER", "")
+          and all("RSRHIERARCHYVIRT" in notes.get(n, "") for n in ("0FISCPER", "0FISCYEAR")), notes)
     listed = {c["name"]: c for c in proposal.get("characteristics", [])}
     check("the characteristics list K4 fixed and the period restricted",
           listed.get("0FISCVARNT", {}).get("value") == "K4" and listed.get("0FISCPER", {}).get("mode") == "members",
@@ -125,16 +137,17 @@ def main():
         try:
             periods, error = captions(args.url, args.client, TEST,
                                       f"SELECT {{}} ON 0, [0FISCPER].[0FISCPER].Members ON 1 FROM [{TEST}]")
-            check("the periods are the regular ones of every fiscal year",
-                  error is None and periods and len(periods) % 12 == 0
+            check("the periods are the regular ones of the interval, every month a period",
+                  error is None and periods and len(periods) == months
                   and all(1 <= int(p[-3:]) <= 12 for p in periods)
                   and all(f"2024{p:03d}" in periods and f"2025{p:03d}" in periods for p in range(1, 13)),
                   error or [p for p in periods if not 1 <= int(p[-3:]) <= 12][:10] or len(periods))
             years, error = captions(args.url, args.client, TEST,
                                     f"SELECT {{}} ON 0, [0FISCYEAR].[0FISCYEAR].Members ON 1 FROM [{TEST}]")
-            check("the years are the fiscal years, twelve periods each",
-                  error is None and years and "2024" in years and periods and len(periods) == 12 * len(years),
-                  error or (len(years), len(periods or [])))
+            check("the years are the fiscal years of the interval",
+                  error is None and years and "2024" in years and len(years) == int(last[0]) - int(first[0]) + 1
+                  and min(years) >= first[0] and max(years) <= last[0],
+                  error or (len(years), len(periods or []), years[:1], years[-1:]))
             for statement, expected in (("[0FISCPER].[2025001].Lag(1)", ["2024012"]),
                                         ("[0FISCPER].[2025001].Lag(12)", ["2024001"]),
                                         ("[0FISCPER].[2024012].Lead(1)", ["2025001"])):

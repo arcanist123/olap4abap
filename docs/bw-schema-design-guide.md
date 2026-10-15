@@ -321,12 +321,20 @@ defaults, so that the common case needs no edit:
 | Characteristic | Proposed | Why |
 |---|---|---|
 | `0FISCVARNT` | filter the cube, `I EQ 'K4'`; not time, members with facts | the most common variant; the user changes it on the variant's dimension. Year and period are then named by their own keys (`2024001`) |
-| `0FISCPER` | restrict members, `I CP '*001'` ... `I CP '*012'` (the regular periods of K4, its months); a time dimension (`TimeMonths`) | BW's SID table has period 000 and the special periods 013 to 016 of every year (its SID conversion makes all periods of a year), which `Lag` and `ParallelPeriod` would count |
-| `0FISCYEAR` | a time dimension (`TimeYears`) | |
+| `0FISCPER` | restrict members to the regular periods of K4 (its months) in BW's interval: `I BT '1995010' '2029012'`, `E CP '*000'`, `E CP '*013'` ... `E CP '*016'`; a time dimension (`TimeMonths`) | BW's SID table has period 000 and the special periods 013 to 016 of every year (its SID conversion makes all periods of a year), which `Lag` and `ParallelPeriod` would count |
+| `0FISCYEAR` | restrict members to BW's interval, `I BT '1995' '2029'`; a time dimension (`TimeYears`) | |
+
+- **BW's interval** (added 2026-10-15) is the one of the virtual time hierarchies, maintained in RSRHIERARCHYVIRT
+  (`RSADMINS`, `ZZXXMLA1_CL_TIME_MD=>interval`; seven years back and ten ahead if not set), the interval the time master
+  data is filled for (`time-master-data.md`). A time dimension cannot have members with facts, so without it its
+  members would be every value of the SID table, also those loaded or converted outside the interval. The example
+  rows are the development system's interval, 1995-10-01 to 2029-12-31 (1995 has the periods 010 to 012). If the
+  facts hold a year or period outside it, that characteristic's members are not restricted to it (the period's still
+  to the regular periods), with a note to widen the interval in RSRHIERARCHYVIRT.
 
 - Time dimensions are marked as the UI marks one: `type="TimeDimension"`, every attribute and level a time level type
   (the suggestion, else `TimeUndefined`), no `olap4abap.membersWithFacts` on the usage.
-- The period's restriction is probed on the facts under K4 when the proposal is made. If they hold period 000 or a
+- The restrictions are probed on the facts under K4 when the proposal is made. If they hold period 000 or a
   special period, the period is neither restricted nor time in that cube: the special periods are real postings, and
   the cube's time is then `0CALMONTH`, derived from the period by the model (not part of the proposal yet). A note says
   so, with the values found. K4 and the year stay.
