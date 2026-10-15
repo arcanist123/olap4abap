@@ -178,22 +178,93 @@ Decided with the user 2026-10-15, to be built next:
   `SVER` and `ANCESTOR_SID IN (...)`, grouped by `ANCESTOR_SID`), never a read for the nodes and another for the
   leaves. Leaf SIDs are positive, node SIDs negative, so they never meet.
 - **Not assigned is a view, one per InfoObject.** It is generated and registered with the InfoObject's tables on
-  accept, also for an InfoObject none of whose hierarchies shows not assigned (its live part is empty then). A
-  hierarchy that suppresses not assigned (`RSHIEDIR-NORESTNODES`) has all its rows in the closure table, nodes,
-  root and identity rows, and the executor reads the table. A hierarchy that shows it has only its nodes' rows there
-  (its root's to the SIDs below it included), and the executor reads the view: the table's rows plus the live rows
-  of every hierarchy of the InfoObject that shows not assigned, an identity row for every SID of the SID table
-  (assigned or not, so also the values under REST_H), the root (`ROOT_SID`) to every SID, and the not-assigned node
-  (`REST_TOP_SID`) to every SID under no leaf of the hierarchy. The view knows which hierarchies and SIDs these are
-  from the directory (its rows with `NORESTNODES` blank: `HIESID`, `SVER`, `ROOT_SID`, `REST_TOP_SID`), so it has no
-  parameters, follows a new `SVER` once the directory names it, and follows master data loads without a refill.
-  The directory row tells the executor which of table and view to read. The root's rows to all SIDs are then not
-  in the table, so no row is twice in the view. The values under no leaf are a set difference, an anti-join
-  whatever its spelling (7.50's CDS has no `NOT EXISTS`, so `LEFT OUTER JOIN ... IS NULL` there), and the only one;
-  the identity and root rows are the SID table as it is. Open: whether a CDS view of 7.50 can say this (the
-  anti-join and the join to the directory), else the same SQL as a derived table of the class's statements; and
-  whether HANA leaves the anti-join out of a query that does not ask for REST_H (the rest node's SID is a column of
-  the directory, no constant): to be measured.
+  accept, also for an InfoObject none of whose hierarchies shows not assigned (its live part is empty then). The
+  closure table holds everything about the assigned values, of every hierarchy alike: the nodes' rows, the root's
+  rows and the leaves' identity rows; a hierarchy that suppresses not assigned and one that shows it have tables of
+  the same shape. The view is the table's rows and, for every hierarchy of the InfoObject that shows not assigned
+  (`RSHIEDIR-NORESTNODES` blank), three rows per SID of the SID table under no leaf of the hierarchy: the
+  not-assigned node to it (`REST_TOP_SID`), the root to it (`ROOT_SID`) and its identity row. These SIDs are one
+  anti-join, the SID table left-outer-joined to the root's rows of the closure (no `DISTINCT`: the closure's key
+  lists each SID below the root once) where none is found (7.50's CDS has no `NOT EXISTS`); the hierarchies and their
+  `HIESID`, `SVER`, `ROOT_SID` and `REST_TOP_SID` come from the directory, so the view has no parameters, follows a
+  new `SVER` once the directory names it, and follows master data loads without a refill. No row of the view is
+  twice. The executor reads the table for a hierarchy that suppresses not assigned and the view for one that shows
+  it (the directory row says which). HANA pushes a filter on `ANCESTOR_SID` through the union and the joins, so a
+  query that does not ask for the not-assigned node pays next to nothing for the anti-join (to be measured). Open:
+  the members of the not-assigned node (REST_H as a root after the hierarchy, its values below it, as BW's MDX shows
+  them) are no rows of the node table; the member reader takes them from the view's rows of `REST_TOP_SID`.
+
+  Example: InfoObject `ZTEST` with three SIDs, the initial value and two values, and two hierarchies of the same
+  structure, a text node `TOTAL` with the value `A` below it; `ZTEST_SUPP` suppresses not assigned, `ZTEST_SHOW`
+  shows it. BW's node SIDs are negative and per InfoObject (`ROOTSID`, `RESTLEAFSID`, the nodes, `RESTTOPSID` of
+  each hierarchy, as `RSRHIEDIR_OLAP` and `/BIC/K` give them).
+
+  SID table `/BIC/SZTEST`:
+
+  | SID | `/BIC/ZTEST` |
+  |----:|--------------|
+  |   0 | (initial, `#`) |
+  |   1 | `A`          |
+  |   2 | `B`          |
+
+  BW's SID structure `/BIC/IZTEST` (`FACTOR` 1 throughout; the not-assigned rows of `ZTEST_SHOW` abbreviated to the
+  link from the root to REST_H, BW writes some more with internal SIDs and none for `ZTEST_SUPP`):
+
+  | HIESID | SVER | LISTNO    | PRED        | SUCC | TLEVEL | NTYPEID              |
+  |-------:|------|----------:|------------:|-----:|-------:|----------------------|
+  |     10 | 1    |         0 | -2000000101 |   -2 |     00 | (root)               |
+  |     10 | 1    |         1 |          -2 |   -4 |     01 | 5 (text node)        |
+  |     10 | 1    |         2 |          -4 |    1 |     02 | `ZTEST`'s            |
+  |     11 | 1    |         0 | -2000000101 |   -6 |     00 | (root)               |
+  |     11 | 1    |         1 |          -6 |   -8 |     01 | 5 (text node)        |
+  |     11 | 1    |         2 |          -8 |    1 |     02 | `ZTEST`'s            |
+  |     11 | 1    | 999999998 |          -6 |   -9 |     01 | (not assigned)       |
+
+  Directory `ZZXXMLA1_HIEDIR` (a row per copy, keyed by `HIESID` and `SVER`):
+
+  | HIESID | SVER | HIENM        | TIMESTMP       | NORESTNODES | ROOT_SID | REST_TOP_SID |
+  |-------:|------|--------------|----------------|-------------|---------:|-------------:|
+  |     10 | 1    | `ZTEST_SUPP` | 20261015120000 | `X`         |       -2 |           -5 |
+  |     11 | 1    | `ZTEST_SHOW` | 20261015120000 |             |       -6 |           -9 |
+
+  Node table `ZZXXMLA1H...` (`PARENT_SID` 0 for the virtual root, the All member):
+
+  | HIESID | SVER | PARENT_SID | SID | DEPTH | POS | END_POS | NODE_IOBJ    | NODE_NAME | VALUE_SID |
+  |-------:|------|-----------:|----:|------:|----:|--------:|--------------|-----------|----------:|
+  |     10 | 1    |          0 |  -2 |     0 |   0 |       2 |              |           |         0 |
+  |     10 | 1    |         -2 |  -4 |     1 |   1 |       2 | `0HIER_NODE` | `TOTAL`   |         0 |
+  |     10 | 1    |         -4 |   1 |     2 |   2 |       2 |              |           |         0 |
+  |     11 | 1    |          0 |  -6 |     0 |   0 |       2 |              |           |         0 |
+  |     11 | 1    |         -6 |  -8 |     1 |   1 |       2 | `0HIER_NODE` | `TOTAL`   |         0 |
+  |     11 | 1    |         -8 |   1 |     2 |   2 |       2 |              |           |         0 |
+
+  Closure table `ZZXXMLA1C...`, the same for both hierarchies:
+
+  | HIESID | SVER | ANCESTOR_SID | SID | row                  |
+  |-------:|------|-------------:|----:|----------------------|
+  |     10 | 1    |           -2 |   1 | root                 |
+  |     10 | 1    |           -4 |   1 | `TOTAL`              |
+  |     10 | 1    |            1 |   1 | identity of `A`      |
+  |     11 | 1    |           -6 |   1 | root                 |
+  |     11 | 1    |           -8 |   1 | `TOTAL`              |
+  |     11 | 1    |            1 |   1 | identity of `A`      |
+
+  The view: the six rows of the table and, for `ZTEST_SHOW` only, the SIDs under no leaf, 0 and 2 (`ZTEST_SUPP`'s
+  directory row has `NORESTNODES` `X`, so it adds nothing):
+
+  | HIESID | SVER | ANCESTOR_SID | SID | row                        |
+  |-------:|------|-------------:|----:|----------------------------|
+  |     11 | 1    |           -9 |   0 | not assigned (REST_H)      |
+  |     11 | 1    |           -9 |   2 | not assigned (REST_H)      |
+  |     11 | 1    |           -6 |   0 | root                       |
+  |     11 | 1    |           -6 |   2 | root                       |
+  |     11 | 1    |            0 |   0 | identity of `#`            |
+  |     11 | 1    |            2 |   2 | identity of `B`            |
+
+  So `ZTEST_SUPP` (read from the table) is All {1} > `TOTAL` {1} > `A` {1}, and `ZTEST_SHOW` (read from the view)
+  is All {0, 1, 2} > `TOTAL` {1} > `A` {1}, then REST_H {0, 2} > `#` {0}, `B` {2}. The cells of `TOTAL`, REST_H and
+  `B` of `ZTEST_SHOW` are one statement: the facts joined to the view on `SID`, `HIESID = 11 AND SVER = '1' AND
+  ANCESTOR_SID IN (-8, -9, 2)`, grouped by `ANCESTOR_SID`.
 - **Copies live as long as BW's versions.** BW keeps an old `SVER` (its row of `RSRHIEDIR_OLAP` with
   `DELETETIMESTMP` set) until no query needs it, so the copy keeps a copy for every `(HIESID, SVER)` that has a row
   in `RSRHIEDIR_OLAP`, current or old, and deletes a copy once BW's row is gone, checked at every refill under the
