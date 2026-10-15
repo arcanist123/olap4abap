@@ -175,7 +175,9 @@ asks olap4abap for `[ZCLDIAG.ZCLDIAG_ICD].Members` (and the others; the names ar
 compared. olap4abap's All member is checked against the total and left out; levels are compared up to the
 not-assigned node, whose values BW puts on its deepest level. `--names` accepts a node's technical name or a leaf's key
 as caption (while olap4abap has no texts), `--with-facts` compares only the members with a value (for dimensions with
-members with facts). What BW shows is in `next-steps.md`, time-independent BW hierarchies.
+members with facts). What BW shows is in `next-steps.md`, time-independent BW hierarchies. One difference is
+intended: BW gives the values below the not-assigned node REST_H the hierarchy's deepest level, olap4abap the level
+below REST_H (decided with the user 2026-10-15); the script is to accept it for those values only.
 
 The copies themselves (`ZZXXMLA1_CL_BW_HIERARCHY_COPY`, `next-steps.md`, part one) are tested by
 

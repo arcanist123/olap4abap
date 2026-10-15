@@ -190,9 +190,13 @@ Decided with the user 2026-10-15, to be built next:
   new `SVER` once the directory names it, and follows master data loads without a refill. No row of the view is
   twice. The executor reads the table for a hierarchy that suppresses not assigned and the view for one that shows
   it (the directory row says which). HANA pushes a filter on `ANCESTOR_SID` through the union and the joins, so a
-  query that does not ask for the not-assigned node pays next to nothing for the anti-join (to be measured). Open:
-  the members of the not-assigned node (REST_H as a root after the hierarchy, its values below it, as BW's MDX shows
-  them) are no rows of the node table; the member reader takes them from the view's rows of `REST_TOP_SID`.
+  query that does not ask for the not-assigned node pays next to nothing for the anti-join (to be measured). The
+  members of the not-assigned node are no rows of the node table: REST_H is a root after the hierarchy's roots, as
+  BW's MDX shows it, and the member reader takes its values, in key order, from the view's rows of `REST_TOP_SID`.
+  They are directly below REST_H, one level deeper (decided with the user 2026-10-15): BW gives them the hierarchy's
+  deepest level (level 4 below REST_H on level 0 in `ZCLPAT_PRG`), which would skip levels, where a parent-child
+  hierarchy has every member one level below its parent, as the reference models it and Excel lays levels out;
+  `bw_hierarchy_test.py` accepts this difference for the not-assigned values only.
 
   Example: InfoObject `ZTEST` with three SIDs, the initial value and two values, and two hierarchies of the same
   structure, a text node `TOTAL` with the value `A` below it; `ZTEST_SUPP` suppresses not assigned, `ZTEST_SHOW`
