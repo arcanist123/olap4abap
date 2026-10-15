@@ -558,7 +558,8 @@ CLASS zzxxmla1_cl_mdx_validator IMPLEMENTATION.
       result = zzxxmla1_cl_mdx_node=>create_symbol( to_upper( node->segments[ 1 ]-name ) ).
       RETURN.
     ENDIF.
-    " the aliases in scope first (ScopedSchemaReader), then the cube, then the named sets of the query
+    " the aliases in scope first (ScopedSchemaReader), then the named sets of the query, then the cube
+    " (Util.lookupCompound: the query's names before the walk, which reads members by name)
     DATA(set_index) = lookup_alias( node->segments ).
     IF set_index > 0.
       result = named_set_expression( set_index ).
@@ -568,13 +569,13 @@ CLASS zzxxmla1_cl_mdx_validator IMPLEMENTATION.
     IF result IS BOUND.
       RETURN.
     ENDIF.
+    set_index = lookup_query_set( node->segments ).
+    IF set_index > 0.
+      result = named_set_expression( set_index ).
+      RETURN.
+    ENDIF.
     DATA(element) = schema_reader->lookup_compound( node->segments ).
     IF element-kind IS INITIAL.
-      set_index = lookup_query_set( node->segments ).
-      IF set_index > 0.
-        result = named_set_expression( set_index ).
-        RETURN.
-      ENDIF.
       fail( |MDX object '{ node->unparse( ) }' not found in cube '{ schema_reader->cube-cube_name }'| ).
     ENDIF.
     " Query.addMeasuresMembers

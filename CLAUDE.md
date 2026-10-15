@@ -174,7 +174,8 @@ Read before designing anything:
   `ZZXXMLA1_CL_MDX_PARSER`, tree `ZZXXMLA1_CL_MDX_NODE`). It parses the whole grammar, with Mondrian's error texts, and its
   unit tests carry Mondrian's `ParserTest`. Keep it in step with `MdxParser.jj`: change the grammar there first, then port.
   The validator (`ZZXXMLA1_CL_MDX_VALIDATOR`, Mondrian's `Query.resolve`/`ValidatorImpl`) resolves identifiers
-  through `ZZXXMLA1_CL_MDX_SCHEMA_READER` (`SchemaReader`). It resolves functions by signature and conversion cost with
+  through `ZZXXMLA1_CL_MDX_SCHEMA_READER` (`SchemaReader`), the query's aliases, named sets and calculated members
+  before the cube (`Util.lookupCompound`: a query's name wins, and it costs no member read). It resolves functions by signature and conversion cost with
   `ZZXXMLA1_CL_MDX_FUNTABLE` (`BuiltinFunTable`, generated from the jar by `scripts/generate-funtable.py`) and types
   every node (`ZZXXMLA1_CL_MDX_TYPE`). The engine (`ZZXXMLA1_CL_MDX_ENGINE`, Mondrian's `RolapResult`) evaluates the
   resolved tree for SELECTs with measures and members of the model's hierarchies, in the evaluation context

@@ -436,6 +436,13 @@ that have facts in it, by the annotation `olap4abap.membersWithFacts` on its `Di
    a characteristic is shared by many providers, which use few of its values); the cube pane's "Members with facts"
    column switches it per dimension, and marking a dimension as time removes it (`scripts/schema_ui_test.py`).
 4. Open: measure the semi-join on a large provider (`ZXMLWIDE` with more records).
+5. Open (noted 2026-10-15): on an aDSO the existence check of a member keyed by its value should read the aDSO's own
+   fact table (its reporting view `/BIC/A<aDSO>7`), without the join. Today every check is
+   `IN ( SELECT <key> FROM <the cube's fact table> )`, and with a compounded characteristic that is the fact view
+   (`ZZXXMLA1_F_<aDSO>`, e.g. `ZZXXMLA1V0000015` of `ZCLVISITA`), which joins the SID of each compounded
+   characteristic. Only a characteristic keyed by that SID needs the fact view; every other one has its value in the
+   aDSO's table. Seen in Excel's filter list on `ZCLVISITA`: before the validator looked up the query's named sets
+   first, each of the 91 lookups of a named set's name as a member was such a semi-join.
 
 ## Then: the schema generator
 

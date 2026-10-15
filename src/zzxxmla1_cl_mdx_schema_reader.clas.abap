@@ -1350,22 +1350,22 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD lookup_compound.
+    " a calculated member of the query first (Util.lookupCompound: getCalculatedMember before the walk, which reads
+    " members by name)
+    IF category = zzxxmla1_cl_mdx_type=>c_category-unknown OR category = zzxxmla1_cl_mdx_type=>c_category-member.
+      result = lookup_calculated_member( segments ).
+      IF result-kind IS NOT INITIAL.
+        RETURN.
+      ENDIF.
+    ENDIF.
     DATA(parent) = VALUE ty_element( kind = c_element-cube ).
     LOOP AT segments INTO DATA(segment).
       DATA(child) = get_element_child( parent = parent segment = segment ).
       IF child-kind IS INITIAL.
-        CLEAR parent.
-        EXIT.
+        RETURN.
       ENDIF.
       parent = child.
     ENDLOOP.
-    " not an element of the cube: a calculated member of the query (QuerySchemaReader.lookupCompoundInternal)
-    IF parent-kind IS INITIAL.
-      IF category = zzxxmla1_cl_mdx_type=>c_category-unknown OR category = zzxxmla1_cl_mdx_type=>c_category-member.
-        result = lookup_calculated_member( segments ).
-      ENDIF.
-      RETURN.
-    ENDIF.
 
     CASE category.
       WHEN zzxxmla1_cl_mdx_type=>c_category-dimension.
