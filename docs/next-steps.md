@@ -80,8 +80,43 @@ Decided with the user 2026-10-15:
   expanded, depth, depth-first number and subtree end) and the closure by `INSERT ... SELECT` (the closure in one
   statement, a range join over `LISTNO`: a node's subtree ends before the next row at its level or above; the rows
   with `LISTNO` 0 and the not-assigned rows left out; a node's distinct values cross-checked with BW's: its leaf rows
-  plus its correction rows' factors). It is lazy: a query compares `RSHIEDIR`'s time stamp with the copy's (one key read) and rebuilds a stale
-  hierarchy under an enqueue lock; a limit on occurrences refuses a hierarchy whose expansion explodes.
+  plus its correction rows' factors). It is lazy: a query compares the hierarchy's current row of `RSRHIEDIR_OLAP`
+  (`SVER`, `TIMESTMP`) with the copy's (one key read) and rebuilds a stale hierarchy under an enqueue lock; a limit
+  on occurrences refuses a hierarchy whose expansion explodes.
+- **Where the copies live** (decided with the user 2026-10-15): a node table and a closure table per InfoObject,
+  holding all of its hierarchies, as BW's `/BIC/I<char>` does. Not one table pair for all hierarchies of all
+  InfoObjects (it would grow beyond what HANA handles well) and not a table pair per hierarchy.
+- **Ids are BW's** (decided with the user 2026-10-15): every inner node occurrence has its own negative node SID in
+  `/BIC/K<char>`, also the occurrences inside an expanded link subtree (`ZCLPAT_PRG`: the link SENIOR -13, the HEART
+  and FALLS under it -14 and -15, `LINKNO` 2 and 1), the postable nodes and `REST_H`; node SIDs are unique per
+  InfoObject across its hierarchies. A leaf has the characteristic's SID, so a leaf occurrence is (parent node SID,
+  SID). No ids of our own: unique names stay paths, and a rebuild takes BW's numbering as it is.
+- **The All member and the hierarchy key** (decided with the user 2026-10-15): `RSRHIEDIR_OLAP` gives each
+  hierarchy its own virtual root `ROOTSID`, not-assigned leaf `RESTLEAFSID` and `REST_H` node `RESTTOPSID`, in the
+  same per-InfoObject range (`ZCLDOC`: -2, -16, -31, ... for its eight hierarchies). The All member is the `ROOTSID`,
+  a node like any other with closure rows to every SID below it, so the closure needs no hierarchy key; the node
+  table's hierarchy column is `ROOT_SID` (roots are the children of `ROOTSID`, a level is `ROOT_SID` and depth).
+  `HIESID` is no key: `RSRHIEDIR_OLAP` can have several rows per `HIESID`.
+- **Versions** (decided with the user 2026-10-15): BW's `SVER` is a read-consistency version: while a hierarchy is
+  changed, its previous structure stays under the old `SVER` for the queries running, and `RSRHIEDIR_OLAP` points
+  new ones to the new version. The current version is the row of `RSRHIEDIR_OLAP` with `DELETETIMESTMP` 0; the old
+  one keeps its row with `DELETETIMESTMP` set to when it was replaced (`COPY_OF_ZCLSERV_CAT`, `HIESID` 246: `SVER`
+  1 deleted at 16:36:21, `SVER` 2 written then, node -22 moved under -23). Both versions are in `/BIC/I` (120 rows
+  each); `/BIC/K` has no `SVER`, so the versions share their node SIDs (a moved node keeps its SID), and `ROOTSID`
+  and the rest SIDs stay. The build reads `/BIC/I` of the `HIESID` and `SVER` of the current row only. The copy does
+  the same, because HANA's read consistency is per statement, not per query: both tables have a version column in
+  their keys (node table: version and node occurrence; closure: version, ancestor and SID), the build writes a new
+  version next to the old one, commits and switches the hierarchy's directory row (`ROOT_SID`, current version, the
+  `HIESID`, `SVER` and `TIMESTMP` it was built from); a query reads the directory row once and binds the version in
+  each statement; an old version is deleted by the build after next. For now the build refuses a hierarchy whose
+  current rows (`DELETETIMESTMP` 0) are more than one (rows with `SVER` `?`, `TMPJOIN`, `HDATE` or a negative
+  `HIESID`, as on `0D_FC_PERS`, are not understood yet).
+- **Statements and HANA's plan cache** (decided with the user 2026-10-15): HANA reuses a plan only for the same
+  statement text, and a statement on a view is compiled with the view's definition, so literals in a statement mean
+  a compile each time. The hierarchy statements bind their single values (`?`, `cl_sql_statement->set_param`, new in
+  `ZZXXMLA1_CL_SQL`): children `PARENT_SID = ?`, a level `ROOT_SID = ? AND DEPTH = ?`, descendants `ROOT_SID = ? AND
+  POS BETWEEN ? AND ?`, a leaf's value `SID = ?`, the version. Lists stay literals for now (`ANCESTOR_SID IN (-5,
+  -7)`), as in the rest of the engine; padding lists to fixed lengths was considered and set aside.
 - **Interval leaves** (`/BIC/J<char>`) are no members: their values are leaves under the interval's parent, as BW
   shows them. The build takes them from `/BIC/I`, which holds them expanded as they were when the hierarchy was
   activated (`ZCLSERV_CAT`), not from `/BIC/J`.
@@ -114,6 +149,12 @@ Open:
 4. The engine: members of a parent-child level and the closure in the fact reads; the planner marks such members
    computed at first, so the evaluator answers them, native and grouped reads later.
 5. The proposal and the UI: offer the hierarchies a characteristic has in `RSHIEDIR`, and the not-assigned switch.
+6. Measure HANA's plan cache (`M_SQL_PLAN_CACHE`: entries, `PREPARATION_COUNT`, `TOTAL_PREPARATION_TIME` against
+   `TOTAL_EXECUTION_TIME`): a statement on a view with two literals and with a bound parameter, and the share of
+   preparation in a FoodMart run. It decides whether the engine's fact and member reads move to bound parameters and
+   whether lists need more than literals.
+7. The other rows of `RSRHIEDIR_OLAP` (`SVER` `?`, `TMPJOIN`, `HDATE`, negative `HIESID`s): what they are, before
+   time-dependent hierarchy structures.
 
 ## Paused: query planning
 
