@@ -2,7 +2,7 @@
 """Tests the copies of BW's hierarchies (docs/next-steps.md, Now: time-independent BW hierarchies, part one) on the
 clinic demo: ZZXXMLA1_CL_BW_HIERARCHY_COPY (run with sapcli class execute) creates the tables of ZCLDIAG, ZCLPAT and
 ZCLSERV if they have none, copies each of their plain hierarchies (refilled if BW's is newer) and prints per hierarchy
-its tables, version, whether it was refilled, the SIDs of its All member and of its not-assigned node, whether that is
+its tables, the HIESID/SVER it is a copy of, whether it was refilled, the SIDs of its All member and of its not-assigned node, whether that is
 shown, its node rows, inner nodes, closure rows, depth, the values of the All member and of the not-assigned node.
 
 The class checks every copy against BW itself (a node's distinct values against BW's rows and correction factors) and
@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bw_hierarchy_test  # noqa: E402
 
 COPY = "ZZXXMLA1_CL_BW_HIERARCHY_COPY"
-FIELDS = ["characteristic", "hierarchy", "status", "node_table", "closure_table", "version", "refilled", "root_sid",
+FIELDS = ["characteristic", "hierarchy", "status", "node_table", "closure_table", "copy", "refilled", "root_sid",
           "rest_top_sid", "rest_shown", "nodes", "inner_nodes", "closure", "depth", "all_values", "rest_values",
           "microseconds"]
 
@@ -61,8 +61,8 @@ def main():
             continue
         if row["refilled"]:
             failures.append(f"{name}: refilled again although BW's hierarchy did not change")
-        if first[key].get("version") not in (row["version"],) and not first[key].get("refilled"):
-            failures.append(f"{name}: version {first[key].get('version')} became {row['version']}")
+        if first[key].get("copy") != row["copy"]:
+            failures.append(f"{name}: the copy of {first[key].get('copy')} became one of {row['copy']}")
         members = bw.get(key)
         if members is None:
             print(f"{name}: OK, {row['nodes']} node rows, {row['closure']} closure rows (no member from BW's MDX)")
@@ -77,7 +77,7 @@ def main():
         elif rest is not None and members[rest]["children"] != int(row["rest_values"]):
             failures.append(f"{name}: {row['rest_values']} not-assigned values, BW's MDX shows "
                             f"{members[rest]['children']}")
-        print(f"{name}: {row['nodes']} node rows, {row['inner_nodes']} inner, {row['closure']} closure rows, "
+        print(f"{name}: copy of {row['copy']}, {row['nodes']} node rows, {row['inner_nodes']} inner, {row['closure']} closure rows, "
               f"depth {row['depth']}, All {row['all_values']} values, not assigned "
               f"{row['rest_values'] if row['rest_shown'] == 'X' else 'suppressed'}, {row['microseconds']} us")
     for failure in failures:

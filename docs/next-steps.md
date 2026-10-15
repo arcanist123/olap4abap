@@ -113,8 +113,8 @@ Decided with the user 2026-10-15:
   1 deleted at 16:36:21, `SVER` 2 written then, node -22 moved under -23). Both versions are in `/BIC/I` (120 rows
   each); `/BIC/K` has no `SVER`, so the versions share their node SIDs (a moved node keeps its SID), and `ROOTSID`
   and the rest SIDs stay. The build reads `/BIC/I` of the `HIESID` and `SVER` of the current row only. The copy does
-  the same, because HANA's read consistency is per statement, not per query: both tables have a version column in
-  their keys (node table: version and node occurrence; closure: version, ancestor and SID), the build writes a new
+  the same, because HANA's read consistency is per statement, not per query: both tables have BW's version in
+  their keys (node table: `HIESID`, `SVER` and node occurrence; closure: `HIESID`, `SVER`, ancestor and SID), the build writes a new
   version next to the old one, commits and switches the hierarchy's directory row (`ROOT_SID`, current version, the
   `HIESID`, `SVER` and `TIMESTMP` it was built from); a query reads the directory row once and binds the version in
   each statement; an old version is deleted by the build after next. For now the build refuses a hierarchy whose
@@ -148,21 +148,25 @@ the not-assigned values as the hierarchy's BW setting says; everything the queri
 consistently. The schema, the names, the engine and the UI (open 2 to 5) build on it.
 
 Done (2026-10-15): `ZZXXMLA1_CL_BW_HIERARCHY_COPY` (`create_tables`, `current`, `values_of`), the directory
-`ZZXXMLA1_HIEDIR` (a row per hierarchy, keyed by BW's `HIEID`) and the registry `ZZXXMLA1_HIETAB` (an InfoObject's
-tables `ZZXXMLA1H` and `ZZXXMLA1C` followed by the same 7 digits, and its last version), bound parameters in
+`ZZXXMLA1_HIEDIR` (a row per hierarchy, keyed by BW's `HIEID`, with the `HIESID` and `SVER` copied and the `SVER`
+before) and the registry `ZZXXMLA1_HIETAB` (an InfoObject's tables `ZZXXMLA1H` and `ZZXXMLA1C` followed by the same
+7 digits; `create_tables` makes tables of an older layout again under their names), bound parameters in
 `ZZXXMLA1_CL_SQL` (`params`, `execute`), the fault `ZZXXMLA1_CX_BW_HIERARCHY`. `python
 scripts/hierarchy_copy_test.py`: the four plain hierarchies of the clinic demo copy and pass the cross-check with
 BW, a second run refills none (a query's check of a current copy: 4 to 9 ms), and node rows and not-assigned values
 are the members BW's MDX shows. Settled while implementing:
-- `VERSION` is numbered per InfoObject, so it also tells the hierarchy: it takes the place of the node table's
-  `ROOT_SID` column (children `VERSION = ? AND PARENT_SID = ?`, a level `VERSION = ? AND DEPTH = ?`, descendants
-  `VERSION = ? AND POS BETWEEN ? AND ?`).
+- A copy is keyed by BW's `HIESID` and `SVER` (decided with the user 2026-10-15, for analysing a copy next to
+  `/BIC/I`): both tables start with them, in place of a version of our own and the node table's `ROOT_SID` column
+  (children `HIESID = ? AND SVER = ? AND PARENT_SID = ?`, a level `... AND DEPTH = ?`, descendants `... AND POS
+  BETWEEN ? AND ?`). BW does not change a structure once its `SVER` is written; a change, also of the not-assigned
+  setting, is a new `SVER` (up to 33 per hierarchy, then given again), and a time-dependent hierarchy has a `HIESID`
+  per time slice. So the staleness check compares `HIESID` and `SVER` only.
 - The closure has rows of inner node occurrences only: a leaf member is its SID, so the facts need no closure for it.
 - The not-assigned values are no database object but a statement of the class (`values_of` the `RESTTOPSID`): the
   SID table's values under no leaf, `NOT EXISTS` in the root's closure rows. While the hierarchy shows them, the All
-  member is every value of the SID table; while it suppresses them (`RSHIEDIR-NORESTNODES`), its closure rows. BW
-  writes the setting into the SID structure too: switching it makes a new `SVER` (`COPY_OF_ZCLSERV_CAT`: `SVER` 3
-  without the rows of `LISTNO` 999999998 and 999999999), so the staleness check catches it. `RSRHIEDIR_OLAP-CARDREST`
+  member is every value of the SID table; while it suppresses them (`RSHIEDIR-NORESTNODES`), its closure rows.
+  Switching the setting makes a new `SVER` (`COPY_OF_ZCLSERV_CAT`: `SVER` 3 without the rows of `LISTNO` 999999998
+  and 999999999). `RSRHIEDIR_OLAP-CARDREST`
   is no count of them (0 on `ZCLSERV_CAT`, where BW's MDX shows `#` under REST_H as the copy does).
 - BW's correction rows are cumulative: a node's distinct values are its leaf rows plus the factors of the correction
   rows of the node and of every inner node below it (`ZCLPAT_PRG`'s PROGRAMS: 1,071 rows, -439 at it, -154 below,

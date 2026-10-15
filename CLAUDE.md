@@ -345,9 +345,9 @@ Read before designing anything:
 - BW hierarchies (in progress, `docs/next-steps.md`, Now: time-independent BW hierarchies): part one, the copies, is
   done. `ZZXXMLA1_CL_BW_HIERARCHY_COPY` keeps per InfoObject a node table and a closure table (generated DDIC tables
   in `$TMP`, `ZZXXMLA1H`/`ZZXXMLA1C` and 7 digits, registered in `ZZXXMLA1_HIETAB`, made by `create_tables`) holding
-  all its hierarchies, a version each (directory `ZZXXMLA1_HIEDIR`): the occurrences of BW's SID structure `/BIC/I`
+  all its hierarchies, keyed by BW's `HIESID` and `SVER` (directory `ZZXXMLA1_HIEDIR`): the occurrences of `/BIC/I`
   with BW's node SIDs, depth-first numbers and subtree ends, and per inner node the distinct SIDs below it. `current`
-  compares the copy with BW's current row of `RSRHIEDIR_OLAP` and refills a stale one in the database under
+  compares the copy's `HIESID`/`SVER` with BW's current row of `RSRHIEDIR_OLAP` and refills a stale one in the database under
   `ENQUEUE_E_TABLE`, cross-checked with BW's correction factors; the refusals are faults of the query
   (`ZZXXMLA1_CX_BW_HIERARCHY`). `values_of` gives a node's SIDs as a statement with bound parameters
   (`ZZXXMLA1_CL_SQL`'s `params`), the not-assigned ones read live as `RSHIEDIR-NORESTNODES` says
