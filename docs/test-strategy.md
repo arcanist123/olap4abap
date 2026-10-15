@@ -190,7 +190,7 @@ MDX shows before and below REST_H.
 
 Hierarchies in which every node occurs once (`ZCLDIAG_ICD`) are also served by the reference, as a parent-child
 hierarchy with a closure table over an export of the clinic InfoCube and the hierarchy's copy (catalog `ZCLVISIT`,
-`reference/schema/ClinicBW.xml`), and their MDX cases are captured and replayed like FoodMart's (planned,
+`reference/schema/ClinicBW.xml`, exported by one script), and their MDX cases are captured and replayed like FoodMart's (planned,
 `next-steps.md`, Reference scenario). BW's MDX stays the oracle for shared nodes, intervals and postable nodes.
 
 ## Mondrian's own tests against our schema

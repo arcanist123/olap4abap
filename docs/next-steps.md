@@ -330,8 +330,9 @@ shows a member's own facts in its value, BW as a first child of its own) and lat
   is the reference's `<Closure parentColumn childColumn>`, its `SID` the fact's `SID_ZCLDIAG`. The reference's
   members are paths as ours (`[Employees].[Sheri Nowmer].[Derrick Whelply]`), and every member one level below its
   parent, the not-assigned values below REST_H too (as decided above). Its All member counts every fact, so a
-  hierarchy that suppresses not assigned would differ there (BW's answer for such a total is to be looked at first);
-  the clinic demo has none, the scenario takes only hierarchies that show it.
+  hierarchy that suppresses not assigned would differ there. Decided with the user 2026-10-15: the reference is the
+  oracle of the narrow case, single-parent trees that show not assigned; a hierarchy that suppresses it is validated
+  against BW's MDX only.
 - **Reference database:** `build-bw-reference-db.py` gets the InfoCube `ZCLVISIT` next to `ZFMSALES` (`CUBES`): its
   fact table, the SID and attribute tables of its characteristics, the views its accepted schema names, and the copy
   of `ZCLDIAG` (node table and the not-assigned view `ZZXXMLA1R...`) with the `HIESID` and `SVER` current at the
@@ -339,12 +340,13 @@ shows a member's own facts in its value, BW as a first child of its own) and lat
   (`ZZXXMLA1_HN_ZCLDIAG_ICD`, `ZZXXMLA1_HC_ZCLDIAG_ICD`; not `ZZXXMLA1_C_`, the characteristic views' prefix): the
   nodes without the virtual root, a root's parent `NULL`, REST_H and the not-assigned values added, a node's name
   (`NODE_NAME` of a text node, the key from the characteristic's view for a value); and the closure rows of the
-  hierarchy. Captured data, not live: a regeneration of the demo or of its hierarchies needs a new export.
-- **Schema:** one file `reference/schema/ClinicBW.xml` serving both, as `FoodmartBW.xml` does: a `Hierarchy` of the
+  hierarchy. Captured data, not live, as the clinic data is static anyway: one script exports BW's side and builds
+  the reference (decided with the user 2026-10-15), so a regeneration of the demo or of its hierarchies is one run of
+  it (and new captures where answers change).
+- **Schema:** the reference's own schema `reference/schema/ClinicBW.xml`, plain parent-child: a `Hierarchy` of the
   dimension `ZCLDIAG` with a level `column="SID" parentColumn="PARENT_SID" nameColumn="NAME"` on the node view and
-  its `<Closure>` on the closure view, annotated with the BW hierarchy (`olap4abap.bwHierarchy` = `ZCLDIAG_ICD`, which
-  the reference ignores). The annotation is how olap4abap finds the copy and its version (`current`), so on SAP the
-  placeholder views are not read; whether the schema names them at all on SAP is open 2.
+  its `<Closure>` on the closure view. Whether SAP serves the same file (open question 4 below) or the schema the
+  proposal makes, the test compares the answers of the catalogs of the same name.
 - **Cases:** catalog `ZCLVISIT` in the reference's `datasources.xml`, cases captured with `capture-execute.py`
   under `reference/` and replayed by `xmla_test.py`: `MDSCHEMA_HIERARCHIES`, `_LEVELS`, `_MEMBERS` (tree operators)
   of the hierarchy; `Members`, `Children`, `Parent`, `Ancestor`, `Descendants` (levels, distances, flags),
@@ -356,15 +358,17 @@ shows a member's own facts in its value, BW as a first child of its own) and lat
 - **Later:** a second single-parent hierarchy only if a case needs one the clinic's lacks (a hierarchy of unequal
   depth, a root with values of its own), made in the clinic generator, not in the reference database.
 
-Open questions (for the user):
+Decided with the user 2026-10-15: the InfoCube `ZCLVISIT` (the simpler export, no reporting view; the hierarchy is
+the characteristic's, the same on the aDSO); single-parent hierarchies that show not assigned only; the export is
+automated (above).
 
-1. The InfoCube `ZCLVISIT` or the aDSO `ZCLVISITA` (which `bw_hierarchy_test.py` asks)? The InfoCube is the simpler
-   export (no reporting view); the hierarchy is the characteristic's, the same on both.
-2. A hierarchy that suppresses not assigned: the reference's All member counts every fact. What BW's total is there
-   is to be looked at before such a hierarchy joins the scenario; the clinic demo has none.
-3. The reference holds an export, not live data: every regeneration of the demo or of its hierarchies needs a new
-   export and possibly new captures. Acceptable, or should the export be part of the demo's setup?
-4. Does SAP's schema name the placeholder views too, or only the annotation (open 2, the schema form)?
+Open question (for the user):
+
+4. Is the reference's schema file also SAP's schema of the catalog, as `FoodmartBW.xml` is for FoodMart? On SAP
+   olap4abap reads the hierarchy from the copy at BW's current version (`ZZXXMLA1_CL_BW_HIERARCHY_COPY=>current`),
+   not from the frozen placeholder views, so if the file is shared, it has to tell olap4abap which BW hierarchy the
+   parent-child level is (an annotation the reference ignores). Not needed if SAP serves the schema the proposal
+   makes (open 2) and only the answers are compared, which is the simpler way: the reference's schema stays plain.
 
 ## Paused: query planning
 
