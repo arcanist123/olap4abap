@@ -179,7 +179,7 @@ Read before designing anything:
   every node (`ZZXXMLA1_CL_MDX_TYPE`). The engine (`ZZXXMLA1_CL_MDX_ENGINE`, Mondrian's `RolapResult`) evaluates the
   resolved tree for SELECTs with measures and members of the model's hierarchies, in the evaluation context
   `ZZXXMLA1_CL_MDX_EVALUATOR` (`RolapEvaluator`: a current member per hierarchy, savepoint/restore, `evaluateCurrent`)
-  (all 244 `reference/` cases pass; 394 of the 395 statements of `tests/mdx/applicable.json` give eMondrian's answer,
+  (all 277 `reference/` cases pass; 394 of the 395 statements of `tests/mdx/applicable.json` give eMondrian's answer,
   #64 differs in the last digits of a sum eMondrian's database adds in another order).
   Hierarchies have levels: the schema's user hierarchies (Store, Product, Customers, Time, Weekly, Promotions) next to
   the attribute hierarchies; cells are grouped by the level columns down to a member's level. Members are never read
@@ -247,7 +247,17 @@ Read before designing anything:
   `Order` sorts in ABAP, break keys evaluated once per tuple into a table and the indexes merge-sorted (step 8).
   `Filter` of such a crossjoin by a condition of stored measures (`AND`, `OR`, comparisons, `+`, `-`, `*`) that is
   false for every tuple without facts is native too (`RolapNativeFilter`, `native_filter`, the condition from
-  `ZZXXMLA1_CL_MDX_PLANNER=>filter_condition` as a `WHERE` of `ordered_paths`), and `NonEmpty` (also with a second
+  `ZZXXMLA1_CL_MDX_PLANNER=>filter_condition` as a `WHERE` of `ordered_paths`). `Filter` of a level's members
+  (`Members`, `Children`, `Descendants`, also in `AddCalculatedMembers` of a hierarchy without calculated members) by
+  the labels of the current member (the subcube's label conditions: `=`, `<`, `>`, `Left`, `Right`, `InStr` of Name,
+  Caption or Key with `AND`, `OR`, `NOT`; `CurrentMember` there is the filtered level, `InStr` ignores case as
+  `Vba.inStr` does) is one read of the members with the condition as `WHERE`, our extension (`native_label_filter`,
+  `ZZXXMLA1_CL_MDX_SCHEMA_READER=>get_level_members_where`; Excel's member search on `ZXMLWIDE`: 12 s to 6 s); not
+  while the evaluator is non-empty. `Count` (`INCLUDEEMPTY`) and `.Count` of a member's `Children` (also in
+  `AddCalculatedMembers` of a hierarchy without query calculated members) is a count query, not a read of the
+  children, our extension (`children_count`, `get_children_count`; the first one in the cells counts the children of
+  every member of the axes; Excel's member search on `ZXMLWIDE`: 6 s to 2.5 s); not while the evaluator is
+  non-empty. `NonEmpty` (also with a second
   set) is one grouped read (`non_empty_groups`), no evaluator call (query planning step 6). Execute
   answers carry the query's `DIMENSION PROPERTIES` (olap4j's standard member properties) and `CELL PROPERTIES`; when
   these show no cell's value (Excel's member lists ask for `CELL_ORDINAL` only), no axis is NON EMPTY and no member is

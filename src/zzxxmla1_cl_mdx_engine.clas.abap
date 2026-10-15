@@ -227,6 +227,9 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       ty_t_cj_args TYPE STANDARD TABLE OF ty_t_cj_arg WITH EMPTY KEY.
     "! the facts of the query, for the native crossjoin
     DATA fact_reader TYPE REF TO zzxxmla1_cl_mdx_facts.
+    "! while native_label_filter translates a Filter's condition: the hierarchy and the level of the members it filters,
+    "! the level of &lt;Hierarchy&gt;.CurrentMember there (comparison_level)
+    DATA filter_level TYPE ty_property_reference.
     "! Query.getMeasuresMembers: the measures the query names, the second set of a NON EMPTY axis' NonEmpty
     DATA query_measures TYPE ty_t_member.
     TYPES ty_path_set TYPE HASHED TABLE OF string WITH UNIQUE KEY table_line.
@@ -407,6 +410,8 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
     CONSTANTS c_max_eval_depth TYPE i VALUE 10.
     "! the cells of executeBody whose evaluation missed no cell, by ordinal: their value is final, a later pass keeps it
     DATA final_cells TYPE HASHED TABLE OF ty_cell WITH UNIQUE KEY ordinal.
+    "! the stored members of the axes while the cells are evaluated, until children_count has counted their children
+    DATA count_members TYPE ty_t_member.
     "! The cells (RolapResult.executeStripe): each tuple of the axis at the index in turn is set in the context, and
     "! the axes before it are run inside; at index 0 the slicer is set and the cell computed (unless final). The first
     "! axis runs fastest.
@@ -815,6 +820,18 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
     "! reference, the crossjoin is not checked against the result limit, only the tuples kept. With a calculated or
     "! null member in the context, a calculated member of the query in a hierarchy of the set, or another set not
     "! native.
+    "! Filter of a level's members (Level.Members, Children, Descendants as native_filter's set; also in
+    "! AddCalculatedMembers of a hierarchy without calculated members) by the labels of the current member, our
+    "! extension: a condition that condition_predicate translates into columns of the level's hierarchy (Excel's label
+    "! filters: =, &lt;, &gt;, Left, Right, InStr of Name, Caption or Key, with AND, OR, NOT) is the WHERE of one read of
+    "! the level's members, in hierarchy order. Not while the evaluator is non-empty (its members are the ones with
+    "! facts in the context).
+    METHODS native_label_filter
+      IMPORTING evaluator     TYPE ty_evaluator
+                node          TYPE ty_node
+      EXPORTING native        TYPE abap_bool
+      RETURNING VALUE(result) TYPE ty_t_tuple
+      RAISING   zzxxmla1_cx_xmla.
     METHODS native_filter
       IMPORTING evaluator     TYPE ty_evaluator
                 node          TYPE ty_node
@@ -1101,6 +1118,16 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       IMPORTING evaluator     TYPE ty_evaluator
                 node          TYPE ty_node
       RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_evaluator=>ty_value
+      RAISING   zzxxmla1_cx_xmla.
+    "! The number of tuples of &lt;Member&gt;.Children, also in AddCalculatedMembers of a hierarchy without calculated
+    "! members, without reading them: a count query (get_children_count), the first one for the members of the axes
+    "! too (count_members); our shortcut, the same number. Not found for any other set or while the evaluator is
+    "! non-empty (non_empty_children reads the children with facts then).
+    METHODS children_count
+      IMPORTING evaluator     TYPE ty_evaluator
+                node          TYPE ty_node
+      EXPORTING found         TYPE abap_bool
+      RETURNING VALUE(result) TYPE i
       RAISING   zzxxmla1_cx_xmla.
     "! The set of an aggregate function, non-empty off (AbstractAggregateFunDef.evaluateCurrentList).
     METHODS evaluate_current_list
@@ -1777,6 +1804,11 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       RETURNING VALUE(result) TYPE REF TO zzxxmla1_cx_mdx_evaluation.
     METHODS set_display_info
       CHANGING tuples TYPE ty_t_tuple.
+    "! The members of the axes whose children can be counted: the stored ones, and the ones visual totals stand for
+    "! (stored then).
+    CLASS-METHODS stored_members
+      IMPORTING axes          TYPE ty_t_axis
+      RETURNING VALUE(result) TYPE ty_t_member.
     METHODS fail
       IMPORTING message TYPE string
       RAISING   zzxxmla1_cx_xmla.
@@ -2007,6 +2039,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     IF cells_needed( result = result non_empty = xsdbool( line_exists( query_axes[ non_empty = abap_true ] ) ) )
        = abap_true.
       set_phase( `Cells` ).
+      count_members = stored_members( result-axes ).
       " planning: all patterns with one statement, a compound slicer as a predicate
       DATA(slicer_predicate) = COND zzxxmla1_cl_mdx_facts=>ty_t_predicate(
         WHEN relational = abap_true AND lines( result-slicer ) > 1 THEN compound_predicate( result-slicer ) ).
@@ -2049,7 +2082,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       ENDIF.
     ENDIF.
     fact_reader->set_batching( abap_false ).
-    CLEAR final_cells.
+    CLEAR: final_cells, count_members.
     set_phase( `Finish` ).
 
     LOOP AT query_axes INTO query_axis WHERE non_empty = abap_true.
@@ -2768,7 +2801,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       WHEN zzxxmla1_cl_mdx_node=>c_kind-level.
         " the (All) level has no key column
         DATA(level) = schema_reader->get_level( arg->element-id ).
-        IF level-key_level > 0.
+        " in a Filter's condition only the filtered level of its hierarchy
+        IF level-key_level > 0 AND ( filter_level-hierarchy <> level-hierarchy OR filter_level-level = level-key_level ).
           result = VALUE #( found = abap_true hierarchy = level-hierarchy level = level-key_level ).
         ENDIF.
         RETURN.
@@ -2784,7 +2818,11 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     IF hierarchy = zzxxmla1_cl_mdx_schema_reader=>c_measures.
       RETURN.
     ENDIF.
-    " the lowest level that is not the (All) level
+    " in a Filter's condition the filtered level, else the lowest level that is not the (All) level
+    IF filter_level-hierarchy = hierarchy.
+      result = VALUE #( found = abap_true hierarchy = hierarchy level = filter_level-level ).
+      RETURN.
+    ENDIF.
     DATA(model) = schema_reader->get_hierarchy( hierarchy )-model.
     DATA(levels) = lines( model-levels ).
     IF levels > 0.
@@ -5296,6 +5334,18 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
           result-text = substring( val = text-text off = start - 1
                                    len = nmin( val1 = length val2 = strlen( text-text ) - start + 1 ) ).
         ENDIF.
+      WHEN `LEFT|Function|9,15` OR `RIGHT|Function|9,15`.
+        " Vba.left, Vba.right: the first or last characters, the whole text if it is not longer
+        text = evaluate_string( evaluator = evaluator node = node->args[ 1 ] ).
+        length = trunc( evaluate_number( evaluator = evaluator node = node->args[ 2 ] ) ).
+        IF length < 0.
+          fail( |String index out of range: { length }| ).
+        ENDIF.
+        result = VALUE #( kind = zzxxmla1_cl_mdx_evaluator=>c_value-string text = text-text ).
+        IF length < strlen( text-text ).
+          result-text = COND #( WHEN to_upper( node->fun_def-name ) = `LEFT` THEN substring( val = text-text len = length )
+                                ELSE substring( val = text-text off = strlen( text-text ) - length len = length ) ).
+        ENDIF.
       WHEN `INSTR|Function|9,9` OR `INSTR|Function|15,9,9` OR `INSTR|Function|15,9,9,15`.
         " the compare argument is not used (the reference's todo)
         DATA(first_text) = COND i( WHEN lines( node->args ) = 2 THEN 1 ELSE 2 ).
@@ -5591,6 +5641,10 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
 
   METHOD filter.
     DATA native TYPE abap_bool.
+    result = native_label_filter( EXPORTING evaluator = evaluator node = node IMPORTING native = native ).
+    IF native = abap_true.
+      RETURN.
+    ENDIF.
     result = native_filter( EXPORTING evaluator = evaluator node = node IMPORTING native = native ).
     IF native = abap_true.
       RETURN.
@@ -5746,6 +5800,51 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
                                          with_empty    = with_empty
                                          tuple_filters = tuple_filters ).
     result = tuples_of_paths( EXPORTING args = args rows = rows IMPORTING native = native ).
+  ENDMETHOD.
+
+  METHOD native_label_filter.
+    CLEAR native.
+    IF lines( node->args ) <> 2 OR evaluator->is_non_empty( ) = abap_true.
+      RETURN.
+    ENDIF.
+    DATA(set) = node->args[ 1 ].
+    IF set->kind = zzxxmla1_cl_mdx_node=>c_kind-resolved_call AND to_upper( set->fun_def-name ) = `ADDCALCULATEDMEMBERS`
+        AND lines( set->args ) = 1.
+      set = set->args[ 1 ].
+    ENDIF.
+    direct_cj_arg( EXPORTING node = set IMPORTING arg = DATA(arg) found = DATA(found) ).
+    IF found = abap_false OR arg-member_list = abap_true OR arg-hierarchy = zzxxmla1_cl_mdx_schema_reader=>c_measures
+        OR schema_reader->get_calculated_members( arg-hierarchy ) IS NOT INITIAL.
+      RETURN.
+    ENDIF.
+    DATA(key_level) = schema_reader->get_level( arg-level )-key_level.
+    IF key_level = 0 OR arg-ancestor-key_level > key_level.
+      RETURN.
+    ENDIF.
+    " the condition, the current member of the hierarchy one of the level's members; only columns of the hierarchy
+    DATA predicate TYPE zzxxmla1_cl_mdx_facts=>ty_t_predicate.
+    filter_level = VALUE #( found = abap_true hierarchy = arg-hierarchy level = key_level ).
+    DATA(root) = condition_predicate( EXPORTING node = node->args[ 2 ] CHANGING predicate = predicate ).
+    CLEAR filter_level.
+    IF root = 0.
+      RETURN.
+    ENDIF.
+    LOOP AT predicate TRANSPORTING NO FIELDS
+         WHERE ( kind = zzxxmla1_cl_mdx_facts=>c_predicate-value AND column-hierarchy <> arg-hierarchy )
+            OR ( kind = zzxxmla1_cl_mdx_facts=>c_predicate-member AND member-hierarchy <> arg-hierarchy ).
+      RETURN.
+    ENDLOOP.
+    " InStr ignores case (Vba.inStr, java_in_str); the subcube's contains does not (our patch of the reference)
+    LOOP AT predicate ASSIGNING FIELD-SYMBOL(<part>) WHERE column-operator = `CONTAINS`.
+      <part>-column-operator = `ICONTAINS`.
+    ENDLOOP.
+    LOOP AT schema_reader->get_level_members_where(
+              level     = arg-level
+              condition = fact_reader->member_condition( predicate = predicate index = root )
+              ancestor  = arg-ancestor ) INTO DATA(member).
+      APPEND VALUE #( ( member ) ) TO result.
+    ENDLOOP.
+    native = abap_true.
   ENDMETHOD.
 
   METHOD native_filter.
@@ -7106,10 +7205,14 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD count.
+    DATA found TYPE abap_bool.
     result-kind = zzxxmla1_cl_mdx_evaluator=>c_value-integer.
     IF node->fun_def-syntax = zzxxmla1_cl_mdx_node=>c_syntax-property.
       " <Set>.Count: the size of the list as it is evaluated
-      result-number = lines( evaluate_set( evaluator = evaluator node = node->args[ 1 ] ) ).
+      result-number = children_count( EXPORTING evaluator = evaluator node = node->args[ 1 ] IMPORTING found = found ).
+      IF found = abap_false.
+        result-number = lines( evaluate_set( evaluator = evaluator node = node->args[ 1 ] ) ).
+      ENDIF.
       RETURN.
     ENDIF.
     " the flag as written: only INCLUDEEMPTY (the default) counts the empty cells
@@ -7117,6 +7220,13 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     DATA(savepoint) = evaluator->savepoint( ).
     evaluator->set_non_empty( abap_false ).
     TRY.
+        IF include_empty = abap_true.
+          result-number = children_count( EXPORTING evaluator = evaluator node = node->args[ 1 ] IMPORTING found = found ).
+          IF found = abap_true.
+            evaluator->restore( savepoint ).
+            RETURN.
+          ENDIF.
+        ENDIF.
         DATA(tuples) = evaluate_set( evaluator = evaluator node = node->args[ 1 ] ).
         IF include_empty = abap_true.
           result-number = lines( tuples ).
@@ -7132,6 +7242,34 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         evaluator->restore( savepoint ).
     ENDTRY.
     evaluator->restore( savepoint ).
+  ENDMETHOD.
+
+  METHOD children_count.
+    CLEAR found.
+    IF evaluator->is_non_empty( ) = abap_true.
+      RETURN.
+    ENDIF.
+    DATA(set) = node.
+    DATA(add_calculated) = xsdbool( set->kind = zzxxmla1_cl_mdx_node=>c_kind-resolved_call
+                                    AND to_upper( set->fun_def-name ) = `ADDCALCULATEDMEMBERS`
+                                    AND lines( set->args ) = 1 ).
+    IF add_calculated = abap_true.
+      set = set->args[ 1 ].
+    ENDIF.
+    IF key_of( set ) <> `CHILDREN|Property|6`.
+      RETURN.
+    ENDIF.
+    DATA(parent) = evaluate_member( evaluator = evaluator node = set->args[ 1 ] ).
+    IF add_calculated = abap_true AND query_calculated_members( parent-hier_id ) IS NOT INITIAL.
+      RETURN.
+    ENDIF.
+    " the members the cells count the children of, in one query per level
+    IF count_members IS NOT INITIAL.
+      schema_reader->prefetch_children_counts( count_members ).
+      CLEAR count_members.
+    ENDIF.
+    result = schema_reader->get_children_count( parent ).
+    found = abap_true.
   ENDMETHOD.
 
   METHOD evaluate_current_list.
@@ -9409,15 +9547,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     " The reference: the number of children (at most 0xffff), 0x10000 if the next tuple's member is a child of this one,
     " 0x20000 if the parent is the one of the previous tuple's member
     " the stored members, and the ones visual totals stand for: their children counted in one query per level
-    DATA(stored) = VALUE ty_t_member( ).
-    LOOP AT tuples INTO DATA(tuple).
-      LOOP AT tuple INTO DATA(member) WHERE is_null = abap_false
-                                        AND ( calculated = abap_false OR calc_name IS NOT INITIAL ).
-        member-calculated = abap_false.
-        APPEND member TO stored.
-      ENDLOOP.
-    ENDLOOP.
-    schema_reader->prefetch_children_counts( stored ).
+    schema_reader->prefetch_children_counts( stored_members( VALUE #( ( tuples = tuples ) ) ) ).
     DATA(count) = lines( tuples ).
     DO count TIMES.
       DATA(position) = sy-index.
@@ -9440,6 +9570,18 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         ENDIF.
       ENDLOOP.
     ENDDO.
+  ENDMETHOD.
+
+  METHOD stored_members.
+    LOOP AT axes INTO DATA(axis).
+      LOOP AT axis-tuples INTO DATA(tuple).
+        LOOP AT tuple INTO DATA(member) WHERE is_null = abap_false
+                                          AND ( calculated = abap_false OR calc_name IS NOT INITIAL ).
+          member-calculated = abap_false.
+          APPEND member TO result.
+        ENDLOOP.
+      ENDLOOP.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD fail.

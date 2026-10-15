@@ -85,7 +85,8 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
         value     TYPE string,
         is_null   TYPE abap_bool,   " the column IS NULL
         quoted    TYPE abap_bool,   " the value is compared as a string literal, else as a number
-        "! empty (=), <, <=, >, >=, or BEGINS, ENDS, CONTAINS (the text of the column, LIKE): Excel's label filters
+        "! empty (=), <, <=, >, >=, or BEGINS, ENDS, CONTAINS (the text of the column, LIKE): Excel's label filters;
+        "! ICONTAINS ignores case (InStr in a Filter, Vba.inStr)
         operator  TYPE string,
       END OF ty_value_column.
     TYPES:
@@ -325,6 +326,12 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
     "! as the reference server adds it to every cell request and native set (RolapEvaluator.getSubcubePredicate).
     METHODS set_subcube
       IMPORTING predicate TYPE ty_t_predicate.
+    "! The SQL condition of a node of a predicate on the columns of one hierarchy's member table, unqualified (a level's
+    "! members read with it, ZZXXMLA1_CL_MODEL=>READ_MEMBERS).
+    METHODS member_condition
+      IMPORTING predicate     TYPE ty_t_predicate
+                index         TYPE i
+      RETURNING VALUE(result) TYPE string.
     "! The fact rows of a cell (RolapCell.drillThroughInternal with an extended context): a request
     "! (RolapAggregationManager.makeDrillThroughRequest) of the key columns of every level of the cell's hierarchies,
     "! the levels of each member and its ancestors up to a unique level constrained to the member's keys, read as
@@ -466,10 +473,11 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
       IMPORTING operand       TYPE ty_top_operand
       RETURNING VALUE(result) TYPE string.
     "! The SQL condition of a node of a predicate (the subcube's, a compound slicer's); the hierarchies of its members
-    "! are joined as s and the position of the hierarchy.
+    "! are joined as s and the position of the hierarchy, its columns qualified so unless qualified is false.
     METHODS predicate_sql
       IMPORTING predicate     TYPE ty_t_predicate
                 index         TYPE i
+                qualified     TYPE abap_bool DEFAULT abap_true
       CHANGING  joined        TYPE ty_t_index
       RETURNING VALUE(result) TYPE string.
     "! The star of the cube (RolapCube's registration of its levels with RolapStar.Table.makeColumns), made once.
@@ -1494,6 +1502,12 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
     ENDWHILE.
   ENDMETHOD.
 
+  METHOD member_condition.
+    DATA joined TYPE ty_t_index.
+    result = predicate_sql( EXPORTING predicate = predicate index = index qualified = abap_false
+                            CHANGING  joined    = joined ).
+  ENDMETHOD.
+
   METHOD predicate_sql.
     DATA(node) = predicate[ index ].
     CASE node-kind.
@@ -1510,14 +1524,16 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
         DATA(conditions) = VALUE string_table( ).
         LOOP AT hierarchies[ id ]-levels INTO DATA(level) TO node-member-level.
           DATA(key) = COND string( WHEN sy-tabix <= lines( keys ) THEN keys[ sy-tabix ] ).
-          APPEND zzxxmla1_cl_sql=>key_condition( column = |s{ id }.{ zzxxmla1_cl_sql=>quote( level-key_column ) }|
-                                                 key    = key ) TO conditions.
+          APPEND zzxxmla1_cl_sql=>key_condition(
+                   column = COND #( WHEN qualified = abap_true THEN |s{ id }.| ) && zzxxmla1_cl_sql=>quote( level-key_column )
+                   key    = key ) TO conditions.
         ENDLOOP.
         result = |( { concat_lines_of( table = conditions sep = ` AND ` ) } )|.
       WHEN c_predicate-and OR c_predicate-or.
         DATA(parts) = VALUE string_table( ).
         LOOP AT node-children INTO DATA(child).
-          APPEND predicate_sql( EXPORTING predicate = predicate index = child CHANGING joined = joined ) TO parts.
+          APPEND predicate_sql( EXPORTING predicate = predicate index = child qualified = qualified
+                                CHANGING  joined    = joined ) TO parts.
         ENDLOOP.
         IF parts IS INITIAL.
           result = COND #( WHEN node-kind = c_predicate-and THEN `1 = 1` ELSE `1 = 0` ).
@@ -1525,18 +1541,18 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
           result = |( { concat_lines_of( table = parts sep = | { node-kind } | ) } )|.
         ENDIF.
       WHEN c_predicate-not.
-        result = |NOT ( { predicate_sql( EXPORTING predicate = predicate index = node-children[ 1 ]
+        result = |NOT ( { predicate_sql( EXPORTING predicate = predicate index = node-children[ 1 ] qualified = qualified
                                          CHANGING  joined    = joined ) } )|.
       WHEN c_predicate-value.
         id = node-column-hierarchy.
         IF NOT line_exists( joined[ table_line = id ] ).
           APPEND id TO joined.
         ENDIF.
-        DATA(column) = |s{ id }.{ zzxxmla1_cl_sql=>quote( node-column-column ) }|.
+        DATA(column) = COND string( WHEN qualified = abap_true THEN |s{ id }.| ) && zzxxmla1_cl_sql=>quote( node-column-column ).
         DATA(operator) = COND string( WHEN node-column-operator IS INITIAL THEN `=` ELSE node-column-operator ).
         IF node-column-is_null = abap_true.
           result = |{ column } IS NULL|.
-        ELSEIF operator = `BEGINS` OR operator = `ENDS` OR operator = `CONTAINS`.
+        ELSEIF operator = `BEGINS` OR operator = `ENDS` OR operator = `CONTAINS` OR operator = `ICONTAINS`.
           " LIKE with \ as escape character for \, % and _
           DATA(pattern) = replace( val = node-column-value sub = `\` with = `\\` occ = 0 ).
           pattern = replace( val = pattern sub = `%` with = `\%` occ = 0 ).
@@ -1544,7 +1560,10 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
           pattern = COND #( WHEN operator = `BEGINS` THEN pattern && `%`
                             WHEN operator = `ENDS` THEN `%` && pattern
                             ELSE `%` && pattern && `%` ).
-          result = |TO_NVARCHAR( { column } ) LIKE { zzxxmla1_cl_sql=>literal( pattern ) } ESCAPE '\\'|.
+          result = COND #( WHEN operator = `ICONTAINS`
+                           THEN |LOWER( TO_NVARCHAR( { column } ) ) LIKE LOWER( { zzxxmla1_cl_sql=>literal( pattern ) } )|
+                           ELSE |TO_NVARCHAR( { column } ) LIKE { zzxxmla1_cl_sql=>literal( pattern ) }| )
+                && | ESCAPE '\\'|.
         ELSEIF node-column-quoted = abap_true.
           " a string comparison: the column may be a number, so its text is compared
           result = |TO_NVARCHAR( { column } ) { operator } { zzxxmla1_cl_sql=>literal( node-column-value ) }|.

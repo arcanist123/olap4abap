@@ -153,6 +153,14 @@ CLASS zzxxmla1_cl_mdx_schema_reader DEFINITION
     METHODS get_level_members
       IMPORTING level         TYPE i
       RETURNING VALUE(result) TYPE ty_t_member.
+    "! The members of a level in hierarchy order whose rows hold a condition (SQL on the columns of the hierarchy's
+    "! member table, ZZXXMLA1_CL_MODEL=>READ_MEMBERS), below an ancestor if one is given: one query (a Filter by the
+    "! labels of the members, read as SqlMemberSource reads a level with a constraint).
+    METHODS get_level_members_where
+      IMPORTING level         TYPE i
+                !condition    TYPE string
+                ancestor      TYPE ty_member OPTIONAL
+      RETURNING VALUE(result) TYPE ty_t_member.
     "! The members of the first level of a hierarchy: its All member, without one the first level read whole.
     METHODS get_hierarchy_root_members
       IMPORTING hierarchy     TYPE i
@@ -951,6 +959,20 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
              INTO TABLE level_lists ASSIGNING <level>.
     ENDIF.
     result = <level>-members.
+  ENDMETHOD.
+
+  METHOD get_level_members_where.
+    DATA(element) = levels[ level ].
+    IF element-key_level = 0 OR element-hierarchy = c_measures.
+      RETURN.
+    ENDIF.
+    DATA(where) = condition.
+    IF ancestor-key_level > 0.
+      where = |{ zzxxmla1_cl_model=>path_condition( hierarchy = model_hierarchies[ element-hierarchy ]
+                                                     level_no  = ancestor-key_level
+                                                     path      = ancestor-path ) } AND ( { where } )|.
+    ENDIF.
+    result = read( hierarchy = element-hierarchy level_no = element-key_level condition = where ).
   ENDMETHOD.
 
   METHOD get_hierarchy_root_members.
