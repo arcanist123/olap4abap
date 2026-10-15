@@ -338,6 +338,6 @@ After changing ABAP in SAP, run `pull` before committing so `src/` is current.
 
 ## Working agreements
 
-- Do not commit credentials: `.mcp.json` is git-ignored; `.mcp.json.example` shows its shape.
+- Do not commit credentials: `.mcp.json` is git-ignored.
 - Authorisations (BW analysis authorisations) are out of scope - do not plan or propose them.
 - Third-party reference code (`mondrian/`, `eMondrian/`) is fetched by `scripts/setup-reference.sh`, not committed.

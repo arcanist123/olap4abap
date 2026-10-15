@@ -8,7 +8,8 @@
   access is enabled through logon data on the ICF node (dev system only). The earlier 401 happened before that was set.
 - Package `$ZZXXMLA1` is created by hand (ADT or SE80); the ABAP FS tool cannot create packages
   ("Parameter recordChanges could not be found. Your client is out of date.").
-- Connect Claude Code via `.mcp.json` (copy `.mcp.json.example`, put in the bearer token from the ABAP FS extension).
+- Connect Claude Code via `.mcp.json` (git-ignored, it holds credentials): the MCP servers, among them vsp
+  (`--url http://vhcala4hci:50000/ --user DEVELOPER --client 001`).
 
 ## Syncing code between SAP and git (vsp, sapcli)
 
