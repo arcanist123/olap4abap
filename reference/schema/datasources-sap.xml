@@ -8,7 +8,7 @@
   Add a catalog: write its schema file among the server's files and add a <Catalog> whose Definition is its path, e.g.
     python scripts/sap-files.py put my/Schema.xml /WEB-INF/schema/Schema.xml
     python scripts/sap-files.py put reference/schema/datasources-sap.xml /WEB-INF/datasources.xml
-  (scripts/sap-files.py deploy writes this file and FoodmartBW.xml).
+  (scripts/sap-files.py deploy writes FoodmartBW.xml and merges these catalogs into the server's file).
 -->
 <DataSources>
   <DataSource>
@@ -20,12 +20,12 @@
     <ProviderType>MDP</ProviderType>
     <AuthenticationMode>Unauthenticated</AuthenticationMode>
     <Catalogs>
-        <Catalog name="ZFOODMART">
-            <Definition>/WEB-INF/schema/FoodmartBW.xml</Definition>
-        </Catalog>
-        <Catalog name="ZFMDRILL">
-            <Definition>/WEB-INF/schema/FoodmartBWDrill.xml</Definition>
-        </Catalog>
+      <Catalog name="ZFOODMART">
+        <Definition>/WEB-INF/schema/FoodmartBW.xml</Definition>
+      </Catalog>
+      <Catalog name="ZFMDRILL">
+        <Definition>/WEB-INF/schema/FoodmartBWDrill.xml</Definition>
+      </Catalog>
     </Catalogs>
   </DataSource>
 </DataSources>

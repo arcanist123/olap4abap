@@ -294,7 +294,7 @@ not part of it (`scripts/sap-files.py deploy`):
 them only in the schema generator's `accept` (`ZZXXMLA1_CL_SCHEMA_API`: a schema file and its catalog); in Git Bash set `MSYS_NO_PATHCONV=1`, or it turns `/WEB-INF/...` into a Windows path.
 A new file is read by the next request.
 
-    python scripts/sap-files.py deploy             # datasources-sap.xml and FoodmartBW.xml, as this repository has them
+    python scripts/sap-files.py deploy             # FoodmartBW(Drill).xml; merges datasources-sap.xml's catalogs into the server's, keeps the others
     python scripts/sap-files.py put my/Sales.xml /WEB-INF/schema/Sales.xml   # a new schema; then a <Catalog> for it in
     python scripts/sap-files.py put reference/schema/datasources-sap.xml /WEB-INF/datasources.xml   # datasources-sap.xml
     python scripts/sap-files.py list | get <path> | delete <path>

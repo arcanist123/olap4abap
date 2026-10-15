@@ -5,7 +5,7 @@ A catalog or a schema is added by writing files, without any new ABAP object.
 
     python scripts/sap-files.py put reference/schema/FoodmartBW.xml /WEB-INF/schema/FoodmartBW.xml
     python scripts/sap-files.py put reference/schema/datasources-sap.xml /WEB-INF/datasources.xml
-    python scripts/sap-files.py deploy               # the above and FoodmartBWDrill.xml: the server's files as this repository has them
+    python scripts/sap-files.py deploy               # the above and FoodmartBWDrill.xml; keeps the server's other catalogs
     python scripts/sap-files.py list
     python scripts/sap-files.py get /WEB-INF/datasources.xml
     python scripts/sap-files.py delete /WEB-INF/schema/Old.xml
@@ -13,12 +13,16 @@ A catalog or a schema is added by writing files, without any new ABAP object.
 Each command is one `sapcli abap run` (a temporary classrun class, as the user of .env.sap; the endpoint itself writes
 only in the schema generator's accept). The content travels base64 encoded, so any text gets there unchanged (UTF-8, line ends
 as LF). A new data sources file or schema is read by the next request; no restart is needed.
+`deploy` writes the schema files as this repository has them and merges the repository's catalogs into the server's
+data sources file: a catalog of the same name is replaced, the others (the setup's demos, the schema builder's accepted
+catalogs) stay; without a data sources file on the server the repository's is written.
 In Git Bash, run with MSYS_NO_PATHCONV=1: otherwise it turns /WEB-INF/... into a Windows path before Python sees it.
 """
 import argparse
 import base64
 import os
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -28,8 +32,10 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 DEPLOY = [
     ("reference/schema/FoodmartBW.xml", "/WEB-INF/schema/FoodmartBW.xml"),
     ("reference/schema/FoodmartBWDrill.xml", "/WEB-INF/schema/FoodmartBWDrill.xml"),
-    ("reference/schema/datasources-sap.xml", "/WEB-INF/datasources.xml"),
 ]
+# the data sources file `deploy` merges its catalogs from
+DATASOURCES = ("reference/schema/datasources-sap.xml", "/WEB-INF/datasources.xml")
+MISSING = "<<file does not exist>>"
 CHUNK = 120  # characters of base64 per source line
 
 
@@ -76,7 +82,11 @@ def literal(text):
 
 
 def put(local, path):
-    text = pathlib.Path(local).read_text(encoding="utf-8-sig").replace("\r\n", "\n")
+    put_text(pathlib.Path(local).read_text(encoding="utf-8-sig"), path)
+
+
+def put_text(text, path):
+    text = text.replace("\r\n", "\n")
     encoded = base64.b64encode(text.encode("utf-8")).decode("ascii")
     # a statement per chunk: one VALUE of all of them exceeds the length of a statement for a large schema
     lines = [f"APPEND {literal(encoded[i:i + CHUNK])} TO chunks." for i in range(0, len(encoded), CHUNK)]
@@ -94,16 +104,85 @@ def put(local, path):
     print(run_abap(code).strip())
 
 
-def get(path):
+def read(path):
+    """The content of a file of the server, None if it does not exist."""
     code = "\n".join([
         f"DATA(file) = zzxxmla1_cl_files=>read( {literal(path)} ).",
         "IF file-path IS INITIAL.",
-        f"  out->write( |{{ {literal(path)} }} does not exist| ).",
+        f"  out->write( {literal(MISSING)} ).",
         "ELSE.",
         "  out->write( file-content ).",
         "ENDIF.",
     ])
-    print(run_abap(code), end="")
+    text = run_abap(code)
+    return None if text.strip() == MISSING else text
+
+
+def get(path):
+    text = read(path)
+    if text is None:
+        print(f"{path} does not exist")
+    else:
+        print(text, end="")
+
+
+DATA_SOURCE = re.compile(r"<DataSource>.*?</DataSource>", re.S)
+CATALOG = re.compile(r'[ \t]*<Catalog\s+name="([^"]*)"(?:[^>]*/>|.*?</Catalog>)', re.S)
+
+
+def reindent(block, indent):
+    lines = block.strip("\n").split("\n")
+    own = len(lines[0]) - len(lines[0].lstrip())
+    return "\n".join(indent + line[own:] if not line[:own].strip() else line for line in lines)
+
+
+def merge_catalogs(server, local):
+    """The server's data sources file with the local one's catalogs: a catalog of the same name in the data source of
+    the same name is replaced, a new one appended to that data source's catalogs, a data source the server lacks
+    appended; everything else in the server's file stays as it is."""
+    for local_source in DATA_SOURCE.findall(local):
+        name = re.search(r"<DataSourceName>\s*(.*?)\s*</DataSourceName>", local_source, re.S).group(1)
+        source = next((m for m in DATA_SOURCE.finditer(server)
+                       if re.search(rf"<DataSourceName>\s*{re.escape(name)}\s*</DataSourceName>", m.group(0))), None)
+        if source is None:
+            end = server.rindex("</DataSources>")
+            server = server[:end] + reindent(local_source, "  ") + "\n" + server[end:]
+            continue
+        text = source.group(0)
+        text = re.sub(r"([ \t]*)<Catalogs\s*/>", r"\1<Catalogs>\n\1</Catalogs>", text)
+        if "</Catalogs>" not in text:
+            indent = re.search(r"\n([ \t]*)</DataSource>", text).group(1) + "  "
+            end = text.rindex("</DataSource>")
+            text = text[:end].rstrip(" \t") + f"{indent}<Catalogs>\n{indent}</Catalogs>\n" + text[end:]
+        indent = re.search(r"([ \t]*)</Catalogs>", text).group(1) + "  "
+        for catalog in CATALOG.finditer(local_source):
+            block = reindent(catalog.group(0), indent)
+            same = next((m for m in CATALOG.finditer(text) if m.group(1) == catalog.group(1)), None)
+            if same:
+                text = text[:same.start()] + block + text[same.end():]
+            else:
+                end = re.search(r"[ \t]*</Catalogs>", text).start()
+                text = text[:end] + block + "\n" + text[end:]
+        server = server[:source.start()] + text + server[source.end():]
+    return server
+
+
+def deploy():
+    # one sapcli call after the other (work processes in PRIV mode, docs/environment.md)
+    for local, path in DEPLOY:
+        put(ROOT / local, path)
+    local, path = DATASOURCES
+    local_text = (ROOT / local).read_text(encoding="utf-8-sig").replace("\r\n", "\n")
+    server = read(path)
+    if server is None:
+        put_text(local_text, path)
+        return
+    server = server.replace("\r\n", "\n")
+    merged = merge_catalogs(server, local_text)
+    if merged == server:
+        print(f"{path}: the catalogs are there already")
+    else:
+        put_text(merged, path)
 
 
 def list_files():
@@ -131,7 +210,7 @@ def main():
     put_parser = commands.add_parser("put", help="write a local file to a path on the server")
     put_parser.add_argument("local")
     put_parser.add_argument("path")
-    commands.add_parser("deploy", help="write the server's files as this repository has them")
+    commands.add_parser("deploy", help="write the repository's schemas and merge its catalogs into the server's")
     commands.add_parser("list", help="list the server's files")
     get_parser = commands.add_parser("get", help="print a file of the server")
     get_parser.add_argument("path")
@@ -143,9 +222,7 @@ def main():
     if args.command == "put":
         put(args.local, args.path)
     elif args.command == "deploy":
-        # one sapcli call after the other (work processes in PRIV mode, docs/environment.md)
-        for local, path in DEPLOY:
-            put(ROOT / local, path)
+        deploy()
     elif args.command == "list":
         list_files()
     elif args.command == "get":
