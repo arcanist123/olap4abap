@@ -81,11 +81,20 @@ Decided with the user 2026-10-15:
   statement, a range join over `LISTNO`: a node's subtree ends before the next row at its level or above; the rows
   with `LISTNO` 0 and the not-assigned rows left out; a node's distinct values cross-checked with BW's: its leaf rows
   plus its correction rows' factors). It is lazy: a query compares the hierarchy's current row of `RSRHIEDIR_OLAP`
-  (`SVER`, `TIMESTMP`) with the copy's (one key read) and rebuilds a stale hierarchy under an enqueue lock; a limit
-  on occurrences refuses a hierarchy whose expansion explodes.
+  (`SVER`, `TIMESTMP`) with the copy's (one key read) and refills a stale hierarchy under an enqueue lock
+  (`ENQUEUE_E_TABLE` on the directory table, decided with the user 2026-10-15): another query that resolves the
+  hierarchy waits for the lock, so it reads a consistent state. No limit on occurrences: shared subtrees are expanded
+  whatever their size (a limit was considered and not agreed). The refusals (a duplicate value with another subtree,
+  a value both an inner node and a leaf, more than one current row of `RSRHIEDIR_OLAP`) are faults of the query that
+  resolves the hierarchy.
 - **Where the copies live** (decided with the user 2026-10-15): a node table and a closure table per InfoObject,
   holding all of its hierarchies, as BW's `/BIC/I<char>` does. Not one table pair for all hierarchies of all
-  InfoObjects (it would grow beyond what HANA handles well) and not a table pair per hierarchy.
+  InfoObjects (it would grow beyond what HANA handles well) and not a table pair per hierarchy. They are DDIC
+  tables (decided with the user 2026-10-15; plain database tables created through ADBC need HANA's enterprise license
+  and are hard to transport), generated in `$TMP` as the views are and found by the generator through a registry
+  table as `ZZXXMLA1_VIEW` (a DDIC table name has at most 16 characters, so the names are generated). They are
+  created when a schema that names a hierarchy of the InfoObject is accepted, never by a query: a query only refills
+  them. They are client-independent, as BW's hierarchy tables are (no `MANDT`).
 - **Ids are BW's** (decided with the user 2026-10-15): every inner node occurrence has its own negative node SID in
   `/BIC/K<char>`, also the occurrences inside an expanded link subtree (`ZCLPAT_PRG`: the link SENIOR -13, the HEART
   and FALLS under it -14 and -15, `LINKNO` 2 and 1), the postable nodes and `REST_H`; node SIDs are unique per
@@ -122,7 +131,8 @@ Decided with the user 2026-10-15:
   activated (`ZCLSERV_CAT`), not from `/BIC/J`.
 - **Not assigned** (values of the master data under no leaf) is a configuration of the hierarchy, as in BW (shown or
   suppressed), read live by a view (`closure UNION ALL` the rest node with every SID that is no leaf), so that it
-  follows master data loads without a rebuild.
+  follows master data loads without a rebuild. The schema and the UI offer no switch for it (decided with the user
+  2026-10-15): the copy follows the hierarchy's own setting in BW (its attribute Suppress 'Unassigned' Node).
 - **Several hierarchies on one characteristic** are allowed: they are more hierarchies of its dimension, next to the
   flat one and the navigation attributes'; one on its All member needs no closure.
 - **Sign reversal** (`FACTOR`) is out of scope.
@@ -131,6 +141,11 @@ Decided with the user 2026-10-15:
 - **Demo:** the clinic demo gets a hierarchy with shared nodes (link nodes, recursively), a postable node and an
   interval leaf. Done: the shared nodes and postable nodes (`ZCLPAT_PRG` on the patient) and intervals,
   overlapping and linked (`ZCLSERV_CAT` on the service).
+
+Part one (agreed with the user 2026-10-15, next): the copies. The node, closure and directory tables (created on
+accept), their refill from `/BIC/I` and `/BIC/K` on a stale `RSRHIEDIR_OLAP` row under the lock, the refusals, and
+the not-assigned view as the hierarchy's BW setting says; everything the queries need to read a hierarchy
+consistently. The schema, the names, the engine and the UI (open 2 to 5) build on it.
 
 Open:
 
@@ -148,7 +163,8 @@ Open:
    engine shows a member's name as its caption (`captionColumn` is paused with the texts).
 4. The engine: members of a parent-child level and the closure in the fact reads; the planner marks such members
    computed at first, so the evaluator answers them, native and grouped reads later.
-5. The proposal and the UI: offer the hierarchies a characteristic has in `RSHIEDIR`, and the not-assigned switch.
+5. The proposal and the UI: offer the hierarchies a characteristic has in `RSHIEDIR` (no not-assigned switch: the
+   hierarchy's setting in BW holds).
 6. Measure HANA's plan cache (`M_SQL_PLAN_CACHE`: entries, `PREPARATION_COUNT`, `TOTAL_PREPARATION_TIME` against
    `TOTAL_EXECUTION_TIME`): a statement on a view with two literals and with a bound parameter, and the share of
    preparation in a FoodMart run. It decides whether the engine's fact and member reads move to bound parameters and
