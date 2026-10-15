@@ -373,8 +373,9 @@ CLASS zzxxmla1_cl_trace IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD seconds_before.
-    " whole seconds: the trace needs no finer limit
-    result = cl_abap_tstmp=>subtractsecs( tstmp = CONV timestamp( tstmp ) secs = seconds ) ##TYPE.
+    " whole seconds: the trace needs no finer limit; cut, not rounded (CONV timestamp rounds 59.6 to 60, which
+    " subtractsecs refuses)
+    result = cl_abap_tstmp=>subtractsecs( tstmp = CONV timestamp( trunc( tstmp ) ) secs = seconds ) ##TYPE.
   ENDMETHOD.
 
   METHOD active_until.

@@ -1580,7 +1580,8 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
       result = `null`.
       RETURN.
     ENDIF.
-    DATA(seconds) = CONV timestamp( value ).
+    " cut, not rounded: CONV timestamp rounds 59.6 to second 60
+    DATA(seconds) = CONV timestamp( trunc( value ) ).
     result = |"{ seconds TIMESTAMP = ISO }Z"|.
   ENDMETHOD.
 

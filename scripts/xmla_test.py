@@ -4,7 +4,10 @@
 Each case directory holds request.xml and response.xml (captured from eMondrian, see docs/test-strategy.md) and
 optionally status.txt (the HTTP status; 200 if missing) and ignore.txt: one XML element name per line whose text may
 differ (URLs, descriptions, ...); `Name@Key=Text` limits that to rows that have a child element Key with the text Text;
-`@Name` ignores the attribute Name of every element (used for parser messages in faults). Responses are
+`@Name` ignores the attribute Name of every element (used for parser messages in faults). A case with subset.txt
+(its text says why) allows rows the expected response does not have: rows of the actual response that are not
+among the expected ones are dropped before the comparison, so the expected rows must still all be there, in their
+order (a rowset of all catalogs or schemas: the server may have catalogs besides FoodMart's). Responses are
 compared as canonical XML without whitespace-only text, so formatting does not matter, but names, namespaces, order
 and values do.
 
@@ -36,7 +39,7 @@ def soap_action(request_xml):
     return SOAP_ACTION["Execute" if "<Execute" in request_xml else "Discover"]
 
 
-def canonical(xml_text, ignore):
+def masked(xml_text, ignore):
     root = ET.fromstring(xml_text)
     plain = {i for i in ignore if "@" not in i}
     attributes = {i[1:] for i in ignore if i.startswith("@")}
@@ -52,7 +55,26 @@ def canonical(xml_text, ignore):
             key, text = condition.split("=", 1)
             if name in children and key in children and children[key].text == text:
                 children[name].text = "*"
-    return ET.canonicalize(ET.tostring(root, encoding="unicode"), strip_text=True)
+    return root
+
+
+def text_of(element):
+    return ET.canonicalize(ET.tostring(element, encoding="unicode"), strip_text=True)
+
+
+def canonical(xml_text, ignore, rows=None):
+    """The response as canonical XML, the ignored texts masked; with rows (canonical rows) only the rows among
+    them."""
+    root = masked(xml_text, ignore)
+    if rows is not None:
+        for parent in list(root.iter()):
+            for child in [c for c in parent if local(c.tag) == "row" and text_of(c) not in rows]:
+                parent.remove(child)
+    return text_of(root)
+
+
+def rows_of(xml_text, ignore):
+    return {text_of(e) for e in masked(xml_text, ignore).iter() if local(e.tag) == "row"}
 
 
 def pretty(canonical_xml):
@@ -89,8 +111,9 @@ def run_case(url, case_dir):
     status, body = post(url, request_xml)
     if status != expected_status:
         return [f"HTTP {status}, expected {expected_status}: {body[:300]}"]
+    expected_rows = rows_of(as_olap4abap(expected_xml), ignore) if (case_dir / "subset.txt").exists() else None
     try:
-        actual = canonical(as_olap4abap(body), ignore)
+        actual = canonical(as_olap4abap(body), ignore, expected_rows)
     except ET.ParseError as error:
         return [f"response is not XML ({error}): {body[:300]}"]
     expected = canonical(as_olap4abap(expected_xml), ignore)

@@ -84,7 +84,9 @@ Every captured exchange in `reference/<case>/` (`request.xml`, `response.xml`, o
 `python scripts/xmla_test.py` posts each request to the SAP endpoint (default
 `http://localhost:50000/zzxxmla1?sap-client=001`) and compares the response with the captured one as canonical XML
 (formatting ignored; names, namespaces, order and values compared). `ignore.txt` lists elements whose text may
-differ, e.g. the data source URL. `--url http://localhost:8080/emondrian/xmla` runs the same cases against eMondrian
+differ, e.g. the data source URL. A case with `subset.txt` (its text says why) allows rows the captured response
+does not have: a rowset of all catalogs or schemas (`dbschema_schemata`, `session_discover_schemadata`) must hold
+FoodMart's rows, in their order, but the server may have other catalogs (the demos, the schema builder's). `--url http://localhost:8080/emondrian/xmla` runs the same cases against eMondrian
 itself, which validates the case before the ABAP side is built. Both answers go through
 `scripts/reference_texts.py` first: where eMondrian names itself (the `Mondrian Error:` prefix, faultactor `Mondrian`,
 `mondrian.olap.fun.MondrianEvaluationException`, Java class names, provider name) olap4abap writes its own name

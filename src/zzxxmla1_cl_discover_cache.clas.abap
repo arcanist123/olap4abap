@@ -117,8 +117,10 @@ CLASS zzxxmla1_cl_discover_cache IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD valid_since.
-    GET TIME STAMP FIELD result.
-    result = cl_abap_tstmp=>subtractsecs( tstmp = CONV timestamp( result ) secs = c_valid_hours * 3600 ) ##TYPE.
+    " whole seconds cut, not rounded: CONV timestamp rounds 59.6 to 60, which subtractsecs refuses
+    DATA now TYPE timestamp.
+    GET TIME STAMP FIELD now.
+    result = cl_abap_tstmp=>subtractsecs( tstmp = now secs = c_valid_hours * 3600 ) ##TYPE.
   ENDMETHOD.
 
   METHOD compress.
