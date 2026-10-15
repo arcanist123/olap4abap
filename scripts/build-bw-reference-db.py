@@ -9,13 +9,15 @@ instead of NULL, SIDs equal to the FoodMart ids).
 
 1. Export (skipped with --no-export): the columns of the tables from DD03L and their rows, read with
    `sapcli datapreview osql` (logon data from .env.sap), into data/foodmart-bw/bw/<table>.json (git-ignored); and the
-   SQL of the generated characteristic views (ZZXXMLA1V..., ZZXXMLA1_CL_BW_VIEW_GEN) from HANA's SYS.VIEWS, read with
-   hdbsql in the SAP container (HANA_CONTAINER, HANA_OS_USER, HANA_KEY; defaults a4h, a4hadm, DEFAULT), into
-   data/foodmart-bw/bw/views.json. HSQLDB takes HANA's view SQL as it is, so the reference has exactly SAP's views.
-   Only the views over tables copied here are kept (SAP has views of other providers, e.g. the clinic demo's).
+   SQL of the generated views of the cubes' characteristics (ZZXXMLA1_CL_BW_VIEW_GEN, the plain views of table
+   ZZXXMLA1_VIEW) from HANA's SYS.VIEWS, read with hdbsql in the SAP container (HANA_CONTAINER, HANA_OS_USER,
+   HANA_KEY; defaults a4h, a4hadm, DEFAULT), into data/foodmart-bw/bw/views.json, keyed by the placeholder of the
+   view (ZZXXMLA1_C_<characteristic>), the name the reference schema gives it: SAP's number (ZZXXMLA1V...) depends on
+   the views the system has besides FoodMart's (scripts/sap-files.py deploy puts it in the schema on SAP). HSQLDB
+   takes HANA's view SQL as it is, so the reference has exactly SAP's views.
 2. Build: adds the tables to data/foodmart-bw/hsqldb-foodmart.jar (the FoodMart data with the empty members, see
    scripts/add-empty-members.py): CREATE MEMORY TABLE after the last CREATE of foodmart.script, the rows at its end.
-   Then the characteristic views under their database names, after the tables. Lines of an earlier run (they name
+   Then the characteristic views under their placeholder names, after the tables. Lines of an earlier run (they name
    /BIC/ tables) are removed first, so the script can run again.
    Column types: NUMC and CHAR are VARCHAR of their length (HANA: NVARCHAR), INT4 is INTEGER, DEC is DECIMAL.
    Primary keys as in BW (none for the fact table, whose package key is not unique), a unique index on SID of the
@@ -44,7 +46,7 @@ CUBES = {
 TABLES = [table for cube, (characteristics, _) in CUBES.items()
           for table in [f"/BIC/F{cube}"] + [f"/BIC/{t}{c}" for c in characteristics for t in "SP"]]
 CR, NL = "\r", "\n"
-VIEW_PATTERN = "ZZXXMLA1V%"  # the database views of ZZXXMLA1_CL_BW_VIEW_GEN
+PLACEHOLDER = "ZZXXMLA1_C_"  # + characteristic: the reference schema's name of its view (ZZXXMLA1_CL_BW_VIEW_GEN)
 CHUNK = 5000  # characters of a view's SQL per hdbsql query
 
 
@@ -111,10 +113,17 @@ def unquote(value):
 
 
 def export_views():
-    """The SQL of the generated characteristic views, read from HANA in chunks (hdbsql cuts LOB values short)."""
+    """The SQL of the plain views of the cubes' characteristics, read from HANA in chunks (hdbsql cuts LOB values
+    short), keyed by their placeholders."""
+    registered = {row["OBJECT_NAME"].strip(): row["VIEW_NAME"].strip()
+                  for row in sapcli("SELECT object_name, view_name, selection FROM zzxxmla1_view WHERE kind = 'C'", 10000)
+                  if not row["SELECTION"].strip()}
     views = {}
-    for name, length in hdbsql("SELECT VIEW_NAME, LENGTH(DEFINITION) FROM SYS.VIEWS "
-                               f"WHERE SCHEMA_NAME = CURRENT_SCHEMA AND VIEW_NAME LIKE '{VIEW_PATTERN}' ORDER BY VIEW_NAME"):
+    for characteristic in [c for characteristics, _ in CUBES.values() for c in characteristics]:
+        name = registered.get(characteristic)
+        assert name, f"no view of {characteristic} (run ZZXXMLA1_CL_BW_VIEW_GEN or scripts/sap-files.py deploy)"
+        length = hdbsql("SELECT LENGTH(DEFINITION) FROM SYS.VIEWS "
+                        f"WHERE SCHEMA_NAME = CURRENT_SCHEMA AND VIEW_NAME = '{name}'")[0][0]
         parts = []
         for start in range(1, int(length) + 1, CHUNK):
             parts += hdbsql(f"SELECT TO_NVARCHAR(SUBSTRING(DEFINITION, {start}, {CHUNK})) FROM SYS.VIEWS "
@@ -122,10 +131,10 @@ def export_views():
         definition = "".join(parts)
         assert len(definition) == int(length), name
         tables = set(re.findall(r'(?:FROM|JOIN)\s+"([^"]+)"', definition))
-        if tables and tables <= set(TABLES):  # only views over the copied tables
-            views[name] = definition
+        assert tables and tables <= set(TABLES), (name, tables)  # a view over the copied tables only
+        views[PLACEHOLDER + characteristic] = definition
+        print(f"exported {name} as {PLACEHOLDER + characteristic}")
     (EXPORT / "views.json").write_text(json.dumps(views, indent=1), encoding="utf-8")
-    print(f"exported {len(views)} views: {', '.join(views)}")
 
 
 def sql_type(field):
@@ -175,6 +184,7 @@ def build():
         creates += c
         inserts += i
     views = json.loads((EXPORT / "views.json").read_text(encoding="utf-8"))
+    assert all(name.startswith(PLACEHOLDER) for name in views), "views.json of an earlier run: export again"
     for name, definition in views.items():
         assert '"/BIC/' in definition, name  # so that a later run removes it with the tables
         creates.append(f'CREATE VIEW PUBLIC."{name}" AS ' + definition.replace(CR, " ").replace(NL, " "))

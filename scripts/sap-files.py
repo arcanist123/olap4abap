@@ -3,9 +3,9 @@
 its web application are to Mondrian, /WEB-INF/datasources.xml and the schema files its catalogs name in Definition.
 A catalog or a schema is added by writing files, without any new ABAP object.
 
-    python scripts/sap-files.py put reference/schema/FoodmartBW.xml /WEB-INF/schema/FoodmartBW.xml
+    python scripts/sap-files.py put my/Schema.xml /WEB-INF/schema/Schema.xml
     python scripts/sap-files.py put reference/schema/datasources-sap.xml /WEB-INF/datasources.xml
-    python scripts/sap-files.py deploy               # the above and FoodmartBWDrill.xml; keeps the server's other catalogs
+    python scripts/sap-files.py deploy               # FoodmartBW.xml, FoodmartBWDrill.xml and their catalogs (below)
     python scripts/sap-files.py list
     python scripts/sap-files.py get /WEB-INF/datasources.xml
     python scripts/sap-files.py delete /WEB-INF/schema/Old.xml
@@ -13,9 +13,12 @@ A catalog or a schema is added by writing files, without any new ABAP object.
 Each command is one `sapcli abap run` (a temporary classrun class, as the user of .env.sap; the endpoint itself writes
 only in the schema generator's accept). The content travels base64 encoded, so any text gets there unchanged (UTF-8, line ends
 as LF). A new data sources file or schema is read by the next request; no restart is needed.
-`deploy` writes the schema files as this repository has them and merges the repository's catalogs into the server's
-data sources file: a catalog of the same name is replaced, the others (the setup's demos, the schema builder's accepted
-catalogs) stay; without a data sources file on the server the repository's is written.
+`deploy` writes the schema files of this repository and merges the repository's catalogs into the server's data
+sources file: a catalog of the same name is replaced, the others (the setup's demos, the schema builder's accepted
+catalogs) stay; without a data sources file on the server the repository's is written. The schemas name their
+dimension tables by placeholder (ZZXXMLA1_C_<characteristic>), as the schema builder's proposals do: a view's number
+depends on the views the system has already (other cubes, the demos), so `deploy` puts in the database view of each
+characteristic's view (ZZXXMLA1_CL_BW_VIEW_GEN->existing_view), generating the view if there is none.
 In Git Bash, run with MSYS_NO_PATHCONV=1: otherwise it turns /WEB-INF/... into a Windows path before Python sees it.
 """
 import argparse
@@ -36,6 +39,8 @@ DEPLOY = [
 # the data sources file `deploy` merges its catalogs from
 DATASOURCES = ("reference/schema/datasources-sap.xml", "/WEB-INF/datasources.xml")
 MISSING = "<<file does not exist>>"
+# a table of a schema named by the characteristic of its view (ZZXXMLA1_CL_BW_VIEW_GEN=>placeholder)
+PLACEHOLDER = re.compile(r'"ZZXXMLA1_C_([^"]+)"')
 CHUNK = 120  # characters of base64 per source line
 
 
@@ -167,10 +172,43 @@ def merge_catalogs(server, local):
     return server
 
 
+def views_of(characteristics):
+    """The database view of each characteristic's plain view, generated where there is none (one sapcli call)."""
+    lines = ["DATA(generator) = NEW zzxxmla1_cl_bw_view_gen( ).",
+             "DATA name TYPE viewname.",
+             "DATA error TYPE REF TO cx_dd_ddl_exception."]
+    for characteristic in characteristics:
+        assert re.fullmatch(r"[A-Z0-9_/]+", characteristic), characteristic
+        lines += [
+            f"name = generator->existing_view( '{characteristic}' ).",
+            "IF name IS INITIAL.",
+            "  TRY.",
+            f"      name = generator->generate( '{characteristic}' )-view_name.",
+            "    CATCH cx_dd_ddl_exception INTO error.",
+            f"      out->write( |{characteristic}: {{ error->get_text( ) }}| ).",
+            "      RETURN.",
+            "  ENDTRY.",
+            "ENDIF.",
+            f"out->write( |{characteristic}={{ name }}| ).",
+        ]
+    lines.append("COMMIT WORK.")
+    output = run_abap("\n".join(lines))
+    views = dict(re.findall(r"^(\S+)=(\S+)\s*$", output, re.M))
+    missing = [c for c in characteristics if c not in views]
+    if missing:
+        sys.exit(f"error: no view of {', '.join(missing)}\n{output}")
+    return views
+
+
 def deploy():
     # one sapcli call after the other (work processes in PRIV mode, docs/environment.md)
-    for local, path in DEPLOY:
-        put(ROOT / local, path)
+    texts = [((ROOT / local).read_text(encoding="utf-8-sig"), path) for local, path in DEPLOY]
+    characteristics = list(dict.fromkeys(c for text, _ in texts for c in PLACEHOLDER.findall(text)))
+    views = views_of(characteristics) if characteristics else {}
+    for characteristic, view in views.items():
+        print(f"{characteristic}: {view}")
+    for text, path in texts:
+        put_text(PLACEHOLDER.sub(lambda m: f'"{views[m.group(1)]}"', text), path)
     local, path = DATASOURCES
     local_text = (ROOT / local).read_text(encoding="utf-8-sig").replace("\r\n", "\n")
     server = read(path)

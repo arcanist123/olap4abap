@@ -285,7 +285,9 @@ CLASS ltc_schema IMPLEMENTATION.
     cl_abap_unit_assert=>assert_true( xsdbool( line_exists( cubes[ cube_name = `ZFMSALES` catalog_name = `ZFOODMART` ] ) ) ).
     DATA(dims) = schema->dimensions( `ZFMSALES` ).
     cl_abap_unit_assert=>assert_equals( act = lines( dims ) exp = 5 ).
-    cl_abap_unit_assert=>assert_equals( act = dims[ 3 ]-dim_table exp = `ZZXXMLA1V0000003` ).
+    " the view's number depends on the system's other views (scripts/sap-files.py deploy)
+    cl_abap_unit_assert=>assert_equals( act = dims[ 3 ]-dim_table
+                                        exp = CONV string( NEW zzxxmla1_cl_bw_view_gen( )->existing_view( 'ZFMSTORE' ) ) ).
     cl_abap_unit_assert=>assert_equals( act = dims[ 5 ]-dim_type exp = `Time` ).
     cl_abap_unit_assert=>assert_equals( act = dims[ 1 ]-dim_type exp = `Standard` ).
     DATA(count) = 0.

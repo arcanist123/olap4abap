@@ -114,9 +114,11 @@ def main():
         status, body, _ = call(args.url, args.client, "GET", "schema", {"catalog": name})
         stored = body.get("xml", "")
         if name == "ZFOODMART":
-            numbers = {(c["table"], c["column"], c["intColumn"]) for c in body.get("intColumns", [])}
+            # the view's number depends on the system's other views (scripts/sap-files.py deploy)
+            numbers = {(c["column"], c["intColumn"]) for c in body.get("intColumns", [])
+                       if re.fullmatch(r"ZZXXMLA1V\d{7}", c["table"])}
             check("schema of ZFOODMART: the numbers of its views' NUMC columns",
-                  ("ZZXXMLA1V0000003", "ZFMSQFT", "ZFMSQFT_INT") in numbers, body.get("intColumns"))
+                  ("ZFMSQFT", "ZFMSQFT_INT") in numbers, body.get("intColumns"))
         check(f"schema of {name}", status == 200 and body.get("file") == entry["file"]
               and stored.lstrip().startswith(("<Schema", "<?xml")) and body.get("outline", {}).get("cubes"), body)
         status, body, _ = call(args.url, args.client, "POST", "check", {"catalog": name}, stored)

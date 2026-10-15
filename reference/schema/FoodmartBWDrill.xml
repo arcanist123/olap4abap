@@ -4,10 +4,11 @@
   the drill-through without RETURN clause that reads the cube's default action (execute_drillthrough_action_*). Its
   dimensions are copies of FoodmartBW.xml's; Media Type has no attribute hierarchy, so the action's column of it is a
   column of the star of its own; the keys of customer and day make the order of the rows unique. The first action is
-  not the default one and must be ignored.
+  not the default one and must be ignored. The tables are placeholders of the characteristics' views, as in
+  FoodmartBW.xml.
 -->
 <Schema name="ZFMDRILL">
-  <Dimension name="Product" table="ZZXXMLA1V0000001">
+  <Dimension name="Product" table="ZZXXMLA1_C_ZFMPROD">
     <DimensionAttribute name="Product Id" usage="Key">
       <KeyColumn dataType="Integer" columnName="SID"/>
     </DimensionAttribute>
@@ -23,7 +24,7 @@
     </Hierarchy>
   </Dimension>
 
-  <Dimension name="Store" table="ZZXXMLA1V0000003">
+  <Dimension name="Store" table="ZZXXMLA1_C_ZFMSTORE">
     <DimensionAttribute name="Store Id" usage="Key">
       <KeyColumn dataType="Integer" columnName="SID"/>
     </DimensionAttribute>
@@ -39,7 +40,7 @@
     </Hierarchy>
   </Dimension>
 
-  <Dimension name="Promotions" table="ZZXXMLA1V0000004">
+  <Dimension name="Promotions" table="ZZXXMLA1_C_ZFMPROMO">
     <DimensionAttribute name="Promotion Id" usage="Key">
       <KeyColumn dataType="Integer" columnName="SID"/>
     </DimensionAttribute>
@@ -52,14 +53,14 @@
     </Hierarchy>
   </Dimension>
 
-  <Dimension name="Customers" table="ZZXXMLA1V0000002">
+  <Dimension name="Customers" table="ZZXXMLA1_C_ZFMCUST">
     <DimensionAttribute name="Customer Id" usage="Key" attributeHierarchyEnabled="false">
       <KeyColumn dataType="Integer" columnName="SID"/>
     </DimensionAttribute>
     <DimensionAttribute name="City"><KeyColumn dataType="String" columnName="ZFMCITY"/></DimensionAttribute>
   </Dimension>
 
-  <Dimension name="Day" table="ZZXXMLA1V0000005">
+  <Dimension name="Day" table="ZZXXMLA1_C_ZFMDATE">
     <DimensionAttribute name="Time Id" usage="Key" attributeHierarchyEnabled="false">
       <KeyColumn dataType="Integer" columnName="SID"/>
     </DimensionAttribute>

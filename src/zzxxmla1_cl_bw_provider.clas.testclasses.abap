@@ -57,7 +57,10 @@ CLASS ltc_bw_provider IMPLEMENTATION.
     cl_abap_unit_assert=>assert_false( store-fact_sid ).
     cl_abap_unit_assert=>assert_initial( store-name_column ).
     cl_abap_unit_assert=>assert_equals( act = store-basic exp = `ZFMSTORE` ).
-    cl_abap_unit_assert=>assert_equals( act = store-view exp = `ZZXXMLA1V0000003` ).
+    " the view's number depends on the system's other views
+    cl_abap_unit_assert=>assert_equals(
+      act = store-view
+      exp = CONV string( NEW zzxxmla1_cl_bw_view_gen( )->existing_view( 'ZFMSTORE' ) ) ).
     cl_abap_unit_assert=>assert_equals( act = store-key_column-name exp = `ZFMSTORE` ).
     cl_abap_unit_assert=>assert_equals( act = store-key_column-datatype exp = `NUMC` ).
     " NUMC: the view has its number too
@@ -91,7 +94,10 @@ CLASS ltc_bw_provider IMPLEMENTATION.
       exp = VALUE string_table( ( `SID_ZFMPROD` ) ( `SID_ZFMCUST` ) ( `SID_ZFMSTORE` ) ( `SID_ZFMPROMO` )
                                 ( `SID_ZFMDATE` ) ) ).
     DATA(date) = provider-characteristics[ iobjnm = `ZFMDATE` ].
-    cl_abap_unit_assert=>assert_equals( act = date-view exp = `ZZXXMLA1V0000005` ).
+    " the view's number depends on the system's other views
+    cl_abap_unit_assert=>assert_equals(
+      act = date-view
+      exp = CONV string( NEW zzxxmla1_cl_bw_view_gen( )->existing_view( 'ZFMDATE' ) ) ).
     cl_abap_unit_assert=>assert_equals( act = lines( date-attributes ) exp = 9 ).
     cl_abap_unit_assert=>assert_equals( act = lines( provider-key_figures ) exp = 3 ).
     cl_abap_unit_assert=>assert_initial( provider-notes ).

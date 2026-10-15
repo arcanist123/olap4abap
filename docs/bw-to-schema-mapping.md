@@ -77,8 +77,9 @@ FoodMart's `store` or `customer`, without snowflake handling. BW-specific parts 
   number. An active source can rename neither itself nor its database view, so a source of another name (the older
   `ZZXXMLA1_C_<char>`) or with a view name of another form is deleted and created again under its number.
 
-Run it with `sapcli class execute ZZXXMLA1_CL_BW_VIEW_GEN` (generates the views of `ZFMSALES`: `ZZXXMLA1V0000001`
-ZFMPROD, `...2` ZFMCUST, `...3` ZFMSTORE, `...4` ZFMPROMO, `...5` ZFMDATE). In HANA each is a plain SQL view
+Run it with `sapcli class execute ZZXXMLA1_CL_BW_VIEW_GEN` (generates the views of `ZFMSALES`). The numbers depend on
+the views the system has already, so a schema of the repository names a view by its placeholder
+(`ZZXXMLA1_C_ZFMSTORE`) and `scripts/sap-files.py deploy` puts in SAP's name. In HANA each is a plain SQL view
 (`SYS.VIEWS`, row view) of the same name. Not yet: texts (`/BIC/T<char>`, needs a language), time characteristics
 without attribute table, navigation and time-dependent attributes. CDS views are not exported by
 `scripts/sap-sync.sh pull`; the generator in `src/` is their source.

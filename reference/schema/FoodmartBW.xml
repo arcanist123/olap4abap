@@ -7,8 +7,10 @@
   Physical side, as BW stores a HANA-optimised InfoCube, without any SQL in the schema:
   - the fact table is the cube's /BIC/FZFMSALES, with one SID column per characteristic (SID_<characteristic>) and the
     key figures;
-  - a dimension's table is the generated CDS view of its characteristic (ZZXXMLA1_CL_BW_VIEW_GEN; database views
-    ZZXXMLA1V0000001 ZFMPROD, ...2 ZFMCUST, ...3 ZFMSTORE, ...4 ZFMPROMO, ...5 ZFMDATE): the SID table joined with the
+  - a dimension's table is the generated CDS view of its characteristic (ZZXXMLA1_CL_BW_VIEW_GEN), named here by its
+    placeholder ZZXXMLA1_C_<characteristic>: the view's number depends on what else the system has, so
+    scripts/sap-files.py deploy puts in the database view SAP has (ZZXXMLA1V...), generating it if there is none, and
+    the reference database has the views under the placeholder names. The view is the SID table joined with the
     active attributes, columns SID, the key and the attributes without the /BIC/ namespace, each NUMC column followed
     by its number COLUMN_INT (docs/bw-to-schema-mapping.md). FoodMart's numbers (Year 1997, Store Sqft 23593) are
     numbers, so the NUMC attributes are named by their _INT columns. The reference database has the same views
@@ -36,7 +38,7 @@
   - the catalog is the InfoArea (ZFOODMART), the cube keeps its technical BW name (caption = BW text).
 -->
 <Schema name="ZFOODMART">
-  <Dimension name="Product" table="ZZXXMLA1V0000001">
+  <Dimension name="Product" table="ZZXXMLA1_C_ZFMPROD">
     <DimensionAttribute name="Product Id" usage="Key">
       <KeyColumn dataType="Integer" columnName="SID"/>
     </DimensionAttribute>
@@ -56,7 +58,7 @@
     </Hierarchy>
   </Dimension>
 
-  <Dimension name="Customers" table="ZZXXMLA1V0000002">
+  <Dimension name="Customers" table="ZZXXMLA1_C_ZFMCUST">
     <DimensionAttribute name="Customer Id" usage="Key">
       <KeyColumn dataType="Integer" columnName="SID"/>
     </DimensionAttribute>
@@ -81,7 +83,7 @@
     </Hierarchy>
   </Dimension>
 
-  <Dimension name="Store" table="ZZXXMLA1V0000003">
+  <Dimension name="Store" table="ZZXXMLA1_C_ZFMSTORE">
     <DimensionAttribute name="Store Id" usage="Key">
       <KeyColumn dataType="Integer" columnName="SID"/>
     </DimensionAttribute>
@@ -114,7 +116,7 @@
     </Hierarchy>
   </Dimension>
 
-  <Dimension name="Promotions" table="ZZXXMLA1V0000004">
+  <Dimension name="Promotions" table="ZZXXMLA1_C_ZFMPROMO">
     <DimensionAttribute name="Promotion Id" usage="Key">
       <KeyColumn dataType="Integer" columnName="SID"/>
     </DimensionAttribute>
@@ -128,7 +130,7 @@
   <!-- A time dimension: ZFMDATE is the date characteristic of the cube. Like the other keys it is the id (time_id).
        Every level of a TimeDimension needs a time level type (RolapLevel), the attribute hierarchies' too; the day name
        and the fiscal period are no period of the calendar, so they are TimeUndefined. The hierarchies are FoodMart's. -->
-  <Dimension name="Time" type="TimeDimension" table="ZZXXMLA1V0000005">
+  <Dimension name="Time" type="TimeDimension" table="ZZXXMLA1_C_ZFMDATE">
     <DimensionAttribute name="Time Id" usage="Key" levelType="TimeDays">
       <KeyColumn dataType="Integer" columnName="SID"/>
     </DimensionAttribute>

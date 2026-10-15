@@ -105,7 +105,8 @@ dimension's default hierarchy `[Store]`, and the key attributes are `[Store.Stor
 
 The schema names the BW tables themselves (`/BIC/FZFMSALES`, `/BIC/S<char>`, `/BIC/P<char>`), so the same file serves
 eMondrian and our engine. Its database (the HSQLDB jar) therefore holds copies of those 11 tables with BW's contents,
-and the generated characteristic views (`ZZXXMLA1V...`) with the SQL HANA has for them. The catalog `ZFMDRILL` (`reference/schema/FoodmartBWDrill.xml`, drill-through
+and the generated characteristic views with the SQL HANA has for them, named by their placeholders
+(`ZZXXMLA1_C_ZFMSTORE`, the schema's names; SAP's `ZZXXMLA1V...` is found in table `ZZXXMLA1_VIEW`). The catalog `ZFMDRILL` (`reference/schema/FoodmartBWDrill.xml`, drill-through
 actions) needs no tables of its own: its cube is on ZFMSALES's. On SAP it is a catalog of `/WEB-INF/datasources.xml` next
 to the ones the schema builder added there. Only views over copied tables are taken; SAP has views of other providers too:
 
@@ -121,7 +122,8 @@ NUMC zero-padded, blanks for missing values; the ABAP FS SQL tool is no use here
 key is not unique; indexes on the SIDs), then the views with HANA's SQL from `SYS.VIEWS`, read with `hdbsql` in the
 `a4h` container as the ABAP database user (`hdbuserstore` key `DEFAULT` of `a4hadm`; the SQL is read in chunks,
 `hdbsql` cuts LOB values after 32 characters). It can run again: lines of an earlier run are replaced. The data preview
-rejects long statements, so the columns are read per table. After the switch (2026-10-04) all 152 reference cases
+rejects long statements, so the columns are read per table. Run it again after the FoodMart generator, whose views
+the export finds by their new numbers. After the switch (2026-10-04) all 152 reference cases
 gave the same answers as with the FoodMart tables, and the same 59 statements of Mondrian's tests apply.
 
 ## FoodMart data for the BW cube
@@ -139,9 +141,10 @@ every run deletes the aDSO `ZFMSALESA` (`CL_RSO_ADSO_API=>DELETE`), the cube (`I
 the characteristics (`ZZXXMLA1_CL_BW_VIEW_GEN=>DELETE`) and then all InfoObjects (`RSDG_IOBJ_MULTI_DELETE`) and creates
 them again: no skip-if-exists, no migration logic. The providers and the views go first because BW refuses to delete a
 characteristic that is used, and a view uses the data elements of the characteristics' attributes ("Data element
-/BIC/OIZFMFAMILY still used in table/view ZZXXMLA1V0000001"). After the load the run generates the views again; deleted
-all together, they get their numbers back in the order of the cube (`ZZXXMLA1V0000001` ZFMPROD ... `...5` ZFMDATE),
-the names `FoodmartBW.xml` and the reference database use. Time is not modelled with BW time characteristics: `ZFMDATE` is a plain `CHAR 10` characteristic keyed
+/BIC/OIZFMFAMILY still used in table/view ZZXXMLA1V...")). After the load the run generates the views again, under
+the next free numbers (other cubes' views, the demos', keep theirs), so the schema files on the server name views that
+are gone: run `python scripts/sap-files.py deploy` after it, which puts the new names in (`FoodmartBW.xml` names the
+views by placeholder, `ZZXXMLA1_C_ZFMPROD`, the reference database by the same names). Time is not modelled with BW time characteristics: `ZFMDATE` is a plain `CHAR 10` characteristic keyed
 by `the_date` (`YYYY-MM-DD`) with the other `time_by_day` columns as flat attributes (BW ignores attributes on `DATS`
 characteristics). Writing a key to a characteristic generates its SID automatically; the attribute values are not
 generated and must be written by the loader.
@@ -287,14 +290,18 @@ not part of it (`scripts/sap-files.py deploy`):
   catalog the path of its schema file in `<Definition>`. Our copy is `reference/schema/datasources-sap.xml`: like the
   container's `reference/schema/datasources.xml`, without `Jdbc` (every catalog is read from the SAP database) and with
   an empty `URL` (`DISCOVER_DATASOURCES` then gives the URL of the request).
-- the schema files, e.g. `/WEB-INF/schema/FoodmartBW.xml` (= `reference/schema/FoodmartBW.xml`). `ZZXXMLA1_CL_SCHEMA`
+- the schema files, e.g. `/WEB-INF/schema/FoodmartBW.xml` (= `reference/schema/FoodmartBW.xml` with the views' names
+  put in: the repository's schemas name each dimension table by the placeholder of its characteristic's view,
+  `ZZXXMLA1_C_ZFMSTORE`, and `deploy` replaces it by the database view SAP has, `ZZXXMLA1V...`, generating the view
+  if there is none; a view's number depends on the views of the system's other cubes, so no schema of the repository
+  names one). `ZZXXMLA1_CL_SCHEMA`
   reads the schema of every catalog once per session; `LAST_SCHEMA_UPDATE` is the time the file was written.
 
 `scripts/sap-files.py` writes and reads them through `sapcli abap run` as the user of `.env.sap`; the endpoint writes
 them only in the schema generator's `accept` (`ZZXXMLA1_CL_SCHEMA_API`: a schema file and its catalog); in Git Bash set `MSYS_NO_PATHCONV=1`, or it turns `/WEB-INF/...` into a Windows path.
 A new file is read by the next request.
 
-    python scripts/sap-files.py deploy             # FoodmartBW(Drill).xml; merges datasources-sap.xml's catalogs into the server's, keeps the others
+    python scripts/sap-files.py deploy             # FoodmartBW(Drill).xml with SAP's view names; merges datasources-sap.xml's catalogs into the server's, keeps the others
     python scripts/sap-files.py put my/Sales.xml /WEB-INF/schema/Sales.xml   # a new schema; then a <Catalog> for it in
     python scripts/sap-files.py put reference/schema/datasources-sap.xml /WEB-INF/datasources.xml   # datasources-sap.xml
     python scripts/sap-files.py list | get <path> | delete <path>
