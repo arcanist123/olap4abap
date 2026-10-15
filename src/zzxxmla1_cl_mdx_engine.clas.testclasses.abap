@@ -69,6 +69,9 @@ CLASS ltc_engine DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION LONG.
     "! Query planning: all-relational queries (NON EMPTY axes, All members, a compound slicer, Time on an axis) give
     "! the same answer with planning on and off.
     METHODS planning_on_and_off FOR TESTING RAISING zzxxmla1_cx_xmla.
+    "! Query planning step 6: Filter on stored measures in SQL (RolapNativeFilter) and NonEmpty by groups give the
+    "! answers of the evaluator (the same statements with a condition or a measure the native reads do not take).
+    METHODS native_filter_and_non_empty FOR TESTING RAISING zzxxmla1_cx_xmla.
     METHODS teardown.
 ENDCLASS.
 
@@ -287,6 +290,64 @@ CLASS ltc_engine IMPLEMENTATION.
 
   METHOD teardown.
     zzxxmla1_cl_mdx_engine=>planning = abap_true.
+  ENDMETHOD.
+
+  METHOD native_filter_and_non_empty.
+    " pairs: the native statement and one the evaluator answers (NOT NOT is not SQL; a calculated measure is not
+    " stored), the filtered set on the columns
+    DATA(pairs) = VALUE string_table(
+      ( `SELECT Filter([Store].[Store City].Members, [Measures].[Unit Sales] > 20000) ON COLUMNS FROM [ZFMSALES]` )
+      ( `SELECT Filter([Store].[Store City].Members, NOT (NOT ([Measures].[Unit Sales] > 20000))) ON COLUMNS `
+     && `FROM [ZFMSALES]` )
+      ( `SELECT Filter([Product].[Product Family].Members * [Store].[Store State].Members, `
+     && `([Measures].[Store Sales] - [Measures].[Store Cost]) * 2 > 50000 AND [Measures].[Unit Sales] < 60000) `
+     && `ON COLUMNS FROM [ZFMSALES]` )
+      ( `SELECT Filter([Product].[Product Family].Members * [Store].[Store State].Members, `
+     && `NOT (NOT (([Measures].[Store Sales] - [Measures].[Store Cost]) * 2 > 50000 `
+     && `AND [Measures].[Unit Sales] < 60000))) `
+     && `ON COLUMNS FROM [ZFMSALES]` )
+      ( `SELECT Filter([Store].[USA].Children, [Measures].[Unit Sales] >= 20000 OR [Measures].[Store Cost] < 10000) `
+     && `ON COLUMNS FROM [ZFMSALES] WHERE [Time].[1997].[Q1]` )
+      ( `SELECT Filter([Store].[USA].Children, NOT (NOT ([Measures].[Unit Sales] >= 20000 `
+     && `OR [Measures].[Store Cost] < 10000))) ON COLUMNS FROM [ZFMSALES] WHERE [Time].[1997].[Q1]` )
+      ( `SELECT NON EMPTY Filter(Descendants([Customers].[USA].[WA], [Customers].[City]), `
+     && `[Measures].[Unit Sales] > 2000) ON COLUMNS FROM [ZFMSALES] WHERE [Product].[Drink]` )
+      ( `SELECT NON EMPTY Filter(Descendants([Customers].[USA].[WA], [Customers].[City]), `
+     && `NOT (NOT ([Measures].[Unit Sales] > 2000))) ON COLUMNS FROM [ZFMSALES] WHERE [Product].[Drink]` )
+      ( `WITH MEMBER [Measures].[U] AS [Measures].[Unit Sales] SELECT `
+     && `NonEmpty([Store].[Store City].Members, {([Product].[Drink].[Dairy], [Measures].[Unit Sales])}) ON COLUMNS `
+     && `FROM [ZFMSALES] WHERE [Time].[1997].[Q2]` )
+      ( `WITH MEMBER [Measures].[U] AS [Measures].[Unit Sales] SELECT `
+     && `NonEmpty([Store].[Store City].Members, {([Product].[Drink].[Dairy], [Measures].[U])}) ON COLUMNS `
+     && `FROM [ZFMSALES] WHERE [Time].[1997].[Q2]` )
+      ( `WITH MEMBER [Measures].[U] AS [Measures].[Unit Sales] SELECT `
+     && `NonEmpty([Customers].[Country].Members * [Product].[Product Family].Members) ON COLUMNS `
+     && `FROM [ZFMSALES] WHERE ([Time].[1997].[Q3], [Measures].[Unit Sales])` )
+      ( `WITH MEMBER [Measures].[U] AS [Measures].[Unit Sales] SELECT `
+     && `NonEmpty([Customers].[Country].Members * [Product].[Product Family].Members) ON COLUMNS `
+     && `FROM [ZFMSALES] WHERE ([Time].[1997].[Q3], [Measures].[U])` ) ).
+    DATA(index) = 1.
+    WHILE index < lines( pairs ).
+      DATA(native) = execute( pairs[ index ] ).
+      DATA(evaluated) = execute( pairs[ index + 1 ] ).
+      cl_abap_unit_assert=>assert_not_initial( act = tuples( native ) msg = pairs[ index ] ).
+      cl_abap_unit_assert=>assert_equals( act = tuples( native ) exp = tuples( evaluated ) msg = pairs[ index ] ).
+      " the last pair has different measures in its cells
+      IF index < 11.
+        cl_abap_unit_assert=>assert_equals( act = values( native ) exp = values( evaluated ) msg = pairs[ index ] ).
+      ENDIF.
+      index = index + 2.
+    ENDWHILE.
+    " the native Filter is one statement with the condition on the groups
+    zzxxmla1_cl_sql=>reset_statistics( ).
+    zzxxmla1_cl_sql=>log_statements = abap_true.
+    execute( pairs[ 3 ] ).
+    zzxxmla1_cl_sql=>log_statements = abap_false.
+    DATA(filtered) = 0.
+    LOOP AT zzxxmla1_cl_sql=>statement_log INTO DATA(logged) WHERE sql CS `/BIC/FZFMSALES` AND sql CS `) > 50000)`.
+      filtered = filtered + 1.
+    ENDLOOP.
+    cl_abap_unit_assert=>assert_equals( act = filtered exp = 1 ).
   ENDMETHOD.
 
   METHOD planning_on_and_off.

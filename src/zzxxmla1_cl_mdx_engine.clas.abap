@@ -306,6 +306,17 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
                 node          TYPE ty_node
       RETURNING VALUE(result) TYPE ty_t_tuple
       RAISING   zzxxmla1_cx_xmla.
+    "! NonEmpty by groups (our extension, docs/query-planning.md, step 6): the tuples of the first set whose group of
+    "! the facts with one tuple of the second set (one empty tuple: NonEmpty of one set) and the context's members of
+    "! the other hierarchies has facts, all groups read with one cross_groups call; what evaluate_current tells for a
+    "! stored measure, whose cell is empty exactly when its group has no facts. Not found when a tuple or the context
+    "! has a calculated or null member, or the measure of the cell would be calculated.
+    METHODS non_empty_groups
+      IMPORTING evaluator     TYPE ty_evaluator
+                left_tuples   TYPE ty_t_tuple
+                right_tuples  TYPE ty_t_tuple
+      EXPORTING found         TYPE abap_bool
+      RETURNING VALUE(result) TYPE ty_t_tuple.
     "! FunUtil.getNonEmptyLevelMembers (RolapSchemaReader.getLevelMembers with the evaluator): under a non-empty
     "! evaluator the members of a level of more than LevelPreCacheThreshold members are read with a
     "! SqlContextConstraint (context_members); otherwise all of them. The reference constrains them by the other axes
@@ -792,6 +803,21 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
                 node          TYPE ty_node
                 top           TYPE abap_bool
                 count         TYPE i
+      EXPORTING native        TYPE abap_bool
+      RETURNING VALUE(result) TYPE ty_t_tuple
+      RAISING   zzxxmla1_cx_xmla.
+    "! RolapNativeFilter: Filter(set, condition) of a crossjoin (CrossJoin or *, as native_top_count) of a level's
+    "! members (Members, Children, Descendants), or of one such operand, whose condition SQL answers
+    "! (ZZXXMLA1_CL_MDX_PLANNER=>filter_condition), in one query (ZZXXMLA1_CL_MDX_FACTS=>ordered_paths): the members'
+    "! crossjoin joined to the facts grouped by them in the context (its stored non-All members of the other
+    "! hierarchies), the condition on the groups, in the set's order (hierarchy order). The condition is false for the
+    "! tuples without facts, so the evaluator's Filter keeps the same tuples, whether it is non-empty or not. As in the
+    "! reference, the crossjoin is not checked against the result limit, only the tuples kept. With a calculated or
+    "! null member in the context, a calculated member of the query in a hierarchy of the set, or another set not
+    "! native.
+    METHODS native_filter
+      IMPORTING evaluator     TYPE ty_evaluator
+                node          TYPE ty_node
       EXPORTING native        TYPE abap_bool
       RETURNING VALUE(result) TYPE ty_t_tuple
       RAISING   zzxxmla1_cx_xmla.
@@ -2953,6 +2979,16 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
                                               THEN evaluate_arg_as_set( evaluator = evaluator call = node index = 2 ) ).
         evaluator->set_non_empty( abap_true ).
         DATA(left_tuples) = evaluate_arg_as_set( evaluator = evaluator call = node index = 1 ).
+        DATA found TYPE abap_bool.
+        result = non_empty_groups( EXPORTING evaluator    = evaluator
+                                             left_tuples  = left_tuples
+                                             right_tuples = COND #( WHEN lines( node->args ) > 1 THEN right_tuples
+                                                                    ELSE VALUE #( ( ) ) )
+                                   IMPORTING found        = found ).
+        IF found = abap_true.
+          evaluator->restore( savepoint ).
+          RETURN.
+        ENDIF.
         LOOP AT left_tuples INTO DATA(left_tuple).
           IF lines( node->args ) = 1.
             evaluator->set_context_members( left_tuple ).
@@ -2974,6 +3010,186 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         evaluator->restore( savepoint ).
     ENDTRY.
     evaluator->restore( savepoint ).
+  ENDMETHOD.
+
+  METHOD non_empty_groups.
+    TYPES:
+      "! the tuples of a set with one pattern: their filters (sorted by hierarchy) and per filter the paths
+      BEGIN OF ty_side_pattern,
+        pattern TYPE string,
+        filters TYPE zzxxmla1_cl_mdx_facts=>ty_t_filter,
+        paths   TYPE zzxxmla1_cl_mdx_facts=>ty_t_paths,
+      END OF ty_side_pattern,
+      ty_t_side_pattern TYPE STANDARD TABLE OF ty_side_pattern WITH EMPTY KEY,
+      "! a tuple: its pattern and the paths of its filters
+      BEGIN OF ty_side_tuple,
+        pattern TYPE i,
+        paths   TYPE string_table,
+      END OF ty_side_tuple,
+      ty_t_side_tuple TYPE STANDARD TABLE OF ty_side_tuple WITH EMPTY KEY,
+      "! a filter of a combination: its source (1 left, 2 right, 3 context) and its position there
+      BEGIN OF ty_source,
+        hierarchy TYPE i,
+        side      TYPE i,
+        position  TYPE i,
+      END OF ty_source,
+      ty_t_source TYPE STANDARD TABLE OF ty_source WITH EMPTY KEY,
+      BEGIN OF ty_combination,
+        sources TYPE ty_t_source,
+        groups  TYPE REF TO zzxxmla1_cl_mdx_facts=>ty_t_group,
+      END OF ty_combination.
+    DATA hierarchies TYPE SORTED TABLE OF i WITH UNIQUE KEY table_line.
+    DATA right_hierarchies TYPE SORTED TABLE OF i WITH UNIQUE KEY table_line.
+    DATA side_patterns TYPE STANDARD TABLE OF ty_t_side_pattern WITH EMPTY KEY.
+    DATA side_tuples TYPE STANDARD TABLE OF ty_t_side_tuple WITH EMPTY KEY.
+    DATA combinations TYPE STANDARD TABLE OF ty_combination WITH EMPTY KEY.
+    DATA patterns TYPE zzxxmla1_cl_mdx_facts=>ty_t_cross_pattern.
+    CLEAR found.
+    IF left_tuples IS INITIAL OR right_tuples IS INITIAL.
+      found = abap_true.
+      RETURN.
+    ENDIF.
+
+    " the hierarchies the tuples set (a set's tuples have the same ones); the right ones set theirs last
+    LOOP AT right_tuples INTO DATA(tuple).
+      LOOP AT tuple INTO DATA(member).
+        IF member-calculated = abap_true OR member-calc_name IS NOT INITIAL OR member-is_null = abap_true.
+          RETURN.
+        ENDIF.
+        INSERT member-hier_id INTO TABLE right_hierarchies.
+        INSERT member-hier_id INTO TABLE hierarchies.
+      ENDLOOP.
+    ENDLOOP.
+    LOOP AT left_tuples INTO tuple.
+      LOOP AT tuple INTO member.
+        IF member-calculated = abap_true OR member-calc_name IS NOT INITIAL OR member-is_null = abap_true.
+          RETURN.
+        ENDIF.
+        INSERT member-hier_id INTO TABLE hierarchies.
+      ENDLOOP.
+    ENDLOOP.
+
+    " the context's non-All members of the other hierarchies; its measure where no tuple sets one
+    DATA(context_filters) = VALUE zzxxmla1_cl_mdx_facts=>ty_t_filter( ).
+    LOOP AT evaluator->get_members( ) INTO member.
+      IF line_exists( hierarchies[ table_line = member-hier_id ] ).
+        CONTINUE.
+      ENDIF.
+      IF member-calculated = abap_true OR member-calc_name IS NOT INITIAL OR member-is_null = abap_true.
+        RETURN.
+      ENDIF.
+      IF member-hier_id <> zzxxmla1_cl_mdx_schema_reader=>c_measures AND member-key_level > 0.
+        APPEND VALUE #( hierarchy = member-hier_id level = member-key_level path = member-path ) TO context_filters.
+      ENDIF.
+    ENDLOOP.
+
+    " each side's tuples by pattern; a left member of a hierarchy the right tuples set is theirs
+    DO 2 TIMES.
+      DATA(side) = sy-index.
+      DATA(patterns_of_side) = VALUE ty_t_side_pattern( ).
+      DATA(tuples_of_side) = VALUE ty_t_side_tuple( ).
+      IF side = 1.
+        ASSIGN left_tuples TO FIELD-SYMBOL(<side_set>).
+      ELSE.
+        ASSIGN right_tuples TO <side_set>.
+      ENDIF.
+      LOOP AT <side_set> INTO tuple.
+        DATA(filters) = VALUE zzxxmla1_cl_mdx_facts=>ty_t_filter( ).
+        LOOP AT tuple INTO member WHERE hier_id <> zzxxmla1_cl_mdx_schema_reader=>c_measures AND key_level > 0.
+          IF side = 1 AND line_exists( right_hierarchies[ table_line = member-hier_id ] ).
+            CONTINUE.
+          ENDIF.
+          APPEND VALUE #( hierarchy = member-hier_id level = member-key_level path = member-path ) TO filters.
+        ENDLOOP.
+        SORT filters BY hierarchy ASCENDING.
+        DATA(pattern) = concat_lines_of( table = VALUE string_table( FOR f IN filters ( |{ f-hierarchy }:{ f-level }| ) )
+                                         sep   = `,` ).
+        DATA(pattern_index) = line_index( patterns_of_side[ pattern = pattern ] ).
+        IF pattern_index = 0.
+          APPEND VALUE #( pattern = pattern filters = filters paths = VALUE #( FOR g IN filters ( ) ) )
+                 TO patterns_of_side.
+          pattern_index = lines( patterns_of_side ).
+        ENDIF.
+        ASSIGN patterns_of_side[ pattern_index ] TO FIELD-SYMBOL(<pattern>).
+        LOOP AT filters INTO DATA(filter).
+          ASSIGN <pattern>-paths[ sy-tabix ] TO FIELD-SYMBOL(<paths>).
+          APPEND filter-path TO <paths>.
+        ENDLOOP.
+        APPEND VALUE #( pattern = pattern_index paths = VALUE #( FOR f IN filters ( f-path ) ) ) TO tuples_of_side.
+      ENDLOOP.
+      LOOP AT patterns_of_side ASSIGNING <pattern>.
+        LOOP AT <pattern>-paths ASSIGNING <paths>.
+          SORT <paths> ASCENDING.
+          DELETE ADJACENT DUPLICATES FROM <paths>.
+        ENDLOOP.
+      ENDLOOP.
+      APPEND patterns_of_side TO side_patterns.
+      APPEND tuples_of_side TO side_tuples.
+    ENDDO.
+
+    " a pattern per combination of a left and a right pattern, with the context; one read
+    LOOP AT side_patterns[ 1 ] INTO DATA(left_pattern).
+      LOOP AT side_patterns[ 2 ] INTO DATA(right_pattern).
+        DATA(sources) = VALUE ty_t_source( ).
+        LOOP AT left_pattern-filters INTO filter.
+          APPEND VALUE #( hierarchy = filter-hierarchy side = 1 position = sy-tabix ) TO sources.
+        ENDLOOP.
+        LOOP AT right_pattern-filters INTO filter.
+          APPEND VALUE #( hierarchy = filter-hierarchy side = 2 position = sy-tabix ) TO sources.
+        ENDLOOP.
+        LOOP AT context_filters INTO filter.
+          APPEND VALUE #( hierarchy = filter-hierarchy side = 3 position = sy-tabix ) TO sources.
+        ENDLOOP.
+        SORT sources BY hierarchy ASCENDING.
+        DATA(cross) = VALUE zzxxmla1_cl_mdx_facts=>ty_cross_pattern( ).
+        LOOP AT sources INTO DATA(source).
+          CASE source-side.
+            WHEN 1.
+              filter = left_pattern-filters[ source-position ].
+              APPEND left_pattern-paths[ source-position ] TO cross-paths.
+            WHEN 2.
+              filter = right_pattern-filters[ source-position ].
+              APPEND right_pattern-paths[ source-position ] TO cross-paths.
+            WHEN OTHERS.
+              filter = context_filters[ source-position ].
+              APPEND VALUE #( ( filter-path ) ) TO cross-paths.
+          ENDCASE.
+          APPEND VALUE #( hierarchy = filter-hierarchy level = filter-level ) TO cross-filters.
+        ENDLOOP.
+        APPEND cross TO patterns.
+        APPEND VALUE #( sources = sources ) TO combinations.
+      ENDLOOP.
+    ENDLOOP.
+    LOOP AT fact_reader->cross_groups( patterns ) INTO DATA(pattern_groups).
+      combinations[ pattern_groups-pattern ]-groups = pattern_groups-groups.
+    ENDLOOP.
+
+    " a left tuple is kept with the first right tuple whose group has facts; a group's key is the paths of its
+    " filters, each followed by the separator (cross_values)
+    DATA(right_count) = lines( side_patterns[ 2 ] ).
+    LOOP AT side_tuples[ 1 ] INTO DATA(left_tuple).
+      DATA(left_index) = sy-tabix.
+      LOOP AT side_tuples[ 2 ] INTO DATA(right_tuple).
+        ASSIGN combinations[ ( left_tuple-pattern - 1 ) * right_count + right_tuple-pattern ]
+               TO FIELD-SYMBOL(<combination>).
+        IF <combination>-groups IS NOT BOUND.
+          CONTINUE.
+        ENDIF.
+        DATA(key) = ``.
+        LOOP AT <combination>-sources INTO source.
+          key = key && SWITCH string( source-side WHEN 1 THEN left_tuple-paths[ source-position ]
+                                                  WHEN 2 THEN right_tuple-paths[ source-position ]
+                                                  ELSE context_filters[ source-position ]-path )
+                    && zzxxmla1_cl_model=>c_separator.
+        ENDLOOP.
+        READ TABLE <combination>-groups->* WITH TABLE KEY key = key ASSIGNING FIELD-SYMBOL(<group>).
+        IF sy-subrc = 0 AND <group>-count > 0.
+          APPEND left_tuples[ left_index ] TO result.
+          EXIT.
+        ENDIF.
+      ENDLOOP.
+    ENDLOOP.
+    found = abap_true.
   ENDMETHOD.
 
   METHOD non_empty_level_members.
@@ -5369,6 +5585,11 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD filter.
+    DATA native TYPE abap_bool.
+    result = native_filter( EXPORTING evaluator = evaluator node = node IMPORTING native = native ).
+    IF native = abap_true.
+      RETURN.
+    ENDIF.
     " the list calcs (MutableListCalc, ImmutableListCalc) and the iterable ones evaluate the same way: the set in the
     " context of the call, then the condition per tuple, non-empty off; the context is restored afterwards
     DATA(tuples) = evaluate_set( evaluator = evaluator node = node->args[ 1 ] ).
@@ -5519,6 +5740,61 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
                                          top           = top
                                          with_empty    = with_empty
                                          tuple_filters = tuple_filters ).
+    result = tuples_of_paths( EXPORTING args = args rows = rows IMPORTING native = native ).
+  ENDMETHOD.
+
+  METHOD native_filter.
+    CLEAR native.
+    IF lines( node->args ) <> 2.
+      RETURN.
+    ENDIF.
+    DATA(condition) = zzxxmla1_cl_mdx_planner=>filter_condition( node->args[ 2 ] ).
+    IF condition IS INITIAL.
+      RETURN.
+    ENDIF.
+    " the set: a crossjoin (CrossJoin or *) or one operand, each a level's members, below a member if there is one
+    DATA operands TYPE zzxxmla1_cl_mdx_node=>ty_t_node.
+    crossjoin_operands( EXPORTING node = node->args[ 1 ] with_star = abap_true CHANGING operands = operands ).
+    DATA args TYPE ty_t_cj_arg.
+    DATA filter_operands TYPE zzxxmla1_cl_mdx_facts=>ty_t_top_operand.
+    LOOP AT operands INTO DATA(operand).
+      direct_cj_arg( EXPORTING node = operand IMPORTING arg = DATA(arg) found = DATA(found) ).
+      IF found = abap_false OR arg-member_list = abap_true
+          OR arg-hierarchy = zzxxmla1_cl_mdx_schema_reader=>c_measures
+          OR line_exists( args[ hierarchy = arg-hierarchy ] )
+          OR schema_reader->get_calculated_members( arg-hierarchy ) IS NOT INITIAL.
+        RETURN.
+      ENDIF.
+      DATA(key_level) = schema_reader->get_level( arg-level )-key_level.
+      IF key_level = 0 OR arg-ancestor-key_level > key_level.
+        RETURN.
+      ENDIF.
+      APPEND arg TO args.
+      APPEND VALUE #( hierarchy = arg-hierarchy level = key_level
+                      ancestor_level = arg-ancestor-key_level ancestor_path = arg-ancestor-path ) TO filter_operands.
+    ENDLOOP.
+
+    " the context of the values: the stored non-All members of the other hierarchies (evaluate_current)
+    DATA filters TYPE zzxxmla1_cl_mdx_facts=>ty_t_filter.
+    LOOP AT evaluator->get_members( ) INTO DATA(context) WHERE hier_id <> zzxxmla1_cl_mdx_schema_reader=>c_measures.
+      IF line_exists( args[ hierarchy = context-hier_id ] ).
+        CONTINUE.
+      ENDIF.
+      IF context-calculated = abap_true OR context-calc_name IS NOT INITIAL OR context-is_null = abap_true.
+        RETURN.
+      ENDIF.
+      IF context-key_level > 0.
+        APPEND VALUE #( hierarchy = context-hier_id level = context-key_level path = context-path ) TO filters.
+      ENDIF.
+    ENDLOOP.
+
+    DATA(rows) = fact_reader->ordered_paths( operands      = filter_operands
+                                             filters       = filters
+                                             items         = VALUE #( )
+                                             with_empty    = abap_false
+                                             tuple_filters = filters
+                                             condition     = condition ).
+    check_result_limit( CONV #( lines( rows ) ) ).
     result = tuples_of_paths( EXPORTING args = args rows = rows IMPORTING native = native ).
   ENDMETHOD.
 

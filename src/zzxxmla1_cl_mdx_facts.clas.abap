@@ -289,11 +289,29 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
         descending TYPE abap_bool,
       END OF ty_order_item,
       ty_t_order_item TYPE STANDARD TABLE OF ty_order_item WITH EMPTY KEY.
+    TYPES:
+      "! A node of the condition of a native Filter (RolapNativeSql.generateFilterCondition), the root first: AND or
+      "! OR of its children, a comparison (<, <=, >, >=, =, <>) or an operator (+, -, *) of its two children, a
+      "! stored measure (its position in the measures) or a decimal number (number).
+      BEGIN OF ty_condition,
+        operator TYPE string,
+        children TYPE ty_t_index,
+        measure  TYPE i,
+        number   TYPE string,
+      END OF ty_condition,
+      ty_t_condition TYPE STANDARD TABLE OF ty_condition WITH EMPTY KEY.
+    CONSTANTS:
+      BEGIN OF c_condition,
+        measure TYPE string VALUE `MEASURE`,
+        number  TYPE string VALUE `NUMBER`,
+      END OF c_condition.
     "! The crossjoin of the operands ordered in the database (top_count, and Order natively): the members' crossjoin
     "! joined to the facts as top_count joins them, the values of the measures of the items with the filters, ordered
     "! by the items, then by the members in the order of the crossjoin (the stable sort keeps the set's order); the
     "! paths of each row's members, the first limit rows. Each statement is answered once per request.
     "! @parameter limit | the most rows; 0: all
+    "! @parameter condition | a native Filter's condition on the values of its measures with the filters (its
+    "!   HAVING); only the tuples that meet it
     METHODS ordered_paths
       IMPORTING operands      TYPE ty_t_top_operand
                 filters       TYPE ty_t_filter
@@ -301,6 +319,7 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
                 limit         TYPE i DEFAULT 0
                 with_empty    TYPE abap_bool
                 tuple_filters TYPE ty_t_filter OPTIONAL
+                condition     TYPE ty_t_condition OPTIONAL
       RETURNING VALUE(result) TYPE ty_t_paths.
     "! The subcube of the query (a subselect): only the facts it admits are read, by value and non_empty_paths alike,
     "! as the reference server adds it to every cell request and native set (RolapEvaluator.getSubcubePredicate).
@@ -432,6 +451,13 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
     METHODS top_facts_sql
       IMPORTING operands      TYPE ty_t_top_operand
                 filters       TYPE ty_t_filter
+                !values       TYPE ty_t_index
+      RETURNING VALUE(result) TYPE string.
+    "! The SQL of a node of a native Filter's condition, the values' columns g."V1", ... by the measures' positions
+    "! in values (RolapNativeSql's compilers: each operation in parentheses).
+    METHODS condition_sql
+      IMPORTING condition     TYPE ty_t_condition
+                index         TYPE i
                 !values       TYPE ty_t_index
       RETURNING VALUE(result) TYPE string.
     "! The members of an operand: the distinct key columns of its levels in its dimension table ("C1", "C2", ...),
@@ -1699,6 +1725,11 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
         APPEND item-measure TO values.
       ENDIF.
     ENDLOOP.
+    LOOP AT condition INTO DATA(condition_node) WHERE operator = c_condition-measure.
+      IF NOT line_exists( values[ table_line = condition_node-measure ] ).
+        APPEND condition_node-measure TO values.
+      ENDIF.
+    ENDLOOP.
     " the values of each tuple from the facts (none: empty, the smallest value); without the empty tuples only those
     " with facts with the tuple filters, which may differ from the values'
     DATA(value_condition) = concat_lines_of( table = value_join sep = ` AND ` ).
@@ -1737,6 +1768,8 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
     ENDLOOP.
     APPEND LINES OF hierarchy_order TO order_by.
     DATA(sql) = |SELECT { concat_lines_of( table = outer_columns sep = `, ` ) } FROM { from }| &&
+                COND string( WHEN condition IS NOT INITIAL
+                             THEN | WHERE { condition_sql( condition = condition index = 1 values = values ) }| ) &&
                 | ORDER BY { concat_lines_of( table = order_by sep = `, ` ) }| &&
                 COND string( WHEN limit > 0 THEN | LIMIT { limit }| ).
     READ TABLE top_answers INTO DATA(answer) WITH TABLE KEY sql = sql.
@@ -1761,6 +1794,22 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
       APPEND paths TO result.
     ENDLOOP.
     INSERT VALUE #( sql = sql paths = result ) INTO TABLE top_answers.
+  ENDMETHOD.
+
+  METHOD condition_sql.
+    DATA(node) = condition[ index ].
+    CASE node-operator.
+      WHEN c_condition-measure.
+        result = |g."V{ line_index( values[ table_line = node-measure ] ) }"|.
+      WHEN c_condition-number.
+        result = node-number.
+      WHEN OTHERS.
+        result = `(` && concat_lines_of( table = VALUE string_table(
+                                                   FOR child IN node-children
+                                                   ( condition_sql( condition = condition index = child
+                                                                    values    = values ) ) )
+                                         sep   = | { node-operator } | ) && `)`.
+    ENDCASE.
   ENDMETHOD.
 
   METHOD load.

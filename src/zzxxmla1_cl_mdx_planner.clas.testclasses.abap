@@ -113,9 +113,12 @@ CLASS ltc_planner IMPLEMENTATION.
     assert_plan( axes = VALUE #( ( c_relational ) ) cells = c_relational query = c_relational ).
     plan_query( `select NonEmptyCrossJoin([Store].[Store Country].Members, [Product].Children) on 0 from [ZFMSALES]` ).
     assert_plan( axes = VALUE #( ( c_relational ) ) cells = c_relational query = c_relational ).
-    " with a second set: evaluated (step 5)
+    " with a second set: its groups with the second set's tuples (step 6); with a calculated measure evaluated
     plan_query( `select NonEmpty([Store].[Store State].Members, {[Measures].[Store Cost]}) on 0 from [ZFMSALES]` ).
-    assert_plan( axes = VALUE #( ( c_computed ) ) cells = c_relational query = c_computed ).
+    assert_plan( axes = VALUE #( ( c_relational ) ) cells = c_relational query = c_relational ).
+    plan_query( `with member [Measures].[C] as [Measures].[Store Cost] `
+             && `select NonEmpty([Store].[Store State].Members, {[Measures].[C]}) on 0 from [ZFMSALES]` ).
+    assert_axis_node( c_computed ).
   ENDMETHOD.
 
   METHOD member_functions.
@@ -185,9 +188,26 @@ CLASS ltc_planner IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD sets_by_value.
-    " the set needs values before the axis exists; its cells are still groups
+    " the set needs values before the axis exists; its cells are still groups. A condition SQL answers is the set's
+    " groups that meet it (RolapNativeFilter, step 6)
     plan_query( `select Filter([Store].[Store State].Members, [Measures].[Unit Sales] > 50000) on 0 from [ZFMSALES]` ).
-    assert_plan( axes = VALUE #( ( c_computed ) ) cells = c_relational query = c_computed ).
+    assert_plan( axes = VALUE #( ( c_relational ) ) cells = c_relational query = c_relational ).
+    plan_query( `select Filter([Store].[Store State].Members, ([Measures].[Store Sales] - [Measures].[Store Cost]) * 2 `
+             && `> 1000 and [Measures].[Unit Sales] < 50000) on 0 from [ZFMSALES]` ).
+    assert_axis_node( c_relational ).
+    " true for a tuple without facts (NOT, an OR with a constant side, + with a number), division, IsEmpty: evaluated
+    plan_query( `select Filter([Store].[Store State].Members, not ([Measures].[Unit Sales] > 50000)) on 0 `
+             && `from [ZFMSALES]` ).
+    assert_axis_node( c_computed ).
+    plan_query( `select Filter([Store].[Store State].Members, [Measures].[Unit Sales] > 50000 or 1 = 1) on 0 `
+             && `from [ZFMSALES]` ).
+    assert_axis_node( c_computed ).
+    plan_query( `select Filter([Store].[Store State].Members, [Measures].[Unit Sales] + 1 > 0) on 0 from [ZFMSALES]` ).
+    assert_axis_node( c_computed ).
+    plan_query( `select Filter([Store].[Store State].Members, [Measures].[Unit Sales] / 2 > 0) on 0 from [ZFMSALES]` ).
+    assert_axis_node( c_computed ).
+    plan_query( `select Filter([Store].[Store State].Members, IsEmpty([Measures].[Unit Sales])) on 0 from [ZFMSALES]` ).
+    assert_axis_node( c_computed ).
     plan_query( `select Generate([Store].Children, {[Store].CurrentMember.FirstChild}) on 0 from [ZFMSALES]` ).
     assert_axis_node( c_computed ).
   ENDMETHOD.
@@ -229,6 +249,9 @@ CLASS ltc_planner IMPLEMENTATION.
              && `select [Countries] on 0 from [ZFMSALES]` ).
     assert_plan( axes = VALUE #( ( c_static ) ) cells = c_relational query = c_relational ).
     plan_query( `with set [Big] as Filter([Store].[Store State].Members, [Measures].[Unit Sales] > 50000) `
+             && `select [Big] on 0 from [ZFMSALES]` ).
+    assert_plan( axes = VALUE #( ( c_relational ) ) cells = c_relational query = c_relational ).
+    plan_query( `with set [Big] as Filter([Store].[Store State].Members, [Store].CurrentMember.Name > "M") `
              && `select [Big] on 0 from [ZFMSALES]` ).
     assert_plan( axes = VALUE #( ( c_computed ) ) cells = c_relational query = c_computed ).
   ENDMETHOD.

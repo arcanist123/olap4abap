@@ -243,7 +243,11 @@ Read before designing anything:
   current member (or of its `Ancestor` at a level) or a stored measure (also through calculated measures that only
   name it) of a set the native crossjoin reads (also through named sets and an identity `Generate`) is native too, our
   extension (`native_order`, `ZZXXMLA1_CL_MDX_FACTS=>ordered_paths`), and `Head` of it is its `LIMIT`; any other
-  `Order` sorts in ABAP, break keys evaluated once per tuple into a table and the indexes merge-sorted (step 8). Execute
+  `Order` sorts in ABAP, break keys evaluated once per tuple into a table and the indexes merge-sorted (step 8).
+  `Filter` of such a crossjoin by a condition of stored measures (`AND`, `OR`, comparisons, `+`, `-`, `*`) that is
+  false for every tuple without facts is native too (`RolapNativeFilter`, `native_filter`, the condition from
+  `ZZXXMLA1_CL_MDX_PLANNER=>filter_condition` as a `WHERE` of `ordered_paths`), and `NonEmpty` (also with a second
+  set) is one grouped read (`non_empty_groups`), no evaluator call (query planning step 6). Execute
   answers carry the query's `DIMENSION PROPERTIES` (olap4j's standard member properties) and `CELL PROPERTIES`; when
   these show no cell's value (Excel's member lists ask for `CELL_ORDINAL` only), no axis is NON EMPTY and no member is
   calculated, the cells are not evaluated (`cells_needed`, our shortcut; the answer is the same). When no member of

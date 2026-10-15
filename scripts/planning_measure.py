@@ -8,6 +8,9 @@ recorded them (ZZXXMLA1_TRACE: runtime_ms, sql_count, sql_ms), then the best run
     pivot        an Excel pivot on ZFOODMART: products drilled to Drink's children by customer countries, Store Cost
     time_1998    a NON EMPTY axis with [Time].[1998] on the other axis (the axis is filtered in the default Time, 1997)
     wide_grid    Excel's 1,001 x 1,001 grid on ZXMLWIDEA (two levels of 1,000 members with their All members)
+    filter, filter_wide, non_empty
+                 Filter on a stored measure of FoodMart's customers and of ZXMLAD00's 100,000 members, NonEmpty of
+                 the customers with a second set (step 6); each *_evaluated the same answer by the evaluator
 
     python scripts/planning_measure.py                       # every statement, 3 runs each
     python scripts/planning_measure.py --case pivot --runs 5
@@ -46,6 +49,28 @@ CASES = {
                   "DIMENSION PROPERTIES PARENT_UNIQUE_NAME ON COLUMNS, NON EMPTY Hierarchize({DrilldownLevel("
                   "{[ZXMLAD02].[All Dimension 02]},,,INCLUDE_CALC_MEMBERS)}) DIMENSION PROPERTIES PARENT_UNIQUE_NAME "
                   "ON ROWS FROM [ZXMLWIDEA] " + EXCEL_CELLS),
+    # step 6: Filter on a stored measure (native, one statement) and the same with NOT NOT (the evaluator per tuple)
+    "filter": ("ZFOODMART",
+               "SELECT {[Measures].[Unit Sales]} ON COLUMNS, Filter([Customers].[Name].Members, "
+               "[Measures].[Unit Sales] > 300) ON ROWS FROM [ZFMSALES]"),
+    "filter_evaluated": ("ZFOODMART",
+                         "SELECT {[Measures].[Unit Sales]} ON COLUMNS, Filter([Customers].[Name].Members, "
+                         "NOT (NOT ([Measures].[Unit Sales] > 300))) ON ROWS FROM [ZFMSALES]"),
+    "filter_wide": ("ZXMLWIDEA",
+                    "SELECT {[Measures].[ZXMLAKF]} ON COLUMNS, Filter([ZXMLAD00].[All Dimension 00].Children, "
+                    "[Measures].[ZXMLAKF] > 7000) ON ROWS FROM [ZXMLWIDEA]"),
+    "filter_wide_evaluated": ("ZXMLWIDEA",
+                              "SELECT {[Measures].[ZXMLAKF]} ON COLUMNS, Filter([ZXMLAD00].[All Dimension 00].Children, "
+                              "NOT (NOT ([Measures].[ZXMLAKF] > 7000))) ON ROWS FROM [ZXMLWIDEA]"),
+    # step 6: NonEmpty with a second set by groups, and the same with a calculated measure (the evaluator)
+    "non_empty": ("ZFOODMART",
+                  "WITH MEMBER [Measures].[U] AS [Measures].[Unit Sales] SELECT {[Measures].[Unit Sales]} ON COLUMNS, "
+                  "NonEmpty([Customers].[Name].Members, {([Product].[Drink].[Dairy], [Measures].[Unit Sales])}) "
+                  "ON ROWS FROM [ZFMSALES]"),
+    "non_empty_evaluated": ("ZFOODMART",
+                            "WITH MEMBER [Measures].[U] AS [Measures].[Unit Sales] SELECT {[Measures].[Unit Sales]} "
+                            "ON COLUMNS, NonEmpty([Customers].[Name].Members, {([Product].[Drink].[Dairy], "
+                            "[Measures].[U])}) ON ROWS FROM [ZFMSALES]"),
 }
 
 

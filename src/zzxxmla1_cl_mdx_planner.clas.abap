@@ -12,11 +12,11 @@
 "! Query planning (docs/query-planning.md), our addition: the reference evaluates every axis and every cell through
 "! RolapEvaluator. The planner marks every node of a resolved query (ZZXXMLA1_CL_MDX_VALIDATOR) as
 "! - static: answered by the schema and member reads (literals, elements, member functions that read no facts);
-"! - relational: answered by grouped SQL over the facts (a stored measure where a value is wanted, NonEmpty of one set,
-"!   NonEmptyCrossJoin, the native TopCount and Order);
+"! - relational: answered by grouped SQL over the facts (a stored measure where a value is wanted, NonEmpty,
+"!   NonEmptyCrossJoin, the native TopCount, Order and Filter);
 "! - computed: for the evaluator (calculated and null members, operators and value functions, sets that depend on
 "!   values, anything not known here).
-"! A node is the highest mark of its arguments and its own, but for TopCount and Order, whose value arguments SQL
+"! A node is the highest mark of its arguments and its own, but for TopCount, Order and Filter, whose value arguments SQL
 "! answers. Relational is computed where a calculated member of the slicer is in the context. Besides its mark a
 "! member, tuple or set node knows whether a calculated member can be among its members (WITH MEMBER, AllMembers,
 "! AddCalculatedMembers, DrilldownLevel with INCLUDE_CALC_MEMBERS, VisualTotals, the current member of a hierarchy with
@@ -65,6 +65,17 @@ CLASS zzxxmla1_cl_mdx_planner DEFINITION
     METHODS get_mark
       IMPORTING node          TYPE ty_node
       RETURNING VALUE(result) TYPE string.
+    "! The condition of Filter(set, condition) that SQL answers (RolapNativeFilter, RolapNativeSql's booleanCompiler,
+    "! a part of it): AND and OR of comparisons (<, <=, >, >=, =, <>) of numbers made of stored measures, decimal
+    "! numbers, +, - and *, in parentheses or not. Not division (by zero MDX gives infinity, SQL an error), NOT and
+    "! IsEmpty (true for an empty cell), calculated measures. Only a condition that is false for every tuple without
+    "! facts in the context, where every stored measure is empty: a comparison with an empty side is false
+    "! (BooleanNull), * is empty with one empty side, + and - with two, AND is false with one false side, OR with
+    "! two. So the groups of the facts that meet it (the tuples with facts) are the tuples the interpreted Filter
+    "! keeps. None for any other condition.
+    CLASS-METHODS filter_condition
+      IMPORTING node          TYPE ty_node
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_facts=>ty_t_condition.
 
   PRIVATE SECTION.
     TYPES:
@@ -107,6 +118,15 @@ CLASS zzxxmla1_cl_mdx_planner DEFINITION
     METHODS is_stored_measure
       IMPORTING node          TYPE ty_node
       RETURNING VALUE(result) TYPE abap_bool.
+    "! A node of filter_condition, appended to the condition (an operation before its arguments).
+    "! @parameter logical | a condition, else a number
+    "! @parameter empty | a condition: false for a tuple without facts; a number: empty for it
+    CLASS-METHODS condition_node
+      IMPORTING node      TYPE ty_node
+                logical   TYPE abap_bool
+      EXPORTING found     TYPE abap_bool
+                !empty    TYPE abap_bool
+      CHANGING  condition TYPE zzxxmla1_cl_mdx_facts=>ty_t_condition.
     "! A calculated member of the query is in the hierarchy (-1: in any).
     METHODS has_calculated
       IMPORTING hierarchy     TYPE i
@@ -322,8 +342,12 @@ CLASS zzxxmla1_cl_mdx_planner IMPLEMENTATION.
         " Exists(set1, set2) relates members, with a measure group it reads facts
         result-mark = COND #( WHEN lines( node->args ) = 2 THEN args_mark ELSE c_mark-computed ).
       WHEN `NONEMPTY`.
-        " NonEmpty(set) is the set's groups with facts; with a second set evaluated (step 5)
-        result-mark = COND #( WHEN lines( node->args ) = 1 THEN relational( args_mark ) ELSE c_mark-computed ).
+        " NonEmpty(set [, set]) is the set's tuples whose groups with the second set's tuples have facts
+        result-mark = relational( args_mark ).
+      WHEN `FILTER`.
+        " a condition SQL answers: the set's groups that meet it (RolapNativeFilter)
+        result-mark = COND #( WHEN lines( node->args ) = 2 AND filter_condition( node->args[ 2 ] ) IS NOT INITIAL
+                              THEN relational( mark( node->args[ 1 ] )-mark ) ELSE c_mark-computed ).
       WHEN `NONEMPTYCROSSJOIN`.
         result-mark = relational( args_mark ).
       WHEN `TOPCOUNT` OR `BOTTOMCOUNT`.
@@ -338,7 +362,7 @@ CLASS zzxxmla1_cl_mdx_planner IMPLEMENTATION.
         result-calculated = abap_true.
       WHEN OTHERS.
         " operators, value functions (aggregates, IIf, CASE, string functions, ...) and sets that depend on values
-        " (Filter, Generate, Existing, ...)
+        " (Filter of another condition, Generate, Existing, ...)
         result-mark = c_mark-computed.
     ENDCASE.
   ENDMETHOD.
@@ -379,6 +403,88 @@ CLASS zzxxmla1_cl_mdx_planner IMPLEMENTATION.
     result = xsdbool( node->kind = zzxxmla1_cl_mdx_node=>c_kind-member
                       AND node->element-member-hier_id = zzxxmla1_cl_mdx_schema_reader=>c_measures
                       AND node->element-member-calculated = abap_false ).
+  ENDMETHOD.
+
+  METHOD filter_condition.
+    condition_node( EXPORTING node = node logical = abap_true
+                    IMPORTING found = DATA(found) empty = DATA(empty)
+                    CHANGING  condition = result ).
+    IF found = abap_false OR empty = abap_false.
+      CLEAR result.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD condition_node.
+    CLEAR: found, empty.
+    IF node->kind = zzxxmla1_cl_mdx_node=>c_kind-literal.
+      " NumberSqlCompiler: a decimal number (digits and a point; a sign is an operator)
+      IF logical = abap_false AND node->category = zzxxmla1_cl_mdx_node=>c_category-numeric
+         AND node->value CO `0123456789.` AND node->value <> `.` AND count( val = node->value sub = `.` ) <= 1.
+        APPEND VALUE #( operator = zzxxmla1_cl_mdx_facts=>c_condition-number number = node->value ) TO condition.
+        found = abap_true.
+      ENDIF.
+      RETURN.
+    ENDIF.
+    IF node->kind = zzxxmla1_cl_mdx_node=>c_kind-member.
+      " StoredMeasureSqlCompiler
+      IF logical = abap_false AND node->element-member-hier_id = zzxxmla1_cl_mdx_schema_reader=>c_measures
+         AND node->element-member-calculated = abap_false AND node->element-member-measure_index > 0.
+        APPEND VALUE #( operator = zzxxmla1_cl_mdx_facts=>c_condition-measure
+                        measure  = node->element-member-measure_index ) TO condition.
+        found = abap_true.
+        empty = abap_true.
+      ENDIF.
+      RETURN.
+    ENDIF.
+    IF node->kind <> zzxxmla1_cl_mdx_node=>c_kind-resolved_call.
+      RETURN.
+    ENDIF.
+    DATA(name) = to_upper( node->fun_def-name ).
+    IF node->fun_def-implementation = `ParenthesesFunDef` AND lines( node->args ) = 1.
+      condition_node( EXPORTING node = node->args[ 1 ] logical = logical
+                      IMPORTING found = found empty = empty
+                      CHANGING  condition = condition ).
+      RETURN.
+    ENDIF.
+    IF node->fun_def-syntax <> zzxxmla1_cl_mdx_node=>c_syntax-infix OR lines( node->args ) <> 2.
+      RETURN.
+    ENDIF.
+    " the arguments' categories: numbers, or conditions of AND and OR
+    DATA(arguments_logical) = abap_false.
+    IF logical = abap_true AND ( name = `AND` OR name = `OR` ).
+      arguments_logical = abap_true.
+    ELSEIF NOT ( ( logical = abap_true AND ( name = `<` OR name = `<=` OR name = `>` OR name = `>=` OR name = `=`
+                                            OR name = `<>` ) )
+                 OR ( logical = abap_false AND ( name = `+` OR name = `-` OR name = `*` ) ) ).
+      RETURN.
+    ENDIF.
+    DATA(category) = COND i( WHEN arguments_logical = abap_true THEN zzxxmla1_cl_mdx_type=>c_category-logical
+                             ELSE zzxxmla1_cl_mdx_type=>c_category-numeric ).
+    IF parameter_category( node = node index = 1 ) <> category OR parameter_category( node = node index = 2 ) <> category.
+      RETURN.
+    ENDIF.
+    " the operation before its arguments
+    APPEND VALUE #( operator = name ) TO condition.
+    DATA(index) = lines( condition ).
+    DATA(empties) = VALUE zzxxmla1_cl_mdx_facts=>ty_t_index( ).
+    DATA(children) = VALUE zzxxmla1_cl_mdx_facts=>ty_t_index( ).
+    LOOP AT node->args INTO DATA(arg).
+      APPEND lines( condition ) + 1 TO children.
+      condition_node( EXPORTING node = arg logical = arguments_logical
+                      IMPORTING found = DATA(arg_found) empty = DATA(arg_empty)
+                      CHANGING  condition = condition ).
+      IF arg_found = abap_false.
+        RETURN.
+      ENDIF.
+      IF arg_empty = abap_true.
+        APPEND sy-tabix TO empties.
+      ENDIF.
+    ENDLOOP.
+    condition[ index ]-children = children.
+    found = abap_true.
+    " false or empty without facts: OR, + and - with both sides so, AND, * and the comparisons with one
+    empty = xsdbool( lines( empties ) = 2
+                     OR ( lines( empties ) = 1 AND name <> `OR` AND name <> `+` AND name <> `-` ) ).
   ENDMETHOD.
 
   METHOD has_calculated.

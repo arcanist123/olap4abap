@@ -114,12 +114,13 @@ reference: the tree (`ZZXXMLA1_CL_MDX_NODE`) is not changed. `get_mark( node )` 
   `Properties`, `Level`, ...), the time functions (`ParallelPeriod`, `PeriodsToDate`, `Ytd`, ...), `CurrentMember`
   and `CurrentDateMember`. The null member needs no rule: axes and the slicer are sets, and `{}` leaves out the tuples
   with it.
-- `NonEmpty` of one set, `NonEmptyCrossJoin`, `TopCount`/`BottomCount` by a stored measure with a static count and
-  `Order` whose keys are all `BASC`/`BDESC` on stored measures or `OrderKey` calls are relational (their value
-  arguments are SQL, so they do not make the node computed); a stored member, tuple or hierarchy where a value is
-  wanted is relational as an argument.
-- Everything else is computed: operators, value functions, `IIf`, `CASE`, aggregates, `Filter`, `Generate`,
-  `Existing`, `NonEmpty` with a second set (step 5), `VisualTotals`, functions not listed.
+- `NonEmpty` (also with a second set, step 6), `NonEmptyCrossJoin`, `TopCount`/`BottomCount` by a stored measure
+  with a static count, `Order` whose keys are all `BASC`/`BDESC` on stored measures or `OrderKey` calls and `Filter`
+  whose condition SQL answers (`filter_condition`, step 6) are relational (their value arguments are SQL, so they do
+  not make the node computed); a stored member, tuple or hierarchy where a value is wanted is relational as an
+  argument.
+- Everything else is computed: operators, value functions, `IIf`, `CASE`, aggregates, `Filter` of another
+  condition, `Generate`, `Existing`, `VisualTotals`, functions not listed.
 - A member, tuple or set node also knows whether a calculated member can be among its members: a calculated member,
   `AllMembers`, `AddCalculatedMembers`, `CalculatedChild`, `DrilldownLevel` with `INCLUDE_CALC_MEMBERS`, and the
   current member (also a hierarchy where a member is wanted), each when its hierarchy has a calculated member of the
@@ -378,6 +379,43 @@ formula per group instead of per cell is step 7. Tests: `planning_on_and_off` co
 mixed statements with planning on and off and reads the mixed grid's facts once; `xmla_test.py` 272 of 274 (the
 two datasources cases), `compare-applicable.py` 394 of 395 (#64), SAP 242 s in total, the slowest 8.3 s.
 
+### Set nodes by groups (step 6, done 2026-10-15)
+
+- **`Filter` in SQL** (`RolapNativeFilter`, `ZZXXMLA1_CL_MDX_ENGINE=>native_filter`): a crossjoin (`CrossJoin` or `*`)
+  of a level's members (`Members`, `Children`, `Descendants`), or one such operand, filtered by a condition SQL
+  answers is one statement: `ordered_paths` with the condition as a `WHERE` on the grouped values of its measures in
+  the context (the stored non-All members of the other hierarchies), in hierarchy order. The condition
+  (`ZZXXMLA1_CL_MDX_PLANNER=>filter_condition`, used by the marking and the engine alike) is a part of
+  `RolapNativeSql`'s: `AND` and `OR` of comparisons of numbers made of stored measures, decimal numbers, `+`, `-`
+  and `*`. The reference sends any condition its compilers know to SQL, also where SQL's answer is not MDX's; here
+  only a condition that is false for every tuple without facts: a comparison with an empty side is false
+  (`BooleanNull`), `*` is empty with one empty side, `+` and `-` only with two, `AND` is false with one false side,
+  `OR` with two. The join keeps only tuples with facts, so the answer is the evaluator's, whether the evaluator is
+  non-empty or not. Not native: `NOT`, `IsEmpty`, division, a constant side of `OR`, `IIf`, names and captions,
+  calculated measures, member lists, a calculated or null member in the context, a calculated member of the query in
+  a hierarchy of the set. Like the reference, the crossjoin is not checked against the result limit, only the tuples
+  kept.
+- **`NonEmpty` by groups** (`non_empty_groups`): `NonEmpty(set [, set])` keeps the tuples of the first set whose
+  group with a tuple of the second set (none: the context) and the context's members of the other hierarchies has
+  facts. All groups are one `cross_groups` call (a pattern per pair of a left and a right pattern, the second set's
+  hierarchies overriding the first's), then each pair's group is looked up by key; no evaluator call. The evaluator
+  stays where a tuple or the context holds a calculated or null member, or the cell's measure is calculated.
+
+Measured with `planning_measure.py` (best of 3, the trace's runtime; `*_evaluated` the same answer by the
+evaluator: `NOT (NOT (...))`, a calculated measure equal to the stored one):
+
+| statement                                                           | evaluator | by groups |
+| ------------------------------------------------------------------- | --------- | --------- |
+| `Filter` of the 10,281 customers by Unit Sales > 300                | 2,377 ms  | 182 ms    |
+| `Filter` of `ZXMLAD00`'s 100,000 members by `ZXMLAKF` (one run)     | 18,299 ms | 3,716 ms  |
+| `NonEmpty` of the customers with `{([Product].[Dairy], [Unit Sales])}` | 1,736 ms | 1,046 ms |
+
+The rest of the native `Filter` on `ZXMLWIDEA` is the member read by the paths of the kept members (18 statements,
+1.9 s) and the answer; of `NonEmpty`, the 10,281 customers' read and the cells. Tests: the engine's
+`native_filter_and_non_empty` (each native statement against its evaluated twin), the planner's marks;
+`xmla_test.py` 272 of 274 (the two datasources cases), `compare-applicable.py` 394 of 395 (#64; #353 differed once in
+the parallel run, the same alone and with its neighbours), SAP 226 s in total.
+
 ## Semantics that must not change
 
 - Empty is "no group", not 0: a stored measure whose group sums to 0 is a cell with 0, written, and `NON EMPTY` keeps
@@ -425,7 +463,8 @@ two datasources cases), `compare-applicable.py` 394 of 395 (#64), SAP 242 s in t
    cache, the cell table. The 1,001 x 1,001 grid 3.5 s (13.8 s). See Cells first (step 4) above.
 5. Done (2026-10-15): mixed queries: the misses of a pass read as one batch (widened), the cells' inputs in their own
    context read before the first pass. See Mixed queries (step 5) above.
-6. More set nodes relational: `Filter` on a stored measure (`RolapNativeFilter`), `NonEmpty` with a second set.
+6. Done (2026-10-15): more set nodes relational: `Filter` on stored measures in SQL (`RolapNativeFilter`), `NonEmpty`
+   (also with a second set) by groups. See Set nodes by groups (step 6) above.
 7. Formulas per group: a calculated measure of arithmetic on stored measures of its own cell computed per group,
    first in ABAP from the groups, later as SQL for the simple operators (`next-steps.md`, query planning step 7).
 

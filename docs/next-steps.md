@@ -89,9 +89,13 @@ keeps the answers: both test suites give the same answers with planning on and o
    the only one. The 1,001 x 1,001 grid with a calculated measure 232 to 108 s, the rest the evaluator's pass per
    cell; `xmla_test.py` 272 of 274, `compare-applicable.py` 394 of 395 (#64). Left over: formulas per group instead of
    per cell, the NON EMPTY filter by the evaluator with a calculated measure.
-6. Next (priority before step 7, the user 2026-10-15): more set nodes relational: `Filter` on a stored measure
-   (`RolapNativeFilter`), `NonEmpty` with a second set.
-7. Formulas per group (after step 6, decided with the user 2026-10-15): a calculated measure whose formula is
+6. Done (2026-10-15): more set nodes relational (`query-planning.md`, Set nodes by groups): `Filter` of a crossjoin
+   of level members by a condition of stored measures is one statement (`RolapNativeFilter`, `native_filter`, only
+   conditions false for every tuple without facts, so the answer is the evaluator's), `NonEmpty` (also with a second
+   set) one `cross_groups` read and a lookup per pair (`non_empty_groups`). `Filter` of the 10,281 customers 2.4 s to
+   0.18 s, of 100,000 members 18.3 to 3.7 s, `NonEmpty` with a second set 1.7 to 1.0 s; `xmla_test.py` 272 of 274,
+   `compare-applicable.py` 394 of 395 (#64).
+7. Next: formulas per group (decided with the user 2026-10-15): a calculated measure whose formula is
    arithmetic of stored measures of its own cell (`[Store Sales] - [Store Cost]`, `[ZXMLAKF] * 2`; no navigation, no
    other member) is computed once per group from the groups the cells' statement read, not by the evaluator per cell
    (the 1,001 x 1,001 grid with such a measure: 108 s, nearly all of it the evaluator's pass at about 100 µs per
