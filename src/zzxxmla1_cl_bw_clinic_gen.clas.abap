@@ -20,6 +20,9 @@
 "! - on the patient ZCLPAT the plain hierarchy ZCLPAT_PRG (care programs > program > patient) with link nodes: a
 "!   patient in two programs is a leaf in both (a duplicate node, or a link node), the heart program is under chronic
 "!   care and under senior care, and senior care with it under prevention (link nodes),
+"! - the service ZCLSERV (52 services by a four-digit code, a dimension of both providers), with the plain hierarchy
+"!   ZCLSERV_CAT (all services > category > ranges of codes) of intervals: overlapping ones, a linked text node with its
+"!   range and a linked range,
 "! - the room ZCLROOM, compounded with the site ZCLSITE: the same rooms R01 to R04 at both sites, so a room is a member
 "!   only with its site (docs/bw-schema-design-guide.md, section 3.7),
 "! - the fiscal time, a dimension of its own: the fiscal year variant ZCLFISCVR (K1, K2, K4), the fiscal year ZCLFISCYR
@@ -57,6 +60,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     CONSTANTS c_hierarchy_site TYPE rshienm VALUE 'ZCLDOC_SITE'.
     CONSTANTS c_hierarchy_diag TYPE rshienm VALUE 'ZCLDIAG_ICD'.
     CONSTANTS c_hierarchy_prg  TYPE rshienm VALUE 'ZCLPAT_PRG'.
+    CONSTANTS c_hierarchy_serv TYPE rshienm VALUE 'ZCLSERV_CAT'.
 
     "! Deletes everything and generates the InfoObjects with their master data and hierarchies, and the providers
     "! asked for with their data, schemas and catalogs; the log of the run.
@@ -104,10 +108,11 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
         leng       TYPE i,
         attributes TYPE ty_t_iobjnm,
         compounding TYPE ty_t_iobjnm,
-        "! with hierarchies; version dependent; the entire hierarchy time dependent
+        "! with hierarchies; version dependent; the entire hierarchy time dependent; with intervals
         hierarchies   TYPE abap_bool,
         hie_versions  TYPE abap_bool,
         hie_timedep   TYPE abap_bool,
+        hie_intervals TYPE abap_bool,
         auth_relevant TYPE abap_bool,
       END OF ty_cha,
       ty_t_cha TYPE STANDARD TABLE OF ty_cha WITH EMPTY KEY.
@@ -188,13 +193,16 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
       END OF ty_physician,
       ty_t_physician TYPE STANDARD TABLE OF ty_physician WITH EMPTY KEY.
     TYPES:
-      "! a node of a hierarchy: a text node (with a text) or a value of the characteristic (its key, no text); a link
-      "! node shows the subtree of the node of its name that is no link
+      "! a node of a hierarchy: a text node (with a text), a value of the characteristic (its key, no text) or an
+      "! interval of values (from and to, named by from); a link node shows the subtree of the node of its name that is
+      "! no link
       BEGIN OF ty_hie_node,
         name   TYPE string,
         parent TYPE string,
         text   TYPE string,
         link   TYPE abap_bool,
+        from   TYPE string,
+        to     TYPE string,
       END OF ty_hie_node,
       ty_t_hie_node TYPE STANDARD TABLE OF ty_hie_node WITH EMPTY KEY.
     TYPES:
@@ -217,6 +225,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
       END OF ty_hierarchy,
       ty_t_hierarchy TYPE STANDARD TABLE OF ty_hierarchy WITH EMPTY KEY.
     TYPES ty_t_htab TYPE rsndi_t_htabstr.
+    TYPES ty_t_jtab TYPE rsndi_t_jtabstr.
     TYPES ty_t_ndi_message TYPE rsndi_t_message.
     TYPES:
       BEGIN OF ty_diagnosis,
@@ -226,6 +235,13 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
         chapter         TYPE string,
       END OF ty_diagnosis,
       ty_t_diagnosis TYPE STANDARD TABLE OF ty_diagnosis WITH EMPTY KEY.
+    TYPES:
+      "! a service a visit is billed for, by a code of four digits whose first is its category
+      BEGIN OF ty_service,
+        code TYPE string,
+        name TYPE string,
+      END OF ty_service,
+      ty_t_service TYPE STANDARD TABLE OF ty_service WITH EMPTY KEY.
     TYPES:
       "! one visit; a key of 0 or blank is BW's blank member
       BEGIN OF ty_visit,
@@ -309,6 +325,13 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     "! The nodes of ZCLPAT_PRG: all care programs > area > program > patient; a program under a second parent is a link
     "! node, a patient in a second program a duplicate node or a link node.
     METHODS care_program_nodes RETURNING VALUE(result) TYPE ty_t_hie_node.
+    "! The nodes of ZCLSERV_CAT: all services > category > interval of codes, and care pathways with overlapping
+    "! intervals, a linked category and a linked interval.
+    METHODS service_catalog_nodes RETURNING VALUE(result) TYPE ty_t_hie_node.
+    "! The services, by code.
+    METHODS services RETURNING VALUE(result) TYPE ty_t_service.
+    "! The service of a visit: by visit type, chapter of the diagnosis and age, its number choosing among a few.
+    METHODS service IMPORTING visit TYPE ty_visit index TYPE i RETURNING VALUE(result) TYPE string.
     "! A text node's name for a text: upper case, a blank or hyphen as underscore, at most 32 characters.
     METHODS node_name IMPORTING text TYPE string RETURNING VALUE(result) TYPE string.
     METHODS add_node
@@ -317,7 +340,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
                 node     TYPE ty_hie_node
                 parentid TYPE rshienodid
                 tlevel   TYPE i
-      CHANGING  htab     TYPE ty_t_htab.
+      CHANGING  htab     TYPE ty_t_htab
+                jtab     TYPE ty_t_jtab.
     "! The departments a patient of each age group is sent to, with their weights.
     METHODS department_weights RETURNING VALUE(result) TYPE ty_t_group_weight.
     "! The diagnoses each department sees, with their weights.
@@ -526,6 +550,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
         hierarchies = abap_true auth_relevant = abap_true )
       ( name = 'ZCLVTYPE' text = 'Visit Type' leng = 20
         attributes = VALUE #( ( 'ZCLSETNG' ) ) )
+      ( name = 'ZCLSERV'  text = 'Service'    datatp = 'NUMC' leng = 4
+        attributes = VALUE #( ( 'ZCLSETNG' ) ) hierarchies = abap_true hie_intervals = abap_true )
       " the day as YYYYMMDD; a plain characteristic, not a BW time characteristic, so it can have attributes
       ( name = 'ZCLDATE'  text = 'Date'       datatp = 'NUMC' leng = 8
         attributes = VALUE #( ( 'ZCLTHEDT' ) ( 'ZCLDAYNM' ) ( 'ZCLMONNM' ) ( 'ZCLYEAR' ) ( 'ZCLQTR' ) ( 'ZCLMONTH' )
@@ -553,7 +579,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       ( suffix = '5' text = 'Time'       iobjtp = 'CHA' iobjnms = VALUE #( ( 'ZCLDATE' ) ) )
       ( suffix = '6' text = 'Room'       iobjtp = 'CHA' iobjnms = VALUE #( ( 'ZCLSITE' ) ( 'ZCLROOM' ) ) )
       ( suffix = '7' text = 'Fiscal Time' iobjtp = 'CHA'
-        iobjnms = VALUE #( ( 'ZCLFISCVR' ) ( 'ZCLFISCYR' ) ( 'ZCLFISCPR' ) ) ) ).
+        iobjnms = VALUE #( ( 'ZCLFISCVR' ) ( 'ZCLFISCYR' ) ( 'ZCLFISCPR' ) ) )
+      ( suffix = '8' text = 'Service'    iobjtp = 'CHA' iobjnms = VALUE #( ( 'ZCLSERV' ) ) ) ).
   ENDMETHOD.
 
   METHOD all_iobjnm.
@@ -563,7 +590,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
 
   METHOD dimension_characteristics.
     result = VALUE #( ( 'ZCLPAT' ) ( 'ZCLDOC' ) ( 'ZCLDIAG' ) ( 'ZCLVTYPE' ) ( 'ZCLDATE' ) ( 'ZCLSITE' ) ( 'ZCLROOM' )
-                      ( 'ZCLFISCVR' ) ( 'ZCLFISCYR' ) ( 'ZCLFISCPR' ) ).
+                      ( 'ZCLFISCVR' ) ( 'ZCLFISCYR' ) ( 'ZCLFISCPR' ) ( 'ZCLSERV' ) ).
   ENDMETHOD.
 
   METHOD random.
@@ -841,6 +868,131 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     " the patients' care programs, plain too, with link nodes
     APPEND VALUE #( iobjnm = 'ZCLPAT' name = c_hierarchy_prg dateto = '99991231' text = `Care Programs`
                     nodes = care_program_nodes( ) ) TO result.
+    " the services by intervals of their codes, plain too
+    APPEND VALUE #( iobjnm = 'ZCLSERV' name = c_hierarchy_serv dateto = '99991231' text = `Service Catalog`
+                    nodes = service_catalog_nodes( ) ) TO result.
+  ENDMETHOD.
+
+  METHOD service_catalog_nodes.
+    " Every category is an interval of codes, so a service is under its category by its code alone. The care pathways
+    " take services again: the emergency pathway an interval within the consultations' (overlapping intervals under
+    " different parents are duplicate nodes), imaging as a link node with its interval below it and the minor
+    " procedures' interval as a link node; the cardiac pathway an interval within the laboratory's and the functional
+    " tests as a link node.
+    result = VALUE #(
+      ( name = `SERVICES` text = `All Services` )
+      ( name = `CONSULT`     parent = `SERVICES`    text = `Consultations` )
+      ( name = `1000`        parent = `CONSULT`     from = `1000` to = `1099` )
+      ( name = `DIAGNOSTICS` parent = `SERVICES`    text = `Diagnostics` )
+      ( name = `LAB`         parent = `DIAGNOSTICS` text = `Laboratory` )
+      ( name = `2000`        parent = `LAB`         from = `2000` to = `2099` )
+      ( name = `IMAGING`     parent = `DIAGNOSTICS` text = `Imaging` )
+      ( name = `2100`        parent = `IMAGING`     from = `2100` to = `2199` )
+      ( name = `FUNCTION`    parent = `DIAGNOSTICS` text = `Functional Tests` )
+      ( name = `2200`        parent = `FUNCTION`    from = `2200` to = `2299` )
+      ( name = `THERAPY`     parent = `SERVICES`    text = `Therapy` )
+      ( name = `3000`        parent = `THERAPY`     from = `3000` to = `3049` )
+      ( name = `3050`        parent = `THERAPY`     from = `3050` to = `3099` )
+      ( name = `PREVENTION`  parent = `SERVICES`    text = `Prevention` )
+      ( name = `4000`        parent = `PREVENTION`  from = `4000` to = `4099` )
+      ( name = `MENTAL`      parent = `SERVICES`    text = `Mental Health` )
+      ( name = `5000`        parent = `MENTAL`      from = `5000` to = `5099` )
+      ( name = `PATHWAYS`    parent = `SERVICES`    text = `Care Pathways` )
+      ( name = `EMERGENCY`   parent = `PATHWAYS`    text = `Emergency Pathway` )
+      ( name = `1010`        parent = `EMERGENCY`   from = `1010` to = `1019` )
+      ( name = `IMAGING`     parent = `EMERGENCY`   text = `Imaging` link = abap_true )
+      ( name = `3000`        parent = `EMERGENCY`   from = `3000` to = `3049` link = abap_true )
+      ( name = `CARDIAC`     parent = `PATHWAYS`    text = `Cardiac Pathway` )
+      ( name = `2003`        parent = `CARDIAC`     from = `2003` to = `2004` )
+      ( name = `FUNCTION`    parent = `CARDIAC`     text = `Functional Tests` link = abap_true ) ).
+  ENDMETHOD.
+
+  METHOD services.
+    result = VALUE #(
+      ( code = `1001` name = `Initial Consultation` )
+      ( code = `1002` name = `Follow-up Consultation` )
+      ( code = `1003` name = `Extended Consultation` )
+      ( code = `1004` name = `Telehealth Consultation` )
+      ( code = `1005` name = `Telehealth Follow-up` )
+      ( code = `1010` name = `Emergency Assessment` )
+      ( code = `1011` name = `Emergency Treatment` )
+      ( code = `1012` name = `Emergency Observation` )
+      ( code = `2001` name = `Complete Blood Count` )
+      ( code = `2002` name = `Metabolic Panel` )
+      ( code = `2003` name = `Lipid Panel` )
+      ( code = `2004` name = `HbA1c Test` )
+      ( code = `2005` name = `Thyroid Panel` )
+      ( code = `2006` name = `Urinalysis` )
+      ( code = `2007` name = `C-Reactive Protein` )
+      ( code = `2008` name = `Rapid Influenza Test` )
+      ( code = `2009` name = `Rapid Strep Test` )
+      ( code = `2010` name = `Bacterial Culture` )
+      ( code = `2101` name = `Chest X-Ray` )
+      ( code = `2102` name = `Limb X-Ray` )
+      ( code = `2103` name = `Spine X-Ray` )
+      ( code = `2104` name = `Ultrasound` )
+      ( code = `2105` name = `Head CT` )
+      ( code = `2106` name = `MRI` )
+      ( code = `2201` name = `ECG` )
+      ( code = `2202` name = `Stress ECG` )
+      ( code = `2203` name = `Echocardiography` )
+      ( code = `2204` name = `Spirometry` )
+      ( code = `2205` name = `Pulse Oximetry` )
+      ( code = `2206` name = `Holter Monitoring` )
+      ( code = `3001` name = `Wound Care` )
+      ( code = `3002` name = `Suturing` )
+      ( code = `3003` name = `Splinting` )
+      ( code = `3004` name = `Cast Application` )
+      ( code = `3005` name = `Skin Biopsy` )
+      ( code = `3006` name = `Cryotherapy` )
+      ( code = `3007` name = `Lesion Excision` )
+      ( code = `3051` name = `Joint Injection` )
+      ( code = `3052` name = `Physiotherapy Session` )
+      ( code = `3053` name = `Inhalation Therapy` )
+      ( code = `3054` name = `Infusion` )
+      ( code = `3055` name = `Intramuscular Injection` )
+      ( code = `4001` name = `Influenza Vaccination` )
+      ( code = `4002` name = `Tetanus Vaccination` )
+      ( code = `4003` name = `Childhood Vaccination` )
+      ( code = `4004` name = `Adult Check-up` )
+      ( code = `4005` name = `Child Check-up` )
+      ( code = `4006` name = `Cancer Screening` )
+      ( code = `4007` name = `Lifestyle Counselling` )
+      ( code = `5001` name = `Psychotherapy Session` )
+      ( code = `5002` name = `Psychiatric Assessment` )
+      ( code = `5003` name = `Crisis Intervention` ) ).
+  ENDMETHOD.
+
+  METHOD service.
+    " no random draw, so the visits stay as they were; some services have no visit (master data without facts)
+    DATA(chapter) = VALUE string( diagnoses[ code = visit-diagnosis ]-chapter OPTIONAL ).
+    DATA(child) = xsdbool( visit-patient > 0 AND patients[ visit-patient ]-age_group = `0-17` ).
+    DATA(choices) = COND string_table(
+      WHEN visit-visit_type = `Telehealth` THEN VALUE #( ( `1004` ) ( `1004` ) ( `1005` ) )
+      WHEN visit-visit_type = `Emergency` THEN SWITCH #( chapter
+        WHEN `Injuries`      THEN VALUE #( ( `2102` ) ( `3002` ) ( `3003` ) )
+        WHEN `Circulatory`   THEN VALUE #( ( `2201` ) ( `1011` ) ( `2001` ) )
+        WHEN `Respiratory`   THEN VALUE #( ( `2101` ) ( `1011` ) ( `2205` ) )
+        WHEN `Mental health` THEN VALUE #( ( `5003` ) )
+        ELSE VALUE #( ( `1010` ) ( `1011` ) ( `1012` ) ) )
+      WHEN visit-visit_type = `Follow-up` THEN SWITCH #( chapter
+        WHEN `Endocrine and metabolic` THEN VALUE #( ( `2004` ) ( `2002` ) ( `1002` ) )
+        WHEN `Circulatory`   THEN VALUE #( ( `2003` ) ( `2201` ) ( `1002` ) )
+        WHEN `Mental health` THEN VALUE #( ( `5001` ) )
+        ELSE VALUE #( ( `1002` ) ) )
+      ELSE SWITCH #( chapter
+        WHEN `Respiratory`   THEN VALUE #( ( `2008` ) ( `2204` ) ( `1001` ) )
+        WHEN `Circulatory`   THEN VALUE #( ( `2201` ) ( `2203` ) ( `2202` ) )
+        WHEN `Endocrine and metabolic` THEN VALUE #( ( `2004` ) ( `2005` ) ( `2002` ) )
+        WHEN `Musculoskeletal` THEN VALUE #( ( `2103` ) ( `3051` ) ( `3052` ) )
+        WHEN `Skin`          THEN VALUE #( ( `3005` ) ( `3006` ) ( `3007` ) )
+        WHEN `Infections`    THEN VALUE #( ( `2007` ) ( `2010` ) ( `2009` ) )
+        WHEN `Injuries`      THEN VALUE #( ( `2102` ) ( `3001` ) ( `3004` ) )
+        WHEN `Mental health` THEN VALUE #( ( `5002` ) ( `5001` ) ( `1003` ) )
+        WHEN `Check-ups`     THEN COND #( WHEN child = abap_true THEN VALUE #( ( `4005` ) ( `4003` ) )
+                                          ELSE VALUE #( ( `4004` ) ( `4001` ) ( `4006` ) ) )
+        ELSE VALUE #( ( `1001` ) ) ) ).
+    result = choices[ index MOD lines( choices ) + 1 ].
   ENDMETHOD.
 
   METHOD care_program_nodes.
@@ -937,7 +1089,11 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
                     nodename = node-name
                     tlevel   = tlevel
                     link     = node-link
+                    intervl  = xsdbool( node-to IS NOT INITIAL )
                     parentid = parentid ) TO htab.
+    IF node-to IS NOT INITIAL.
+      APPEND VALUE #( nodeid = nodeid leaffrom = node-from leafto = node-to ) TO jtab.
+    ENDIF.
     " BW shows a link node's original's subtree below it: it has no children of its own
     IF node-link = abap_true.
       RETURN.
@@ -954,7 +1110,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
                           node     = child
                           parentid = nodeid
                           tlevel   = tlevel + 1
-                CHANGING  htab     = htab ).
+                CHANGING  htab     = htab
+                          jtab     = jtab ).
       previous = childid.
     ENDLOOP.
   ENDMETHOD.
@@ -1150,6 +1307,9 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       ( iobjnm = 'ZCLDOC' attributes = VALUE #( ( 'ZCLDNAME' ) ( 'ZCLDEPT' ) ( 'ZCLEXPER' ) ) rows = physician_rows )
       ( iobjnm = 'ZCLDIAG' attributes = VALUE #( ( 'ZCLDTEXT' ) ( 'ZCLDGRP' ) ( 'ZCLDCHAP' ) ) rows = diagnosis_rows )
       ( iobjnm = 'ZCLVTYPE' attributes = VALUE #( ( 'ZCLSETNG' ) ) rows = type_rows )
+      ( iobjnm = 'ZCLSERV' attributes = VALUE #( ( 'ZCLSETNG' ) )
+        rows = VALUE #( FOR v IN services( )
+                        ( VALUE #( ( v-code ) ( COND #( WHEN v-name CS `Telehealth` THEN `Remote` ELSE `In person` ) ) ) ) ) )
       ( iobjnm = 'ZCLDATE' attributes = VALUE #( ( 'ZCLTHEDT' ) ( 'ZCLDAYNM' ) ( 'ZCLMONNM' ) ( 'ZCLYEAR' ) ( 'ZCLQTR' )
                                                  ( 'ZCLMONTH' ) ( 'ZCLWEEK' ) ( 'ZCLDAYOM' ) )
         rows = date_rows )
@@ -1173,6 +1333,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
 
   METHOD texts.
     " the keys of the master data, and per value of an attribute its text
+    DATA(catalog) = services( ).
     LOOP AT master_data( ) INTO DATA(md).
       DATA(keys) = lines( md-compounding ) + 1.
       LOOP AT md-rows INTO DATA(fields).
@@ -1184,6 +1345,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
           WHEN 'ZCLVTYPE' THEN VALUE #( short = key
                                         long  = COND #( WHEN key = `Telehealth` THEN `Telehealth Consultation`
                                                         ELSE |{ key } Visit| ) )
+          WHEN 'ZCLSERV' THEN VALUE #( long = catalog[ code = key ]-name )
           WHEN 'ZCLDATE' THEN VALUE #( short = fields[ 2 ] long = long_date( CONV d( key ) ) )
           WHEN 'ZCLSITE' THEN VALUE #( short = |{ to_mixed( key ) } Site|
                                        long  = |{ to_mixed( key ) } Site, { fields[ 2 ] }| )
@@ -1513,6 +1675,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       hietabfl   = cha-hierarchies
       hieverfl   = cha-hie_versions
       hienmtfl   = cha-hie_timedep
+      hieintfl   = cha-hie_intervals
       authrelfl  = cha-auth_relevant ).
     LOOP AT cha-attributes INTO DATA(attribute).
       APPEND VALUE #( chabasnm = cha-name
@@ -1793,6 +1956,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
 
   METHOD load_hierarchy.
     DATA htab TYPE ty_t_htab.
+    DATA jtab TYPE ty_t_jtab.
     DATA texts TYPE rsndi_t_hiedirt.
     DATA node_texts TYPE rsndi_t_thiernode.
     DATA messages TYPE ty_t_ndi_message.
@@ -1803,7 +1967,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
                         node     = hierarchy-nodes[ parent = `` ]
                         parentid = 0
                         tlevel   = 1
-              CHANGING  htab     = htab ).
+              CHANGING  htab     = htab
+                        jtab     = jtab ).
     texts = VALUE #( ( langu = 'E' txtsh = hierarchy-text txtmd = hierarchy-text txtlg = hierarchy-text ) ).
     node_texts = VALUE #( FOR n IN hierarchy-nodes WHERE ( text IS NOT INITIAL )
                           ( langu = 'E' nodename = n-name txtsh = n-text txtmd = n-text txtlg = n-text ) ).
@@ -1822,7 +1987,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
         i_t_hierstruc = htab
         i_t_thiernode = node_texts
         i_t_nodenames = VALUE rsndi_t_nodenmstr( )
-        i_t_hierintvl = VALUE rsndi_t_jtabstr( )
+        i_t_hierintvl = jtab
         i_t_nodeattr  = VALUE rssh_t_nodeattr( )
         i_t_level     = VALUE rsndi_t_hielvt( )
       IMPORTING
@@ -1846,7 +2011,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     ENDIF.
     write( |hierarchy { hierarchy-name } version { hierarchy-version }, { hierarchy-datefrom DATE = ISO } to | &&
            |{ hierarchy-dateto DATE = ISO }: { lines( htab ) } nodes | &&
-           |({ lines( VALUE ty_t_htab( FOR h IN htab WHERE ( link = abap_true ) ( h ) ) ) } links), | &&
+           |({ lines( VALUE ty_t_htab( FOR h IN htab WHERE ( link = abap_true ) ( h ) ) ) } links, | &&
+           |{ lines( jtab ) } intervals), | &&
            |{ COND string( WHEN subrc = 0 THEN `active` ELSE |FAILED, subrc { subrc }| ) }| ).
     IF subrc <> 0.
       write_ndi_messages( messages ).
@@ -1877,6 +2043,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       <value> = visit-diagnosis.
       ASSIGN COMPONENT 'ZCLVTYPE' OF STRUCTURE <row> TO <value>.
       <value> = visit-visit_type.
+      ASSIGN COMPONENT 'ZCLSERV' OF STRUCTURE <row> TO <value>.
+      <value> = service( visit = visit index = index ).
       ASSIGN COMPONENT 'ZCLDATE' OF STRUCTURE <row> TO <value>.
       <value> = visit-day.
       DATA(room) = room( visit ).
@@ -1949,7 +2117,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     DATA messages TYPE rs_t_msg.
     DATA error TYPE REF TO cx_root.
     " the characteristics of the cube with BW's calendar in place of the date; 0CALDAY has no SID table, so no view
-    objects = VALUE #( FOR c IN VALUE ty_t_iobjnm( ( 'ZCLPAT' ) ( 'ZCLDOC' ) ( 'ZCLDIAG' ) ( 'ZCLVTYPE' ) ( 'ZCLSITE' )
+    objects = VALUE #( FOR c IN VALUE ty_t_iobjnm( ( 'ZCLPAT' ) ( 'ZCLDOC' ) ( 'ZCLDIAG' ) ( 'ZCLVTYPE' ) ( 'ZCLSERV' )
+                                                   ( 'ZCLSITE' )
                                                    ( 'ZCLROOM' ) ( '0CALDAY' ) ( '0CALWEEK' ) ( '0CALMONTH' )
                                                    ( '0CALQUARTER' ) ( '0CALYEAR' ) ( 'ZCLFISCVR' )
                                                    ( 'ZCLFISCYR' ) ( 'ZCLFISCPR' ) )
@@ -2012,6 +2181,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     DATA(physician) = iobj_field( struct = line iobjnm = 'ZCLDOC' ).
     DATA(diagnosis) = iobj_field( struct = line iobjnm = 'ZCLDIAG' ).
     DATA(visit_type) = iobj_field( struct = line iobjnm = 'ZCLVTYPE' ).
+    DATA(service_field) = iobj_field( struct = line iobjnm = 'ZCLSERV' ).
     DATA(site) = iobj_field( struct = line iobjnm = 'ZCLSITE' ).
     DATA(room_field) = iobj_field( struct = line iobjnm = 'ZCLROOM' ).
     DATA(visit_number) = iobj_field( struct = line iobjnm = 'ZCLVISNO' ).
@@ -2038,6 +2208,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       <value> = visit-diagnosis.
       ASSIGN COMPONENT visit_type OF STRUCTURE <row> TO <value>.
       <value> = visit-visit_type.
+      ASSIGN COMPONENT service_field OF STRUCTURE <row> TO <value>.
+      <value> = service( visit = visit index = index ).
       DATA(room) = room( visit ).
       ASSIGN COMPONENT site OF STRUCTURE <row> TO <value>.
       <value> = room-site.

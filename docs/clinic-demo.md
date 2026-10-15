@@ -26,7 +26,8 @@ on a test system: the visits are thinned evenly over the days, so every day keep
   of the date.
 - Characteristics with flat attributes: patient `ZCLPAT` (name, sex, birth year, age group on 1 January 2024, blood
   group, insurance, city, region), physician `ZCLDOC` (name, department, years in practice), diagnosis `ZCLDIAG` (ICD-10
-  code; name in plain words, group, chapter), visit type `ZCLVTYPE` (care setting), date `ZCLDATE` (`YYYYMMDD`; the date
+  code; name in plain words, group, chapter), visit type `ZCLVTYPE` (care setting), service `ZCLSERV` (52 services
+  by a four-digit code, care setting; see below), date `ZCLDATE` (`YYYYMMDD`; the date
   text, day and month names, year, quarter, month, week counted from 1 January, day of month). The date is a plain
   characteristic, as FoodMart's `ZFMDATE`, so it can carry attributes.
 - The site `ZCLSITE` (`NORTH`, `SOUTH`; city) and the room `ZCLROOM` (room type), **compounded** with the site: R01 to
@@ -50,6 +51,7 @@ on a test system: the visits are thinned evenly over the days, so every day keep
   tables and checks no authorizations.
 - The patient `ZCLPAT` has the hierarchy `ZCLPAT_PRG` with **duplicate and link nodes** (shared subtrees and patients
   under two parents, see below), the test case of BW hierarchies with shared nodes; it is not authorization relevant.
+- The service `ZCLSERV` has the hierarchy `ZCLSERV_CAT` of **intervals**, overlapping and linked (see below).
 - Key figures: `ZCLVISNO` (1 per visit: the aDSO adds up visits with the same keys, so counting rows would not count
   visits), `ZCLDUR` duration, `ZCLWAIT` waiting time (minutes), `ZCLLABS` lab tests, `ZCLCHRG` charges.
 - Texts: every characteristic has language-dependent short, medium and long texts (a text table `/BIC/T...`), and the
@@ -168,6 +170,42 @@ The hierarchy table has 613 nodes (2 linked text nodes, 39 linked and 96 duplica
 the heart program's 185 patients under Senior Care, plus Senior Care's 274 nodes under Prevention), and the
 not-assigned node at 999999998/999999999.
 
+## The hierarchy of the services
+
+The service `ZCLSERV` (a dimension of its own in both providers, the InfoCube's `ZCLVISIT8`) is billed per visit: 52
+services by a code of four digits whose first is the category (1 consultations, 2 diagnostics, 3 therapy, 4
+prevention, 5 mental health), each with the care setting as attribute (telehealth remote, the rest in person). A
+visit's service follows from its visit type, the chapter of its diagnosis and the patient's age, its number choosing
+among a few (no random draw, the visits stay as they were); 42 services have visits, 10 have none.
+
+Its hierarchy `ZCLSERV_CAT`, Service Catalog, is plain and holds **intervals** (`HIEINTFL` on the characteristic; an
+interval is a leaf `INTERVL` = `X` named by its lower bound, its bounds in `/BIC/JZCLSERV`), no single values:
+
+```
+All Services  SERVICES
+├── Consultations  CONSULT        1000-1099
+├── Diagnostics  DIAGNOSTICS
+│   ├── Laboratory  LAB           2000-2099
+│   ├── Imaging  IMAGING          2100-2199
+│   └── Functional Tests  FUNCTION  2200-2299
+├── Therapy  THERAPY              3000-3049, 3050-3099
+├── Prevention  PREVENTION        4000-4099
+├── Mental Health  MENTAL         5000-5099
+└── Care Pathways  PATHWAYS
+    ├── Emergency Pathway  EMERGENCY  1010-1019 (within the consultations' interval)
+    │                                 Imaging: link, with its interval 2100-2199
+    │                                 3000-3049: a linked interval (the minor procedures)
+    └── Cardiac Pathway  CARDIAC      2003-2004 (within the laboratory's interval)
+                                      Functional Tests: link, with its interval
+```
+
+Overlapping intervals are duplicate nodes: BW refuses them, as a value within an interval, only under the same parent.
+The hierarchy table has 25 nodes (11 intervals, 3 links). BW's SID structure `/BIC/IZCLSERV` expands every interval to
+the values it holds when the hierarchy is activated, a row per value, all with the interval's `LISTNO` (1000-1099:
+the eight consultations, `LISTNO` 3); the links are expanded too (the linked Imaging with its interval one level
+deeper, the linked interval to its seven services). A value in more than one place has one more row under the root
+with `LISTNO` 0 (as in `/BIC/IZCLPAT`).
+
 The run deletes the characteristics' hierarchies before the InfoObjects. An analysis authorization on a hierarchy node
 also stores the hierarchy's `HIEID` (`RSECHIE`), and every run creates new ones: check the hierarchy authorizations
 after a run (not tried yet).
@@ -188,7 +226,8 @@ recorded yet, some emergency visits have no physician (triage) or an unidentifie
 no blank visits.
 
 The site and the room come from the physician (even: north, odd: south) and the patient (the room), so they draw no
-random number and the visits stay as they were; a visit without physician has neither (`#/#`).
+random number and the visits stay as they were; a visit without physician has neither (`#/#`). The service
+draws no random number either (The hierarchy of the services).
 
 ## The schemas
 

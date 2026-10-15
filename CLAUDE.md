@@ -333,6 +333,8 @@ Read before designing anything:
   relevant with the plain hierarchy `ZCLDIAG_ICD`, for authorizations that combine the two characteristics. The
   patient `ZCLPAT` has the plain hierarchy `ZCLPAT_PRG` (care programs) with link nodes (subtrees under two parents,
   recursively) and duplicate and link leaves (patients in two programs), the test case of shared nodes (`docs/clinic-demo.md`).
+  The service `ZCLSERV` (52 services, a dimension of both providers) has the plain hierarchy `ZCLSERV_CAT` of
+  intervals of codes: overlapping ones, a linked text node with its interval and a linked interval.
   With another checkbox the wide demo (`docs/wide-demo.md`, `ZZXXMLA1_CL_BW_WIDE_GEN`): InfoCube
   `ZXMLWIDE` and aDSO `ZXMLWIDEA` with 100 characteristics `ZXMLAD00`-`ZXMLAD99` of 1,000 members each (`ZXMLAD00`
   100,000), one key figure

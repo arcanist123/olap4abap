@@ -27,7 +27,9 @@ and version-dependent hierarchies on both (the clinic demo's `ZCLDOC_ORG`, `ZCLD
 Test cases: the clinic demo's `ZCLDIAG_ICD` (All Diagnoses > chapter > group > diagnosis, 69 nodes, plain;
 `clinic-demo.md`, The hierarchy of the diagnoses) and, for shared nodes, `ZCLPAT_PRG` (care programs > program >
 patient, plain: link nodes, a subtree under two parents, recursively, and patients under two programs as duplicate
-and link leaves; `clinic-demo.md`, The hierarchy of the care programs).
+and link leaves; `clinic-demo.md`, The hierarchy of the care programs) and, for intervals, `ZCLSERV_CAT` (services >
+category > interval of codes: overlapping intervals, a linked text node with its interval, a linked interval;
+`clinic-demo.md`, The hierarchy of the services).
 
 BW's tables (looked at on `ZCLDIAG`): `/BIC/H<char>` is the node tree (`NODEID`, `PARENTID`, `CHILDID`, `NEXTID`,
 `TLEVEL`, `LINK`); `/BIC/I<char>` (SID structure, written by BW on activation) has a row per node with its parent's
@@ -69,7 +71,9 @@ Decided with the user 2026-10-15:
   statement, a range join over the depth-first numbers; if `/BIC/I` does not expand link nodes, one statement per
   depth). It is lazy: a query compares `RSHIEDIR`'s time stamp with the copy's (one key read) and rebuilds a stale
   hierarchy under an enqueue lock; a limit on occurrences refuses a hierarchy whose expansion explodes.
-- **Interval leaves** (`/BIC/J<char>`) are expanded to their values at the build.
+- **Interval leaves** (`/BIC/J<char>`) are expanded to their values at the build. BW's `/BIC/I` holds them
+  expanded already, as it was when the hierarchy was activated (a row per value of the interval with the interval's
+  `LISTNO`; `ZCLSERV_CAT`).
 - **Not assigned** (values of the master data under no leaf) is a configuration of the hierarchy, as in BW (shown or
   suppressed), read live by a view (`closure UNION ALL` the rest node with every SID that is no leaf), so that it
   follows master data loads without a rebuild.
@@ -79,8 +83,8 @@ Decided with the user 2026-10-15:
 - **Portable SQL:** no HANA-only features (BW's cached column hierarchy views, hierarchy functions, CDS
   hierarchies): plain tables and standard SQL, so that the engine can later run on another database (Later: DuckDB).
 - **Demo:** the clinic demo gets a hierarchy with shared nodes (link nodes, recursively), a postable node and an
-  interval leaf. Done: the shared nodes (`ZCLPAT_PRG` on the patient); not yet: the postable node and the interval
-  leaf.
+  interval leaf. Done: the shared nodes (`ZCLPAT_PRG` on the patient) and intervals, overlapping and linked
+  (`ZCLSERV_CAT` on the service); not yet: the postable node.
 
 Open:
 

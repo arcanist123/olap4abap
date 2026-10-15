@@ -36,7 +36,7 @@ DISCOVER = """<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap
 </PropertyList></Properties></Discover></SOAP-ENV:Body></SOAP-ENV:Envelope>"""
 
 # the characteristics with a dimension on both providers; the cube also has the date, the aDSO BW's calendar
-DIMENSIONS = ["ZCLPAT", "ZCLDOC", "ZCLDIAG", "ZCLVTYPE", "ZCLSITE", "ZCLROOM", "ZCLFISCVR", "ZCLFISCYR", "ZCLFISCPR"]
+DIMENSIONS = ["ZCLPAT", "ZCLDOC", "ZCLDIAG", "ZCLVTYPE", "ZCLSERV", "ZCLSITE", "ZCLROOM", "ZCLFISCVR", "ZCLFISCYR", "ZCLFISCPR"]
 OWN = {"ZCLVISIT": ["ZCLDATE"], "ZCLVISITA": ["0CALWEEK", "0CALMONTH", "0CALQUARTER", "0CALYEAR"]}
 MEASURE = "[Measures].[ZCLVISNO]"
 # the members that have no facts: not members at all (the first patient registered without a visit)
