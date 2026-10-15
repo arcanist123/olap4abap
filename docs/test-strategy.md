@@ -159,6 +159,24 @@ Kingsport, the registered patient 2001) must not be found, their neighbours must
 the patients, native `TopCount` and `MDSCHEMA_LEVELS`' `LEVEL_CARDINALITY` must agree; the aDSO's years without facts
 must stay members (time is not restricted). 71 checks, about 30 s.
 
+## Clinic demo: BW hierarchies
+
+The reference knows no BW hierarchy, so BW's own MDX engine is the oracle, asked live on the same system, not
+captured: a regeneration of the demo or a change of its hierarchies needs no new capture.
+
+    python scripts/bw_hierarchy_test.py                 # --names, --with-facts, --bw-only
+
+`ZZXXMLA1_CL_BW_HIERARCHY_PROBE` (run by the script with `sapcli class execute`) asks BW (`BAPI_MDDATASET_*`) on
+`$ZCLVISITA` for the provider's total and, per plain hierarchy of `ZCLDIAG`, `ZCLPAT` and `ZCLSERV`, every member of
+`{<hierarchy>.Members}` with its level, number of children, caption and the values of `ZCLVISNO` and `ZCLCHRG`
+(3,080 rows). The script checks BW's answer itself (the roots and the not-assigned node add up to the total), then
+asks olap4abap for `[ZCLDIAG.ZCLDIAG_ICD].Members` (and the others; the names are a table in the script) on catalog
+`ZCLVISITA` and compares position by position: BW's unique names repeat for the occurrences of a node, so they are not
+compared. olap4abap's All member is checked against the total and left out; levels are compared up to the
+not-assigned node, whose values BW puts on its deepest level. `--names` accepts a node's technical name or a leaf's key
+as caption (while olap4abap has no texts), `--with-facts` compares only the members with a value (for dimensions with
+members with facts). What BW shows is in `next-steps.md`, time-independent BW hierarchies.
+
 ## Mondrian's own tests against our schema
 
 The eMondrian container serves only our reference catalog `ZFOODMART` (`scripts/deploy-reference-schema.sh`, installs

@@ -63,6 +63,8 @@ Read before designing anything:
   DISCOVER_DATASOURCES, anything else is a SOAP fault), other methods 405.
 - XMLA tests: `python scripts/xmla_test.py` replays `reference/<case>/` against SAP (see `docs/test-strategy.md`);
   `python scripts/compare-applicable.py` runs Mondrian's test statements on eMondrian and SAP and groups the gaps.
+  BW hierarchies: `python scripts/bw_hierarchy_test.py` compares with BW's own MDX, asked live
+  (`ZZXXMLA1_CL_BW_HIERARCHY_PROBE`).
 - The model is the catalogs' Mondrian schemas, configured as in Mondrian: the server has files (table `ZZXXMLA1_FILE`,
   `ZZXXMLA1_CL_FILES`), `/WEB-INF/datasources.xml` (`reference/schema/datasources-sap.xml`) lists the data sources and
   their catalogs, read by `ZZXXMLA1_CL_REPOSITORY` (Mondrian's `FileRepository`/`DataSourcesConfig`), and each catalog's

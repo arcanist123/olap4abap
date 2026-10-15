@@ -35,7 +35,15 @@ BW's tables (looked at on `ZCLDIAG`): `/BIC/H<char>` is the node tree (`NODEID`,
 `TLEVEL`, `LINK`); `/BIC/I<char>` (SID structure, written by BW on activation) has a row per node with its parent's
 SID (`PRED`), its own (`SUCC`), its position in depth-first order (`LISTNO`), `TLEVEL`, the node type (`NTYPEID`:
 5 a text node, else the characteristic's) and `FACTOR` (sign reversal), and the not-assigned node (`LISTNO`
-999999998, 999999999). Neither holds ancestor and descendant pairs.
+999999998, 999999999). Neither holds ancestor and descendant pairs. Looked at on the clinic demo 2026-10-15:
+`/BIC/I` holds every occurrence, the linked subtrees expanded; an interval is no row of its own but its values, each a
+row directly under the interval's parent with the interval's `LISTNO` (so a `LISTNO` is unique per node but not per
+leaf: a leaf occurrence is `LISTNO` and `SUCC`); and rows with `LISTNO` 0 are BW's corrections for values reached by
+more than one path: per ancestor and value a row with `FACTOR` -(n-1) (-1, -2), at the ancestor's `TLEVEL`, so that
+the rows of a subtree summed with their factors count each value once. BW's MDX (`bw_hierarchy_test.py`) shows a
+member per occurrence, but its unique names repeat for the occurrences of a node (`[HEART<pad>0HIER_NODE]` three
+times), no member for an interval, a postable node as a node whose first child is its own value, and the not-assigned
+node `REST_H` (`1HIER_REST`) as a second root after the hierarchy with the values below it (`#` among them).
 
 Decided with the user 2026-10-15:
 
@@ -62,19 +70,21 @@ Decided with the user 2026-10-15:
   refused.
 - **Postable nodes** (an inner node that is a value of the characteristic and has facts of its own): the sync adds an
   extra leaf occurrence under it, named as the node, with its own facts (SSAS's `NonLeafDataVisible`), so that the
-  children add up to their parent. BW's `/BIC/I` does the same: the node gets a negative node SID and its value is
-  its first leaf, before the children (`ZCLPAT_PRG`, Family Care).
+  children add up to their parent. BW's `/BIC/I` does the same already: the node gets a negative node SID and its
+  value is its first leaf, before the children (`ZCLPAT_PRG`, Family Care), so the build takes the leaf from
+  `/BIC/I` and adds none of its own.
 - **Order:** BW's, from `LISTNO`; a shared subtree keeps its original's order. Members are never read as a whole
   hierarchy into ABAP (Member decision in `mvp-scope.md`): children by parent, descendants by the depth-first
   range, a level by depth, all in SQL on the node table, ordered by the stored number.
 - **The build** stays in the database, never row by row through ABAP: the node table (occurrences, shared subtrees
   expanded, depth, depth-first number and subtree end) and the closure by `INSERT ... SELECT` (the closure in one
-  statement, a range join over the depth-first numbers; if `/BIC/I` does not expand link nodes, one statement per
-  depth). It is lazy: a query compares `RSHIEDIR`'s time stamp with the copy's (one key read) and rebuilds a stale
+  statement, a range join over `LISTNO`: a node's subtree ends before the next row at its level or above; the rows
+  with `LISTNO` 0 and the not-assigned rows left out; a node's distinct values cross-checked with BW's: its leaf rows
+  plus its correction rows' factors). It is lazy: a query compares `RSHIEDIR`'s time stamp with the copy's (one key read) and rebuilds a stale
   hierarchy under an enqueue lock; a limit on occurrences refuses a hierarchy whose expansion explodes.
-- **Interval leaves** (`/BIC/J<char>`) are expanded to their values at the build. BW's `/BIC/I` holds them
-  expanded already, as it was when the hierarchy was activated (a row per value of the interval with the interval's
-  `LISTNO`; `ZCLSERV_CAT`).
+- **Interval leaves** (`/BIC/J<char>`) are no members: their values are leaves under the interval's parent, as BW
+  shows them. The build takes them from `/BIC/I`, which holds them expanded as they were when the hierarchy was
+  activated (`ZCLSERV_CAT`), not from `/BIC/J`.
 - **Not assigned** (values of the master data under no leaf) is a configuration of the hierarchy, as in BW (shown or
   suppressed), read live by a view (`closure UNION ALL` the rest node with every SID that is no leaf), so that it
   follows master data loads without a rebuild.
@@ -91,7 +101,11 @@ Open:
 
 1. Answered 2026-10-15 on `ZCLPAT_PRG`: `/BIC/I` holds the shared subtrees expanded, every occurrence with its own
    `LISTNO` (613 nodes, 1,072 numbered rows; with the postable nodes since, 626 and 1,090), so the closure is one
-   statement.
+   statement (with intervals: see BW's tables above).
+   Test (2026-10-15): `python scripts/bw_hierarchy_test.py` compares olap4abap's members of the three hierarchies with
+   BW's MDX, asked live (`ZZXXMLA1_CL_BW_HIERARCHY_PROBE`), position by position: level, children, caption, values
+   (`test-strategy.md`, BW hierarchies). BW's side passes its own checks; olap4abap's fails until the hierarchies are
+   served (`[ZCLDIAG.ZCLDIAG_ICD]` not found).
 2. The schema: `parentColumn` with `<Closure>` as the reference models it, with our extensions (the closure's child
    is the SID, members are occurrences); `ZZXXMLA1_CL_SCHEMA` refuses both today. The reference can be the oracle
    for single-parent hierarchies only; for shared nodes, BW's own MDX (`ZZXXMLA1_BW_AUTH_PROBE`).
