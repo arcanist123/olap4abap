@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Copies the BW tables of the cube ZFMSALES, as BW holds them, into the reference database of the eMondrian container.
+"""Copies the BW tables of the cubes ZFMSALES and ZCLVISIT, as BW holds them, and the copy of the BW hierarchy
+ZCLDIAG_ICD into the reference database of the eMondrian container.
 
 Why: the reference schema (reference/schema/FoodmartBW.xml) names the BW tables themselves (/BIC/FZFMSALES,
 /BIC/SZFMSTORE, /BIC/PZFMSTORE, ...), so that the same schema runs in eMondrian and in SAP (docs/mvp-scope.md, schema
@@ -7,23 +8,39 @@ decision). The reference database therefore needs tables of these names with BW'
 and attribute tables of the characteristics of the cube, with BW's columns and values (NUMC zero-padded, blank
 instead of NULL, SIDs equal to the FoodMart ids).
 
-1. Export (skipped with --no-export): the columns of the tables from DD03L and their rows, read with
-   `sapcli datapreview osql` (logon data from .env.sap), into data/foodmart-bw/bw/<table>.json (git-ignored); and the
-   SQL of the generated views of the cubes' characteristics (ZZXXMLA1_CL_BW_VIEW_GEN, the plain views of table
-   ZZXXMLA1_VIEW) from HANA's SYS.VIEWS, read with hdbsql in the SAP container (HANA_CONTAINER, HANA_OS_USER,
-   HANA_KEY; defaults a4h, a4hadm, DEFAULT), into data/foodmart-bw/bw/views.json, keyed by the placeholder of the
-   view (ZZXXMLA1_C_<characteristic>), the name the reference schema gives it: SAP's number (ZZXXMLA1V...) depends on
-   the views the system has besides FoodMart's (scripts/sap-files.py deploy puts it in the schema on SAP). HSQLDB
-   takes HANA's view SQL as it is, so the reference has exactly SAP's views.
+The clinic InfoCube ZCLVISIT (docs/clinic-demo.md) is the reference scenario for BW hierarchies (docs/next-steps.md,
+Reference scenario): its hierarchy ZCLDIAG_ICD, in which every node occurs once, is served by the reference as a
+parent-child hierarchy with a closure table (reference/schema/ClinicBW.xml, catalog ZCLVISIT).
+
+1. Export (skipped with --no-export): the SQL of the generated views of the cubes' characteristics
+   (ZZXXMLA1_CL_BW_VIEW_GEN, the plain views of table ZZXXMLA1_VIEW, the ones the accepted schemas name) from HANA's
+   SYS.VIEWS, read with hdbsql in the SAP container (HANA_CONTAINER, HANA_OS_USER, HANA_KEY; defaults a4h, a4hadm,
+   DEFAULT), into data/foodmart-bw/bw/views.json, keyed by the placeholder of the view (ZZXXMLA1_C_<characteristic>),
+   the name the reference schemas give it: SAP's number (ZZXXMLA1V...) depends on the views the system has besides
+   these (scripts/sap-files.py deploy puts it in the schema on SAP). HSQLDB takes HANA's view SQL as it is, so the
+   reference has exactly SAP's views. Then the tables: the fact tables, the SID and attribute tables of the
+   characteristics and every other table the views read (the text tables of the clinic), their columns from DD03L
+   and their rows read with `sapcli datapreview osql` (logon data from .env.sap), into
+   data/foodmart-bw/bw/<table>.json (git-ignored), listed in tables.json. Then per hierarchy of HIERARCHIES the copy
+   of ZZXXMLA1_CL_BW_HIERARCHY_COPY at BW's current version (the row of RSRHIEDIR_OLAP without DELETETIMESTMP, as
+   the copy finds it; run program ZZXXMLA1_HIERARCHY_COPY first if the copy is older): the rows of its node table
+   (ZZXXMLA1H...) and of its not-assigned view (ZZXXMLA1R..., the closure with REST_H and the values under no leaf)
+   for that HIESID and SVER, into hierarchy_<name>.json.
 2. Build: adds the tables to data/foodmart-bw/hsqldb-foodmart.jar (the FoodMart data with the empty members, see
    scripts/add-empty-members.py): CREATE MEMORY TABLE after the last CREATE of foodmart.script, the rows at its end.
-   Then the characteristic views under their placeholder names, after the tables. Lines of an earlier run (they name
-   /BIC/ tables) are removed first, so the script can run again.
-   Column types: NUMC and CHAR are VARCHAR of their length (HANA: NVARCHAR), INT4 is INTEGER, DEC is DECIMAL.
-   Primary keys as in BW (none for the fact table, whose package key is not unique), a unique index on SID of the
-   SID tables and an index per SID column of the fact table (HSQLDB joins without them are slow).
+   Then the characteristic views under their placeholder names, after the tables, and per hierarchy two reference
+   views (hierarchy_views): ZZXXMLA1_HN_<hierarchy>, the nodes without the virtual root (a root's PARENT_SID NULL),
+   REST_H and the not-assigned values added, each with its NAME (a text node's technical name, a value's key from the
+   characteristic's view, # for the initial value, as BW's MDX names them) and its POS (BW's order of siblings);
+   and ZZXXMLA1_HC_<hierarchy>, the closure (ANCESTOR_SID, SID) without the virtual root's rows. The copy's tables
+   keep SAP's names; only the reference views are named in ClinicBW.xml. Lines of an earlier run (they name /BIC/ or
+   ZZXXMLA1 objects) are removed first, so the script can run again.
+   Column types: NUMC, CHAR, LANG and DATS are VARCHAR of their length (HANA: NVARCHAR), INT4 is INTEGER, DEC is
+   DECIMAL; a negative number comes from the data preview with its sign at the end (37-). Primary keys as in BW
+   (none for the fact table, whose package key is not unique, and none for a view), a unique index on SID of the SID
+   tables and an index per SID column of the fact table (HSQLDB joins without them are slow).
 
-Then: scripts/deploy-reference-schema.sh (installs jar and schema in the container).
+Then: scripts/deploy-reference-schema.sh (installs jar and schemas in the container).
 
 Usage: python scripts/build-bw-reference-db.py [--no-export]
 """
@@ -42,11 +59,17 @@ SCRIPT = "hsqldb-foodmart/foodmart.script"
 # the cubes and their characteristics; DD03L is read per cube with the LIKE pattern of its tables
 CUBES = {
     "ZFMSALES": (["ZFMPROD", "ZFMCUST", "ZFMSTORE", "ZFMPROMO", "ZFMDATE"], "/BIC/_ZFM%"),
+    "ZCLVISIT": (["ZCLPAT", "ZCLDOC", "ZCLDIAG", "ZCLVTYPE", "ZCLDATE", "ZCLSITE", "ZCLROOM", "ZCLFISCVR",
+                  "ZCLFISCYR", "ZCLFISCPR", "ZCLSERV"], "/BIC/_ZCL%"),
 }
-TABLES = [table for cube, (characteristics, _) in CUBES.items()
-          for table in [f"/BIC/F{cube}"] + [f"/BIC/{t}{c}" for c in characteristics for t in "SP"]]
+# the BW hierarchies the reference serves as parent-child hierarchies with a closure: hierarchy -> characteristic;
+# only hierarchies in which every node occurs once and that show the not-assigned values (docs/next-steps.md,
+# Reference scenario)
+HIERARCHIES = {"ZCLDIAG_ICD": "ZCLDIAG"}
 CR, NL = "\r", "\n"
 PLACEHOLDER = "ZZXXMLA1_C_"  # + characteristic: the reference schema's name of its view (ZZXXMLA1_CL_BW_VIEW_GEN)
+NODES, CLOSURE = "ZZXXMLA1_HN_", "ZZXXMLA1_HC_"  # + hierarchy: the reference views of a hierarchy
+OBJECT = re.compile(r'"(/BIC/|ZZXXMLA1)')  # a line of an earlier run names one of these
 CHUNK = 5000  # characters of a view's SQL per hdbsql query
 
 
@@ -67,26 +90,74 @@ def sapcli(statement, rows):
     return json.loads(result.stdout.decode("utf-8"))
 
 
+def table_file(table):
+    return EXPORT / (table.replace("/", "_").strip("_") + ".json")
+
+
+def ddic_fields(rows):
+    return [dict(name=c["FIELDNAME"], key=c["KEYFLAG"] == "X", type=c["DATATYPE"], length=int(c["LENG"]),
+                 decimals=int(c["DECIMALS"])) for c in rows if c["DATATYPE"] and not c["FIELDNAME"].startswith(".")]
+
+
+DD03L = "SELECT tabname, position, fieldname, keyflag, datatype, leng, decimals FROM dd03l WHERE as4local = 'A' AND "
+
+
 def export():
     EXPORT.mkdir(parents=True, exist_ok=True)
+    read_by_views = export_views()
+    tables = sorted({table for cube, (characteristics, _) in CUBES.items()
+                     for table in [f"/BIC/F{cube}"] + [f"/BIC/{t}{c}" for c in characteristics for t in "SP"]}
+                    | read_by_views)
     columns = {}
     for _, pattern in CUBES.values():
-        for c in sapcli("SELECT tabname, position, fieldname, keyflag, datatype, leng, decimals FROM dd03l "
-                        f"WHERE as4local = 'A' AND tabname LIKE '{pattern}' "
-                        "ORDER BY tabname ASCENDING, position ASCENDING", 100000):
+        for c in sapcli(DD03L + f"tabname LIKE '{pattern}' ORDER BY tabname ASCENDING, position ASCENDING", 100000):
             columns.setdefault(c["TABNAME"], []).append(c)
-    for table in TABLES:
-        fields = [dict(name=c["FIELDNAME"], key=c["KEYFLAG"] == "X", type=c["DATATYPE"], length=int(c["LENG"]),
-                       decimals=int(c["DECIMALS"])) for c in columns.get(table, [])
-                  if c["DATATYPE"] and not c["FIELDNAME"].startswith(".")]
-        assert fields, table
+    for table in tables:
+        fields = ddic_fields(columns.get(table, []))
+        assert fields, f"{table}: no columns in DD03L (not covered by the LIKE patterns of CUBES?)"
         # one statement per table: the data preview rejects longer statements
         rows = sapcli(f"SELECT * FROM {table}", 1000000)
         data = dict(table=table, fields=fields, rows=[[r[f["name"]] for f in fields] for r in rows])
-        file = EXPORT / (table.replace("/", "_").strip("_") + ".json")
-        file.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        table_file(table).write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
         print(f"exported {table}: {len(rows)} rows")
-    export_views()
+    (EXPORT / "tables.json").write_text(json.dumps(tables, indent=1), encoding="utf-8")
+    for hierarchy, characteristic in HIERARCHIES.items():
+        export_hierarchy(hierarchy, characteristic)
+
+
+def export_hierarchy(hierarchy, characteristic):
+    """The copy of the hierarchy at BW's current version: the directory row and the rows of the node table and of
+    the not-assigned view for its HIESID and SVER."""
+    registry = sapcli(f"SELECT node_table, rest_view FROM zzxxmla1_hietab WHERE iobjnm = '{characteristic}'", 10)
+    assert len(registry) == 1, f"{characteristic} has no copy tables: run program ZZXXMLA1_HIERARCHY_COPY"
+    copies = sapcli("SELECT hieid, hiesid, sver, timestmp, root_sid, rest_top_sid, norestnodes FROM zzxxmla1_hiedir "
+                    f"WHERE iobjnm = '{characteristic}' AND hienm = '{hierarchy}'", 1000)
+    assert copies, f"{hierarchy} has no copy: run program ZZXXMLA1_HIERARCHY_COPY"
+    # BW's current version, as ZZXXMLA1_CL_BW_HIERARCHY_COPY finds it
+    current = sapcli("SELECT hiesid, sver, timestmp FROM rsrhiedir_olap "
+                     f"WHERE hieid = '{copies[0]['HIEID']}' AND objvers = 'A' AND deletetimestmp = 0", 10)
+    assert len(current) == 1, f"{hierarchy}: {len(current)} current rows in RSRHIEDIR_OLAP"
+    key = (number(current[0]["HIESID"]), current[0]["SVER"], number(current[0]["TIMESTMP"]))
+    copy = [c for c in copies if (number(c["HIESID"]), c["SVER"], number(c["TIMESTMP"])) == key]
+    assert copy, f"{hierarchy}: no copy of BW's current version {key}: run program ZZXXMLA1_HIERARCHY_COPY"
+    copy = copy[0]
+    assert not copy["NORESTNODES"].strip(), f"{hierarchy} suppresses the not-assigned values: not a reference case"
+    hiesid, sver = key[0], key[1]
+    data = dict(hierarchy=hierarchy, characteristic=characteristic, hiesid=hiesid, sver=sver, timestmp=key[2],
+                root_sid=number(copy["ROOT_SID"]), rest_top_sid=number(copy["REST_TOP_SID"]))
+    for part, table in (("nodes", registry[0]["NODE_TABLE"]), ("closure", registry[0]["REST_VIEW"])):
+        fields = ddic_fields(sapcli(DD03L + f"tabname = '{table}' ORDER BY position ASCENDING", 1000))
+        assert fields, table
+        rows = sapcli(f"SELECT * FROM {table} WHERE hiesid = {hiesid} AND sver = '{sver}'", 1000000)
+        data[part] = dict(table=table, fields=fields, rows=[[r[f["name"]] for f in fields] for r in rows])
+        print(f"exported {table} of {hierarchy} (HIESID {hiesid}, SVER {sver}): {len(rows)} rows")
+    (EXPORT / f"hierarchy_{hierarchy}.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+
+
+def number(value):
+    """A number as the data preview writes it: blanks around it, a negative one with its sign at the end (37-)."""
+    value = value.strip()
+    return "-" + value[:-1] if value.endswith("-") else value
 
 
 def hdbsql(statement):
@@ -114,11 +185,11 @@ def unquote(value):
 
 def export_views():
     """The SQL of the plain views of the cubes' characteristics, read from HANA in chunks (hdbsql cuts LOB values
-    short), keyed by their placeholders."""
+    short), keyed by their placeholders; returns the tables they read."""
     registered = {row["OBJECT_NAME"].strip(): row["VIEW_NAME"].strip()
                   for row in sapcli("SELECT object_name, view_name, selection FROM zzxxmla1_view WHERE kind = 'C'", 10000)
                   if not row["SELECTION"].strip()}
-    views = {}
+    views, read = {}, set()
     for characteristic in [c for characteristics, _ in CUBES.values() for c in characteristics]:
         name = registered.get(characteristic)
         assert name, f"no view of {characteristic} (run ZZXXMLA1_CL_BW_VIEW_GEN or scripts/sap-files.py deploy)"
@@ -131,14 +202,16 @@ def export_views():
         definition = "".join(parts)
         assert len(definition) == int(length), name
         tables = set(re.findall(r'(?:FROM|JOIN)\s+"([^"]+)"', definition))
-        assert tables and tables <= set(TABLES), (name, tables)  # a view over the copied tables only
+        assert tables and all(t.startswith("/BIC/") for t in tables), (name, tables)  # a view over BW tables only
+        read |= tables
         views[PLACEHOLDER + characteristic] = definition
         print(f"exported {name} as {PLACEHOLDER + characteristic}")
     (EXPORT / "views.json").write_text(json.dumps(views, indent=1), encoding="utf-8")
+    return read
 
 
 def sql_type(field):
-    if field["type"] in ("NUMC", "CHAR"):
+    if field["type"] in ("NUMC", "CHAR", "LANG", "DATS"):
         return f'VARCHAR({field["length"]})'
     if field["type"] == "INT4":
         return "INTEGER"
@@ -148,8 +221,8 @@ def sql_type(field):
 
 
 def literal(field, value):
-    value = value.strip() if field["type"] in ("INT4", "DEC") else value
     if field["type"] in ("INT4", "DEC"):
+        value = number(value)
         float(value)
         return value
     assert all(ord(ch) < 128 for ch in value), value  # the script is read as ISO-8859-1 with \\u escapes
@@ -161,9 +234,9 @@ def statements(data):
     columns = ",".join(f'"{f["name"]}" {sql_type(f)} NOT NULL' for f in fields)
     keys = ",".join(f'"{f["name"]}"' for f in fields if f["key"])
     # the fact table of a HANA-optimised cube has no unique key (DD03L flags only the package dimension)
-    primary_key = "" if table.startswith("/BIC/F") else f",PRIMARY KEY({keys})"
+    primary_key = "" if table.startswith("/BIC/F") or not keys else f",PRIMARY KEY({keys})"
     create = [f'CREATE MEMORY TABLE PUBLIC."{table}"({columns}{primary_key})']
-    if any(f["name"] == "SID" for f in fields) and not any(f["name"] == "SID" and f["key"] for f in fields):
+    if table.startswith("/BIC/S") and not any(f["name"] == "SID" and f["key"] for f in fields):
         index = "I_" + table.replace("/", "_").strip("_") + "_SID"
         create.append(f'CREATE UNIQUE INDEX {index} ON PUBLIC."{table}"("SID")')
     if table.startswith("/BIC/F"):
@@ -176,24 +249,59 @@ def statements(data):
     return create, inserts
 
 
+def hierarchy_views(data):
+    """The reference views of a hierarchy over its copy: the nodes as a parent-child table and the closure."""
+    h, c = data["hierarchy"], data["characteristic"]
+    nodes, closure = data["nodes"]["table"], data["closure"]["table"]
+    root, rest = data["root_sid"], data["rest_top_sid"]
+    copy = f'"HIESID" = {data["hiesid"]} AND "SVER" = \'{data["sver"]}\''
+    pos = [f["name"] for f in data["nodes"]["fields"]].index("POS")
+    last = max(int(number(row[pos])) for row in data["nodes"]["rows"])
+    key = f'CASE WHEN V."{c}" = \'\' THEN \'#\' ELSE V."{c}" END'  # BW's MDX names the initial value #
+    node_view = (
+        f'CREATE VIEW PUBLIC."{NODES}{h}" AS '
+        # the nodes of the copy without the virtual root (the All member); a root has no parent
+        f'SELECT N."SID", CASE WHEN N."PARENT_SID" = {root} THEN NULL ELSE N."PARENT_SID" END AS "PARENT_SID", '
+        f'CASE WHEN N."NODE_IOBJ" <> \'\' THEN N."NODE_NAME" ELSE {key} END AS "NAME", N."POS" '
+        f'FROM PUBLIC."{nodes}" N LEFT JOIN PUBLIC."{PLACEHOLDER}{c}" V ON V."SID" = N."SID" '
+        f'WHERE N.{copy} AND N."PARENT_SID" <> 0 '
+        # REST_H, a root after the hierarchy, and the values under no leaf below it
+        f'UNION ALL SELECT {rest}, NULL, \'REST_H\', {last + 1} FROM (VALUES(0)) '
+        f'UNION ALL SELECT R."SID", {rest}, {key}, {last + 2} + R."SID" '
+        f'FROM PUBLIC."{closure}" R JOIN PUBLIC."{PLACEHOLDER}{c}" V ON V."SID" = R."SID" '
+        f'WHERE R.{copy} AND R."ANCESTOR_SID" = {rest}')
+    closure_view = (
+        f'CREATE VIEW PUBLIC."{CLOSURE}{h}" AS SELECT R."ANCESTOR_SID", R."SID" FROM PUBLIC."{closure}" R '
+        f'WHERE R.{copy} AND R."ANCESTOR_SID" <> {root}')
+    return [node_view, closure_view]
+
+
 def build():
     creates, inserts = [], []
-    for table in TABLES:
-        data = json.loads((EXPORT / (table.replace("/", "_").strip("_") + ".json")).read_text(encoding="utf-8"))
-        c, i = statements(data)
+    tables = json.loads((EXPORT / "tables.json").read_text(encoding="utf-8"))
+    for table in tables:
+        c, i = statements(json.loads(table_file(table).read_text(encoding="utf-8")))
         creates += c
         inserts += i
+    hierarchies = [json.loads((EXPORT / f"hierarchy_{h}.json").read_text(encoding="utf-8")) for h in HIERARCHIES]
+    for data in hierarchies:
+        for part in ("nodes", "closure"):
+            c, i = statements(data[part])
+            creates += c
+            inserts += i
     views = json.loads((EXPORT / "views.json").read_text(encoding="utf-8"))
     assert all(name.startswith(PLACEHOLDER) for name in views), "views.json of an earlier run: export again"
     for name, definition in views.items():
-        assert '"/BIC/' in definition, name  # so that a later run removes it with the tables
         creates.append(f'CREATE VIEW PUBLIC."{name}" AS ' + definition.replace(CR, " ").replace(NL, " "))
+    for data in hierarchies:
+        creates += hierarchy_views(data)
+    assert all(OBJECT.search(c) for c in creates)  # so that a later run removes them
     with zipfile.ZipFile(JAR) as zin:
         items = [(item, zin.read(item.filename)) for item in zin.infolist()]
     patched = []
     for item, content in items:
         if item.filename == SCRIPT:
-            lines = [line for line in content.decode("utf-8").split(NL) if '"/BIC/' not in line]
+            lines = [line for line in content.decode("utf-8").split(NL) if not OBJECT.search(line)]
             end = CR if lines[0].endswith(CR) else ""
             last_create = max(n for n, line in enumerate(lines) if line.startswith("CREATE "))
             lines[last_create + 1:last_create + 1] = [c + end for c in creates]
@@ -204,7 +312,8 @@ def build():
     with zipfile.ZipFile(JAR, "w", zipfile.ZIP_DEFLATED) as zout:
         for item, content in patched:
             zout.writestr(item, content)
-    print(f"wrote {JAR.relative_to(ROOT)}: {len(TABLES)} BW tables, {len(inserts)} rows, {len(views)} views")
+    print(f"wrote {JAR.relative_to(ROOT)}: {len(tables)} BW tables, {len(hierarchies)} hierarchies, "
+          f"{len(inserts)} rows, {len(views)} views")
 
 
 def main():

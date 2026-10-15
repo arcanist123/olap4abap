@@ -129,6 +129,16 @@ rejects long statements, so the columns are read per table. Run it again after t
 the export finds by their new numbers. After the switch (2026-10-04) all 152 reference cases
 gave the same answers as with the FoodMart tables, and the same 59 statements of Mondrian's tests apply.
 
+The same run exports the clinic InfoCube `ZCLVISIT` (catalog `ZCLVISIT`, `reference/schema/ClinicBW.xml`; 69 tables
+with its text tables, which the views read) and the copy of its hierarchy `ZCLDIAG_ICD` at BW's current version (the
+rows of `ZZXXMLA1H...` and `ZZXXMLA1R...` for its `HIESID` and `SVER`; run `ZZXXMLA1_HIERARCHY_COPY` first if the copy
+is older), and builds the two reference views of the hierarchy over them, `ZZXXMLA1_HN_ZCLDIAG_ICD` (nodes) and
+`ZZXXMLA1_HC_ZCLDIAG_ICD` (closure) (`next-steps.md`, Reference scenario). The tables a view reads are taken from its
+SQL, listed in `tables.json` of the export; LANG and DATS are VARCHAR too, and a negative number of the data preview
+(`37-`) is turned round. After a regeneration of the clinic demo or of its hierarchies: run it again, check the export
+with `python scripts/bw_hierarchy_test.py --reference` and capture the changed answers again
+(`python scripts/recapture-cases.py execute_hier_ members_hier_ mdschema_hierarchies_hier mdschema_levels_hier`).
+
 ## FoodMart data for the BW cube
 
 `python scripts/export-foodmart-csv.py` reads `eMondrian/.../hsqldb-foodmart.jar` (fetched by `setup-reference.sh`) and

@@ -1,0 +1,618 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<ExecuteResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:mddataset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:schemas-microsoft-com:xml-analysis:mddataset" xmlns="urn:schemas-microsoft-com:xml-analysis:mddataset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:sql="urn:schemas-microsoft-com:xml-sql" elementFormDefault="qualified">
+        <xsd:complexType name="MemberType">
+          <xsd:sequence>
+            <xsd:element name="UName" type="xsd:string"/>
+            <xsd:element name="Caption" type="xsd:string"/>
+            <xsd:element name="LName" type="xsd:string"/>
+            <xsd:element name="LNum" type="xsd:unsignedInt"/>
+            <xsd:element name="DisplayInfo" type="xsd:unsignedInt"/>
+            <xsd:sequence maxOccurs="unbounded" minOccurs="0">
+              <xsd:any processContents="lax" maxOccurs="unbounded"/>
+            </xsd:sequence>
+          </xsd:sequence>
+          <xsd:attribute name="Hierarchy" type="xsd:string"/>
+        </xsd:complexType>
+        <xsd:complexType name="PropType">
+          <xsd:attribute name="name" type="xsd:string"/>
+        </xsd:complexType>
+        <xsd:complexType name="TupleType">
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:element name="Member" type="MemberType"/>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:complexType name="MembersType">
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:element name="Member" type="MemberType"/>
+          </xsd:sequence>
+          <xsd:attribute name="Hierarchy" type="xsd:string"/>
+        </xsd:complexType>
+        <xsd:complexType name="TuplesType">
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:element name="Tuple" type="TupleType"/>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:complexType name="CrossProductType">
+          <xsd:sequence>
+            <xsd:choice minOccurs="0" maxOccurs="unbounded">
+              <xsd:element name="Members" type="MembersType"/>
+              <xsd:element name="Tuples" type="TuplesType"/>
+            </xsd:choice>
+          </xsd:sequence>
+          <xsd:attribute name="Size" type="xsd:unsignedInt"/>
+        </xsd:complexType>
+        <xsd:complexType name="OlapInfo">
+          <xsd:sequence>
+            <xsd:element name="CubeInfo">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element name="Cube" maxOccurs="unbounded">
+                    <xsd:complexType>
+                      <xsd:sequence>
+                        <xsd:element name="CubeName" type="xsd:string"/>
+                      </xsd:sequence>
+                    </xsd:complexType>
+                  </xsd:element>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="AxesInfo">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element name="AxisInfo" maxOccurs="unbounded">
+                    <xsd:complexType>
+                      <xsd:sequence>
+                        <xsd:element name="HierarchyInfo" minOccurs="0" maxOccurs="unbounded">
+                          <xsd:complexType>
+                            <xsd:sequence>
+                              <xsd:sequence maxOccurs="unbounded">
+                                <xsd:element name="UName" type="PropType"/>
+                                <xsd:element name="Caption" type="PropType"/>
+                                <xsd:element name="LName" type="PropType"/>
+                                <xsd:element name="LNum" type="PropType"/>
+                                <xsd:element name="DisplayInfo" type="PropType" minOccurs="0" maxOccurs="unbounded"/>
+                              </xsd:sequence>
+                              <xsd:sequence>
+                                <xsd:any processContents="lax" minOccurs="0" maxOccurs="unbounded"/>
+                              </xsd:sequence>
+                            </xsd:sequence>
+                            <xsd:attribute name="name" type="xsd:string" use="required"/>
+                          </xsd:complexType>
+                        </xsd:element>
+                      </xsd:sequence>
+                      <xsd:attribute name="name" type="xsd:string"/>
+                    </xsd:complexType>
+                  </xsd:element>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="CellInfo">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:sequence minOccurs="0" maxOccurs="unbounded">
+                    <xsd:choice>
+                      <xsd:element name="Value" type="PropType"/>
+                      <xsd:element name="FmtValue" type="PropType"/>
+                      <xsd:element name="BackColor" type="PropType"/>
+                      <xsd:element name="ForeColor" type="PropType"/>
+                      <xsd:element name="FontName" type="PropType"/>
+                      <xsd:element name="FontSize" type="PropType"/>
+                      <xsd:element name="FontFlags" type="PropType"/>
+                      <xsd:element name="FormatString" type="PropType"/>
+                      <xsd:element name="NonEmptyBehavior" type="PropType"/>
+                      <xsd:element name="SolveOrder" type="PropType"/>
+                      <xsd:element name="Updateable" type="PropType"/>
+                      <xsd:element name="Visible" type="PropType"/>
+                      <xsd:element name="Expression" type="PropType"/>
+                    </xsd:choice>
+                  </xsd:sequence>
+                  <xsd:sequence maxOccurs="unbounded" minOccurs="0">
+                    <xsd:any processContents="lax" maxOccurs="unbounded"/>
+                  </xsd:sequence>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:complexType name="Axes">
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:element name="Axis">
+              <xsd:complexType>
+                <xsd:choice minOccurs="0" maxOccurs="unbounded">
+                  <xsd:element name="CrossProduct" type="CrossProductType"/>
+                  <xsd:element name="Tuples" type="TuplesType"/>
+                  <xsd:element name="Members" type="MembersType"/>
+                </xsd:choice>
+                <xsd:attribute name="name" type="xsd:string"/>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:complexType name="CellData">
+          <xsd:sequence>
+            <xsd:element name="Cell" minOccurs="0" maxOccurs="unbounded">
+              <xsd:complexType>
+                <xsd:sequence maxOccurs="unbounded">
+                  <xsd:choice>
+                    <xsd:element name="Value"/>
+                    <xsd:element name="FmtValue" type="xsd:string"/>
+                    <xsd:element name="BackColor" type="xsd:unsignedInt"/>
+                    <xsd:element name="ForeColor" type="xsd:unsignedInt"/>
+                    <xsd:element name="FontName" type="xsd:string"/>
+                    <xsd:element name="FontSize" type="xsd:unsignedShort"/>
+                    <xsd:element name="FontFlags" type="xsd:unsignedInt"/>
+                    <xsd:element name="FormatString" type="xsd:string"/>
+                    <xsd:element name="NonEmptyBehavior" type="xsd:unsignedShort"/>
+                    <xsd:element name="SolveOrder" type="xsd:unsignedInt"/>
+                    <xsd:element name="Updateable" type="xsd:unsignedInt"/>
+                    <xsd:element name="Visible" type="xsd:unsignedInt"/>
+                    <xsd:element name="Expression" type="xsd:string"/>
+                  </xsd:choice>
+                </xsd:sequence>
+                <xsd:attribute name="CellOrdinal" type="xsd:unsignedInt" use="required"/>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:element name="root">
+          <xsd:complexType>
+            <xsd:sequence maxOccurs="unbounded">
+              <xsd:element name="OlapInfo" type="OlapInfo"/>
+              <xsd:element name="Axes" type="Axes"/>
+              <xsd:element name="CellData" type="CellData"/>
+            </xsd:sequence>
+          </xsd:complexType>
+        </xsd:element>
+      </xsd:schema>
+      <OlapInfo>
+        <CubeInfo>
+          <Cube>
+            <CubeName>ZCLVISIT</CubeName>
+            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-15T21:29:14</LastDataUpdate>
+            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-15T21:29:14</LastSchemaUpdate>
+          </Cube>
+        </CubeInfo>
+        <AxesInfo>
+          <AxisInfo name="Axis0">
+            <HierarchyInfo name="[Measures]">
+              <UName name="[Measures].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
+              <Caption name="[Measures].[MEMBER_CAPTION]" type="xsd:string"/>
+              <LName name="[Measures].[LEVEL_UNIQUE_NAME]" type="xsd:string"/>
+              <LNum name="[Measures].[LEVEL_NUMBER]" type="xsd:unsignedInt"/>
+              <DisplayInfo name="[Measures].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
+            </HierarchyInfo>
+          </AxisInfo>
+          <AxisInfo name="Axis1">
+            <HierarchyInfo name="[ZCLDOC]">
+              <UName name="[ZCLDOC].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
+              <Caption name="[ZCLDOC].[MEMBER_CAPTION]" type="xsd:string"/>
+              <LName name="[ZCLDOC].[LEVEL_UNIQUE_NAME]" type="xsd:string"/>
+              <LNum name="[ZCLDOC].[LEVEL_NUMBER]" type="xsd:unsignedInt"/>
+              <DisplayInfo name="[ZCLDOC].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
+            </HierarchyInfo>
+          </AxisInfo>
+          <AxisInfo name="SlicerAxis">
+            <HierarchyInfo name="[ZCLDIAG.ZCLDIAG_ICD]">
+              <UName name="[ZCLDIAG.ZCLDIAG_ICD].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
+              <Caption name="[ZCLDIAG.ZCLDIAG_ICD].[MEMBER_CAPTION]" type="xsd:string"/>
+              <LName name="[ZCLDIAG.ZCLDIAG_ICD].[LEVEL_UNIQUE_NAME]" type="xsd:string"/>
+              <LNum name="[ZCLDIAG.ZCLDIAG_ICD].[LEVEL_NUMBER]" type="xsd:unsignedInt"/>
+              <DisplayInfo name="[ZCLDIAG.ZCLDIAG_ICD].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
+            </HierarchyInfo>
+          </AxisInfo>
+        </AxesInfo>
+        <CellInfo>
+          <Value name="VALUE"/>
+          <FmtValue name="FORMATTED_VALUE" type="xsd:string"/>
+        </CellInfo>
+      </OlapInfo>
+      <Axes>
+        <Axis name="Axis0">
+          <Tuples>
+            <Tuple>
+              <Member Hierarchy="[Measures]">
+                <UName>[Measures].[ZCLVISNO]</UName>
+                <Caption>Visits</Caption>
+                <LName>[Measures].[MeasuresLevel]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Measures]">
+                <UName>[Measures].[ZCLCHRG]</UName>
+                <Caption>Charges</Caption>
+                <LName>[Measures].[MeasuresLevel]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+          </Tuples>
+        </Axis>
+        <Axis name="Axis1">
+          <Tuples>
+            <Tuple>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[0]</UName>
+                <Caption>000</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[1]</UName>
+                <Caption>001</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[2]</UName>
+                <Caption>002</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[3]</UName>
+                <Caption>003</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[4]</UName>
+                <Caption>004</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[5]</UName>
+                <Caption>005</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[6]</UName>
+                <Caption>006</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[7]</UName>
+                <Caption>007</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[8]</UName>
+                <Caption>008</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[9]</UName>
+                <Caption>009</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[10]</UName>
+                <Caption>010</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[11]</UName>
+                <Caption>011</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[12]</UName>
+                <Caption>012</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[13]</UName>
+                <Caption>013</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[14]</UName>
+                <Caption>014</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[15]</UName>
+                <Caption>015</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[16]</UName>
+                <Caption>016</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[17]</UName>
+                <Caption>017</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[18]</UName>
+                <Caption>018</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[19]</UName>
+                <Caption>019</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[20]</UName>
+                <Caption>020</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+          </Tuples>
+        </Axis>
+        <Axis name="SlicerAxis">
+          <Tuples>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[REST_H]</UName>
+                <Caption>REST_H</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[ZCLDIAG]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>1</DisplayInfo>
+              </Member>
+            </Tuple>
+          </Tuples>
+        </Axis>
+      </Axes>
+      <CellData>
+        <Cell CellOrdinal="0">
+          <FmtValue/>
+        </Cell>
+        <Cell CellOrdinal="1">
+          <FmtValue/>
+        </Cell>
+        <Cell CellOrdinal="2">
+          <Value xsi:type="xsd:double">28</Value>
+          <FmtValue>28.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="3">
+          <Value xsi:type="xsd:double">3150.9</Value>
+          <FmtValue>3,150.900</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="4">
+          <Value xsi:type="xsd:double">21</Value>
+          <FmtValue>21.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="5">
+          <Value xsi:type="xsd:double">2375.8</Value>
+          <FmtValue>2,375.800</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="6">
+          <Value xsi:type="xsd:double">25</Value>
+          <FmtValue>25.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="7">
+          <Value xsi:type="xsd:double">2873.6</Value>
+          <FmtValue>2,873.600</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="8">
+          <Value xsi:type="xsd:double">24</Value>
+          <FmtValue>24.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="9">
+          <Value xsi:type="xsd:double">2499.8</Value>
+          <FmtValue>2,499.800</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="10">
+          <Value xsi:type="xsd:double">28</Value>
+          <FmtValue>28.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="11">
+          <Value xsi:type="xsd:double">3215.3</Value>
+          <FmtValue>3,215.300</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="12">
+          <Value xsi:type="xsd:double">14</Value>
+          <FmtValue>14.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="13">
+          <Value xsi:type="xsd:double">1547.6</Value>
+          <FmtValue>1,547.600</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="14">
+          <Value xsi:type="xsd:double">19</Value>
+          <FmtValue>19.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="15">
+          <Value xsi:type="xsd:double">1767.3</Value>
+          <FmtValue>1,767.300</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="16">
+          <Value xsi:type="xsd:double">7</Value>
+          <FmtValue>7.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="17">
+          <Value xsi:type="xsd:double">742.1</Value>
+          <FmtValue>742.100</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="18">
+          <Value xsi:type="xsd:double">8</Value>
+          <FmtValue>8.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="19">
+          <Value xsi:type="xsd:double">1236.5</Value>
+          <FmtValue>1,236.500</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="20">
+          <Value xsi:type="xsd:double">13</Value>
+          <FmtValue>13.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="21">
+          <Value xsi:type="xsd:double">1912.5</Value>
+          <FmtValue>1,912.500</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="22">
+          <Value xsi:type="xsd:double">21</Value>
+          <FmtValue>21.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="23">
+          <Value xsi:type="xsd:double">3400.7</Value>
+          <FmtValue>3,400.700</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="24">
+          <Value xsi:type="xsd:double">15</Value>
+          <FmtValue>15.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="25">
+          <Value xsi:type="xsd:double">1519.5</Value>
+          <FmtValue>1,519.500</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="26">
+          <Value xsi:type="xsd:double">21</Value>
+          <FmtValue>21.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="27">
+          <Value xsi:type="xsd:double">2465.5</Value>
+          <FmtValue>2,465.500</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="28">
+          <Value xsi:type="xsd:double">8</Value>
+          <FmtValue>8.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="29">
+          <Value xsi:type="xsd:double">782.6</Value>
+          <FmtValue>782.600</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="30">
+          <Value xsi:type="xsd:double">20</Value>
+          <FmtValue>20.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="31">
+          <Value xsi:type="xsd:double">2059.3</Value>
+          <FmtValue>2,059.300</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="32">
+          <Value xsi:type="xsd:double">13</Value>
+          <FmtValue>13.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="33">
+          <Value xsi:type="xsd:double">1268.1</Value>
+          <FmtValue>1,268.100</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="34">
+          <Value xsi:type="xsd:double">15</Value>
+          <FmtValue>15.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="35">
+          <Value xsi:type="xsd:double">1718.5</Value>
+          <FmtValue>1,718.500</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="36">
+          <Value xsi:type="xsd:double">12</Value>
+          <FmtValue>12.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="37">
+          <Value xsi:type="xsd:double">1165.9</Value>
+          <FmtValue>1,165.900</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="38">
+          <Value xsi:type="xsd:double">14</Value>
+          <FmtValue>14.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="39">
+          <Value xsi:type="xsd:double">8534.5</Value>
+          <FmtValue>8,534.500</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="40">
+          <Value xsi:type="xsd:double">11</Value>
+          <FmtValue>11.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="41">
+          <Value xsi:type="xsd:double">6837</Value>
+          <FmtValue>6,837.000</FmtValue>
+        </Cell>
+      </CellData>
+    </root>
+  </return>
+</ExecuteResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

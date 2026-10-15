@@ -1,8 +1,9 @@
 <?xml version="1.0"?>
 <!--
   eMondrian data sources for the reference container: the same as the one shipped with eMondrian, except that the
-  catalogs are ZFOODMART (reference/schema/FoodmartBW.xml), the schema that mirrors our BW model, and ZFMDRILL
-  (reference/schema/FoodmartBWDrill.xml, drill-through actions). The original FoodMart catalog is gone on
+  catalogs are ZFOODMART (reference/schema/FoodmartBW.xml), the schema that mirrors our BW model, ZFMDRILL
+  (reference/schema/FoodmartBWDrill.xml, drill-through actions) and ZCLVISIT (reference/schema/ClinicBW.xml, the
+  clinic InfoCube with the BW hierarchy ZCLDIAG_ICD). The original FoodMart catalog is gone on
   purpose, so that every answer of the container can be compared one-to-one with our ABAP server.
   Installed by scripts/deploy-reference-schema.sh.
 -->
@@ -21,6 +22,9 @@
         </Catalog>
         <Catalog name="ZFMDRILL">
             <Definition>/WEB-INF/schema/FoodmartBWDrill.xml</Definition>
+        </Catalog>
+        <Catalog name="ZCLVISIT">
+            <Definition>/WEB-INF/schema/ClinicBW.xml</Definition>
         </Catalog>
     </Catalogs>
   </DataSource>

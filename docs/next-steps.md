@@ -365,6 +365,40 @@ Decided with the user 2026-10-15 too: the reference's schema is its own (`Clinic
 annotation); SAP serves the schema the proposal makes (open 2), and the test compares the answers of the catalogs of
 the same name. On SAP olap4abap reads the hierarchy from the copy at BW's current version, not from the frozen views.
 
+Done (2026-10-15): the reference serves `ZCLDIAG_ICD`.
+- Export: `build-bw-reference-db.py` exports `ZCLVISIT` (its fact table, the SID, attribute and text tables the
+  characteristics' views read, the views) and the copy of `ZCLDIAG` at BW's current version (`HIESID` 43, `SVER` 1:
+  70 node rows, 183 rows of the not-assigned view), and builds `ZZXXMLA1_HN_ZCLDIAG_ICD` (nodes: `SID`,
+  `PARENT_SID`, `NAME`, `POS`; REST_H's value of the initial value is named `#`, as BW's MDX names it) and
+  `ZZXXMLA1_HC_ZCLDIAG_ICD` (closure: `ANCESTOR_SID`, `SID`, without the virtual root's rows).
+- Schema: `ClinicBW.xml` is SAP's accepted schema of `ZCLVISIT` without annotations and with the placeholders, plus
+  the hierarchy `[ZCLDIAG.ZCLDIAG_ICD]` (caption Diagnoses by ICD-10 Chapter, All member `All Diagnoses by ICD-10
+  Chapter`): one level `ZCLDIAG`, `column="SID" parentColumn="PARENT_SID" nameColumn="NAME" ordinalColumn="POS"`
+  (BW's order of siblings), its `<Closure parentColumn="ANCESTOR_SID" childColumn="SID">`. The dimension has no
+  `table`: the reference gives every hierarchy of a dimension with a table that table (`RolapHierarchy`), so each
+  hierarchy names its own, the flat one first, so that the drill-through's attributes bind to the characteristic's
+  view. Open 2 (the proposal's form) has these names to match.
+- Check: `bw_hierarchy_test.py --reference` passes: the reference's 71 members (and its All member, the provider's
+  total) are BW's in depth, children, name, values and order. BW is asked on the aDSO, which holds the same visits.
+- Cases: 60, captured with `capture-execute.py` and `capture-case.py`; 1,212 of their cells recomputed from the
+  exported facts and the closure, all the same, and the NON EMPTY rows complete. Excel's queries are the shapes Excel
+  sent through `xmla-proxy.py` before (pivot rows, expand, crossjoin, item path, filter list, children count, member
+  search, slicer), applied to the hierarchy; not yet a live Excel session against the reference.
+- What the reference answers on a parent-child level: every member is on the one level (`LNum` 1, its `DEPTH` the
+  depth), `MDSCHEMA_LEVELS` shows the hierarchy as `Level 01` to `Level 04`, `PrevMember`/`NextMember` step to the
+  member of the same depth in hierarchy order, a compound slicer or an `Aggregate` of a node and a member below it
+  counts that member twice (the reference sums the tuples; BW would count it once). It has no `IsLeaf` and no
+  `IsAncestor` (`Children.Count = 0` and `Ascendants` stand in for them in the cases).
+- Not captured, the reference is wrong there: a subselect of a node (Excel's filter on a hierarchy) constrains the
+  facts to the node's own key, not to the closure, so a node has no facts (`{RESPIRATORY, J06}` keeps J06 only), and
+  a drill-through of a node gives no rows (a leaf's gives them). Open: fix the reference (as its subcube patches, in
+  `scripts/patches/`) or take these from BW's MDX.
+- SAP's answers on the clinic catalog differ from the reference's besides the hierarchy: member unique names by the
+  name, not the key (`[ZCLDOC].[000]` where the reference has `[ZCLDOC].[0]`), the measure's name as its caption
+  (`ZCLVISNO`, the reference `Visits`), the default drill-through with the measure; and SAP's schema annotates
+  `olap4abap.omitEmptyCells` and `olap4abap.membersWithFacts`, which change answers. The engine work and open 2 meet
+  these first.
+
 ## Paused: query planning
 
 Paused 2026-10-15 before step 7 (decided with the user): BW models what users report as stored key figures, so a

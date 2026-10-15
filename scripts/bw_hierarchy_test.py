@@ -15,14 +15,21 @@ link leaves, postable nodes) and ZCLSERV_CAT (intervals, overlapping and linked)
 - the not-assigned node (REST_H) is a root after the hierarchy, its values below it; BW gives them its deepest level;
 - no All member: olap4abap's All member, if it has one, is checked against the provider's total and left out.
 
-Per member: level (relative to the first root, not under the not-assigned node), number of children, caption (BW's
-text; with --names a text node's technical name or a leaf's key is accepted too, as long as olap4abap has no texts) and
-the values. Members BW shows without value are left out by olap4abap's members-with-facts dimensions; --with-facts
+Per member: level (relative to the first root, not under the not-assigned node; a member's DEPTH where it has one,
+as the members of a parent-child level all have the level's number), number of children, caption (BW's text; with
+--names a text node's technical name or a leaf's key is accepted too, as long as olap4abap has no texts) and the
+values. Members BW shows without value are left out by olap4abap's members-with-facts dimensions; --with-facts
 compares only the members with a value, in BW's order.
+
+--reference checks the reference server's copy of the hierarchies in which every node occurs once (docs/next-steps.md,
+Reference scenario; catalog ZCLVISIT, reference/schema/ClinicBW.xml, built by scripts/build-bw-reference-db.py) against
+BW's MDX instead, names as captions: so the export is known to be BW's hierarchy before cases are captured from it.
+BW is asked on the aDSO ZCLVISITA, the reference serves the InfoCube ZCLVISIT: both hold the same visits.
 
     python scripts/bw_hierarchy_test.py
     python scripts/bw_hierarchy_test.py --names --with-facts --url http://localhost:50000/zzxxmla1?sap-client=001
     python scripts/bw_hierarchy_test.py --bw-only           # BW's answer and its own checks
+    python scripts/bw_hierarchy_test.py --reference         # the reference server's ZCLDIAG_ICD
 """
 import argparse
 import html
@@ -43,6 +50,10 @@ HIERARCHIES = {
     ("ZCLSERV", "ZCLSERV_CAT"): "[ZCLSERV.ZCLSERV_CAT]",
 }
 NOT_ASSIGNED = "1HIER_REST"
+# --reference: the reference server, its catalog and the hierarchies it serves
+REFERENCE_URL = "http://localhost:8080/emondrian/xmla"
+REFERENCE_CATALOG = "ZCLVISIT"
+REFERENCE_HIERARCHIES = [("ZCLDIAG", "ZCLDIAG_ICD")]
 
 EXECUTE = """<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/"><SOAP-ENV:Body>
 <Execute xmlns="urn:schemas-microsoft-com:xml-analysis"><Command><Statement>{statement}</Statement></Command>
@@ -96,7 +107,11 @@ def bw_members():
             continue
         found = re.fullmatch(r"\[(\S+)\s+(\S+)\]", hierarchy)
         node = re.fullmatch(r".*\]\.\[(.*)\]", unique).group(1)
-        name, _, kind = node.rpartition(" ") if " " in node else (node, "", "")
+        # a node is its name padded to 32 characters and its InfoObject: a name of 32 leaves no blank between them
+        if " " in node:
+            name, _, kind = node.rpartition(" ")
+        else:
+            name, kind = node[:32], node[32:]
         hierarchies.setdefault((found.group(1), found.group(2)), []).append({
             "level": int(level), "children": int(children), "caption": caption, "values": values,
             "name": name.strip(), "kind": kind})
@@ -119,7 +134,7 @@ def post(url, statement):
 def olap4abap_members(url, hierarchy):
     """olap4abap's members of the hierarchy with level, children, caption and values; or the fault."""
     text = post(url, f"SELECT {{{', '.join(MEASURES)}}} ON 0, {{{hierarchy}.Members}} "
-                     f"DIMENSION PROPERTIES CHILDREN_CARDINALITY ON 1 FROM [{CATALOG}]")
+                     f"DIMENSION PROPERTIES DEPTH, CHILDREN_CARDINALITY ON 1 FROM [{CATALOG}]")
     fault = re.search(r"<faultstring>(.*?)</faultstring>", text, re.S)
     if fault:
         return None, html.unescape(fault.group(1))
@@ -136,7 +151,8 @@ def olap4abap_members(url, hierarchy):
     for row, member in enumerate(tuples):
         members.append({
             "unique": field(member, "UName"), "caption": field(member, "Caption"),
-            "level": int(field(member, "LNum") or 0), "children": int(field(member, "CHILDREN_CARDINALITY") or 0),
+            "level": int(field(member, "DEPTH") or field(member, "LNum") or 0),
+            "children": int(field(member, "CHILDREN_CARDINALITY") or 0),
             "values": [cells.get(row * len(MEASURES) + column) for column in range(len(MEASURES))]})
     return members, None
 
@@ -189,12 +205,21 @@ def compare(total, key, expected, actual, args, check):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--url", default="http://localhost:50000/zzxxmla1?sap-client=001")
+    parser.add_argument("--url", help="the XMLA endpoint (default SAP's, with --reference the reference server)")
     parser.add_argument("--names", action="store_true", help="accept a node's name or key as its caption")
     parser.add_argument("--with-facts", action="store_true", help="compare only the members with a value")
     parser.add_argument("--bw-only", action="store_true", help="only BW's answer and its own checks")
+    parser.add_argument("--reference", action="store_true",
+                        help="check the reference server's hierarchies (catalog ZCLVISIT) against BW's")
     parser.add_argument("--show", type=int, default=10, help="differences shown per hierarchy")
     args = parser.parse_args()
+    global CATALOG
+    hierarchies_checked = HIERARCHIES
+    if args.reference:
+        CATALOG = REFERENCE_CATALOG
+        hierarchies_checked = {key: HIERARCHIES[key] for key in REFERENCE_HIERARCHIES}
+        args.names = True
+    args.url = args.url or (REFERENCE_URL if args.reference else "http://localhost:50000/zzxxmla1?sap-client=001")
     failures = []
 
     def check(name, condition, detail=""):
@@ -203,7 +228,7 @@ def main():
             failures.append(name)
 
     total, hierarchies = bw_members()
-    for key, hierarchy in HIERARCHIES.items():
+    for key, hierarchy in hierarchies_checked.items():
         expected = hierarchies.get(key)
         if not expected:
             check(f"BW {key[1]}: shown by BW's MDX", False, "not in the probe's answer")
