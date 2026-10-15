@@ -347,15 +347,13 @@ shows a member's own facts in its value, BW as a first child of its own) and lat
   dimension `ZCLDIAG` with a level `column="SID" parentColumn="PARENT_SID" nameColumn="NAME"` on the node view and
   its `<Closure>` on the closure view; not SAP's schema (decided below).
 - **Cases:** catalog `ZCLVISIT` in the reference's `datasources.xml`, cases captured with `capture-execute.py`
-  under `reference/` and replayed by `xmla_test.py`: `MDSCHEMA_HIERARCHIES`, `_LEVELS`, `_MEMBERS` (tree operators)
-  of the hierarchy; `Members`, `Children`, `Parent`, `Ancestor`, `Descendants` (levels, distances, flags),
-  `DrilldownLevel`, `DrilldownMember`, `Hierarchize`, `IsLeaf`, `Level.Ordinal`, `VisualTotals`, `Aggregate` of nodes;
-  `NON EMPTY` and crossjoins with the physician and the visit type; a node in the slicer, in a subselect (Excel's
-  filter on a hierarchy) and in a compound slicer; Excel's queries on the hierarchy (captured from Excel against the
-  reference); `DRILLTHROUGH` on a node. Before capture, the reference's values of every member are checked against
-  BW's MDX (`bw_hierarchy_test.py`'s BW side), so the export is known to be BW's hierarchy.
-- **Later:** a second single-parent hierarchy only if a case needs one the clinic's lacks (a hierarchy of unequal
-  depth, a root with values of its own), made in the clinic generator, not in the reference database.
+  under `reference/` and replayed by `xmla_test.py`, only for what the engine's hierarchy work builds (open 4): the
+  schema rowsets of the hierarchy, `Members`, `Children`, `Parent`, `Descendants`, and a node with the facts (on an
+  axis, in the slicer). Before capture, the reference's values of every member are checked against BW's MDX
+  (`bw_hierarchy_test.py`'s BW side), so the export is known to be BW's hierarchy.
+- **Not in scope** (decided with the user 2026-10-15: the hierarchy work is big enough): no second hierarchy, no new
+  demo data, no cases for functions the hierarchy work does not touch (`VisualTotals`, subselects, drill-through,
+  Excel's queries); they are added when that work is planned.
 
 Decided with the user 2026-10-15: the InfoCube `ZCLVISIT` (the simpler export, no reporting view; the hierarchy is
 the characteristic's, the same on the aDSO); single-parent hierarchies that show not assigned only; the export is
