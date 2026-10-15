@@ -345,8 +345,7 @@ shows a member's own facts in its value, BW as a first child of its own) and lat
   it (and new captures where answers change).
 - **Schema:** the reference's own schema `reference/schema/ClinicBW.xml`, plain parent-child: a `Hierarchy` of the
   dimension `ZCLDIAG` with a level `column="SID" parentColumn="PARENT_SID" nameColumn="NAME"` on the node view and
-  its `<Closure>` on the closure view. Whether SAP serves the same file (open question 4 below) or the schema the
-  proposal makes, the test compares the answers of the catalogs of the same name.
+  its `<Closure>` on the closure view; not SAP's schema (decided below).
 - **Cases:** catalog `ZCLVISIT` in the reference's `datasources.xml`, cases captured with `capture-execute.py`
   under `reference/` and replayed by `xmla_test.py`: `MDSCHEMA_HIERARCHIES`, `_LEVELS`, `_MEMBERS` (tree operators)
   of the hierarchy; `Members`, `Children`, `Parent`, `Ancestor`, `Descendants` (levels, distances, flags),
@@ -362,13 +361,9 @@ Decided with the user 2026-10-15: the InfoCube `ZCLVISIT` (the simpler export, n
 the characteristic's, the same on the aDSO); single-parent hierarchies that show not assigned only; the export is
 automated (above).
 
-Open question (for the user):
-
-4. Is the reference's schema file also SAP's schema of the catalog, as `FoodmartBW.xml` is for FoodMart? On SAP
-   olap4abap reads the hierarchy from the copy at BW's current version (`ZZXXMLA1_CL_BW_HIERARCHY_COPY=>current`),
-   not from the frozen placeholder views, so if the file is shared, it has to tell olap4abap which BW hierarchy the
-   parent-child level is (an annotation the reference ignores). Not needed if SAP serves the schema the proposal
-   makes (open 2) and only the answers are compared, which is the simpler way: the reference's schema stays plain.
+Decided with the user 2026-10-15 too: the reference's schema is its own (`ClinicBW.xml`, plain parent-child, no
+annotation); SAP serves the schema the proposal makes (open 2), and the test compares the answers of the catalogs of
+the same name. On SAP olap4abap reads the hierarchy from the copy at BW's current version, not from the frozen views.
 
 ## Paused: query planning
 
