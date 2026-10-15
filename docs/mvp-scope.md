@@ -185,8 +185,10 @@ Decisions taken by the project owner on 2026-10-02, with reasons.
 
 ## Out of scope (MVP)
 
-- **BW external hierarchies** (`/BI0/H...` tables) and Mondrian **parent-child hierarchies** (these need a closure
-  table).
+- **BW external hierarchies that are time or version dependent.** Time-independent ones are in scope since
+  2026-10-15 (decided with the user; `next-steps.md`, Now: time-independent BW hierarchies), as Mondrian
+  **parent-child hierarchies** over a materialized closure, also with nodes under several parents. Sign reversal of
+  hierarchy nodes is out of scope.
 - **Key-date logic** (see `mondrian-hierarchies-and-time-dependency.md` for how it could be added later: a key-date
   view per characteristic). Time-dependent attributes and texts are read as one snapshot, valid on 9999-12-31
   (`bw-schema-design-guide.md`, decided 2026-10-08), as BW shows them with that key date.

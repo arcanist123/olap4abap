@@ -15,7 +15,84 @@ eMondrian's database adds in another order (`docs/test-strategy.md`). The run (t
 two minutes; #85 takes 1 s with the native `Order` (step 8, 105 s before), #46 2.3 s with the native `TopCount` (step
 9); everything else is below 10 s.
 
-## Now: query planning
+## Now: time-independent BW hierarchies
+
+Decided with the user 2026-10-15: the next big piece of work is BW's external hierarchies (`/BI0/H<char>`,
+`/BIC/H<char>`, directory `RSHIEDIR`) that are neither time nor version dependent, ahead of planning step 7 and the
+texts (both paused below). Users report on BW hierarchies, and none of them can be shown today. A plain hierarchy
+needs no key date, so this does not wait for one. Afterwards the key date (time-dependent attributes, texts and
+navigation attributes read on a date instead of 9999-12-31; open: how a client, Excel above all, sends it), then time-
+and version-dependent hierarchies on both (the clinic demo's `ZCLDOC_ORG`, `ZCLDOC_SITE`).
+
+Test case: the clinic demo's `ZCLDIAG_ICD` (All Diagnoses > chapter > group > diagnosis, 69 nodes, plain;
+`clinic-demo.md`, The hierarchy of the diagnoses).
+
+BW's tables (looked at on `ZCLDIAG`): `/BIC/H<char>` is the node tree (`NODEID`, `PARENTID`, `CHILDID`, `NEXTID`,
+`TLEVEL`, `LINK`); `/BIC/I<char>` (SID structure, written by BW on activation) has a row per node with its parent's
+SID (`PRED`), its own (`SUCC`), its position in depth-first order (`LISTNO`), `TLEVEL`, the node type (`NTYPEID`:
+5 a text node, else the characteristic's) and `FACTOR` (sign reversal), and the not-assigned node (`LISTNO`
+999999998, 999999999). Neither holds ancestor and descendant pairs.
+
+Decided with the user 2026-10-15:
+
+- **Multiple parents.** A node can be under several parents (BW's link nodes), recursively, and its subtree has the
+  same shape under each. Members are its occurrences (one per path, as BW shows it): every member has one parent,
+  so `Parent`, `Ancestor` and drill-down keep their meaning, and unique names are paths
+  (`[ZCLDIAG.ZCLDIAG_ICD].[ROOT].[A00-B99].[A00]`), stable across rebuilds while the structure is (an occurrence id
+  would change with each rebuild and break saved Excel pivots). `&[key]` of a value with several occurrences finds
+  the first one (hand-written MDX only; Excel sends back the unique names it got).
+- **No double counting.** A node's value is the sum over the distinct values below it: a value reached by two paths
+  counts once. The rows are a materialized closure `(ancestor occurrence, SID)`, distinct, which the facts join by an
+  equi-join, filtered to the ancestors asked for; no range join, `DISTINCT` or hierarchy function at query time
+  (100 million facts joined to a closure built in the query would not run). The All member is a closure row to every
+  SID. Consequences for the engine: a parent is never summed from its children (no `roll_up`, no grouping set that
+  leaves the closure column out, as for distinct count); every closure in a statement is grouped or filtered to one
+  ancestor; a set of a hierarchy's members (slicer, subselect, `Aggregate`, `VisualTotals`) is one semi-join
+  `sid IN (SELECT sid FROM closure WHERE ancestor IN (...))`, as BW counts a selection of nodes, not a sum per member.
+- **Flattened levels** (ragged, up to 99 level columns) are ruled out: a value under two paths is two rows, and the
+  facts joined to them double.
+- **Depth** is at most 99. A value that is in the hierarchy twice, once as an inner node and once as a leaf, is
+  refused.
+- **Postable nodes** (an inner node that is a value of the characteristic and has facts of its own): the sync adds an
+  extra leaf occurrence under it, named as the node, with its own facts (SSAS's `NonLeafDataVisible`), so that the
+  children add up to their parent.
+- **Order:** BW's, from `LISTNO`; a shared subtree keeps its original's order. Members are never read as a whole
+  hierarchy into ABAP (Member decision in `mvp-scope.md`): children by parent, descendants by the depth-first
+  range, a level by depth, all in SQL on the node table, ordered by the stored number.
+- **The build** stays in the database, never row by row through ABAP: the node table (occurrences, shared subtrees
+  expanded, depth, depth-first number and subtree end) and the closure by `INSERT ... SELECT` (the closure in one
+  statement, a range join over the depth-first numbers; if `/BIC/I` does not expand link nodes, one statement per
+  depth). It is lazy: a query compares `RSHIEDIR`'s time stamp with the copy's (one key read) and rebuilds a stale
+  hierarchy under an enqueue lock; a limit on occurrences refuses a hierarchy whose expansion explodes.
+- **Interval leaves** (`/BIC/J<char>`) are expanded to their values at the build.
+- **Not assigned** (values of the master data under no leaf) is a configuration of the hierarchy, as in BW (shown or
+  suppressed), read live by a view (`closure UNION ALL` the rest node with every SID that is no leaf), so that it
+  follows master data loads without a rebuild.
+- **Several hierarchies on one characteristic** are allowed: they are more hierarchies of its dimension, next to the
+  flat one and the navigation attributes'; one on its All member needs no closure.
+- **Sign reversal** (`FACTOR`) is out of scope.
+- **Portable SQL:** no HANA-only features (BW's cached column hierarchy views, hierarchy functions, CDS
+  hierarchies): plain tables and standard SQL, so that the engine can later run on another database (Later: DuckDB).
+- **Demo:** the clinic demo gets a hierarchy with shared nodes (link nodes, recursively), a postable node and an
+  interval leaf.
+
+Open:
+
+1. Whether `/BIC/I` holds the shared subtrees expanded, with their own `LISTNO` (needs the demo's hierarchy with
+   link nodes); this decides between the one-statement and the per-depth closure.
+2. The schema: `parentColumn` with `<Closure>` as the reference models it, with our extensions (the closure's child
+   is the SID, members are occurrences); `ZZXXMLA1_CL_SCHEMA` refuses both today. The reference can be the oracle
+   for single-parent hierarchies only; for shared nodes, BW's own MDX (`ZZXXMLA1_BW_AUTH_PROBE`).
+3. Names and captions of nodes: a text node's name is its technical name, a leaf's the characteristic's key; the
+   engine shows a member's name as its caption (`captionColumn` is paused with the texts).
+4. The engine: members of a parent-child level and the closure in the fact reads; the planner marks such members
+   computed at first, so the evaluator answers them, native and grouped reads later.
+5. The proposal and the UI: offer the hierarchies a characteristic has in `RSHIEDIR`, and the not-assigned switch.
+
+## Paused: query planning
+
+Paused 2026-10-15 before step 7 (decided with the user): BW models what users report as stored key figures, so a
+calculated measure over a whole large grid is not a common case; time-independent hierarchies come first.
 
 Decided 2026-10-14 (`query-planning.md`): a planner between the validator and the engine marks every node static,
 relational or computed; the static and relational parts are answered from the schema, the member reads and grouped
@@ -95,7 +172,7 @@ keeps the answers: both test suites give the same answers with planning on and o
    set) one `cross_groups` read and a lookup per pair (`non_empty_groups`). `Filter` of the 10,281 customers 2.4 s to
    0.18 s, of 100,000 members 18.3 to 3.7 s, `NonEmpty` with a second set 1.7 to 1.0 s; `xmla_test.py` 272 of 274,
    `compare-applicable.py` 394 of 395 (#64).
-7. Next: formulas per group (decided with the user 2026-10-15): a calculated measure whose formula is
+7. Paused (2026-10-15, see above): formulas per group (decided with the user 2026-10-15): a calculated measure whose formula is
    arithmetic of stored measures of its own cell (`[Store Sales] - [Store Cost]`, `[ZXMLAKF] * 2`; no navigation, no
    other member) is computed once per group from the groups the cells' statement read, not by the evaluator per cell
    (the 1,001 x 1,001 grid with such a measure: 108 s, nearly all of it the evaluator's pass at about 100 µs per
@@ -467,11 +544,13 @@ Design in `schema-generator.md`. Order:
    throwaway catalog). One cube per catalog for the MVP (`mvp-scope.md`, Catalog decision).
    Open: an accept through the UI checked by hand (the API's accept was); calculated members of the schema (the
    reader ignores them) and aggregators other than `sum`/`count` (the engine sums them) are not offered.
-## Next: texts
+## Paused: texts
 
-How members show BW's texts. Order:
+Paused 2026-10-15 (decided with the user): the texts are useful as they are, and a report shows a characteristic as
+BW does, its key and its text side by side; whether users want the text as the caption instead is not clear. The
+steps wait, as planned:
 
-1. Next (asked 2026-10-15, not started): `captionColumn` in the engine. A level's key column joins and groups, its
+1. Not started (asked 2026-10-15): `captionColumn` in the engine. A level's key column joins and groups, its
    `nameColumn` names the member (unique name, MDX lookup), its `captionColumn` is only shown (`MEMBER_CAPTION`); so a
    text caption joins nothing, and texts that are not unique do not clash. Today `ZZXXMLA1_CL_SCHEMA` refuses
    `captionColumn` (and `caption` expressions) and a member's caption is its name. To do:
@@ -709,6 +788,8 @@ evaluation (`MemberArrayValueCalc`; before, `([Measures].[Foo], [Time].CurrentMe
   crossjoin, `fast_cells`, `set_display_info`, `axis_properties`), the 70 MB of axes copied as strings in `build`
   about 1.2 s (they could go to the parts as the cells do), sending 0.5 s. Excel shows at most 16,384 columns, so the
   layout is unusual, but a crossjoin of two characteristics on rows is not.
+- Long term: other databases reached from ABAP, DuckDB first. The engine's SQL stays standard for it (no HANA-only
+  features such as BW's cached column hierarchy views; decided 2026-10-15 with the BW hierarchies).
 - The result limit is a class attribute; a setting (per system, like Mondrian's property file) would let it be changed
   without a transport.
 - Done: the native NON EMPTY crossjoin. Not yet: its context constraint with calculated members (Aggregate members
