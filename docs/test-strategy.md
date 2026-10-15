@@ -188,6 +188,11 @@ their plain hierarchies, each checked against BW's rows and correction factors):
 refill none, and per hierarchy the node rows but the virtual root and the not-assigned values must be the members BW's
 MDX shows before and below REST_H.
 
+Hierarchies in which every node occurs once (`ZCLDIAG_ICD`) are also served by the reference, as a parent-child
+hierarchy with a closure table over an export of the clinic InfoCube and the hierarchy's copy (catalog `ZCLVISIT`,
+`reference/schema/ClinicBW.xml`), and their MDX cases are captured and replayed like FoodMart's (planned,
+`next-steps.md`, Reference scenario). BW's MDX stays the oracle for shared nodes, intervals and postable nodes.
+
 ## Mondrian's own tests against our schema
 
 The eMondrian container serves only our reference catalog `ZFOODMART` (`scripts/deploy-reference-schema.sh`, installs

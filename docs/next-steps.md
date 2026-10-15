@@ -298,7 +298,8 @@ Open:
    served (`[ZCLDIAG.ZCLDIAG_ICD]` not found).
 2. The schema: `parentColumn` with `<Closure>` as the reference models it, with our extensions (the closure's child
    is the SID, members are occurrences); `ZZXXMLA1_CL_SCHEMA` refuses both today. The reference can be the oracle
-   for single-parent hierarchies only; for shared nodes, BW's own MDX (`ZZXXMLA1_BW_AUTH_PROBE`).
+   for single-parent hierarchies only (the reference scenario below); for shared nodes, BW's own MDX
+   (`ZZXXMLA1_BW_AUTH_PROBE`).
 3. Names and captions of nodes: a text node's name is its technical name, a leaf's the characteristic's key; the
    engine shows a member's name as its caption (`captionColumn` is paused with the texts).
 4. The engine: members of a parent-child level and the closure in the fact reads; the planner marks such members
@@ -311,6 +312,59 @@ Open:
    whether lists need more than literals.
 7. The other rows of `RSRHIEDIR_OLAP` (`SVER` `?`, `TMPJOIN`, `HDATE`, negative `HIESID`s): what they are, before
    time-dependent hierarchy structures.
+
+### Reference scenario: the clinic's hierarchies in the reference server
+
+Proposed 2026-10-15 (the user: a reference scenario for hierarchies without duplicates, link nodes and intervals, run
+in the reference server, to validate against). `bw_hierarchy_test.py` compares members and their values with BW's
+MDX, but BW's MDX knows little of the MDX the engine has to answer on a hierarchy (`Descendants` with flags,
+`Ancestor`, `DrilldownMember`, `VisualTotals`, subselects and slicers of nodes, `NON EMPTY`, crossjoins, drill-through,
+the schema rowsets). A hierarchy in which every node occurs once is a parent-child hierarchy with a closure table as
+the reference models it (FoodMart's `Employees`), so the reference answers all of it, as it does for FoodMart. It is
+built before the engine (open 4), so the engine is developed against it, and BW's MDX stays the oracle for what
+the reference cannot model: shared nodes (`ZCLPAT_PRG`), intervals (`ZCLSERV_CAT`), postable nodes (the reference
+shows a member's own facts in its value, BW as a first child of its own) and later time and versions.
+
+- **Hierarchy:** `ZCLDIAG_ICD` (69 nodes, shows not assigned). The copy maps one to one: node SIDs are negative, value
+  SIDs positive, so `SID` of the node table is a key; `PARENT_SID` is the parent; the closure's `(ANCESTOR_SID, SID)`
+  is the reference's `<Closure parentColumn childColumn>`, its `SID` the fact's `SID_ZCLDIAG`. The reference's
+  members are paths as ours (`[Employees].[Sheri Nowmer].[Derrick Whelply]`), and every member one level below its
+  parent, the not-assigned values below REST_H too (as decided above). Its All member counts every fact, so a
+  hierarchy that suppresses not assigned would differ there (BW's answer for such a total is to be looked at first);
+  the clinic demo has none, the scenario takes only hierarchies that show it.
+- **Reference database:** `build-bw-reference-db.py` gets the InfoCube `ZCLVISIT` next to `ZFMSALES` (`CUBES`): its
+  fact table, the SID and attribute tables of its characteristics, the views its accepted schema names, and the copy
+  of `ZCLDIAG` (node table and the not-assigned view `ZZXXMLA1R...`) with the `HIESID` and `SVER` current at the
+  export. Per hierarchy two reference views over them, under placeholder names as the characteristic views have
+  (`ZZXXMLA1_HN_ZCLDIAG_ICD`, `ZZXXMLA1_HC_ZCLDIAG_ICD`; not `ZZXXMLA1_C_`, the characteristic views' prefix): the
+  nodes without the virtual root, a root's parent `NULL`, REST_H and the not-assigned values added, a node's name
+  (`NODE_NAME` of a text node, the key from the characteristic's view for a value); and the closure rows of the
+  hierarchy. Captured data, not live: a regeneration of the demo or of its hierarchies needs a new export.
+- **Schema:** one file `reference/schema/ClinicBW.xml` serving both, as `FoodmartBW.xml` does: a `Hierarchy` of the
+  dimension `ZCLDIAG` with a level `column="SID" parentColumn="PARENT_SID" nameColumn="NAME"` on the node view and
+  its `<Closure>` on the closure view, annotated with the BW hierarchy (`olap4abap.bwHierarchy` = `ZCLDIAG_ICD`, which
+  the reference ignores). The annotation is how olap4abap finds the copy and its version (`current`), so on SAP the
+  placeholder views are not read; whether the schema names them at all on SAP is open 2.
+- **Cases:** catalog `ZCLVISIT` in the reference's `datasources.xml`, cases captured with `capture-execute.py`
+  under `reference/` and replayed by `xmla_test.py`: `MDSCHEMA_HIERARCHIES`, `_LEVELS`, `_MEMBERS` (tree operators)
+  of the hierarchy; `Members`, `Children`, `Parent`, `Ancestor`, `Descendants` (levels, distances, flags),
+  `DrilldownLevel`, `DrilldownMember`, `Hierarchize`, `IsLeaf`, `Level.Ordinal`, `VisualTotals`, `Aggregate` of nodes;
+  `NON EMPTY` and crossjoins with the physician and the visit type; a node in the slicer, in a subselect (Excel's
+  filter on a hierarchy) and in a compound slicer; Excel's queries on the hierarchy (captured from Excel against the
+  reference); `DRILLTHROUGH` on a node. Before capture, the reference's values of every member are checked against
+  BW's MDX (`bw_hierarchy_test.py`'s BW side), so the export is known to be BW's hierarchy.
+- **Later:** a second single-parent hierarchy only if a case needs one the clinic's lacks (a hierarchy of unequal
+  depth, a root with values of its own), made in the clinic generator, not in the reference database.
+
+Open questions (for the user):
+
+1. The InfoCube `ZCLVISIT` or the aDSO `ZCLVISITA` (which `bw_hierarchy_test.py` asks)? The InfoCube is the simpler
+   export (no reporting view); the hierarchy is the characteristic's, the same on both.
+2. A hierarchy that suppresses not assigned: the reference's All member counts every fact. What BW's total is there
+   is to be looked at before such a hierarchy joins the scenario; the clinic demo has none.
+3. The reference holds an export, not live data: every regeneration of the demo or of its hierarchies needs a new
+   export and possibly new captures. Acceptable, or should the export be part of the demo's setup?
+4. Does SAP's schema name the placeholder views too, or only the annotation (open 2, the schema form)?
 
 ## Paused: query planning
 
