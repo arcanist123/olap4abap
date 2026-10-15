@@ -4,14 +4,13 @@ extension; docs/mvp-scope.md, Members with facts) on the clinic demo against SAP
 so there is no captured answer: the oracle is the engine's own NON EMPTY, which reads the members with facts from the
 fact table, while a level's members come from the dimension table with the restriction.
 
-The clinic demo (docs/clinic-demo.md) has 300 patients registered without a visit, some in the region Coastal (city
-Kingsport) where nobody has visited; its schemas annotate every dimension but time. Checks, on the cube ZCLVISIT and the
-aDSO ZCLVISITA:
-- every level of the annotated dimensions (user and attribute hierarchies), children and descendants: the members are
-  those of NON EMPTY over all facts, in the same order;
-- members without facts cannot be named (Coastal, Kingsport, the registered patient 2001), their neighbours can;
-- counts, ranges along a level, native TopCount and MDSCHEMA_LEVELS' LEVEL_CARDINALITY agree with them;
-- the time dimensions are not restricted (to be decided): the aDSO's years without facts are members.
+The clinic demo (docs/clinic-demo.md) has 300 patients registered without a visit; its schemas are the schema
+generator's proposals, which annotate every dimension (none is marked time). Checks, on the cube ZCLVISIT and the aDSO
+ZCLVISITA:
+- every dimension's level (a flat hierarchy per characteristic, named by its technical name) and the All member's
+  children: the members are those of NON EMPTY over all facts, in the same order;
+- a patient without facts cannot be named (the registered patient 002001), the one before can;
+- counts, ranges along a level, native TopCount and MDSCHEMA_LEVELS' LEVEL_CARDINALITY agree with them.
 
     python scripts/clinic_test.py
     python scripts/clinic_test.py --url http://localhost:50000/zzxxmla1?sap-client=001
@@ -35,29 +34,23 @@ DISCOVER = """<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap
 <Properties><PropertyList><DataSourceInfo>ABAP BW</DataSourceInfo><Catalog>{catalog}</Catalog><Content>Data</Content>
 </PropertyList></Properties></Discover></SOAP-ENV:Body></SOAP-ENV:Envelope>"""
 
-# the sets whose members must be those with facts, on both providers
-SETS = [
-    "[Patient].[Region].Members", "[Patient].[City].Members", "[Patient].[Patient].Members",
-    "[Patient.Demographics].[Age Group].Members", "[Patient.Demographics].[Sex].Members",
-    "[Patient.Region].[Region].Members", "[Patient.City].[City].Members", "[Patient.Patient Name].[Patient Name].Members",
-    "[Patient].[North].Children", "[Patient].[North].[Ashford].Children",
-    "Descendants([Patient].[South], [Patient].[Patient])", "[Patient].[All Patients].Children",
-    "[Physician].[Department].Members", "[Physician].[Physician].Members",
-    "[Diagnosis].[Chapter].Members", "[Diagnosis].[Group].Members", "[Diagnosis].[Diagnosis].Members",
-    "[Visit Type].[Care Setting].Members", "[Visit Type].[Visit Type].Members",
-    "[Site].[Site].Members", "[Room].[Room].Members",
-]
-# the members that have no facts: not members at all
-UNKNOWN = ["[Patient].[Coastal]", "[Patient].[Coastal].[Kingsport]", "[Patient.Region].[Coastal]",
-           "[Patient.City].[Kingsport]", "[Patient.Patient Id].[002001]"]
+# the characteristics with a dimension on both providers; the cube also has the date, the aDSO BW's calendar
+DIMENSIONS = ["ZCLPAT", "ZCLDOC", "ZCLDIAG", "ZCLVTYPE", "ZCLSITE", "ZCLROOM", "ZCLFISCVR", "ZCLFISCYR", "ZCLFISCPR"]
+OWN = {"ZCLVISIT": ["ZCLDATE"], "ZCLVISITA": ["0CALWEEK", "0CALMONTH", "0CALQUARTER", "0CALYEAR"]}
+MEASURE = "[Measures].[ZCLVISNO]"
+# the members that have no facts: not members at all (the first patient registered without a visit)
+UNKNOWN = ["[ZCLPAT].[002001]"]
 # the members with facts next to them: found
-KNOWN = ["[Patient].[North]", "[Patient.City].[Ashford]", "[Patient.Patient Id].[002000]"]
+KNOWN = ["[ZCLPAT].[002000]"]
 # the levels whose LEVEL_CARDINALITY is checked
-CARDINALITIES = {"[Patient].[Region]": "[Patient].[Region].Members", "[Patient].[City]": "[Patient].[City].Members",
-                 "[Patient].[Patient]": "[Patient].[Patient].Members",
-                 "[Patient.City].[City]": "[Patient.City].[City].Members"}
-# the cube's time hierarchy has no All member (default 2025): all facts are both years
-ALL_FACTS = {"ZCLVISIT": " WHERE {[Time].[2024], [Time].[2025]}", "ZCLVISITA": ""}
+CARDINALITIES = {"[ZCLPAT].[ZCLPAT]": "[ZCLPAT].[ZCLPAT].Members", "[ZCLDOC].[ZCLDOC]": "[ZCLDOC].[ZCLDOC].Members",
+                 "[ZCLDIAG].[ZCLDIAG]": "[ZCLDIAG].[ZCLDIAG].Members"}
+
+
+def sets(catalog):
+    """The sets whose members must be those with facts."""
+    return ([f"[{d}].[{d}].Members" for d in DIMENSIONS + OWN[catalog]]
+            + ["[ZCLPAT].[All Patient].Children", "[ZCLDOC].[All Physician].Children"])
 
 
 def post(url, body, action):
@@ -104,15 +97,13 @@ def main():
             failures.append(name)
 
     for catalog in ("ZCLVISIT", "ZCLVISITA"):
-        where = ALL_FACTS[catalog]
-
         def run(statement):
             return Execute(args.url, catalog, statement)
 
         counts = {}
-        for set_expression in SETS:
-            members = run(f"SELECT [Measures].[Visits] ON 0, {set_expression} ON 1 FROM {catalog}")
-            with_facts = run(f"SELECT [Measures].[Visits] ON 0, NON EMPTY {set_expression} ON 1 FROM {catalog}{where}")
+        for set_expression in sets(catalog):
+            members = run(f"SELECT {MEASURE} ON 0, {set_expression} ON 1 FROM {catalog}")
+            with_facts = run(f"SELECT {MEASURE} ON 0, NON EMPTY {set_expression} ON 1 FROM {catalog}")
             if members.fault or with_facts.fault:
                 check(f"{catalog} {set_expression}", False, members.fault or with_facts.fault)
                 continue
@@ -130,7 +121,7 @@ def main():
             answer = run(f"SELECT {member} ON 0 FROM {catalog}")
             check(f"{catalog} {member} is a member", answer.axis("Axis0") == [member], answer.fault)
 
-        patients = "[Patient].[Patient].Members"
+        patients = "[ZCLPAT].[ZCLPAT].Members"
         answer = run(
             f"WITH MEMBER [Measures].[Members] AS Count({patients})\n"
             f" MEMBER [Measures].[Range] AS Count({{{patients}.Item(0) : "
@@ -147,8 +138,7 @@ def main():
 
         # native TopCount: the members' crossjoin is read with the restriction too, members without facts would be
         # empty values at the end
-        answer = run(f"SELECT [Measures].[Visits] ON 0, TopCount({patients}, 100000, [Measures].[Visits]) ON 1 "
-                     f"FROM {catalog}{where}")
+        answer = run(f"SELECT {MEASURE} ON 0, TopCount({patients}, 100000, {MEASURE}) ON 1 FROM {catalog}")
         check(f"{catalog} native TopCount over the patients", answer.fault is None
               and len(answer.axis("Axis1")) == counts.get(patients) and "" not in answer.values(),
               answer.fault or len(answer.axis("Axis1")))
@@ -159,14 +149,6 @@ def main():
         for level, set_expression in CARDINALITIES.items():
             check(f"{catalog} LEVEL_CARDINALITY of {level}", cardinality.get(level) == counts.get(set_expression),
                   f"{cardinality.get(level)} != {counts.get(set_expression)}")
-
-    # time is not restricted: the aDSO's years come from the SID table of 0CALYEAR, most without facts
-    years = Execute(args.url, "ZCLVISITA", "SELECT [Measures].[Visits] ON 0, [Year].[Year].Members ON 1 FROM ZCLVISITA")
-    with_facts = Execute(args.url, "ZCLVISITA",
-                         "SELECT [Measures].[Visits] ON 0, NON EMPTY [Year].[Year].Members ON 1 FROM ZCLVISITA")
-    check("ZCLVISITA time not restricted: years without facts are members",
-          years.fault is None and len(years.axis("Axis1")) > len(with_facts.axis("Axis1")) > 0,
-          years.fault or (len(years.axis("Axis1")), len(with_facts.axis("Axis1"))))
 
     print(f"\n{len(failures)} failure(s)")
     return 1 if failures else 0

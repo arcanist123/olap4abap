@@ -7,8 +7,8 @@ the reference server's expected answers exist only for FoodMart.
 
 Run program `ZZXXMLA1_SETUP` with the checkbox "Also generate the clinic demo", or
 `sapcli class execute ZZXXMLA1_CL_BW_CLINIC_GEN`. A run takes about two minutes and **deletes and creates** InfoArea
-`ZCLINIC`'s objects (the aDSO, the cube, the views of its characteristics and the InfoObjects `ZCL*`); the views of the
-time characteristics `0CAL*` are shared with other providers and only generated again.
+`ZCLINIC`'s objects (the demo's catalogs, the aDSO, the cube, the views of its characteristics and the InfoObjects
+`ZCL*`); the views of the time characteristics `0CAL*` are shared with other providers and only generated again.
 
 "Clinic demo: max. visits" (`run( max_visits = ... )` of the class) caps the number of visits for a smaller demo, e.g.
 on a test system: the visits are thinned evenly over the days, so every day keeps its share; 0 (the default) keeps all
@@ -25,7 +25,7 @@ on a test system: the visits are thinned evenly over the days, so every day keep
   text, day and month names, year, quarter, month, week counted from 1 January, day of month). The date is a plain
   characteristic, as FoodMart's `ZFMDATE`, so it can carry attributes.
 - The site `ZCLSITE` (`NORTH`, `SOUTH`; city) and the room `ZCLROOM` (room type), **compounded** with the site: R01 to
-  R04 are at both sites, R05 only in the north, so a room is a member only with its site, `[Room].[NORTH/R01]`
+  R04 are at both sites, R05 only in the north, so a room is a member only with its site, `[ZCLROOM].[NORTH/R01]`
   (`docs/bw-schema-design-guide.md`, section 3.7). The south rooms are loaded first, so their SIDs come before the
   north ones and the members' order (by name, `OrderByColumn`) differs from the SIDs'. The aDSO is read through its
   fact view (the SID of the room, `ZZXXMLA1_CL_BW_VIEW_GEN=>generate_fact_view`), which a run deletes before the aDSO.
@@ -45,14 +45,22 @@ on a test system: the visits are thinned evenly over the days, so every day keep
   tables and checks no authorizations.
 - Key figures: `ZCLVISNO` (1 per visit: the aDSO adds up visits with the same keys, so counting rows would not count
   visits), `ZCLDUR` duration, `ZCLWAIT` waiting time (minutes), `ZCLLABS` lab tests, `ZCLCHRG` charges.
-- The views of the characteristics (`ZZXXMLA1_CL_BW_VIEW_GEN`), the schema files `/WEB-INF/schema/ZCLVISIT.xml` and
-  `/WEB-INF/schema/ZCLVISITA.xml` and a catalog for each in `/WEB-INF/datasources.xml` (added once; the setup writes the
-  data sources file if there is none).
+- Texts: every characteristic has language-dependent short, medium and long texts (a text table `/BIC/T...`), and the
+  run loads EN texts for all its values: the patient's and the physician's name, the diagnosis in plain words, the
+  visit type (`Outpatient Visit`), the date (`Monday, 1 January 2024`, short `2024-01-01`), site and room
+  (`Consultation Room 1`), the fiscal year variant (`Calendar Year, 4 Special Periods`), year and period
+  (`Period 001/2024, January 2024`), and every value of an attribute (`0-17`: `Children (0-17)`, `O+`: `O Positive`,
+  ...). The views carry them (`TXTMD`, `<attribute>_TXT`).
+- The schema the schema generator proposes for each provider, accepted through the schema API with its views
+  (`ZZXXMLA1_CL_BW_VIEW_GEN`): the schema files `/WEB-INF/schema/ZCLVISIT.xml` and `/WEB-INF/schema/ZCLVISITA.xml` and
+  a catalog for each in `/WEB-INF/datasources.xml` (the setup writes the data sources file if there is none); see The
+  schemas below.
 - The same with the fiscal year variant fixed to K4 (`docs/bw-schema-design-guide.md`, section 3.8): the catalogs
   `ZCLVISIT_K4` and `ZCLVISITA_K4` (cubes named as the catalogs, `/WEB-INF/schema/ZCLVISIT_K4.xml`, ...), on the views
-  filtered on K4 that the run generates with the others: a fact view per provider (on the InfoCube too, its fact table
-  joined to the variant's SID table) and the views of the variant (one row, K4), the fiscal year and period. A run deletes all of them with the
-  views of the characteristics and the providers' fact views.
+  filtered on K4 that accepting them generates: a fact view per provider (on the InfoCube too, its fact table joined to
+  the variant's SID table) and the views of the variant (one row, K4), the fiscal year and period. A run deletes all of
+  them with the views of the characteristics and the providers' fact views, also views whose row of `ZZXXMLA1_VIEW` is
+  lost (found by their description): BW refuses to delete a characteristic a view still uses.
 
 ## The hierarchies of the physicians
 
@@ -141,43 +149,35 @@ random number and the visits stay as they were; a visit without physician has ne
 
 ## The schemas
 
-The generator writes the schemas itself, by the rules of the proposal (`docs/schema-generator.md`): on the cube a
-dimension is keyed by the SID of its view and named by the value, on the aDSO keyed by the value (the fact column).
+The schemas are the schema generator's (`docs/schema-generator.md`): per provider the run proposes the schema as
+`GET proposal` does (the fiscal defaults, which concern only BW's `0FISC*`, then `ZZXXMLA1_CL_SCHEMA_PROPOSAL`) and
+accepts it through the schema API (`POST accept`, catalog = provider: the views generated, the schema file written,
+the catalog added); then it fixes the same proposal to K4 as `POST fix` does (`ZZXXMLA1_CL_SCHEMA_FIX`), names the
+schema and the cube as the catalog (`ZCLVISIT_K4`, caption "Clinic Visits (K4)") and accepts that. Before it deletes
+anything, the run removes the four catalogs through the API (`POST remove`, with their files and filtered views).
 
-| Dimension | User hierarchies | Notes |
-|---|---|---|
-| Patient | Region > City > Patient (named by the patient's name; properties Sex, Birth Year, Blood Group, Insurance); `Demographics`: Age Group > Sex | City `uniqueMembers="false"` |
-| Physician | Department > Physician (property Years in Practice) | |
-| Diagnosis | Chapter > Group > Diagnosis | the group Influenza has one diagnosis |
-| Visit Type | Care Setting > Visit Type | |
-| Site | none (property City) | |
-| Room | none (properties Room Key, Room Type) | keyed by the SID on both providers (the aDSO's fact view), named and ordered by `COMPOUND_KEY` (`NORTH/R01`) |
-| Time (cube) | Year > Quarter > Month (named by the month) > Day, without All member, default `[Time].[2025]`; `Weekly`: Year > Week > Day | `TimeDimension` |
-| Year, Quarter, Month, Week (aDSO) | none | one dimension per time characteristic, which have no attributes |
-| Fiscal Year Variant | none | `K1`, `K2`, `K4`; in the K4 catalogs the one member `K4` |
-| Fiscal Year, Fiscal Period | none | compounded with the variant: keyed by the SID, named and ordered by `COMPOUND_KEY` (`K4/2024`, `K4/2024001`); in the K4 catalogs not compounded, still keyed by the SID (on the aDSO too) and named by their own key (`2024`, `2024001`) |
+So the schemas follow `docs/bw-schema-design-guide.md`: a dimension per characteristic named by its technical name and
+captioned by its text (`[ZCLPAT]`, "Patient"), one flat hierarchy with an All member (`All Patient`) and one level
+(`[ZCLPAT].[ZCLPAT]`), members named by the key as BW holds it (`[ZCLPAT].[002000]`; on the cube keyed by the SID, on
+the aDSO by the value), the text and the display attributes (each with its text) as member properties; measures by
+their technical names (`[Measures].[ZCLVISNO]`, the default measure). The room, the fiscal year and the fiscal period
+are compounded: keyed by the SID on both providers, named by `COMPOUND_KEY` (`NORTH/R01`, `K4/2024001`); in the K4
+catalogs the year and period are named by their own key (`2024001`). The cube has the date `ZCLDATE`, the aDSO BW's
+`0CALWEEK`, `0CALMONTH`, `0CALQUARTER` and `0CALYEAR` (`0CALDAY` has no SID table). The proposal makes no user
+hierarchies (Region > City > Patient and the like are for the UI to add) and marks no dimension as time.
 
-Every dimension but time is annotated `olap4abap.membersWithFacts` on the cube's `DimensionUsage`
-(`mvp-scope.md`, Members with facts decision): its members are only those with visits, so the registered patients,
-Kingsport and Coastal are no members (`scripts/clinic_test.py` checks it on both providers). The time dimensions are
-not annotated (to be decided).
-
-Every attribute is also an attribute hierarchy (`[Patient.Age Group]`). Measures: Visits, Duration Min, Waiting Min, Lab
-Tests (format `#,##0`), Charges (`#,##0.00`). A hierarchy other than Time has an All member: BW's blank member sorts
-first, so without an All member it would be the default member and every query would read the blank visits only.
+Every dimension is annotated `olap4abap.membersWithFacts` on the cube's `DimensionUsage` (`mvp-scope.md`, Members with
+facts decision): its members are only those with visits, so the 300 registered patients are no members
+(`scripts/clinic_test.py` checks it on both providers). The cubes are annotated `olap4abap.omitEmptyCells`.
 
 Examples:
 
-    SELECT [Measures].Members ON 0, [Physician].[Department].Members ON 1 FROM ZCLVISIT
+    SELECT [Measures].Members ON 0, [ZCLDOC].[ZCLDOC].Members ON 1 FROM ZCLVISIT
 
-    WITH MEMBER [Measures].[Prev Year] AS ([Measures].[Visits], ParallelPeriod([Time].[Year], 1))
-         MEMBER [Measures].[Avg Wait] AS [Measures].[Waiting Min] / [Measures].[Visits], FORMAT_STRING = '0.0'
-    SELECT {[Measures].[Visits], [Measures].[Prev Year], [Measures].[Avg Wait]} ON 0,
-           [Time].[2025].[Q1].Children ON 1
+    SELECT [Measures].[ZCLVISNO] ON 0, NON EMPTY [0CALMONTH].[0CALMONTH].Members ON 1 FROM ZCLVISITA
+
+    SELECT [Measures].[ZCLVISNO] ON 0, [ZCLPAT].[ZCLPAT].Members DIMENSION PROPERTIES [ZCLPAT].[ZCLPAT].[Text] ON 1
     FROM ZCLVISIT
 
-    SELECT [Patient.Demographics].[Age Group].Members ON 0, [Physician].[Department].Members ON 1
-    FROM ZCLVISIT WHERE [Measures].[Visits]
-
-    SELECT [Measures].[Visits] ON 0, NON EMPTY [Fiscal Period].[Fiscal Period].Members ON 1
+    SELECT [Measures].[ZCLVISNO] ON 0, NON EMPTY [ZCLFISCPR].[ZCLFISCPR].Members ON 1
     FROM ZCLVISITA_K4

@@ -12,10 +12,6 @@
       "url": "https://github.com/abaplint/deps",
       "folder": "/deps",
       "files": "/src/**/*.*"
-    },
-    {
-      "folder": "/abaplint/stubs",
-      "files": "/**/*.*"
     }
   ],
   "syntax": {

@@ -44,6 +44,19 @@ CLASS zzxxmla1_cl_bw_wide_gen DEFINITION
 
   PROTECTED SECTION.
   PRIVATE SECTION.
+    " BW's codes (type pools RS, RSD, RSDMD), as constants of this class
+    CONSTANTS: BEGIN OF c_objvers,
+                 active   TYPE c LENGTH 1 VALUE 'A',
+                 modified TYPE c LENGTH 1 VALUE 'M',
+               END OF c_objvers.
+    CONSTANTS: BEGIN OF c_iobjtp,
+                 charact   TYPE c LENGTH 3 VALUE 'CHA',
+                 keyfigure TYPE c LENGTH 3 VALUE 'KYF',
+               END OF c_iobjtp.
+    CONSTANTS c_cubetype_basic TYPE c LENGTH 1 VALUE 'B'.
+    CONSTANTS: BEGIN OF c_tabclass,
+                 md TYPE c LENGTH 1 VALUE 'M',
+               END OF c_tabclass.
     CONSTANTS c_seed            TYPE int8 VALUE 20261006.
     CONSTANTS c_characteristics TYPE i VALUE 100.
     CONSTANTS c_members         TYPE i VALUE 1000.
@@ -212,7 +225,7 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
     IF sy-subrc <> 0.
       RETURN.
     ENDIF.
-    SELECT SINGLE infocube FROM rsdcube WHERE infocube = @c_cube AND objvers = @rs_c_objvers-active
+    SELECT SINGLE infocube FROM rsdcube WHERE infocube = @c_cube AND objvers = @c_objvers-active
       INTO @DATA(active) ##NEEDED.
     IF sy-subrc <> 0.
       " a cube that was saved but never activated (a cancelled run): IWP_ICUBE_DELETE asks whether to delete its
@@ -220,10 +233,10 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
       CALL FUNCTION 'RSDG_CUBE_DELETE'
         EXPORTING
           i_infocube       = c_cube
-          i_write_protocol = rs_c_false
-          i_progress       = rs_c_false
-          i_with_impact    = rs_c_false
-          i_with_cto       = rs_c_false
+          i_write_protocol = abap_false
+          i_progress       = abap_false
+          i_with_impact    = abap_false
+          i_with_cto       = abap_false
         IMPORTING
           e_t_msg          = messages
           e_subrc          = subrc.
@@ -250,13 +263,13 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD delete_adso.
-    IF cl_rso_adso_api=>exist( c_adso ) <> rs_c_true.
+    IF cl_rso_adso_api=>exist( c_adso ) <> abap_true.
       RETURN.
     ENDIF.
     TRY.
         cl_rso_adso_api=>delete( i_adsonm         = c_adso
-                                 i_with_cto       = rs_c_false
-                                 i_force_deletion = rs_c_true ).
+                                 i_with_cto       = abap_false
+                                 i_force_deletion = abap_true ).
         COMMIT WORK AND WAIT.
         write( |delete aDSO { c_adso }: done| ).
       CATCH cx_rs_all_msg INTO DATA(error).
@@ -296,8 +309,8 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
     CALL FUNCTION 'RSDG_IOBJ_MULTI_DELETE'
       EXPORTING
         i_t_iobjnm        = iobjnms
-        i_check_dependent = rs_c_false
-        i_manual          = rs_c_false
+        i_check_dependent = abap_false
+        i_manual          = abap_false
       IMPORTING
         e_t_msg           = messages
         e_subrc           = subrc.
@@ -339,8 +352,8 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
     " with master data, so it has an attribute table with its members, but without attributes
     DATA(details) = VALUE bapi6108(
       infoobject = iobjnm
-      version    = rs_c_objvers-modified
-      type       = rsd_c_objtp-charact
+      version    = c_objvers-modified
+      type       = c_iobjtp-charact
       textshort  = text
       textlong   = text
       infoarea   = c_infoarea
@@ -349,7 +362,7 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
       intlen     = length
       leng       = length
       outputlen  = length
-      attribfl   = rs_c_true ).
+      attribfl   = abap_true ).
     CALL FUNCTION 'BAPI_IOBJ_CREATE'
       EXPORTING
         details     = details
@@ -372,8 +385,8 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
     DATA iobj TYPE bapi6108-infoobject.
     DATA(details) = VALUE bapi6108(
       infoobject = c_key_figure
-      version    = rs_c_objvers-modified
-      type       = rsd_c_objtp-keyfigure
+      version    = c_objvers-modified
+      type       = c_iobjtp-keyfigure
       textshort  = 'Amount'
       textlong   = 'Amount'
       infoarea   = c_infoarea
@@ -430,19 +443,19 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
     DATA dimension TYPE rsdimension.
     DATA(package_dimension) = CONV rsdimension( |{ c_cube }P| ).
     APPEND VALUE #( infocube  = c_cube
-                    objvers   = rs_c_objvers-modified
+                    objvers   = c_objvers-modified
                     dimension = package_dimension
                     textlong  = 'Data Package'
                     iobjtp    = 'DPA' ) TO dimension_table.
     LOOP AT VALUE ty_t_iobjnm( ( '0CHNGID' ) ( '0RECORDTP' ) ( '0REQUID' ) ) INTO DATA(iobjnm).
       position = position + 1.
       APPEND VALUE #( infocube   = c_cube
-                      objvers    = rs_c_objvers-modified
+                      objvers    = c_objvers-modified
                       dimension  = package_dimension
                       posit      = sy-tabix
                       infoobject = iobjnm ) TO dimension_infoobjects.
       APPEND VALUE #( infocube   = c_cube
-                      objvers    = rs_c_objvers-modified
+                      objvers    = c_objvers-modified
                       posit      = position
                       infoobject = iobjnm
                       iobjtp     = 'DPA' ) TO infoobjects.
@@ -453,34 +466,34 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
       dimension = |{ c_cube }{ substring( val = suffixes off = index DIV c_per_dimension len = 1 ) }|.
       IF in_dimension = 1.
         APPEND VALUE #( infocube  = c_cube
-                        objvers   = rs_c_objvers-modified
+                        objvers   = c_objvers-modified
                         dimension = dimension
                         textlong  = |Dimensions { iobjnm+6(2) }-{ iobjnm+6(1) }9|
                         iobjtp    = 'CHA' ) TO dimension_table.
       ENDIF.
       position = position + 1.
       APPEND VALUE #( infocube   = c_cube
-                      objvers    = rs_c_objvers-modified
+                      objvers    = c_objvers-modified
                       dimension  = dimension
                       posit      = in_dimension
                       infoobject = iobjnm ) TO dimension_infoobjects.
       APPEND VALUE #( infocube   = c_cube
-                      objvers    = rs_c_objvers-modified
+                      objvers    = c_objvers-modified
                       posit      = position
                       infoobject = iobjnm
                       iobjtp     = 'CHA' ) TO infoobjects.
     ENDLOOP.
     position = position + 1.
     APPEND VALUE #( infocube   = c_cube
-                    objvers    = rs_c_objvers-modified
+                    objvers    = c_objvers-modified
                     posit      = position
                     infoobject = c_key_figure
-                    iobjtp     = rsd_c_objtp-keyfigure ) TO infoobjects.
+                    iobjtp     = c_iobjtp-keyfigure ) TO infoobjects.
     DATA(details) = VALUE bapi6112( infocube = c_cube
-                                    objvers  = rs_c_objvers-modified
+                                    objvers  = c_objvers-modified
                                     textlong = 'Wide demo (100 characteristics)'
                                     infoarea = c_infoarea
-                                    cubetype = rsd_c_cubetype-basic_ic ).
+                                    cubetype = c_cubetype_basic ).
     CALL FUNCTION 'BAPI_CUBE_CREATE'
       EXPORTING
         details              = details
@@ -538,12 +551,12 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
       ASSIGN COMPONENT |/BIC/{ iobjnm }| OF STRUCTURE <row> TO <value>.
       <value> = sy-index.
       ASSIGN COMPONENT 'OBJVERS' OF STRUCTURE <row> TO <value>.
-      <value> = rs_c_objvers-active.
+      <value> = c_objvers-active.
     ENDDO.
     CALL FUNCTION 'RSDMD_WRITE_ATTRIBUTES_TEXTS'
       EXPORTING
         i_iobjnm               = iobjnm
-        i_tabclass             = rsdmd_c_tabclass-md
+        i_tabclass             = c_tabclass-md
         i_t_attr               = attributes
       IMPORTING
         e_t_idocstate          = messages
@@ -589,7 +602,7 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
       CALL FUNCTION 'RSDRI_CUBE_WRITE_PACKAGE'
         EXPORTING
           i_infocube         = c_cube
-          i_curr_conversion  = rs_c_false
+          i_curr_conversion  = abap_false
         IMPORTING
           e_requid           = request
           e_records          = written
@@ -640,7 +653,7 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
                                            i_s_adsoflags = flags
                                            i_t_object    = objects
                                            i_t_dimension = VALUE #( )
-                                           i_with_cto    = rs_c_false
+                                           i_with_cto    = abap_false
                                  IMPORTING e_t_msg       = messages ).
         COMMIT WORK AND WAIT.
         write( |create aDSO { c_adso }: active| ).
@@ -697,7 +710,7 @@ CLASS zzxxmla1_cl_bw_wide_gen IMPLEMENTATION.
       CALL FUNCTION 'RSDSO_WRITE_API'
         EXPORTING
           i_adsonm            = c_adso
-          i_activate_data     = rs_c_true
+          i_activate_data     = abap_true
           it_data             = <table>
         IMPORTING
           e_lines_inserted    = inserted

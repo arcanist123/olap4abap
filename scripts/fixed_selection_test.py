@@ -4,7 +4,7 @@
 The clinic demo (docs/clinic-demo.md) books each visit under one of the fiscal year variants K1, K2 and K4 and
 deploys, per provider (the cube ZCLVISIT, the aDSO ZCLVISITA), a plain catalog and one that fixes the variant to K4:
 - the plain catalog is the oracle: the variant a dimension, the years and periods compounded with it (K1/2024001,
-  ..., K4/2025012), the visits under [Fiscal Year Variant].[K4];
+  ..., K4/2025012), the visits under [ZCLFISCVR].[K4];
 - the K4 catalog (ZCLVISIT_K4, ZCLVISITA_K4) has the variant as a dimension with the one member K4, its visits are
   those under K4, its years 2024 and 2025 and its periods 2024001 to 2025012 by their own key, and they add up to
   its visits.
@@ -37,8 +37,8 @@ EXECUTE = """<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/
 YEARS = ["2024", "2025"]
 PERIODS = [f"{year}{month:03d}" for year in (2024, 2025) for month in range(1, 13)]
 VARIANTS = ("K1", "K2", "K4")
-# the demo cube's Time has no All member and defaults to 2025 (docs/clinic-demo.md); the aDSO's calendar has one
-ALL_YEARS = {"ZCLVISIT": "{[Time].[2024], [Time].[2025]}", "ZCLVISITA": ""}
+# the demo's schemas are the schema generator's proposals: dimensions and measures by their technical names
+VISITS = "[Measures].[ZCLVISNO]"
 
 
 def api(base, client, method, resource, params=None, body=None):
@@ -90,21 +90,17 @@ def main():
         return execute(args.url, args.client, catalog, statement)
 
     for provider in ("ZCLVISIT", "ZCLVISITA"):
-        years = ALL_YEARS[provider]
-        where = f" WHERE {years}" if years else ""
         # the demo's plain catalog: the oracle
-        _, values, error = run(provider, f"SELECT [Measures].[Visits] ON 0 FROM {provider} WHERE "
-                                         + (f"{years} * {{[Fiscal Year Variant].[K4]}}" if years
-                                            else "[Fiscal Year Variant].[K4]"))
+        _, values, error = run(provider, f"SELECT {VISITS} ON 0 FROM {provider} WHERE [ZCLFISCVR].[K4]")
         check(f"{provider}: the visits under K4", error is None and values, error)
         expected = float(values[0]) if values else None
-        captions, _, error = run(provider, f"SELECT [Measures].[Visits] ON 0, "
-                                           f"NON EMPTY [Fiscal Period].[Fiscal Period].Members ON 1 FROM {provider}{where}")
+        captions, _, error = run(provider, f"SELECT {VISITS} ON 0, "
+                                           f"NON EMPTY [ZCLFISCPR].[ZCLFISCPR].Members ON 1 FROM {provider}")
         check(f"{provider}: the periods compounded, K1/2024001 to K4/2025012",
               error is None and captions == [f"{v}/{p}" for v in VARIANTS for p in PERIODS],
               error or (captions or [])[:6])
-        captions, _, error = run(provider, f"SELECT [Measures].[Visits] ON 0, "
-                                           f"NON EMPTY [Fiscal Year].[Fiscal Year].Members ON 1 FROM {provider}{where}")
+        captions, _, error = run(provider, f"SELECT {VISITS} ON 0, "
+                                           f"NON EMPTY [ZCLFISCYR].[ZCLFISCYR].Members ON 1 FROM {provider}")
         check(f"{provider}: the years compounded, K1/2024 to K4/2025",
               error is None and captions == [f"{v}/{y}" for v in VARIANTS for y in YEARS], error or captions)
         if expected is None:
@@ -112,20 +108,20 @@ def main():
 
         # the demo's K4 catalog
         catalog = f"{provider}_K4"
-        _, values, error = run(catalog, f"SELECT [Measures].[Visits] ON 0 FROM {catalog}{where}")
+        _, values, error = run(catalog, f"SELECT {VISITS} ON 0 FROM {catalog}")
         check(f"{catalog}: the cube's visits are the K4 ones ({expected:.0f})",
               error is None and values and abs(float(values[0]) - expected) < 0.5, error or values)
-        captions, values, error = run(catalog, f"SELECT [Measures].[Visits] ON 0, "
-                                               f"NON EMPTY [Fiscal Period].[Fiscal Period].Members ON 1 FROM {catalog}{where}")
+        captions, values, error = run(catalog, f"SELECT {VISITS} ON 0, "
+                                               f"NON EMPTY [ZCLFISCPR].[ZCLFISCPR].Members ON 1 FROM {catalog}")
         check(f"{catalog}: periods by their own key, 2024001 to 2025012", error is None and captions == PERIODS,
               error or captions)
         check(f"{catalog}: the periods add up to the cube's visits",
               error is None and values and abs(sum(float(v) for v in values) - expected) < 0.5, values)
-        captions, _, error = run(catalog, f"SELECT [Measures].[Visits] ON 0, "
-                                          f"NON EMPTY [Fiscal Year].[Fiscal Year].Members ON 1 FROM {catalog}{where}")
+        captions, _, error = run(catalog, f"SELECT {VISITS} ON 0, "
+                                          f"NON EMPTY [ZCLFISCYR].[ZCLFISCYR].Members ON 1 FROM {catalog}")
         check(f"{catalog}: years by their own key", error is None and captions == YEARS, error or captions)
-        captions, _, error = run(catalog, f"SELECT [Measures].[Visits] ON 0, "
-                                          f"[Fiscal Year Variant].[Variant].Members ON 1 FROM {catalog}{where}")
+        captions, _, error = run(catalog, f"SELECT {VISITS} ON 0, "
+                                          f"[ZCLFISCVR].[ZCLFISCVR].Members ON 1 FROM {catalog}")
         check(f"{catalog}: the variant has one member, K4", error is None and captions == ["K4"], error or captions)
 
         # the API, as the schema builder uses it: the plain proposal, fixed as an edit

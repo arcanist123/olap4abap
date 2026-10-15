@@ -322,8 +322,10 @@ failed statement is the SOAP fault `Server.00UE001` with the statement and the d
 The code must run on NetWeaver 7.50 (`docs/mvp-scope.md`), but the development system is ABAP Platform 2025 and
 activates newer syntax. `scripts/abaplint.sh` checks `src/` offline with abaplint's 7.50 grammar (`abaplint.json`,
 version pinned in the script; npx fetches it) and with a syntax check against stubs: SAP's standard objects from
-github.com/abaplint/deps and ours in `abaplint/stubs/` (table `ZZXXMLA1_FILE` and the BW type pools RS, RSD, RSDMD; add a
-stub when new code uses a DDIC object that `src/` does not contain). Run it after every change; it takes seconds.
+github.com/abaplint/deps. The project keeps no stubs of its own, so that it contains no copy of SAP source: code does
+not name the constants of SAP's type pools that deps lacks (BW's RS, RSD, RSDMD) but declares its own in the class
+(`c_objvers`, `c_iobjtp`, `c_tabclass`; `abap_true`/`abap_false` for `rs_c_true`/`rs_c_false`). Run it after every
+change; it takes seconds.
 abaplint does not know the parameters of built-in functions, so the script also searches for `pcre =`.
 7.50 replacements used so far: `RAISE EXCEPTION TYPE cx EXPORTING ...` for `RAISE EXCEPTION NEW` (7.52); for a
 factory method (`of_code`, `create`) the raising helpers `ZZXXMLA1_CX_XMLA=>raise_code` and

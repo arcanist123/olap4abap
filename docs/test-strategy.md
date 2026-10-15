@@ -108,7 +108,7 @@ without members with facts); accepted into the test catalog `ZZFISCTEST` its per
 `Lag`/`Lead` step over the special periods; then the catalog is removed. It needs the fiscal time master data filled
 (`time-master-data.md`).
 `python scripts/fixed_selection_test.py` does change it: for the clinic demo's `ZCLVISIT` and `ZCLVISITA` it first
-queries the demo's catalogs, the plain one as oracle (the visits under `[Fiscal Year Variant].[K4]`, the periods
+queries the demo's catalogs, the plain one as oracle (the visits under `[ZCLFISCVR].[K4]`, the periods
 `K1/2024001` ...) and the one with the fiscal year variant fixed to K4 (`ZCLVISIT_K4`; `bw-schema-design-guide.md`,
 section 3.8: the same visits, the periods and years by their own key, the variant with the one member K4). Then the
 schema builder's way: it fixes the plain proposal with `POST fix` (`fixed.ZCLFISCVR=K4`, annotated

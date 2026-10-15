@@ -509,8 +509,8 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
     DATA objects  TYPE cl_rso_adso_api=>tn_t_object.
     TRY.
         cl_rso_adso_api=>read( EXPORTING i_adsonm               = adso
-                                         i_with_enqueue         = rs_c_false
-                                         i_with_authority_check = rs_c_false
+                                         i_with_enqueue         = abap_false
+                                         i_with_authority_check = abap_false
                                IMPORTING e_text                 = text
                                          e_infoarea             = infoarea
                                          e_t_object             = objects ).

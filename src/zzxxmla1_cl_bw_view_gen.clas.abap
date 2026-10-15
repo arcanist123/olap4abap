@@ -480,14 +480,20 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
                 !description TYPE ddtext
                 source       TYPE string
       RAISING   cx_dd_ddl_exception.
-    "! Deletes the views of a kind and characteristic or provider (DDL source, database view and row), and a plain
-    "! one of a run before table ZZXXMLA1_VIEW; returns whether there was one.
+    "! Deletes the views of a kind and characteristic or provider (DDL source, database view and row), and the ones
+    "! without row whose description names it (a plain one of a run before table ZZXXMLA1_VIEW, or one whose row is
+    "! lost); returns whether there was one.
     METHODS delete_all
       IMPORTING kind          TYPE c
                 object_name   TYPE csequence
-                !description  TYPE ddtext
       RETURNING VALUE(result) TYPE abap_bool
       RAISING   cx_dd_ddl_exception.
+    "! The DDL sources whose description names a characteristic or provider (BW characteristic C: ..., BW aDSO P: ...,
+    "! BW provider P: ...), registered or not.
+    METHODS ddls_of_object
+      IMPORTING kind          TYPE c
+                object_name   TYPE csequence
+      RETURNING VALUE(result) TYPE string_table.
     "! The compounding of a basic characteristic in BW's order, with its fields (RSDIOBJCMP).
     METHODS compounding
       IMPORTING basic         TYPE rsiobjnm
@@ -648,9 +654,7 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD delete.
-    result = delete_all( kind        = c_kind-characteristic
-                         object_name = characteristic
-                         description = description( characteristic ) ).
+    result = delete_all( kind = c_kind-characteristic object_name = characteristic ).
   ENDMETHOD.
 
   METHOD delete_all.
@@ -664,12 +668,31 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
     DELETE FROM zzxxmla1_view WHERE kind = @kind AND object_name = @object.
-    " a plain view of a run before the table
-    DATA(older) = ddl_of_description( description ).
-    IF older IS NOT INITIAL.
-      ddl_handler( )->delete( older ).
+    " a plain view of a run before the table, or a view whose row is lost: BW refuses to delete the characteristic
+    LOOP AT ddls_of_object( kind = kind object_name = object_name ) INTO DATA(orphan).
+      ddl_handler( )->delete( CONV #( orphan ) ).
       result = abap_true.
-    ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD ddls_of_object.
+    DATA(prefix) = CONV ddlname( |{ c_ddl_prefix }%| ).
+    DATA(patterns) = COND string_table(
+      WHEN kind = c_kind-characteristic THEN VALUE #( ( |BW characteristic { object_name }:%| ) )
+      ELSE VALUE #( ( |BW aDSO { object_name }:%| ) ( |BW provider { object_name }:%| ) ) ).
+    LOOP AT patterns INTO DATA(pattern).
+      DATA(text) = CONV ddtext( pattern ).
+      SELECT DISTINCT t~ddlname FROM ddddlsrct AS t
+        INNER JOIN ddddlsrc AS s ON s~ddlname = t~ddlname AND s~as4local = t~as4local
+        WHERE t~ddtext LIKE @text AND t~ddlname LIKE @prefix
+        ORDER BY t~ddlname ASCENDING
+        INTO TABLE @DATA(names).
+      LOOP AT names INTO DATA(name).
+        IF NOT line_exists( result[ table_line = CONV string( name-ddlname ) ] ).
+          APPEND CONV string( name-ddlname ) TO result.
+        ENDIF.
+      ENDLOOP.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD registered.
@@ -721,7 +744,7 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD delete_fact_view.
-    result = delete_all( kind = c_kind-fact object_name = provider description = fact_description( provider ) ).
+    result = delete_all( kind = c_kind-fact object_name = provider ).
   ENDMETHOD.
 
   METHOD existing_fact_view.
@@ -815,8 +838,8 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
     adso = metadata-provider.
     TRY.
         cl_rso_adso_api=>read( EXPORTING i_adsonm               = adso
-                                         i_with_enqueue         = rs_c_false
-                                         i_with_authority_check = rs_c_false
+                                         i_with_enqueue         = abap_false
+                                         i_with_authority_check = abap_false
                                IMPORTING e_t_object             = objects ).
         DATA(tables) = cl_rso_adso=>get_tablnm( adso ).
         metadata-fact_table = VALUE #( tables[ dsotabtype = cl_rsdso_constants=>n_c_viewtype_reporting ]-name

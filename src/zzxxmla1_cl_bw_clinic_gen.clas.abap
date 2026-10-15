@@ -27,11 +27,12 @@
 "!   source system's fiscal year variants,
 "! - the cube-type aDSO ZCLVISITA with the same visits and BW's standard time characteristics in place of the date,
 "!   read through its fact view (the SID of the room, ZZXXMLA1_CL_BW_VIEW_GEN),
-"! loads both, generates the CDS views of the characteristics (ZZXXMLA1_CL_BW_VIEW_GEN), writes a schema per provider
-"! (/WEB-INF/schema/ZCLVISIT.xml, /WEB-INF/schema/ZCLVISITA.xml) and one per provider that fixes the fiscal year
-"! variant to K4 (ZCLVISIT_K4, ZCLVISITA_K4: the variant a dimension with one member, the periods by their own key, on
-"! the views filtered on K4) and
-"! adds a catalog for each to /WEB-INF/datasources.xml.
+"! loads both and deploys per provider the schema the schema generator proposes (docs/schema-generator.md) and the
+"! same with the fiscal year variant fixed to K4 (ZCLVISIT_K4, ZCLVISITA_K4), each accepted through the schema API as
+"! the UI accepts it: the views generated (ZZXXMLA1_CL_BW_VIEW_GEN), the schema file written and its catalog added to
+"! /WEB-INF/datasources.xml.
+"! Every characteristic has language-dependent texts (short, medium and long) and the run loads EN texts for all its
+"! values, so the views and BW's own front ends show a text next to every key.
 "! The data comes from a seeded pseudo-random generator: every run gives the same visits. BW's blank member (the initial
 "! key, SID 0) exists in every hierarchy; a few visits use it (no diagnosis recorded yet, no physician assigned at
 "! triage, a patient not identified, no visit type), so it has data.
@@ -63,6 +64,20 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
 
   PROTECTED SECTION.
   PRIVATE SECTION.
+    " BW's codes (type pools RS, RSD, RSDMD), as constants of this class
+    CONSTANTS: BEGIN OF c_objvers,
+                 active   TYPE c LENGTH 1 VALUE 'A',
+                 modified TYPE c LENGTH 1 VALUE 'M',
+               END OF c_objvers.
+    CONSTANTS: BEGIN OF c_iobjtp,
+                 charact   TYPE c LENGTH 3 VALUE 'CHA',
+                 keyfigure TYPE c LENGTH 3 VALUE 'KYF',
+               END OF c_iobjtp.
+    CONSTANTS c_cubetype_basic TYPE c LENGTH 1 VALUE 'B'.
+    CONSTANTS: BEGIN OF c_tabclass,
+                 md   TYPE c LENGTH 1 VALUE 'M',
+                 text TYPE c LENGTH 1 VALUE 'T',
+               END OF c_tabclass.
     CONSTANTS c_first_day TYPE d VALUE '20240101'.
     CONSTANTS c_last_day  TYPE d VALUE '20251231'.
     CONSTANTS c_seed      TYPE int8 VALUE 20240101.
@@ -114,6 +129,22 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
         rows       TYPE ty_t_row,
       END OF ty_md,
       ty_t_md TYPE STANDARD TABLE OF ty_md WITH EMPTY KEY.
+    TYPES:
+      "! the EN texts of a characteristic: per row the values of the compounding, the key, the short and the long text
+      "! (the medium text is the long one, cut at 40)
+      BEGIN OF ty_texts,
+        iobjnm      TYPE rsiobjnm,
+        compounding TYPE ty_t_iobjnm,
+        rows        TYPE ty_t_row,
+        "! the keys of the rows, joined by /
+        seen        TYPE HASHED TABLE OF string WITH UNIQUE KEY table_line,
+      END OF ty_texts,
+      ty_t_texts TYPE STANDARD TABLE OF ty_texts WITH EMPTY KEY.
+    TYPES:
+      BEGIN OF ty_text,
+        short TYPE string,
+        long  TYPE string,
+      END OF ty_text.
     TYPES:
       BEGIN OF ty_weight,
         key    TYPE string,
@@ -283,6 +314,25 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     "! Keeps max_visits of the visits, evenly spread, in their order.
     METHODS limit_visits IMPORTING max_visits TYPE i.
     METHODS master_data RETURNING VALUE(result) TYPE ty_t_md.
+    "! The texts of every characteristic: of the keys of the master data, of the values of the attributes and of the
+    "! fiscal time, whose SIDs come with the loads.
+    METHODS texts RETURNING VALUE(result) TYPE ty_t_texts.
+    "! The text of a value of an attribute characteristic (ZCLAGEGR 0-17: Children (0-17)).
+    METHODS attribute_text
+      IMPORTING iobjnm        TYPE rsiobjnm
+                value         TYPE string
+      RETURNING VALUE(result) TYPE ty_text.
+    "! Appends a row of texts to the characteristic's entry; a blank key or one that is there already is left out.
+    METHODS add_text
+      IMPORTING iobjnm      TYPE rsiobjnm
+                compounding TYPE ty_t_iobjnm OPTIONAL
+                keys        TYPE string_table
+                text        TYPE ty_text
+      CHANGING  texts       TYPE ty_t_texts.
+    METHODS month_name IMPORTING month TYPE i RETURNING VALUE(result) TYPE string.
+    METHODS day_name IMPORTING day TYPE d RETURNING VALUE(result) TYPE string.
+    "! Monday, 1 January 2024
+    METHODS long_date IMPORTING day TYPE d RETURNING VALUE(result) TYPE string.
     METHODS calendar IMPORTING day TYPE d RETURNING VALUE(result) TYPE ty_calendar.
     "! The site and room of a visit, from its physician and patient: no random number, so the visits stay as they were.
     METHODS room IMPORTING visit TYPE ty_visit RETURNING VALUE(result) TYPE ty_room.
@@ -303,12 +353,12 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     METHODS create_cube.
     METHODS activate_cube.
     METHODS load_master_data IMPORTING md TYPE ty_md.
+    "! Writes the EN texts into the characteristic's text table (/BIC/T...).
+    METHODS load_texts IMPORTING texts TYPE ty_texts.
     "! Saves and activates a time slice of a hierarchy (RSNDI_SHIE_STRUCTURE_UPDATE4, RSNDI_SHIE_ACTIVATE; UPDATE3
     "! dumps on the 2025 system: CL_RSSH_HIERARCHY_FUNC=>NDI_UPDATE no longer takes its table of hierarchy texts).
     METHODS load_hierarchy IMPORTING hierarchy TYPE ty_hierarchy.
     METHODS load_cube.
-    "! Generates the views of the cube's characteristics and of the aDSO's time characteristics.
-    METHODS generate_views RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_view_gen=>ty_t_view.
     METHODS create_adso.
     "! The name BW generated for a table or view of the aDSO (CL_RSO_ADSO=>GET_TABLNM).
     METHODS adso_table IMPORTING type TYPE rsdsotabtype RETURNING VALUE(result) TYPE tabname.
@@ -316,13 +366,6 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     "! Counts the rows of a fact table or view and sums the duration.
     METHODS verify IMPORTING source TYPE csequence.
 
-    "! The schema of the cube (adso = false) or of the aDSO; fixed: the one that fixes the fiscal year variant to K4
-    "! (catalog and cube PROVIDER_K4).
-    METHODS schema_xml
-      IMPORTING adso          TYPE abap_bool
-                fixed         TYPE abap_bool DEFAULT abap_false
-                views         TYPE zzxxmla1_cl_bw_view_gen=>ty_t_view
-      RETURNING VALUE(result) TYPE string.
     "! The selection of the K4 schemas: ZCLFISCVR fixed to K4, filter the cube with I EQ K4.
     METHODS k4
       RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_view_gen=>ty_t_selection.
@@ -331,27 +374,23 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
       IMPORTING adso          TYPE abap_bool
                 fixed         TYPE abap_bool
       RETURNING VALUE(result) TYPE string.
-    "! The key attribute's columns: on the cube keyed by the SID and named by the value, on the aDSO keyed by the value;
-    "! the value as BW holds it, NUMC with its zeros.
-    METHODS key_columns
-      IMPORTING adso          TYPE abap_bool
-                column        TYPE csequence
-      RETURNING VALUE(result) TYPE string.
-    METHODS attribute_xml
-      IMPORTING name          TYPE csequence
-                column        TYPE csequence
-                level_type    TYPE csequence OPTIONAL
-      RETURNING VALUE(result) TYPE string.
-    "! The view of a characteristic (or the fact view of a provider): the plain one, or fixed the one filtered on K4.
-    METHODS view_of
-      IMPORTING views         TYPE zzxxmla1_cl_bw_view_gen=>ty_t_view
-                iobjnm        TYPE rsiobjnm
-                fixed         TYPE abap_bool DEFAULT abap_false
-      RETURNING VALUE(result) TYPE string.
-    "! Writes the schema file and adds its catalog to the data sources file if it is not there.
-    METHODS write_catalog
+    "! Per provider the schema the proposal makes (as GET proposal of the schema API: the fiscal defaults, then the
+    "! proposal) and the same with the fiscal year variant fixed to K4 (as POST fix), each accepted as the UI accepts it
+    "! (POST accept: the views generated, the schema file written, the catalog added).
+    METHODS deploy_schemas.
+    "! The proposal for a provider.
+    METHODS propose
+      IMPORTING provider      TYPE csequence
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_schema_def=>ty_schema
+      RAISING   zzxxmla1_cx_bw_provider
+                zzxxmla1_cx_xom.
+    "! Accepts a schema into a catalog through the schema API.
+    METHODS accept
       IMPORTING catalog TYPE csequence
-                xml     TYPE string.
+                !schema TYPE zzxxmla1_cl_schema_def=>ty_schema.
+    "! Removes the catalogs of the demo's schemas (and their files and views) through the schema API, so that accept
+    "! checks no catalog on the views a run deletes.
+    METHODS remove_catalogs.
 
     "! The field of an InfoObject in BW's generated tables (RSD_FIELDNM_GET_FROM_IOBJNM), checked against the structure;
     "! without namespace: as a fact view names it.
@@ -403,6 +442,10 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     LOOP AT master_data( ) INTO DATA(md).
       load_master_data( md ).
     ENDLOOP.
+    " after the attributes: the rooms' SIDs follow the order of their master data load
+    LOOP AT texts( ) INTO DATA(texts).
+      load_texts( texts ).
+    ENDLOOP.
     LOOP AT hierarchies( ) INTO DATA(hierarchy).
       load_hierarchy( hierarchy ).
     ENDLOOP.
@@ -412,13 +455,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     load_adso( ).
     verify( adso_table( cl_rsdso_constants=>n_c_viewtype_reporting ) ).
 
-    DATA(views) = generate_views( ).
-    write_catalog( catalog = c_cube xml = schema_xml( adso = abap_false views = views ) ).
-    write_catalog( catalog = c_adso xml = schema_xml( adso = abap_true views = views ) ).
-    write_catalog( catalog = catalog_name( adso = abap_false fixed = abap_true )
-                   xml     = schema_xml( adso = abap_false fixed = abap_true views = views ) ).
-    write_catalog( catalog = catalog_name( adso = abap_true fixed = abap_true )
-                   xml     = schema_xml( adso = abap_true fixed = abap_true views = views ) ).
+    deploy_schemas( ).
     result = log.
   ENDMETHOD.
 
@@ -1033,11 +1070,6 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
                                       ( VALUE #( ( `Follow-up` ) ( `In person` ) ) )
                                       ( VALUE #( ( `Emergency` ) ( `In person` ) ) )
                                       ( VALUE #( ( `Telehealth` ) ( `Remote` ) ) ) ).
-    DATA(month_names) = VALUE string_table( ( `January` ) ( `February` ) ( `March` ) ( `April` ) ( `May` ) ( `June` )
-                                            ( `July` ) ( `August` ) ( `September` ) ( `October` ) ( `November` )
-                                            ( `December` ) ).
-    DATA(day_names) = VALUE string_table( ( `Monday` ) ( `Tuesday` ) ( `Wednesday` ) ( `Thursday` ) ( `Friday` )
-                                          ( `Saturday` ) ( `Sunday` ) ).
     DATA date_rows TYPE ty_t_row.
     DATA(day) = c_first_day.
     WHILE day <= c_last_day.
@@ -1045,7 +1077,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       DATA(january) = CONV d( |{ day(4) }0101| ).
       " weeks counted from 1 January, so every week belongs to one year
       APPEND VALUE #( ( |{ day }| ) ( |{ day(4) }-{ day+4(2) }-{ day+6(2) }| )
-                      ( day_names[ ( day - CONV d( '19000101' ) ) MOD 7 + 1 ] ) ( month_names[ month ] )
+                      ( day_name( day ) ) ( month_name( month ) )
                       ( |{ day(4) }| ) ( |Q{ ( month - 1 ) DIV 3 + 1 }| ) ( |{ month }| )
                       ( |{ ( day - january ) DIV 7 + 1 }| ) ( |{ CONV i( day+6(2) ) }| ) ) TO date_rows.
       day = day + 1.
@@ -1076,6 +1108,137 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
                         ( VALUE #( ( `NORTH` ) ( `R03` ) ( `Treatment` ) ) )
                         ( VALUE #( ( `NORTH` ) ( `R04` ) ( `Treatment` ) ) )
                         ( VALUE #( ( `NORTH` ) ( `R05` ) ( `Imaging` ) ) ) ) ) ).
+  ENDMETHOD.
+
+  METHOD texts.
+    " the keys of the master data, and per value of an attribute its text
+    LOOP AT master_data( ) INTO DATA(md).
+      DATA(keys) = lines( md-compounding ) + 1.
+      LOOP AT md-rows INTO DATA(fields).
+        DATA(key) = fields[ keys ].
+        DATA(text) = SWITCH ty_text( md-iobjnm
+          WHEN 'ZCLPAT' THEN VALUE #( long = fields[ 2 ] )
+          WHEN 'ZCLDOC' THEN VALUE #( long = fields[ 2 ] )
+          WHEN 'ZCLDIAG' THEN VALUE #( long = fields[ 2 ] )
+          WHEN 'ZCLVTYPE' THEN VALUE #( short = key
+                                        long  = COND #( WHEN key = `Telehealth` THEN `Telehealth Consultation`
+                                                        ELSE |{ key } Visit| ) )
+          WHEN 'ZCLDATE' THEN VALUE #( short = fields[ 2 ] long = long_date( CONV d( key ) ) )
+          WHEN 'ZCLSITE' THEN VALUE #( short = |{ to_mixed( key ) } Site|
+                                       long  = |{ to_mixed( key ) } Site, { fields[ 2 ] }| )
+          " the room type and number: Consultation Room 1
+          WHEN 'ZCLROOM' THEN VALUE #( short = |Room { CONV i( substring( val = key off = 1 ) ) }|
+                                       long  = |{ fields[ 3 ] } Room { CONV i( substring( val = key off = 1 ) ) }| ) ).
+        add_text( EXPORTING iobjnm      = md-iobjnm
+                            compounding = md-compounding
+                            keys        = VALUE #( FOR i = 1 UNTIL i > keys ( fields[ i ] ) )
+                            text        = text
+                  CHANGING  texts       = result ).
+        LOOP AT md-attributes INTO DATA(attribute).
+          DATA(value) = fields[ keys + sy-tabix ].
+          add_text( EXPORTING iobjnm = attribute
+                              keys   = VALUE #( ( value ) )
+                              text   = attribute_text( iobjnm = attribute value = value )
+                    CHANGING  texts  = result ).
+        ENDLOOP.
+      ENDLOOP.
+    ENDLOOP.
+    " the fiscal time: the variants as SAP's standard ones, and per variant the years and periods of the calendar
+    DATA(variants) = VALUE string_table( ( `K1` ) ( `K2` ) ( `K4` ) ).
+    LOOP AT variants INTO DATA(variant).
+      DATA(special) = substring( val = variant off = 1 ).
+      add_text( EXPORTING iobjnm = 'ZCLFISCVR'
+                          keys   = VALUE #( ( variant ) )
+                          text   = VALUE #( short = |Calendar Year ({ variant })|
+                                            long  = |Calendar Year, { special } Special | &&
+                                                    |Period{ COND string( WHEN special <> `1` THEN `s` ) }| )
+                CHANGING  texts  = result ).
+      DO c_last_day(4) - c_first_day(4) + 1 TIMES.
+        DATA(year) = CONV string( c_first_day(4) + sy-index - 1 ).
+        add_text( EXPORTING iobjnm      = 'ZCLFISCYR'
+                            compounding = VALUE #( ( 'ZCLFISCVR' ) )
+                            keys        = VALUE #( ( variant ) ( year ) )
+                            text        = VALUE #( long = |Fiscal Year { year }| )
+                  CHANGING  texts       = result ).
+        DO 12 TIMES.
+          DATA(period) = |{ sy-index WIDTH = 3 ALIGN = RIGHT PAD = '0' }|.
+          add_text( EXPORTING iobjnm      = 'ZCLFISCPR'
+                              compounding = VALUE #( ( 'ZCLFISCVR' ) )
+                              keys        = VALUE #( ( variant ) ( |{ year }{ period }| ) )
+                              text        = VALUE #( short = |{ period }/{ year }|
+                                                     long  = |Period { period }/{ year }, | &&
+                                                             |{ month_name( sy-index ) } { year }| )
+                    CHANGING  texts       = result ).
+        ENDDO.
+      ENDDO.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD attribute_text.
+    result-long = SWITCH string( iobjnm
+      WHEN 'ZCLBYEAR' THEN |Born { value }|
+      WHEN 'ZCLAGEGR' THEN SWITCH string( value WHEN `0-17`  THEN `Children (0-17)`
+                                           WHEN `18-39` THEN `Young Adults (18-39)`
+                                           WHEN `40-64` THEN `Adults (40-64)`
+                                           ELSE |Seniors ({ value })| )
+      " O+: O Positive
+      WHEN 'ZCLBLOOD' THEN |{ substring( val = value len = strlen( value ) - 1 ) } | &&
+                           |{ COND string( WHEN substring( val = value off = strlen( value ) - 1 ) = `+` THEN `Positive`
+                                      ELSE `Negative` ) }|
+      WHEN 'ZCLINSUR' THEN SWITCH string( value WHEN `Self-pay` THEN `Self-paying Patient`
+                                           ELSE |{ value } Health Insurance| )
+      WHEN 'ZCLREGIO' THEN |{ value } Region|
+      WHEN 'ZCLDEPT'  THEN |Department of { value }|
+      WHEN 'ZCLEXPER' THEN |{ value } Years in Practice|
+      WHEN 'ZCLSETNG' THEN |{ value } Care|
+      WHEN 'ZCLTHEDT' THEN long_date( CONV d( replace( val = value sub = `-` with = `` occ = 0 ) ) )
+      WHEN 'ZCLYEAR'  THEN |Year { value }|
+      WHEN 'ZCLQTR'   THEN |{ SWITCH string( value WHEN `Q1` THEN `1st` WHEN `Q2` THEN `2nd` WHEN `Q3` THEN `3rd`
+                                              ELSE `4th` ) } Quarter|
+      WHEN 'ZCLMONTH' THEN month_name( CONV i( value ) )
+      WHEN 'ZCLWEEK'  THEN |Week { value }|
+      WHEN 'ZCLDAYOM' THEN |Day { value }|
+      WHEN 'ZCLRTYPE' THEN |{ value } Room|
+      ELSE value ).
+    result-short = SWITCH string( iobjnm
+      WHEN 'ZCLAGEGR' OR 'ZCLBLOOD' OR 'ZCLTHEDT' OR 'ZCLINSUR' THEN value
+      WHEN 'ZCLDAYNM' OR 'ZCLMONNM' THEN substring( val = value len = 3 ) ).
+  ENDMETHOD.
+
+  METHOD add_text.
+    IF keys[ lines( keys ) ] IS INITIAL.
+      RETURN.
+    ENDIF.
+    READ TABLE texts ASSIGNING FIELD-SYMBOL(<texts>) WITH KEY iobjnm = iobjnm.
+    IF sy-subrc <> 0.
+      APPEND VALUE #( iobjnm = iobjnm compounding = compounding ) TO texts ASSIGNING <texts>.
+    ENDIF.
+    INSERT concat_lines_of( table = keys sep = `/` ) INTO TABLE <texts>-seen.
+    IF sy-subrc <> 0.
+      RETURN.
+    ENDIF.
+    DATA(new_row) = keys.
+    APPEND COND string( WHEN text-short IS NOT INITIAL THEN text-short ELSE text-long ) TO new_row.
+    APPEND text-long TO new_row.
+    APPEND new_row TO <texts>-rows.
+  ENDMETHOD.
+
+  METHOD month_name.
+    DATA(names) = VALUE string_table( ( `January` ) ( `February` ) ( `March` ) ( `April` ) ( `May` ) ( `June` )
+                                      ( `July` ) ( `August` ) ( `September` ) ( `October` ) ( `November` )
+                                      ( `December` ) ).
+    result = names[ month ].
+  ENDMETHOD.
+
+  METHOD day_name.
+    " 1 January 1900 was a Monday
+    DATA(names) = VALUE string_table( ( `Monday` ) ( `Tuesday` ) ( `Wednesday` ) ( `Thursday` ) ( `Friday` )
+                                      ( `Saturday` ) ( `Sunday` ) ).
+    result = names[ ( day - CONV d( '19000101' ) ) MOD 7 + 1 ].
+  ENDMETHOD.
+
+  METHOD long_date.
+    result = |{ day_name( day ) }, { CONV i( day+6(2) ) } { month_name( CONV i( day+4(2) ) ) } { day(4) }|.
   ENDMETHOD.
 
   METHOD room.
@@ -1113,6 +1276,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD delete_all.
+    remove_catalogs( ).
     " the providers and the views use the characteristics, so they go first; the fact views select from the providers
     LOOP AT VALUE string_table( ( CONV #( c_adso ) ) ( CONV #( c_cube ) ) ) INTO DATA(provider).
       TRY.
@@ -1151,13 +1315,13 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD delete_adso.
-    IF cl_rso_adso_api=>exist( c_adso ) <> rs_c_true.
+    IF cl_rso_adso_api=>exist( c_adso ) <> abap_true.
       RETURN.
     ENDIF.
     TRY.
         cl_rso_adso_api=>delete( i_adsonm         = c_adso
-                                 i_with_cto       = rs_c_false
-                                 i_force_deletion = rs_c_true ).
+                                 i_with_cto       = abap_false
+                                 i_force_deletion = abap_true ).
         COMMIT WORK AND WAIT.
         write( |delete aDSO { c_adso }: done| ).
       CATCH cx_rs_all_msg INTO DATA(error).
@@ -1225,8 +1389,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     CALL FUNCTION 'RSDG_IOBJ_MULTI_DELETE'
       EXPORTING
         i_t_iobjnm        = iobjnms
-        i_check_dependent = rs_c_false
-        i_manual          = rs_c_false
+        i_check_dependent = abap_false
+        i_manual          = abap_false
       IMPORTING
         e_t_msg           = messages
         e_subrc           = subrc.
@@ -1266,8 +1430,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     DATA(datatp) = COND datatype_d( WHEN cha-datatp IS INITIAL THEN 'CHAR' ELSE cha-datatp ).
     DATA(details) = VALUE bapi6108(
       infoobject = cha-name
-      version    = rs_c_objvers-modified
-      type       = rsd_c_objtp-charact
+      version    = c_objvers-modified
+      type       = c_iobjtp-charact
       textshort  = cha-text
       textlong   = cha-text
       infoarea   = c_infoarea
@@ -1276,15 +1440,22 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       intlen     = cha-leng
       leng       = cha-leng
       outputlen  = cha-leng
-      lowercase  = COND #( WHEN datatp = 'CHAR' THEN rs_c_true )
-      attribfl   = COND #( WHEN cha-attributes IS NOT INITIAL THEN rs_c_true )
+      lowercase  = COND #( WHEN datatp = 'CHAR' THEN abap_true )
+      " language-dependent short, medium and long texts, not time dependent
+      txttabfl   = '1'
+      txtshfl    = abap_true
+      txtmdfl    = abap_true
+      txtlgfl    = abap_true
+      nolangu    = abap_false
+      txttimfl   = '0'
+      attribfl   = COND #( WHEN cha-attributes IS NOT INITIAL THEN abap_true )
       hietabfl   = cha-hierarchies
       hieverfl   = cha-hie_versions
       hienmtfl   = cha-hie_timedep
       authrelfl  = cha-auth_relevant ).
     LOOP AT cha-attributes INTO DATA(attribute).
       APPEND VALUE #( chabasnm = cha-name
-                      objvers  = rs_c_objvers-modified
+                      objvers  = c_objvers-modified
                       attrinm  = attribute
                       posit    = sy-tabix
                       attritp  = 'DIS'
@@ -1293,7 +1464,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     ENDLOOP.
     LOOP AT cha-compounding INTO DATA(compounding).
       APPEND VALUE #( infoobject = cha-name
-                      objvers    = rs_c_objvers-modified
+                      objvers    = c_objvers-modified
                       posit      = sy-tabix
                       iobjcmp    = compounding ) TO compounds.
     ENDLOOP.
@@ -1320,8 +1491,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     DATA iobj TYPE bapi6108-infoobject.
     DATA(details) = VALUE bapi6108(
       infoobject = kyf-name
-      version    = rs_c_objvers-modified
-      type       = rsd_c_objtp-keyfigure
+      version    = c_objvers-modified
+      type       = c_iobjtp-keyfigure
       textshort  = kyf-text
       textlong   = kyf-text
       infoarea   = c_infoarea
@@ -1376,7 +1547,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     LOOP AT dimensions( ) INTO DATA(dime).
       DATA(dimension) = CONV rsdimension( |{ c_cube }{ dime-suffix }| ).
       APPEND VALUE #( infocube  = c_cube
-                      objvers   = rs_c_objvers-modified
+                      objvers   = c_objvers-modified
                       dimension = dimension
                       textlong  = dime-text
                       iobjtp    = dime-iobjtp ) TO dimension_table.
@@ -1384,12 +1555,12 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
         DATA(dimension_position) = sy-tabix.
         position = position + 1.
         APPEND VALUE #( infocube   = c_cube
-                        objvers    = rs_c_objvers-modified
+                        objvers    = c_objvers-modified
                         dimension  = dimension
                         posit      = dimension_position
                         infoobject = iobjnm ) TO dimension_infoobjects.
         APPEND VALUE #( infocube   = c_cube
-                        objvers    = rs_c_objvers-modified
+                        objvers    = c_objvers-modified
                         posit      = position
                         infoobject = iobjnm
                         iobjtp     = dime-iobjtp ) TO infoobjects.
@@ -1398,16 +1569,16 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     LOOP AT key_figures( ) INTO DATA(kyf).
       position = position + 1.
       APPEND VALUE #( infocube   = c_cube
-                      objvers    = rs_c_objvers-modified
+                      objvers    = c_objvers-modified
                       posit      = position
                       infoobject = kyf-name
-                      iobjtp     = rsd_c_objtp-keyfigure ) TO infoobjects.
+                      iobjtp     = c_iobjtp-keyfigure ) TO infoobjects.
     ENDLOOP.
     DATA(details) = VALUE bapi6112( infocube = c_cube
-                                    objvers  = rs_c_objvers-modified
+                                    objvers  = c_objvers-modified
                                     textlong = 'Clinic Visits'
                                     infoarea = c_infoarea
-                                    cubetype = rsd_c_cubetype-basic_ic ).
+                                    cubetype = c_cubetype_basic ).
     CALL FUNCTION 'BAPI_CUBE_CREATE'
       EXPORTING
         details              = details
@@ -1464,7 +1635,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       ASSIGN COMPONENT |/BIC/{ md-iobjnm }| OF STRUCTURE <row> TO <value>.
       <value> = fields[ keys ].
       ASSIGN COMPONENT 'OBJVERS' OF STRUCTURE <row> TO <value>.
-      <value> = rs_c_objvers-active.
+      <value> = c_objvers-active.
       LOOP AT md-attributes INTO DATA(attribute).
         ASSIGN COMPONENT |/BIC/{ attribute }| OF STRUCTURE <row> TO <value>.
         <value> = fields[ sy-tabix + keys ].
@@ -1474,7 +1645,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     CALL FUNCTION 'RSDMD_WRITE_ATTRIBUTES_TEXTS'
       EXPORTING
         i_iobjnm               = md-iobjnm
-        i_tabclass             = rsdmd_c_tabclass-md
+        i_tabclass             = c_tabclass-md
         i_t_attr               = attributes
       IMPORTING
         e_t_idocstate          = messages
@@ -1493,6 +1664,69 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       ROLLBACK WORK.
     ENDIF.
     write( |load { md-iobjnm }: { lines( <table> ) } records, | &&
+           |{ COND string( WHEN ok = abap_true THEN `done` ELSE |FAILED, subrc { subrc }| ) }| ).
+  ENDMETHOD.
+
+  METHOD load_texts.
+    " rows of the text table: the compounding, the key, the language and the short, medium and long text
+    FIELD-SYMBOLS <table> TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <row> TYPE any.
+    FIELD-SYMBOLS <value> TYPE any.
+    DATA data TYPE REF TO data.
+    DATA messages TYPE rsarr_t_idocstate.
+    DATA subrc TYPE sy-subrc.
+    DATA described TYPE REF TO cl_abap_typedescr.
+    cl_abap_typedescr=>describe_by_name( EXPORTING  p_name         = |/BIC/T{ texts-iobjnm }|
+                                         RECEIVING  p_descr_ref    = described
+                                         EXCEPTIONS type_not_found = 1
+                                                    OTHERS         = 2 ).
+    IF sy-subrc <> 0.
+      write( |texts of { texts-iobjnm }: FAILED, no text table /BIC/T{ texts-iobjnm }| ).
+      RETURN.
+    ENDIF.
+    DATA(line) = CAST cl_abap_structdescr( described ).
+    DATA(table_type) = cl_abap_tabledescr=>create( line ).
+    CREATE DATA data TYPE HANDLE table_type.
+    ASSIGN data->* TO <table>.
+    DATA(keys) = lines( texts-compounding ) + 1.
+    LOOP AT texts-rows INTO DATA(fields).
+      APPEND INITIAL LINE TO <table> ASSIGNING <row>.
+      LOOP AT texts-compounding INTO DATA(compounding).
+        ASSIGN COMPONENT |/BIC/{ compounding }| OF STRUCTURE <row> TO <value>.
+        <value> = fields[ sy-tabix ].
+      ENDLOOP.
+      ASSIGN COMPONENT |/BIC/{ texts-iobjnm }| OF STRUCTURE <row> TO <value>.
+      <value> = fields[ keys ].
+      ASSIGN COMPONENT 'LANGU' OF STRUCTURE <row> TO <value>.
+      <value> = 'E'.
+      ASSIGN COMPONENT 'TXTSH' OF STRUCTURE <row> TO <value>.
+      <value> = fields[ keys + 1 ].
+      ASSIGN COMPONENT 'TXTMD' OF STRUCTURE <row> TO <value>.
+      <value> = fields[ keys + 2 ].
+      ASSIGN COMPONENT 'TXTLG' OF STRUCTURE <row> TO <value>.
+      <value> = fields[ keys + 2 ].
+    ENDLOOP.
+    CALL FUNCTION 'RSDMD_WRITE_ATTRIBUTES_TEXTS'
+      EXPORTING
+        i_iobjnm               = texts-iobjnm
+        i_tabclass             = c_tabclass-text
+      IMPORTING
+        e_t_idocstate          = messages
+        e_subrc                = subrc
+      TABLES
+        i_t_table              = <table>
+      EXCEPTIONS
+        attribute_name_error   = 1
+        iobj_not_found         = 2
+        generate_program_error = 3
+        OTHERS                 = 4.
+    DATA(ok) = xsdbool( sy-subrc = 0 AND subrc = 0 ).
+    IF ok = abap_true.
+      COMMIT WORK AND WAIT.
+    ELSE.
+      ROLLBACK WORK.
+    ENDIF.
+    write( |texts of { texts-iobjnm }: { lines( <table> ) } records, | &&
            |{ COND string( WHEN ok = abap_true THEN `done` ELSE |FAILED, subrc { subrc }| ) }| ).
   ENDMETHOD.
 
@@ -1606,7 +1840,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     CALL FUNCTION 'RSDRI_CUBE_WRITE_PACKAGE'
       EXPORTING
         i_infocube         = c_cube
-        i_curr_conversion  = rs_c_false
+        i_curr_conversion  = abap_false
       IMPORTING
         e_requid           = request
         e_records          = records
@@ -1645,31 +1879,6 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
            |{ REDUCE i( INIT s = 0 FOR v IN visits NEXT s = s + v-duration ) })| ).
   ENDMETHOD.
 
-  METHOD generate_views.
-    DATA(generator) = NEW zzxxmla1_cl_bw_view_gen( ).
-    TRY.
-        result = generator->generate_cube( c_cube ).
-        LOOP AT VALUE ty_t_iobjnm( ( '0CALWEEK' ) ( '0CALMONTH' ) ( '0CALQUARTER' ) ( '0CALYEAR' ) ) INTO DATA(iobjnm).
-          APPEND generator->generate( iobjnm ) TO result.
-        ENDLOOP.
-        " the aDSO's facts with the SID of the room (characteristic of the view: the aDSO)
-        APPEND generator->generate_fact_view( c_adso ) TO result.
-        " the K4 schemas: the facts of both filtered on the variant, the variant, the year and the period filtered on it
-        DATA(selection) = k4( ).
-        APPEND generator->generate_fact_view( provider = c_cube selection = selection ) TO result.
-        APPEND generator->generate_fact_view( provider = c_adso selection = selection ) TO result.
-        APPEND generator->generate( characteristic = 'ZCLFISCVR' selection = selection ) TO result.
-        APPEND generator->generate( characteristic = 'ZCLFISCYR' selection = selection ) TO result.
-        APPEND generator->generate( characteristic = 'ZCLFISCPR' selection = selection ) TO result.
-      CATCH cx_dd_ddl_exception INTO DATA(error).
-        write( |views: FAILED, { error->get_text( ) }| ).
-    ENDTRY.
-    LOOP AT result INTO DATA(view).
-      write( |view of { view-characteristic }{ COND string( WHEN view-selection IS NOT INITIAL
-                                                            THEN | ({ view-selection })| ) }: { view-view_name }| ).
-    ENDLOOP.
-  ENDMETHOD.
-
   METHOD create_adso.
     DATA objects TYPE cl_rso_adso_api=>tn_t_object.
     DATA messages TYPE rs_t_msg.
@@ -1691,7 +1900,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
                                            i_s_adsoflags = flags
                                            i_t_object    = objects
                                            i_t_dimension = VALUE #( )
-                                           i_with_cto    = rs_c_false
+                                           i_with_cto    = abap_false
                                  IMPORTING e_t_msg       = messages ).
         COMMIT WORK AND WAIT.
         write( |create aDSO { c_adso }: active| ).
@@ -1801,7 +2010,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     CALL FUNCTION 'RSDSO_WRITE_API'
       EXPORTING
         i_adsonm            = c_adso
-        i_activate_data     = rs_c_true
+        i_activate_data     = abap_true
         it_data             = <table>
       IMPORTING
         e_lines_inserted    = inserted
@@ -1827,26 +2036,6 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
-  METHOD key_columns.
-    result = COND #(
-      WHEN adso = abap_true THEN |<KeyColumn dataType="String" columnName="{ column }"/>|
-      ELSE |<KeyColumn dataType="Integer" columnName="SID"/><NameColumn dataType="String" columnName="{ column }"/>| ).
-  ENDMETHOD.
-
-  METHOD attribute_xml.
-    result = |    <DimensionAttribute name="{ name }"| &&
-             COND string( WHEN level_type IS NOT INITIAL THEN | levelType="{ level_type }"| ) &&
-             |><KeyColumn dataType="String" columnName="{ column }"/></DimensionAttribute>\n|.
-  ENDMETHOD.
-
-  METHOD view_of.
-    DATA(selection) = COND string( WHEN fixed = abap_true THEN zzxxmla1_cl_bw_selection=>selection_text( k4( ) ) ).
-    result = VALUE #( views[ characteristic = iobjnm selection = selection ]-view_name OPTIONAL ).
-    IF result IS INITIAL.
-      write( |schema: no view of { iobjnm }{ COND string( WHEN selection IS NOT INITIAL THEN | ({ selection })| ) }| ).
-    ENDIF.
-  ENDMETHOD.
-
   METHOD k4.
     result = VALUE #( ( iobjnm = 'ZCLFISCVR'
                         mode   = zzxxmla1_cl_bw_selection=>c_mode-filter
@@ -1858,272 +2047,73 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
              |{ COND string( WHEN fixed = abap_true THEN |_{ c_fixed_variant }| ) }|.
   ENDMETHOD.
 
-  METHOD schema_xml.
-    DATA(name) = catalog_name( adso = adso fixed = fixed ).
-    " the aDSO's facts from its fact view, which has the SIDs of the room, the fiscal year and period and its fields
-    " without namespace; fixed, the facts of both from the fact view filtered on K4, which has them too
-    DATA(fact_table) = COND string( WHEN adso = abap_true OR fixed = abap_true
-                                    THEN view_of( views = views iobjnm = COND #( WHEN adso = abap_true THEN c_adso
-                                                                                 ELSE c_cube ) fixed = fixed )
-                                    ELSE |/BIC/F{ c_cube }| ).
-    DATA(without_namespace) = xsdbool( adso = abap_true OR fixed = abap_true ).
-    " Clinic Visits (aDSO, K4)
-    DATA(caption) = COND string( WHEN adso = abap_true AND fixed = abap_true THEN | (aDSO, { c_fixed_variant })|
-                                 WHEN adso = abap_true THEN ` (aDSO)`
-                                 WHEN fixed = abap_true THEN | ({ c_fixed_variant })| ).
-    IF fact_table IS INITIAL.
-      RETURN.
-    ENDIF.
-    DATA(fact) = CAST cl_abap_structdescr( cl_abap_typedescr=>describe_by_name( fact_table ) ).
+  METHOD deploy_schemas.
+    LOOP AT VALUE string_table( ( CONV #( c_cube ) ) ( CONV #( c_adso ) ) ) INTO DATA(provider).
+      DATA(schema) = VALUE zzxxmla1_cl_schema_def=>ty_schema( ).
+      TRY.
+          schema = propose( provider ).
+        CATCH zzxxmla1_cx_bw_provider INTO DATA(error).
+          write( |proposal of { provider }: FAILED, { error->get_text( ) }| ).
+          CONTINUE.
+        CATCH zzxxmla1_cx_xom INTO DATA(xom_error).
+          write( |proposal of { provider }: FAILED, { xom_error->error_message }| ).
+          CONTINUE.
+      ENDTRY.
+      accept( catalog = provider schema = schema ).
 
-    result =
-      |<?xml version="1.0"?>\n| &&
-      |<!-- The clinic demo, generated by ZZXXMLA1_CL_BW_CLINIC_GEN (docs/clinic-demo.md). -->\n| &&
-      |<Schema name="{ name }">\n| &&
-      |  <Dimension name="Patient" table="{ view_of( views = views iobjnm = 'ZCLPAT' ) }">\n| &&
-      |    <DimensionAttribute name="Patient Id" usage="Key">| &&
-      key_columns( adso = adso column = `ZCLPAT` ) && |</DimensionAttribute>\n| &&
-      attribute_xml( name = `Patient Name` column = `ZCLPNAME` ) &&
-      attribute_xml( name = `Sex` column = `ZCLSEX` ) &&
-      attribute_xml( name = `Birth Year` column = `ZCLBYEAR` ) &&
-      attribute_xml( name = `Age Group` column = `ZCLAGEGR` ) &&
-      attribute_xml( name = `Blood Group` column = `ZCLBLOOD` ) &&
-      attribute_xml( name = `Insurance` column = `ZCLINSUR` ) &&
-      attribute_xml( name = `City` column = `ZCLCITY` ) &&
-      attribute_xml( name = `Region` column = `ZCLREGIO` ) &&
-      |    <Hierarchy hasAll="true" allMemberName="All Patients">\n| &&
-      |      <Level name="Region" uniqueMembers="true" sourceAttribute="Region"/>\n| &&
-      |      <Level name="City" uniqueMembers="false" sourceAttribute="City"/>\n| &&
-      |      <Level name="Patient" uniqueMembers="true" nameColumn="ZCLPNAME" sourceAttribute="Patient Id">\n| &&
-      |        <Property name="Sex" sourceAttribute="Sex"/>\n| &&
-      |        <Property name="Birth Year" sourceAttribute="Birth Year"/>\n| &&
-      |        <Property name="Blood Group" sourceAttribute="Blood Group"/>\n| &&
-      |        <Property name="Insurance" sourceAttribute="Insurance"/>\n| &&
-      |      </Level>\n| &&
-      |    </Hierarchy>\n| &&
-      |    <Hierarchy name="Demographics" hasAll="true" allMemberName="All Patients">\n| &&
-      |      <Level name="Age Group" uniqueMembers="true" sourceAttribute="Age Group"/>\n| &&
-      |      <Level name="Sex" uniqueMembers="false" sourceAttribute="Sex"/>\n| &&
-      |    </Hierarchy>\n| &&
-      |  </Dimension>\n| &&
-      |  <Dimension name="Physician" table="{ view_of( views = views iobjnm = 'ZCLDOC' ) }">\n| &&
-      |    <DimensionAttribute name="Physician Id" usage="Key">| &&
-      key_columns( adso = adso column = `ZCLDOC` ) && |</DimensionAttribute>\n| &&
-      attribute_xml( name = `Physician Name` column = `ZCLDNAME` ) &&
-      attribute_xml( name = `Department` column = `ZCLDEPT` ) &&
-      attribute_xml( name = `Years in Practice` column = `ZCLEXPER` ) &&
-      |    <Hierarchy hasAll="true" allMemberName="All Physicians">\n| &&
-      |      <Level name="Department" uniqueMembers="true" sourceAttribute="Department"/>\n| &&
-      |      <Level name="Physician" uniqueMembers="true" nameColumn="ZCLDNAME" sourceAttribute="Physician Id">\n| &&
-      |        <Property name="Years in Practice" sourceAttribute="Years in Practice"/>\n| &&
-      |      </Level>\n| &&
-      |    </Hierarchy>\n| &&
-      |  </Dimension>\n| &&
-      |  <Dimension name="Diagnosis" table="{ view_of( views = views iobjnm = 'ZCLDIAG' ) }">\n| &&
-      |    <DimensionAttribute name="Diagnosis Code" usage="Key">| &&
-      key_columns( adso = adso column = `ZCLDIAG` ) && |</DimensionAttribute>\n| &&
-      attribute_xml( name = `Diagnosis Name` column = `ZCLDTEXT` ) &&
-      attribute_xml( name = `Diagnosis Group` column = `ZCLDGRP` ) &&
-      attribute_xml( name = `Chapter` column = `ZCLDCHAP` ) &&
-      |    <Hierarchy hasAll="true" allMemberName="All Diagnoses">\n| &&
-      |      <Level name="Chapter" uniqueMembers="true" sourceAttribute="Chapter"/>\n| &&
-      |      <Level name="Group" uniqueMembers="true" sourceAttribute="Diagnosis Group"/>\n| &&
-      |      <Level name="Diagnosis" uniqueMembers="true" nameColumn="ZCLDTEXT" sourceAttribute="Diagnosis Code"/>\n| &&
-      |    </Hierarchy>\n| &&
-      |  </Dimension>\n| &&
-      |  <Dimension name="Visit Type" table="{ view_of( views = views iobjnm = 'ZCLVTYPE' ) }">\n| &&
-      |    <DimensionAttribute name="Type" usage="Key">| &&
-      key_columns( adso = adso column = `ZCLVTYPE` ) && |</DimensionAttribute>\n| &&
-      attribute_xml( name = `Care Setting` column = `ZCLSETNG` ) &&
-      |    <Hierarchy hasAll="true" allMemberName="All Visit Types">\n| &&
-      |      <Level name="Care Setting" uniqueMembers="true" sourceAttribute="Care Setting"/>\n| &&
-      |      <Level name="Visit Type" uniqueMembers="true" sourceAttribute="Type"/>\n| &&
-      |    </Hierarchy>\n| &&
-      |  </Dimension>\n| &&
-      |  <Dimension name="Site" table="{ view_of( views = views iobjnm = 'ZCLSITE' ) }">\n| &&
-      |    <DimensionAttribute name="Site Id" usage="Key">| &&
-      key_columns( adso = adso column = `ZCLSITE` ) && |</DimensionAttribute>\n| &&
-      attribute_xml( name = `City` column = `ZCLCITY` ) &&
-      |    <Hierarchy hasAll="true" allMemberName="All Sites">\n| &&
-      |      <Level name="Site" uniqueMembers="true" sourceAttribute="Site Id">\n| &&
-      |        <Property name="City" sourceAttribute="City"/>\n| &&
-      |      </Level>\n| &&
-      |    </Hierarchy>\n| &&
-      |  </Dimension>\n| &&
-      " compounded with the site: keyed by the SID on both providers, named and ordered by site and room (NORTH/R01)
-      |  <Dimension name="Room" table="{ view_of( views = views iobjnm = 'ZCLROOM' ) }">\n| &&
-      |    <DimensionAttribute name="Room Id" usage="Key"><KeyColumn dataType="Integer" columnName="SID"/>| &&
-      |<OrderByColumn dataType="String" columnName="{ zzxxmla1_cl_bw_view_gen=>c_compound_key }"/>| &&
-      |<NameColumn dataType="String" columnName="{ zzxxmla1_cl_bw_view_gen=>c_compound_key }"/></DimensionAttribute>\n| &&
-      attribute_xml( name = `Room Key` column = `ZCLROOM` ) &&
-      attribute_xml( name = `Room Type` column = `ZCLRTYPE` ) &&
-      |    <Hierarchy hasAll="true" allMemberName="All Rooms">\n| &&
-      |      <Level name="Room" uniqueMembers="true" sourceAttribute="Room Id">\n| &&
-      |        <Property name="Room Key" sourceAttribute="Room Key"/>\n| &&
-      |        <Property name="Room Type" sourceAttribute="Room Type"/>\n| &&
-      |      </Level>\n| &&
-      |    </Hierarchy>\n| &&
-      |  </Dimension>\n|.
-
-    " the fiscal time: the year and the period compounded with the variant (K4/2024001, keyed by the SID on both
-    " providers); with the variant fixed the variant has one member (its view filtered on K4), and the year and the
-    " period, on their views filtered on K4, are named by their own key (2024001), still keyed by the SID
-    result = result &&
-      |  <Dimension name="Fiscal Year Variant" table="{ view_of( views = views iobjnm = 'ZCLFISCVR' fixed = fixed ) }">\n| &&
-      |    <DimensionAttribute name="Variant" usage="Key">| &&
-      key_columns( adso = adso column = `ZCLFISCVR` ) && |</DimensionAttribute>\n| &&
-      |    <Hierarchy hasAll="true" allMemberName="All Variants">\n| &&
-      |      <Level name="Variant" uniqueMembers="true" sourceAttribute="Variant"/>\n| &&
-      |    </Hierarchy>\n| &&
-      |  </Dimension>\n|.
-    LOOP AT VALUE ty_t_group_weight( ( scope = `Fiscal Year` key = `ZCLFISCYR` )
-                                     ( scope = `Fiscal Period` key = `ZCLFISCPR` ) ) INTO DATA(fiscal).
-      DATA(fiscal_view) = view_of( views = views iobjnm = CONV #( fiscal-key ) fixed = fixed ).
-      result = result &&
-        |  <Dimension name="{ fiscal-scope }" table="{ fiscal_view }">\n| &&
-        |    <DimensionAttribute name="{ fiscal-scope } Id" usage="Key">| &&
-        COND string( WHEN fixed = abap_true THEN key_columns( adso = abap_false column = fiscal-key )
-                     ELSE |<KeyColumn dataType="Integer" columnName="SID"/>| &&
-                          |<OrderByColumn dataType="String" columnName="{ zzxxmla1_cl_bw_view_gen=>c_compound_key }"/>| &&
-                          |<NameColumn dataType="String" columnName="{ zzxxmla1_cl_bw_view_gen=>c_compound_key }"/>| ) &&
-        |</DimensionAttribute>\n| &&
-        |    <Hierarchy hasAll="true" allMemberName="All { fiscal-scope }s">\n| &&
-        |      <Level name="{ fiscal-scope }" uniqueMembers="true" sourceAttribute="{ fiscal-scope } Id"/>\n| &&
-        |    </Hierarchy>\n| &&
-        |  </Dimension>\n|.
+      " the variant fixed to K4: the facts and the fiscal time on views filtered on it; the cube named as its catalog
+      DATA(fixed) = catalog_name( adso = xsdbool( provider = c_adso ) fixed = abap_true ).
+      TRY.
+          NEW zzxxmla1_cl_schema_fix( )->fix( EXPORTING cube      = schema-cubes[ 1 ]-name
+                                                        selection = k4( )
+                                              CHANGING  schema    = schema ).
+        CATCH zzxxmla1_cx_bw_provider INTO error.
+          write( |fix of { fixed }: FAILED, { error->get_text( ) }| ).
+          CONTINUE.
+      ENDTRY.
+      schema-name = fixed.
+      schema-cubes[ 1 ]-name = fixed.
+      schema-cubes[ 1 ]-caption = |{ schema-cubes[ 1 ]-caption } ({ c_fixed_variant })|.
+      accept( catalog = fixed schema = schema ).
     ENDLOOP.
-
-    DATA(usages) = VALUE string_table( ).
-    IF adso = abap_false.
-      " the date with its attributes: a time dimension; BW's blank member (year 0) would come first, so the default
-      " member is the last year
-      result = result &&
-        |  <Dimension name="Time" type="TimeDimension" table="{ view_of( views = views iobjnm = 'ZCLDATE' ) }">\n| &&
-        |    <DimensionAttribute name="Date Id" usage="Key" levelType="TimeDays">| &&
-        key_columns( adso = adso column = `ZCLDATE` ) && |</DimensionAttribute>\n| &&
-        attribute_xml( name = `The Date` column = `ZCLTHEDT` level_type = `TimeDays` ) &&
-        attribute_xml( name = `Day Name` column = `ZCLDAYNM` level_type = `TimeUndefined` ) &&
-        attribute_xml( name = `Month Name` column = `ZCLMONNM` level_type = `TimeMonths` ) &&
-        attribute_xml( name = `Year` column = `ZCLYEAR` level_type = `TimeYears` ) &&
-        attribute_xml( name = `Quarter` column = `ZCLQTR` level_type = `TimeQuarters` ) &&
-        attribute_xml( name = `Month of Year` column = `ZCLMONTH` level_type = `TimeMonths` ) &&
-        attribute_xml( name = `Week of Year` column = `ZCLWEEK` level_type = `TimeWeeks` ) &&
-        attribute_xml( name = `Day of Month` column = `ZCLDAYOM` level_type = `TimeDays` ) &&
-        |    <Hierarchy hasAll="false" defaultMember="[Time].[2025]">\n| &&
-        |      <Level name="Year" uniqueMembers="true" sourceAttribute="Year" levelType="TimeYears"/>\n| &&
-        |      <Level name="Quarter" uniqueMembers="false" sourceAttribute="Quarter" levelType="TimeQuarters"/>\n| &&
-        |      <Level name="Month" uniqueMembers="false" sourceAttribute="Month of Year" nameColumn="ZCLMONNM" | &&
-        |levelType="TimeMonths"/>\n| &&
-        |      <Level name="Day" uniqueMembers="true" sourceAttribute="The Date" levelType="TimeDays"/>\n| &&
-        |    </Hierarchy>\n| &&
-        |    <Hierarchy name="Weekly" hasAll="true">\n| &&
-        |      <Level name="Year" uniqueMembers="true" sourceAttribute="Year" levelType="TimeYears"/>\n| &&
-        |      <Level name="Week" uniqueMembers="false" sourceAttribute="Week of Year" levelType="TimeWeeks"/>\n| &&
-        |      <Level name="Day" uniqueMembers="true" sourceAttribute="The Date" levelType="TimeDays"/>\n| &&
-        |    </Hierarchy>\n| &&
-        |  </Dimension>\n|.
-      usages = VALUE #( ( |Patient:SID_ZCLPAT| ) ( |Physician:SID_ZCLDOC| ) ( |Diagnosis:SID_ZCLDIAG| )
-                        ( |Visit Type:SID_ZCLVTYPE| ) ( |Time:SID_ZCLDATE| ) ( |Site:SID_ZCLSITE| )
-                        ( |Room:SID_ZCLROOM| ) ( |Fiscal Year Variant:SID_ZCLFISCVR| )
-                        ( |Fiscal Year:SID_ZCLFISCYR| ) ( |Fiscal Period:SID_ZCLFISCPR| ) ).
-    ELSE.
-      " BW's time characteristics have no attributes: one dimension each, keyed by the value as the fact column
-      DATA(calendar) = VALUE ty_t_group_weight( ( scope = `Year` key = `0CALYEAR` )
-                                                ( scope = `Quarter` key = `0CALQUARTER` )
-                                                ( scope = `Month` key = `0CALMONTH` )
-                                                ( scope = `Week` key = `0CALWEEK` ) ).
-      LOOP AT calendar INTO DATA(period).
-        DATA(column) = iobj_field( struct = fact iobjnm = CONV #( period-key ) without_namespace = abap_true ).
-        result = result &&
-          |  <Dimension name="{ period-scope }" table="{ view_of( views = views iobjnm = CONV #( period-key ) ) }">\n| &&
-          |    <DimensionAttribute name="{ period-scope }" usage="Key">| &&
-          key_columns( adso = adso column = column ) && |</DimensionAttribute>\n| &&
-          |  </Dimension>\n|.
-      ENDLOOP.
-      LOOP AT VALUE ty_t_group_weight( ( scope = `Patient` key = `ZCLPAT` ) ( scope = `Physician` key = `ZCLDOC` )
-                                       ( scope = `Diagnosis` key = `ZCLDIAG` ) ( scope = `Visit Type` key = `ZCLVTYPE` )
-                                       ( scope = `Site` key = `ZCLSITE` ) ( LINES OF calendar ) ) INTO period.
-        APPEND |{ period-scope }:{ iobj_field( struct = fact iobjnm = CONV #( period-key ) without_namespace = adso ) }|
-          TO usages.
-      ENDLOOP.
-      " the room by its SID, which the fact view has, the fiscal year and period too (with the variant fixed as well)
-      APPEND |Room:SID_{ iobj_field( struct = fact iobjnm = 'ZCLROOM' without_namespace = adso ) }| TO usages.
-      APPEND |Fiscal Year Variant:{ iobj_field( struct = fact iobjnm = 'ZCLFISCVR' without_namespace = adso ) }|
-        TO usages.
-      APPEND |Fiscal Year:SID_ZCLFISCYR| TO usages.
-      APPEND |Fiscal Period:SID_ZCLFISCPR| TO usages.
-    ENDIF.
-
-    " the K4 schemas: the variant filters the cube
-    DATA(k4_selection) = k4( ).
-    DATA(variant) = k4_selection[ 1 ].
-    DATA(annotation) = zzxxmla1_cl_bw_selection=>annotation_name( characteristic = variant-iobjnm mode = variant-mode ).
-    DATA(rows) = zzxxmla1_cl_bw_selection=>rows_text( variant-rows ).
-    result = result &&
-      |  <Cube name="{ name }" caption="Clinic Visits{ caption }" defaultMeasure="Visits">\n| &&
-      COND string( WHEN fixed = abap_true
-                   THEN |    <Annotations><Annotation name="{ annotation }">{ rows }</Annotation></Annotations>\n| ) &&
-      |    <Table name="{ fact_table }"/>\n|.
-    " the characteristics other than time show only their values with visits, so the patients registered without a
-    " visit are no members (the time dimensions: to be decided, docs/mvp-scope.md, Members with facts)
-    DATA(time_dimensions) = VALUE string_table( ( `Time` ) ( `Year` ) ( `Quarter` ) ( `Month` ) ( `Week` ) ).
-    LOOP AT usages INTO DATA(usage).
-      SPLIT usage AT `:` INTO DATA(dimension) DATA(foreign_key).
-      result = result && |    <DimensionUsage name="{ dimension }" source="{ dimension }" foreignKey="{ foreign_key }"|.
-      IF line_exists( time_dimensions[ table_line = dimension ] ).
-        result = result && |/>\n|.
-      ELSE.
-        result = result && |>\n      <Annotations><Annotation name="{ zzxxmla1_cl_schema=>c_members_with_facts }">| &&
-                           |true</Annotation></Annotations>\n    </DimensionUsage>\n|.
-      ENDIF.
-    ENDLOOP.
-    DATA(duration) = iobj_field( struct = fact iobjnm = 'ZCLDUR' without_namespace = without_namespace ).
-    DATA(visit_number) = iobj_field( struct = fact iobjnm = 'ZCLVISNO' without_namespace = without_namespace ).
-    DATA(wait) = iobj_field( struct = fact iobjnm = 'ZCLWAIT' without_namespace = without_namespace ).
-    DATA(labs) = iobj_field( struct = fact iobjnm = 'ZCLLABS' without_namespace = without_namespace ).
-    DATA(charges) = iobj_field( struct = fact iobjnm = 'ZCLCHRG' without_namespace = without_namespace ).
-    result = result &&
-      |    <Measure name="Visits" column="{ visit_number }" aggregator="sum" | &&
-      |formatString="#,##0"/>\n| &&
-      |    <Measure name="Duration Min" column="{ duration }" aggregator="sum" formatString="#,##0"/>\n| &&
-      |    <Measure name="Waiting Min" column="{ wait }" aggregator="sum" | &&
-      |formatString="#,##0"/>\n| &&
-      |    <Measure name="Lab Tests" column="{ labs }" aggregator="sum" | &&
-      |formatString="#,##0"/>\n| &&
-      |    <Measure name="Charges" column="{ charges }" aggregator="sum" | &&
-      |formatString="#,##0.00"/>\n| &&
-      |  </Cube>\n| &&
-      |</Schema>\n|.
   ENDMETHOD.
 
-  METHOD write_catalog.
-    IF xml IS INITIAL.
-      write( |catalog { catalog }: FAILED, no schema| ).
-      RETURN.
+  METHOD propose.
+    DATA(reader) = NEW zzxxmla1_cl_bw_provider( ).
+    DATA(read) = reader->read( provider ).
+    DATA(defaults) = NEW zzxxmla1_cl_schema_defaults( )->propose( read ).
+    IF defaults-selection IS NOT INITIAL.
+      read = reader->read( name = provider selection = defaults-selection ).
     ENDIF.
-    DATA(path) = |/WEB-INF/schema/{ catalog }.xml|.
-    zzxxmla1_cl_files=>write( path = path content = xml ).
+    result = NEW zzxxmla1_cl_schema_proposal( )->propose( provider = read time = defaults-time )-schema.
+  ENDMETHOD.
+
+  METHOD accept.
+    DATA(response) = NEW zzxxmla1_cl_schema_api( )->handle( VALUE #(
+      method     = `POST`
+      path       = |{ zzxxmla1_cl_schema_api=>c_path }accept|
+      parameters = VALUE #( ( name = `catalog` value = catalog ) )
+      body       = zzxxmla1_cl_schema_def=>to_xml( schema ) ) ).
+    write( |catalog { catalog }: { COND string( WHEN response-status = 200 THEN `accepted`
+                                                ELSE |FAILED, { response-status } { response-body }| ) }| ).
+  ENDMETHOD.
+
+  METHOD remove_catalogs.
     DATA(datasources) = zzxxmla1_cl_files=>read( zzxxmla1_cl_files=>c_datasources )-content.
-    IF datasources IS INITIAL.
-      datasources = zzxxmla1_cl_files=>default_datasources( ).
-    ENDIF.
-    IF datasources NS |<Catalog name="{ catalog }">|.
-      " into the first data source's Catalogs
-      FIND FIRST OCCURRENCE OF `</Catalogs>` IN datasources MATCH OFFSET DATA(offset).
-      IF sy-subrc <> 0.
-        ROLLBACK WORK.
-        write( |catalog { catalog }: FAILED, { zzxxmla1_cl_files=>c_datasources } has no Catalogs| ).
-        RETURN.
+    DATA(api) = NEW zzxxmla1_cl_schema_api( ).
+    LOOP AT VALUE string_table( ( catalog_name( adso = abap_false fixed = abap_false ) )
+                                ( catalog_name( adso = abap_true fixed = abap_false ) )
+                                ( catalog_name( adso = abap_false fixed = abap_true ) )
+                                ( catalog_name( adso = abap_true fixed = abap_true ) ) ) INTO DATA(catalog).
+      IF datasources NS |<Catalog name="{ catalog }">|.
+        CONTINUE.
       ENDIF.
-      datasources = substring( val = datasources len = offset ) &&
-                    |  <Catalog name="{ catalog }">\n| &&
-                    |        <Definition>{ path }</Definition>\n| &&
-                    |      </Catalog>\n    | &&
-                    substring( val = datasources off = offset ).
-    ENDIF.
-    zzxxmla1_cl_files=>write( path = zzxxmla1_cl_files=>c_datasources content = datasources ).
-    COMMIT WORK.
-    write( |catalog { catalog }: { path }| ).
+      DATA(response) = api->handle( VALUE #( method     = `POST`
+                                             path       = |{ zzxxmla1_cl_schema_api=>c_path }remove|
+                                             parameters = VALUE #( ( name = `catalog` value = catalog ) ) ) ).
+      write( |remove catalog { catalog }: { COND string( WHEN response-status = 200 THEN `done`
+                                                         ELSE |FAILED, { response-status } { response-body }| ) }| ).
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD iobj_field.

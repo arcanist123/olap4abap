@@ -309,11 +309,12 @@ Read before designing anything:
   `ZZXXMLA1_TRCUSR` and `ZZXXMLA1_DSCACHE`, which sapcli neither exports nor imports): it deletes
   the schema builder's old copies below `/schema/` and, if there is none, writes a
   `/WEB-INF/datasources.xml` without catalogs; with its checkbox also the clinic demo (`docs/clinic-demo.md`): InfoCube
-  `ZCLVISIT` and aDSO `ZCLVISITA` with made-up visits of patients to a clinic, their schemas and catalogs
-  (`ZZXXMLA1_CL_BW_CLINIC_GEN`), and per provider a catalog with the fiscal year variant fixed to K4 (`ZCLVISIT_K4`,
+  `ZCLVISIT` and aDSO `ZCLVISITA` with made-up visits of patients to a clinic (every characteristic with EN texts),
+  their schemas and catalogs (`ZZXXMLA1_CL_BW_CLINIC_GEN`; the schema generator's proposals, accepted through the schema
+  API), and per provider a catalog with the fiscal year variant fixed to K4 (`POST fix`; `ZCLVISIT_K4`,
   `ZCLVISITA_K4`, the variant a dimension with one member); its room `ZCLROOM` is compounded with the site `ZCLSITE`, its fiscal year and period with the
   variant `ZCLFISCVR`. 300 of its patients are registered without a visit, and its schemas annotate every
-  dimension but time `olap4abap.membersWithFacts`. The clinic demo is the
+  dimension `olap4abap.membersWithFacts` (the proposal marks none as time). The clinic demo is the
   project's own demo data; FoodMart stays the test source.
   For looking into BW's analysis authorizations its physician `ZCLDOC` is authorization relevant and has two
   hierarchies, `ZCLDOC_ORG` and `ZCLDOC_SITE` (two names are needed for authorization tests): version dependent,

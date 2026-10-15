@@ -6,7 +6,8 @@
 #
 # abaplint (run with npx, version pinned below) parses offline with the grammar of the release in abaplint.json and
 # checks the syntax against stubs: SAP's standard objects from github.com/abaplint/deps (abaplint clones it into a
-# temporary folder) and our own in abaplint/stubs/ (the BW type pools).
+# temporary folder). The project has no stubs of its own: it copies no SAP source, so a class names BW's codes (type
+# pools RS, RSD, RSDMD) as constants of its own.
 # check_syntax skips ZZXXMLA1_MAIN_ENDPOINT only because the deps stub of IF_HTTP_SERVER lacks SSL_ACTIVE; its 7.50
 # grammar is still checked. abaplint does not check the parameters of built-in functions, so the release-specific
 # ones are searched for below (pcre = needs 7.55).
