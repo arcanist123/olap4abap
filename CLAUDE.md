@@ -354,7 +354,9 @@ Read before designing anything:
   `RSRHIEDIR_OLAP` (`HIESID`, `SVER`, `TIMESTMP`) and refills a missing one in the database under `ENQUEUE_E_TABLE`,
   cross-checked with BW's correction factors; a copy lives as long as BW keeps its version. The refusals are faults
   of the query (`ZZXXMLA1_CX_BW_HIERARCHY`). `values_of` gives a member's SIDs as a statement with bound parameters
-  (`ZZXXMLA1_CL_SQL`'s `params`) (`scripts/hierarchy_copy_test.py`). Not yet in the schema, the engine or accept.
+  (`ZZXXMLA1_CL_SQL`'s `params`) (`scripts/hierarchy_copy_test.py`). Program `ZZXXMLA1_HIERARCHY_COPY` (SE38)
+  creates the objects of the characteristics selected and copies their hierarchies (`run`), listing per hierarchy the
+  copy or its refusal and its counts. Not yet in the schema, the engine or accept.
 - Reference: eMondrian built from source and running in Docker; captured exchanges are in `reference/`.
 
 ## Syncing ABAP code with git

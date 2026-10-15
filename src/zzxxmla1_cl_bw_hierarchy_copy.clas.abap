@@ -102,6 +102,28 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
         params TYPE zzxxmla1_cl_sql=>ty_t_param,
       END OF ty_statement.
 
+    TYPES ty_r_iobjnm TYPE RANGE OF rsiobjnm.
+    TYPES ty_r_hienm TYPE RANGE OF rshienm.
+    TYPES:
+      "! the outcome of copying a hierarchy (run): the copy, or the error; its counts and the time of current
+      BEGIN OF ty_run,
+        characteristic TYPE rsiobjnm,
+        name           TYPE rshienm,
+        error          TYPE string,
+        tables         TYPE ty_tables,
+        hierarchy      TYPE ty_hierarchy,
+        nodes          TYPE i,          " node rows
+        inner_nodes    TYPE i,
+        closure_rows   TYPE i,          " of the closure table
+        depth          TYPE i,
+        identity_rows  TYPE i,
+        root_rows      TYPE i,          " the All member's rows of the closure table
+        all_values     TYPE i,          " the All member's values, read as a query reads them
+        rest_values    TYPE i,          " the not-assigned node's values, read as a query reads them
+        microseconds   TYPE i,
+      END OF ty_run,
+      ty_t_run TYPE STANDARD TABLE OF ty_run WITH EMPTY KEY.
+
     "! package: the package new tables are created in.
     METHODS constructor
       IMPORTING package TYPE devclass DEFAULT c_default_package.
@@ -123,6 +145,12 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
       IMPORTING hierarchy     TYPE ty_hierarchy
                 node_sid      TYPE i
       RETURNING VALUE(result) TYPE ty_statement.
+    "! Creates the objects of each characteristic and copies each of its time-independent hierarchies that are not
+    "! version dependent (program ZZXXMLA1_HIERARCHY_COPY, the class run for scripts/hierarchy_copy_test.py).
+    METHODS run
+      IMPORTING characteristics TYPE ty_r_iobjnm
+                hierarchies     TYPE ty_r_hienm OPTIONAL
+      RETURNING VALUE(result)   TYPE ty_t_run.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -314,23 +342,42 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD if_oo_adt_classrun~main.
-    " the plain hierarchies of the clinic demo: tables, copy and BW's counts, tab-separated for
-    " scripts/hierarchy_copy_test.py
+    " the plain hierarchies of the clinic demo, tab-separated for scripts/hierarchy_copy_test.py
+    DATA(rows) = run( VALUE #( sign = 'I' option = 'EQ' ( low = 'ZCLDIAG' ) ( low = 'ZCLPAT' ) ( low = 'ZCLSERV' ) ) ).
+    DATA(t) = cl_abap_char_utilities=>horizontal_tab.
+    LOOP AT rows INTO DATA(row).
+      IF row-error IS NOT INITIAL.
+        out->write( |{ row-characteristic }{ t }{ row-name }{ t }ERROR{ t }{ row-error }| ).
+        CONTINUE.
+      ENDIF.
+      DATA(hierarchy) = row-hierarchy.
+      out->write( |{ row-characteristic }{ t }{ row-name }{ t }OK{ t }{ row-tables-node }{ t }{ row-tables-closure }{ t }| &&
+                  |{ hierarchy-hiesid }/{ hierarchy-sver }{ t }{ hierarchy-refilled }{ t }{ hierarchy-root_sid }{ t }| &&
+                  |{ hierarchy-rest_top_sid }{ t }{ hierarchy-rest_shown }{ t }{ row-nodes }{ t }{ row-inner_nodes }{ t }| &&
+                  |{ row-closure_rows }{ t }{ row-depth }{ t }{ row-all_values }{ t }{ row-rest_values }{ t }| &&
+                  |{ row-microseconds }{ t }{ row-identity_rows }{ t }{ row-root_rows }{ t }{ hierarchy-closure }| ).
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD run.
     SELECT iobjnm, hienm FROM rshiedir
-      WHERE iobjnm IN ('ZCLDIAG', 'ZCLPAT', 'ZCLSERV') AND objvers = 'A' AND version = ''
+      WHERE iobjnm IN @characteristics AND hienm IN @hierarchies AND objvers = 'A' AND version = ''
+        AND dateto = '99991231'
       ORDER BY iobjnm ASCENDING, hienm ASCENDING
-      INTO TABLE @DATA(hierarchies).
-    LOOP AT hierarchies INTO DATA(row).
+      INTO TABLE @DATA(rows).
+    LOOP AT rows INTO DATA(row).
+      DATA(line) = VALUE ty_run( characteristic = row-iobjnm name = row-hienm ).
       TRY.
-          DATA(tables) = create_tables( row-iobjnm ).
+          line-tables = create_tables( row-iobjnm ).
           GET RUN TIME FIELD DATA(started).
-          DATA(hierarchy) = current( characteristic = row-iobjnm name = row-hienm ).
+          line-hierarchy = current( characteristic = row-iobjnm name = row-hienm ).
           GET RUN TIME FIELD DATA(stopped).
-          DATA(hiesid) = NEW i( hierarchy-hiesid ).
-          DATA(sver) = NEW string( hierarchy-sver ).
-          DATA(root_sid) = NEW i( hierarchy-root_sid ).
-          DATA(node) = quote( tables-node ).
-          DATA(closure) = quote( tables-closure ).
+          line-microseconds = stopped - started.
+          DATA(hiesid) = NEW i( line-hierarchy-hiesid ).
+          DATA(sver) = NEW string( line-hierarchy-sver ).
+          DATA(root_sid) = NEW i( line-hierarchy-root_sid ).
+          DATA(node) = quote( line-tables-node ).
+          DATA(closure) = quote( line-tables-closure ).
           DATA(counts) = zzxxmla1_cl_sql=>query(
             sql     = |SELECT ( SELECT COUNT( * ) FROM { node } WHERE "HIESID" = ? AND "SVER" = ? ), | &&
                       |( SELECT COUNT( * ) FROM { node } WHERE "HIESID" = ? AND "SVER" = ? AND "SID" < 0 ), | &&
@@ -342,19 +389,21 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
             columns = 6
             params  = VALUE #( ( hiesid ) ( sver ) ( hiesid ) ( sver ) ( hiesid ) ( sver ) ( hiesid ) ( sver )
                                ( hiesid ) ( sver ) ( hiesid ) ( sver ) ( root_sid ) ) ).
-          DATA(root) = values_of( hierarchy = hierarchy node_sid = hierarchy-root_sid ).
-          DATA(rest) = values_of( hierarchy = hierarchy node_sid = hierarchy-rest_top_sid ).
-          DATA(root_count) = lines( zzxxmla1_cl_sql=>query( sql = root-sql columns = 1 params = root-params ) ).
-          DATA(rest_count) = lines( zzxxmla1_cl_sql=>query( sql = rest-sql columns = 1 params = rest-params ) ).
-          DATA(line) = counts[ 1 ].
-          out->write( |{ row-iobjnm }\t{ row-hienm }\tOK\t{ tables-node }\t{ tables-closure }\t| &&
-                      |{ hierarchy-hiesid }/{ hierarchy-sver }\t{ hierarchy-refilled }\t{ hierarchy-root_sid }\t| &&
-                      |{ hierarchy-rest_top_sid }\t{ hierarchy-rest_shown }\t{ line[ 1 ] }\t{ line[ 2 ] }\t| &&
-                      |{ line[ 3 ] }\t{ line[ 4 ] }\t{ root_count }\t{ rest_count }\t{ stopped - started }\t| &&
-                      |{ line[ 5 ] }\t{ line[ 6 ] }\t{ hierarchy-closure }| ).
+          DATA(count) = counts[ 1 ].
+          line-nodes = count[ 1 ].
+          line-inner_nodes = count[ 2 ].
+          line-closure_rows = count[ 3 ].
+          line-depth = count[ 4 ].
+          line-identity_rows = count[ 5 ].
+          line-root_rows = count[ 6 ].
+          DATA(root) = values_of( hierarchy = line-hierarchy node_sid = line-hierarchy-root_sid ).
+          DATA(rest) = values_of( hierarchy = line-hierarchy node_sid = line-hierarchy-rest_top_sid ).
+          line-all_values = lines( zzxxmla1_cl_sql=>query( sql = root-sql columns = 1 params = root-params ) ).
+          line-rest_values = lines( zzxxmla1_cl_sql=>query( sql = rest-sql columns = 1 params = rest-params ) ).
         CATCH zzxxmla1_cx_bw_hierarchy zzxxmla1_cx_sql INTO DATA(error).
-          out->write( |{ row-iobjnm }\t{ row-hienm }\tERROR\t{ error->get_text( ) }| ).
+          line-error = error->get_text( ).
       ENDTRY.
+      APPEND line TO result.
     ENDLOOP.
   ENDMETHOD.
 
