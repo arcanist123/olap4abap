@@ -24,8 +24,10 @@ needs no key date, so this does not wait for one. Afterwards the key date (time-
 navigation attributes read on a date instead of 9999-12-31; open: how a client, Excel above all, sends it), then time-
 and version-dependent hierarchies on both (the clinic demo's `ZCLDOC_ORG`, `ZCLDOC_SITE`).
 
-Test case: the clinic demo's `ZCLDIAG_ICD` (All Diagnoses > chapter > group > diagnosis, 69 nodes, plain;
-`clinic-demo.md`, The hierarchy of the diagnoses).
+Test cases: the clinic demo's `ZCLDIAG_ICD` (All Diagnoses > chapter > group > diagnosis, 69 nodes, plain;
+`clinic-demo.md`, The hierarchy of the diagnoses) and, for shared nodes, `ZCLPAT_PRG` (care programs > program >
+patient, plain: link nodes, a subtree under two parents, recursively, and patients under two programs as duplicate
+and link leaves; `clinic-demo.md`, The hierarchy of the care programs).
 
 BW's tables (looked at on `ZCLDIAG`): `/BIC/H<char>` is the node tree (`NODEID`, `PARENTID`, `CHILDID`, `NEXTID`,
 `TLEVEL`, `LINK`); `/BIC/I<char>` (SID structure, written by BW on activation) has a row per node with its parent's
@@ -35,8 +37,11 @@ SID (`PRED`), its own (`SUCC`), its position in depth-first order (`LISTNO`), `T
 
 Decided with the user 2026-10-15:
 
-- **Multiple parents.** A node can be under several parents (BW's link nodes), recursively, and its subtree has the
-  same shape under each. Members are its occurrences (one per path, as BW shows it): every member has one parent,
+- **Multiple parents.** A node can be under several parents, recursively: as a link node (`LINK` = `X`, no children
+  of its own, BW shows its original's subtree) or, for a value of the characteristic, as a duplicate node (BW takes a
+  value more than once without a link, each occurrence with children of its own). Its subtree has the same shape under
+  each (decided with the user 2026-10-15): BW lets one duplicate of a value have a subtree and another have none or a
+  different one, which we refuse; a link node has its original's subtree, so it always qualifies. Members are its occurrences (one per path, as BW shows it): every member has one parent,
   so `Parent`, `Ancestor` and drill-down keep their meaning, and unique names are paths
   (`[ZCLDIAG.ZCLDIAG_ICD].[ROOT].[A00-B99].[A00]`), stable across rebuilds while the structure is (an occurrence id
   would change with each rebuild and break saved Excel pivots). `&[key]` of a value with several occurrences finds
@@ -74,12 +79,13 @@ Decided with the user 2026-10-15:
 - **Portable SQL:** no HANA-only features (BW's cached column hierarchy views, hierarchy functions, CDS
   hierarchies): plain tables and standard SQL, so that the engine can later run on another database (Later: DuckDB).
 - **Demo:** the clinic demo gets a hierarchy with shared nodes (link nodes, recursively), a postable node and an
-  interval leaf.
+  interval leaf. Done: the shared nodes (`ZCLPAT_PRG` on the patient); not yet: the postable node and the interval
+  leaf.
 
 Open:
 
-1. Whether `/BIC/I` holds the shared subtrees expanded, with their own `LISTNO` (needs the demo's hierarchy with
-   link nodes); this decides between the one-statement and the per-depth closure.
+1. Answered 2026-10-15 on `ZCLPAT_PRG`: `/BIC/I` holds the shared subtrees expanded, every occurrence with its own
+   `LISTNO` (613 nodes, 1,072 numbered rows), so the closure is one statement.
 2. The schema: `parentColumn` with `<Closure>` as the reference models it, with our extensions (the closure's child
    is the SID, members are occurrences); `ZZXXMLA1_CL_SCHEMA` refuses both today. The reference can be the oracle
    for single-parent hierarchies only; for shared nodes, BW's own MDX (`ZZXXMLA1_BW_AUTH_PROBE`).

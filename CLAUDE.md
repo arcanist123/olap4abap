@@ -330,7 +330,9 @@ Read before designing anything:
   For looking into BW's analysis authorizations its physician `ZCLDOC` is authorization relevant and has two
   hierarchies, `ZCLDOC_ORG` and `ZCLDOC_SITE` (two names are needed for authorization tests): version dependent,
   entire hierarchy time dependent, two versions of two time slices each; the diagnosis `ZCLDIAG` is authorization
-  relevant with the plain hierarchy `ZCLDIAG_ICD`, for authorizations that combine the two characteristics.
+  relevant with the plain hierarchy `ZCLDIAG_ICD`, for authorizations that combine the two characteristics. The
+  patient `ZCLPAT` has the plain hierarchy `ZCLPAT_PRG` (care programs) with link nodes (subtrees under two parents,
+  recursively) and duplicate and link leaves (patients in two programs), the test case of shared nodes (`docs/clinic-demo.md`).
   With another checkbox the wide demo (`docs/wide-demo.md`, `ZZXXMLA1_CL_BW_WIDE_GEN`): InfoCube
   `ZXMLWIDE` and aDSO `ZXMLWIDEA` with 100 characteristics `ZXMLAD00`-`ZXMLAD99` of 1,000 members each (`ZXMLAD00`
   100,000), one key figure

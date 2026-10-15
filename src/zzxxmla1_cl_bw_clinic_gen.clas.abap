@@ -17,6 +17,9 @@
 "!   hierarchy time dependent, each with two versions of two time slices,
 "! - on the diagnosis ZCLDIAG, also authorization relevant, the plain hierarchy ZCLDIAG_ICD (all diagnoses > chapter >
 "!   group > diagnosis), for authorizations that combine both characteristics,
+"! - on the patient ZCLPAT the plain hierarchy ZCLPAT_PRG (care programs > program > patient) with link nodes: a
+"!   patient in two programs is a leaf in both (a duplicate node, or a link node), the heart program is under chronic
+"!   care and under senior care, and senior care with it under prevention (link nodes),
 "! - the room ZCLROOM, compounded with the site ZCLSITE: the same rooms R01 to R04 at both sites, so a room is a member
 "!   only with its site (docs/bw-schema-design-guide.md, section 3.7),
 "! - the fiscal time, a dimension of its own: the fiscal year variant ZCLFISCVR (K1, K2, K4), the fiscal year ZCLFISCYR
@@ -53,6 +56,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     CONSTANTS c_hierarchy_org  TYPE rshienm VALUE 'ZCLDOC_ORG'.
     CONSTANTS c_hierarchy_site TYPE rshienm VALUE 'ZCLDOC_SITE'.
     CONSTANTS c_hierarchy_diag TYPE rshienm VALUE 'ZCLDIAG_ICD'.
+    CONSTANTS c_hierarchy_prg  TYPE rshienm VALUE 'ZCLPAT_PRG'.
 
     "! Deletes everything and generates the InfoObjects with their master data and hierarchies, and the providers
     "! asked for with their data, schemas and catalogs; the log of the run.
@@ -184,11 +188,13 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
       END OF ty_physician,
       ty_t_physician TYPE STANDARD TABLE OF ty_physician WITH EMPTY KEY.
     TYPES:
-      "! a node of a hierarchy of the physicians: a text node (with a text) or a physician (its key, no text)
+      "! a node of a hierarchy: a text node (with a text) or a value of the characteristic (its key, no text); a link
+      "! node shows the subtree of the node of its name that is no link
       BEGIN OF ty_hie_node,
         name   TYPE string,
         parent TYPE string,
         text   TYPE string,
+        link   TYPE abap_bool,
       END OF ty_hie_node,
       ty_t_hie_node TYPE STANDARD TABLE OF ty_hie_node WITH EMPTY KEY.
     TYPES:
@@ -283,7 +289,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
                 registered TYPE abap_bool DEFAULT abap_false.
     METHODS build_physicians.
     METHODS build_diagnoses.
-    "! The time slices of the versions of ZCLDOC_ORG and ZCLDOC_SITE.
+    "! The time slices of the versions of ZCLDOC_ORG and ZCLDOC_SITE, ZCLDIAG_ICD and ZCLPAT_PRG.
     METHODS hierarchies RETURNING VALUE(result) TYPE ty_t_hierarchy.
     "! The nodes of a time slice of ZCLDOC_ORG: the text nodes and below its department every physician, moved ones
     "! elsewhere.
@@ -300,6 +306,9 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     "! Appends a node and its subtree to the hierarchy table (NDI format: parent, first child and next sibling).
     "! The nodes of ZCLDIAG_ICD: all diagnoses > chapter > group > diagnosis.
     METHODS diagnosis_nodes RETURNING VALUE(result) TYPE ty_t_hie_node.
+    "! The nodes of ZCLPAT_PRG: all care programs > area > program > patient; a program under a second parent is a link
+    "! node, a patient in a second program a duplicate node or a link node.
+    METHODS care_program_nodes RETURNING VALUE(result) TYPE ty_t_hie_node.
     "! A text node's name for a text: upper case, a blank or hyphen as underscore, at most 32 characters.
     METHODS node_name IMPORTING text TYPE string RETURNING VALUE(result) TYPE string.
     METHODS add_node
@@ -507,7 +516,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       " the dimension characteristics
       ( name = 'ZCLPAT'   text = 'Patient'    datatp = 'NUMC' leng = 6
         attributes = VALUE #( ( 'ZCLPNAME' ) ( 'ZCLSEX' ) ( 'ZCLBYEAR' ) ( 'ZCLAGEGR' ) ( 'ZCLBLOOD' ) ( 'ZCLINSUR' )
-                              ( 'ZCLCITY' ) ( 'ZCLREGIO' ) ) )
+                              ( 'ZCLCITY' ) ( 'ZCLREGIO' ) )
+        hierarchies = abap_true )
       ( name = 'ZCLDOC'   text = 'Physician'  datatp = 'NUMC' leng = 3
         attributes = VALUE #( ( 'ZCLDNAME' ) ( 'ZCLDEPT' ) ( 'ZCLEXPER' ) )
         hierarchies = abap_true hie_versions = abap_true hie_timedep = abap_true auth_relevant = abap_true )
@@ -828,6 +838,47 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     " the diagnoses in a plain hierarchy, neither version nor time dependent
     APPEND VALUE #( iobjnm = 'ZCLDIAG' name = c_hierarchy_diag dateto = '99991231' text = `Diagnoses by ICD-10 Chapter`
                     nodes = diagnosis_nodes( ) ) TO result.
+    " the patients' care programs, plain too, with link nodes
+    APPEND VALUE #( iobjnm = 'ZCLPAT' name = c_hierarchy_prg dateto = '99991231' text = `Care Programs`
+                    nodes = care_program_nodes( ) ) TO result.
+  ENDMETHOD.
+
+  METHOD care_program_nodes.
+    " The heart program is under chronic care and under senior care, and senior care under prevention too: link nodes,
+    " whose subtree is their original's, so the heart program's patients are in the hierarchy three times, a link node
+    " in a linked subtree. A patient in two programs is a leaf in both: a duplicate node (BW takes a value more than
+    " once), in fall prevention a link node if the patient is in the heart program too.
+    result = VALUE #(
+      ( name = `PROGRAMS` text = `All Care Programs` )
+      ( name = `CHRONIC`     parent = `PROGRAMS`   text = `Chronic Care` )
+      ( name = `DIABETES`    parent = `CHRONIC`    text = `Diabetes Program` )
+      ( name = `HEART`       parent = `CHRONIC`    text = `Heart Program` )
+      ( name = `RESPIRATORY` parent = `CHRONIC`    text = `Respiratory Program` )
+      ( name = `SENIOR`      parent = `PROGRAMS`   text = `Senior Care` )
+      ( name = `HEART`       parent = `SENIOR`     text = `Heart Program` link = abap_true )
+      ( name = `FALLS`       parent = `SENIOR`     text = `Fall Prevention` )
+      ( name = `PREVENTION`  parent = `PROGRAMS`   text = `Prevention` )
+      ( name = `SENIOR`      parent = `PREVENTION` text = `Senior Care` link = abap_true )
+      ( name = `CHILD`       parent = `PREVENTION` text = `Child Health` ) ).
+    " By age group and number, no random draw (the visits stay as they were); the patients without a visit too. Most
+    " patients are in no program (BW's not assigned).
+    LOOP AT patients INTO DATA(patient).
+      DATA(adult) = xsdbool( patient-age_group = `40-64` OR patient-age_group = `65+` ).
+      DATA(senior) = xsdbool( patient-age_group = `65+` ).
+      DATA(programs) = VALUE string_table(
+        ( COND #( WHEN adult = abap_true AND patient-id MOD 9 = 0 THEN `DIABETES` ) )
+        ( COND #( WHEN senior = abap_true AND patient-id MOD 4 = 0
+                    OR patient-age_group = `40-64` AND patient-id MOD 12 = 0 THEN `HEART` ) )
+        ( COND #( WHEN adult = abap_true AND patient-id MOD 10 = 4 THEN `RESPIRATORY` ) )
+        ( COND #( WHEN senior = abap_true AND patient-id MOD 6 = 0 THEN `FALLS` ) )
+        ( COND #( WHEN patient-age_group = `0-17` AND patient-id MOD 5 = 0 THEN `CHILD` ) ) ).
+      LOOP AT programs INTO DATA(program) WHERE table_line IS NOT INITIAL.
+        APPEND VALUE #( name   = |{ patient-id WIDTH = 6 ALIGN = RIGHT PAD = '0' }|
+                        parent = program
+                        link   = xsdbool( program = `FALLS` AND line_exists( programs[ table_line = `HEART` ] ) ) )
+               TO result.
+      ENDLOOP.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD diagnosis_nodes.
@@ -885,7 +936,12 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
                     iobjnm   = COND #( WHEN node-text IS INITIAL THEN iobjnm ELSE '0HIER_NODE' )
                     nodename = node-name
                     tlevel   = tlevel
+                    link     = node-link
                     parentid = parentid ) TO htab.
+    " BW shows a link node's original's subtree below it: it has no children of its own
+    IF node-link = abap_true.
+      RETURN.
+    ENDIF.
     LOOP AT nodes INTO DATA(child) WHERE parent = node-name.
       DATA(childid) = CONV rshienodid( lines( htab ) + 1 ).
       IF previous IS INITIAL.
@@ -1751,6 +1807,9 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     texts = VALUE #( ( langu = 'E' txtsh = hierarchy-text txtmd = hierarchy-text txtlg = hierarchy-text ) ).
     node_texts = VALUE #( FOR n IN hierarchy-nodes WHERE ( text IS NOT INITIAL )
                           ( langu = 'E' nodename = n-name txtsh = n-text txtmd = n-text txtlg = n-text ) ).
+    " a link node's text is its original's
+    SORT node_texts BY nodename.
+    DELETE ADJACENT DUPLICATES FROM node_texts COMPARING nodename.
     DATA(header) = VALUE rsndi_s_hierupdate( hienm    = hierarchy-name
                                              version  = hierarchy-version
                                              iobjnm   = hierarchy-iobjnm
@@ -1786,7 +1845,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       ROLLBACK WORK.
     ENDIF.
     write( |hierarchy { hierarchy-name } version { hierarchy-version }, { hierarchy-datefrom DATE = ISO } to | &&
-           |{ hierarchy-dateto DATE = ISO }: { lines( htab ) } nodes, | &&
+           |{ hierarchy-dateto DATE = ISO }: { lines( htab ) } nodes | &&
+           |({ lines( VALUE ty_t_htab( FOR h IN htab WHERE ( link = abap_true ) ( h ) ) ) } links), | &&
            |{ COND string( WHEN subrc = 0 THEN `active` ELSE |FAILED, subrc { subrc }| ) }| ).
     IF subrc <> 0.
       write_ndi_messages( messages ).

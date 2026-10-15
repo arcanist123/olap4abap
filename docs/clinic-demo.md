@@ -48,6 +48,8 @@ on a test system: the visits are thinned evenly over the days, so every day keep
   with BW's analysis authorizations, also in combination. BW's own queries on `ZCLVISIT`/`ZCLVISITA` (RSRT, BEx,
   Analysis for Office) then need an analysis authorization that covers `ZCLDOC` and `ZCLDIAG`; olap4abap reads the
   tables and checks no authorizations.
+- The patient `ZCLPAT` has the hierarchy `ZCLPAT_PRG` with **duplicate and link nodes** (shared subtrees and patients
+  under two parents, see below), the test case of BW hierarchies with shared nodes; it is not authorization relevant.
 - Key figures: `ZCLVISNO` (1 per visit: the aDSO adds up visits with the same keys, so counting rows would not count
   visits), `ZCLDUR` duration, `ZCLWAIT` waiting time (minutes), `ZCLLABS` lab tests, `ZCLCHRG` charges.
 - Texts: every characteristic has language-dependent short, medium and long texts (a text table `/BIC/T...`), and the
@@ -126,6 +128,45 @@ version. The text nodes are named by their text in upper case with `_` for blank
 `RESPIRATORY`, `UPPER_RESPIRATORY_INFECTIONS`, `CHRONIC_LOWER_RESPIRATORY_DISEAS`, `CHECK_UPS`, ... A department
 treats some chapters more than others (respiratory diagnoses mostly in pulmonology, general practice and pediatrics),
 so a node of each hierarchy restricts the visits differently from their intersection.
+
+## The hierarchy of the care programs
+
+The patient `ZCLPAT` has the hierarchy `ZCLPAT_PRG`, Care Programs, plain as `ZCLDIAG_ICD` (neither version nor time
+dependent), with a node in several places in both of BW's ways:
+
+- a **duplicate node**: BW takes a value of the characteristic more than once, each an ordinary node (with children
+  of its own; BW even lets one duplicate have a subtree and another none, which olap4abap refuses: duplicates must
+  have the same subtree, `next-steps.md`, Multiple parents); here leaves only;
+- a **link node** (`LINK` = `X` in `/BIC/HZCLPAT`, `link` of the generator's node): no children of its own, BW shows
+  its original's subtree (the node of that name that is no link) below it; a value or a text node.
+
+```
+All Care Programs  PROGRAMS
+├── Chronic Care  CHRONIC
+│   ├── Diabetes Program  DIABETES        127 patients
+│   ├── Heart Program  HEART              185 patients (30 also in Diabetes: duplicates)
+│   └── Respiratory Program  RESPIRATORY  118 patients (45 duplicates)
+├── Senior Care  SENIOR
+│   ├── Heart Program  HEART              link: the heart program's subtree again
+│   └── Fall Prevention  FALLS             87 patients (39 links: also in Heart; 21 duplicates)
+└── Prevention  PREVENTION
+    ├── Senior Care  SENIOR               link: Senior Care's subtree, with its link to HEART (recursive)
+    └── Child Health  CHILD                85 patients
+```
+
+So the heart program's patients are in the hierarchy three times (Chronic Care, Senior Care, Prevention > Senior
+Care), a patient in two programs a second time as a leaf (in Fall Prevention a link if the patient is in Heart
+Program too, otherwise a duplicate), and a node sums distinct patients: Senior Care counts a
+patient of Heart Program and Fall Prevention once, All Care Programs counts the 467 patients in a program once. The
+members follow from the age group and the patient's number, without a random draw (the visits stay as they were):
+Diabetes 40 and older, number divisible by 9; Heart 65 and older divisible by 4, 40-64 divisible by 12; Respiratory 40
+and older, number ending in 4; Fall Prevention 65 and older divisible by 6; Child Health under 18 divisible by 5. The
+patients without a visit are in it too; the other patients (most of them) are not assigned.
+
+The hierarchy table has 613 nodes (2 linked text nodes, 39 linked and 96 duplicate patients); BW's SID structure
+`/BIC/IZCLPAT` holds every occurrence, the linked subtrees expanded, each with its own `LISTNO`: 1,072 rows numbered 1 to 1,072 (613, plus
+the heart program's 185 patients under Senior Care, plus Senior Care's 274 nodes under Prevention), and the
+not-assigned node at 999999998/999999999.
 
 The run deletes the characteristics' hierarchies before the InfoObjects. An analysis authorization on a hierarchy node
 also stores the hierarchy's `HIEID` (`RSECHIE`), and every run creates new ones: check the hierarchy authorizations
