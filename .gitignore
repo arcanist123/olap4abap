@@ -28,3 +28,4 @@ __pycache__/
 
 # Mondrian 10.2.0.0-SNAPSHOT (EPL, from before the BSL switch), copied by hand as a further reference
 /mondrian-10.2.0.0/
+.vscode/
