@@ -2832,11 +2832,17 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         execute_error( |Standard properties of a level in DIMENSION PROPERTIES are not implemented yet: | &&
                        id->unparse( ) ).
       ENDIF.
-      APPEND name TO axis-properties.
+      " a name once, though levels of several hierarchies have a property of it (Text); each level's is kept
+      IF NOT line_exists( axis-properties[ table_line = name ] ).
+        APPEND name TO axis-properties.
+      ENDIF.
+      DATA(hierarchy) = schema_reader->get_hierarchy( schema_reader->get_level( element-id )-hierarchy )-unique_name.
+      IF line_exists( axis-level_properties[ name = name hierarchy = hierarchy ] ).
+        CONTINUE.
+      ENDIF.
       " olap4j's datatype of the property as XML schema type (XmlaHandler.getXsdType)
       APPEND VALUE #( name      = name
-                      hierarchy = schema_reader->get_hierarchy( schema_reader->get_level( element-id )-hierarchy
-                                                                )-unique_name
+                      hierarchy = hierarchy
                       xsd_type  = SWITCH #( property-data_type WHEN `Numeric` THEN `xsd:double`
                                                                WHEN `Integer` THEN `xsd:int`
                                                                WHEN `Long` THEN `xsd:long`
@@ -2855,9 +2861,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         ENDIF.
         LOOP AT axis-properties INTO name.
           " a property of a level: the value of a member of its hierarchy that has one (getHierarchyProperty)
-          READ TABLE axis-level_properties INTO DATA(level_property) WITH KEY name = name.
-          IF sy-subrc = 0.
-            IF level_property-hierarchy = member-hierarchy.
+          IF line_exists( axis-level_properties[ name = name ] ).
+            IF line_exists( axis-level_properties[ name = name hierarchy = member-hierarchy ] ).
               schema_reader->get_property_value( EXPORTING member   = member
                                                            name     = name
                                                  IMPORTING property = DATA(property_definition)

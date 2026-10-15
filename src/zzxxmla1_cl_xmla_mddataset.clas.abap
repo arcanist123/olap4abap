@@ -253,9 +253,8 @@ CLASS zzxxmla1_cl_xmla_mddataset IMPLEMENTATION.
         |              <LNum name="{ h }.[LEVEL_NUMBER]" type="xsd:unsignedInt"/>| && nl &&
         |              <DisplayInfo name="{ h }.[DISPLAY_INFO]" type="xsd:unsignedInt"/>| && nl.
       LOOP AT properties INTO DATA(property).
-        READ TABLE level_properties INTO DATA(level_property) WITH KEY name = property.
-        IF sy-subrc = 0.
-          IF level_property-hierarchy = name.
+        IF line_exists( level_properties[ name = property ] ).
+          IF line_exists( level_properties[ name = property hierarchy = name ] ).
             result = result && |              <{ element_name( property ) } | &&
                                |name="{ h }.{ text( zzxxmla1_cl_mdx_node=>quote_identifier( property ) ) }"/>| && nl.
           ENDIF.
@@ -302,7 +301,7 @@ CLASS zzxxmla1_cl_xmla_mddataset IMPLEMENTATION.
           value = entry-value.
         ENDIF.
         DATA(element) = element_name( property ).
-        READ TABLE level_properties INTO DATA(level_property) WITH KEY name = property.
+        READ TABLE level_properties INTO DATA(level_property) WITH KEY name = property hierarchy = member-hierarchy.
         DATA(type) = COND string( WHEN sy-subrc = 0 THEN | xsi:type="{ level_property-xsd_type }"| ).
         result = result && |                <{ element }{ type }>{ text( value ) }</{ element }>| && nl.
       ENDLOOP.

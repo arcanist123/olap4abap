@@ -10,7 +10,8 @@ ZCLVISITA:
 - every dimension's level (a flat hierarchy per characteristic, named by its technical name) and the All member's
   children: the members are those of NON EMPTY over all facts, in the same order;
 - a patient without facts cannot be named (the registered patient 002001), the one before can;
-- counts, ranges along a level, native TopCount and MDSCHEMA_LEVELS' LEVEL_CARDINALITY agree with them.
+- counts, ranges along a level, native TopCount and MDSCHEMA_LEVELS' LEVEL_CARDINALITY agree with them;
+- and, not about members with facts: the Text property of two hierarchies on one axis is written per hierarchy.
 
     python scripts/clinic_test.py
     python scripts/clinic_test.py --url http://localhost:50000/zzxxmla1?sap-client=001
@@ -142,6 +143,16 @@ def main():
         check(f"{catalog} native TopCount over the patients", answer.fault is None
               and len(answer.axis("Axis1")) == counts.get(patients) and "" not in answer.values(),
               answer.fault or len(answer.axis("Axis1")))
+
+        # a property of the same name on levels of two hierarchies of one axis (every characteristic's Text, as Excel
+        # asks for it when two fields are nested): each hierarchy lists it once and each member has its own
+        answer = run(f"SELECT {{[ZCLDIAG].[A09]}} * Head([ZCLPAT].[ZCLPAT].Members, 2) DIMENSION PROPERTIES "
+                     f"[ZCLPAT].[ZCLPAT].[Text], [ZCLDIAG].[ZCLDIAG].[Text] ON 0 FROM {catalog}")
+        infos = dict(re.findall(r'<HierarchyInfo name="([^"]*)">(.*?)</HierarchyInfo>', answer.text, re.S))
+        members = re.findall(r'<Member Hierarchy="([^"]*)">(.*?)</Member>', answer.text, re.S)
+        check(f"{catalog} Text of two hierarchies on one axis", answer.fault is None and len(members) == 4
+              and all(infos.get(h, "").count(f'name="{h}.[Text]"') == 1 for h in ("[ZCLDIAG]", "[ZCLPAT]"))
+              and all(m.count("<Text ") == 1 for _, m in members), answer.fault or infos or members)
 
         text = post(args.url, DISCOVER.format(request_type="MDSCHEMA_LEVELS", catalog=catalog), "Discover")
         cardinality = {html.unescape(u): int(c) for u, c in re.findall(

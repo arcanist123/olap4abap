@@ -655,6 +655,15 @@ evaluation (`MemberArrayValueCalc`; before, `([Measures].[Foo], [Time].CurrentMe
   (`RolapResult`, `CompoundSlicerRolapMember`).
 - Done: `VisualTotals`, `CurrentDateMember`, `Parameter`, `LastNonEmpty`, `CASE`, `CoalesceEmpty`,
   `AddCalculatedMembers`, `.Properties`, and the result limit.
+- Runtime of a large axis with member properties (measured 2026-10-15): Excel's `NON EMPTY CrossJoin(Hierarchize(
+  {DrilldownLevel({[ZCLDIAG].[All Diagnosis]},,,INCLUDE_CALC_MEMBERS)}), Hierarchize({DrilldownLevel({[ZCLPAT].[All
+  Patient]},,,INCLUDE_CALC_MEMBERS)}))` on COLUMNS of `ZCLVISITA`, with the 26 `DIMENSION PROPERTIES` of both
+  characteristics (Patient's attributes and texts, Diagnosis's), takes 11.9 s, of which its 9 SQL statements take
+  0.2 s; the answer is 26,512 tuples and 75 MB, 70 MB of it axis members, each patient's properties written once per
+  tuple. The same cells with Patient on COLUMNS and Diagnosis on ROWS take 1.36 s (8 MB). First find where the
+  11.6 s in ABAP go with a method trace (axis, `axis_properties`, `ZZXXMLA1_CL_XMLA_MDDATASET`'s writing), then make
+  that part linear in the answer's size. Excel shows at most 16,384 columns, so the layout is unusual, but a crossjoin
+  of two characteristics on rows is not.
 - The result limit is a class attribute; a setting (per system, like Mondrian's property file) would let it be changed
   without a transport.
 - Done: the native NON EMPTY crossjoin. Not yet: its context constraint with calculated members (Aggregate members
