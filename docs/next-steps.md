@@ -161,18 +161,49 @@ are the members BW's MDX shows. Settled while implementing:
   BETWEEN ? AND ?`). BW does not change a structure once its `SVER` is written; a change, also of the not-assigned
   setting, is a new `SVER` (up to 33 per hierarchy, then given again), and a time-dependent hierarchy has a `HIESID`
   per time slice. So the staleness check compares `HIESID` and `SVER` only.
-- The closure has rows of inner node occurrences only: a leaf member is its SID, so the facts need no closure for it.
-- The not-assigned values are no database object but a statement of the class (`values_of` the `RESTTOPSID`): the
-  SID table's values under no leaf, `NOT EXISTS` in the root's closure rows. While the hierarchy shows them, the All
-  member is every value of the SID table; while it suppresses them (`RSHIEDIR-NORESTNODES`), its closure rows.
-  Switching the setting makes a new `SVER` (`COPY_OF_ZCLSERV_CAT`: `SVER` 3 without the rows of `LISTNO` 999999998
-  and 999999999). `RSRHIEDIR_OLAP-CARDREST`
-  is no count of them (0 on `ZCLSERV_CAT`, where BW's MDX shows `#` under REST_H as the copy does).
+- Built so far, changed by the decisions below: the closure has rows of inner node occurrences only, and the
+  not-assigned values are a statement of the class (`values_of` the `RESTTOPSID`). Switching the setting makes a new
+  `SVER` (`COPY_OF_ZCLSERV_CAT`: `SVER` 3 without the rows of `LISTNO` 999999998 and 999999999).
+  `RSRHIEDIR_OLAP-CARDREST` is no count of the not-assigned values (0 on `ZCLSERV_CAT`, where BW's MDX shows `#`
+  under REST_H as the copy does).
 - BW's correction rows are cumulative: a node's distinct values are its leaf rows plus the factors of the correction
   rows of the node and of every inner node below it (`ZCLPAT_PRG`'s PROGRAMS: 1,071 rows, -439 at it, -154 below,
   478 values). The virtual root has none, so it is not cross-checked.
 - Accept does not create the tables yet: the schema does not name BW hierarchies before open 2; until then the test
   creates them.
+
+Decided with the user 2026-10-15, to be built next:
+- **Identity rows.** The closure has a row (`ANCESTOR_SID` = `SID`) for every leaf, so that every member, node or
+  leaf, is an ancestor and every fact read is the same join (facts to the closure on `SID`, filtered on `HIESID`,
+  `SVER` and `ANCESTOR_SID IN (...)`, grouped by `ANCESTOR_SID`), never a read for the nodes and another for the
+  leaves. Leaf SIDs are positive, node SIDs negative, so they never meet.
+- **Not assigned is a view, one per InfoObject.** It is generated and registered with the InfoObject's tables on
+  accept, also for an InfoObject none of whose hierarchies shows not assigned (its live part is empty then). A
+  hierarchy that suppresses not assigned (`RSHIEDIR-NORESTNODES`) has all its rows in the closure table, nodes,
+  root and identity rows, and the executor reads the table. A hierarchy that shows it has only its nodes' rows there
+  (its root's to the SIDs below it included), and the executor reads the view: the table's rows plus the live rows
+  of every hierarchy of the InfoObject that shows not assigned, an identity row for every SID of the SID table
+  (assigned or not, so also the values under REST_H), the root (`ROOT_SID`) to every SID, and the not-assigned node
+  (`REST_TOP_SID`) to every SID under no leaf of the hierarchy. The view knows which hierarchies and SIDs these are
+  from the directory (its rows with `NORESTNODES` blank: `HIESID`, `SVER`, `ROOT_SID`, `REST_TOP_SID`), so it has no
+  parameters, follows a new `SVER` once the directory names it, and follows master data loads without a refill.
+  The directory row tells the executor which of table and view to read. The root's rows to all SIDs are then not
+  in the table, so no row is twice in the view. The values under no leaf are a set difference, an anti-join
+  whatever its spelling (7.50's CDS has no `NOT EXISTS`, so `LEFT OUTER JOIN ... IS NULL` there), and the only one;
+  the identity and root rows are the SID table as it is. Open: whether a CDS view of 7.50 can say this (the
+  anti-join and the join to the directory), else the same SQL as a derived table of the class's statements; and
+  whether HANA leaves the anti-join out of a query that does not ask for REST_H (the rest node's SID is a column of
+  the directory, no constant): to be measured.
+- **Copies live as long as BW's versions.** BW keeps an old `SVER` (its row of `RSRHIEDIR_OLAP` with
+  `DELETETIMESTMP` set) until no query needs it, so the copy keeps a copy for every `(HIESID, SVER)` that has a row
+  in `RSRHIEDIR_OLAP`, current or old, and deletes a copy once BW's row is gone, checked at every refill under the
+  lock. A query pinned to an old `SVER` keeps its copy as long as BW keeps its own, however many changes (up to 33)
+  came in between. The directory gets a row per copy, keyed by `HIESID` and `SVER`, with the `TIMESTMP` it was
+  copied from, instead of a row per hierarchy with the `SVER` before. BW gives an `SVER` again only after its row is
+  gone; a copy whose `HIESID` and `SVER` are BW's current row's but whose `TIMESTMP` is not is of an earlier use of
+  that `SVER`, and is deleted and refilled. A query reads BW's current row as now and the copy of its `HIESID`,
+  `SVER` and `TIMESTMP`, refilled if there is none. (This replaces deleting the `SVER` before at the next refill and
+  the rows of the same `SVER` before a refill, which could delete a copy a query still reads.)
 
 Open:
 
