@@ -3,13 +3,17 @@
 clinic demo: ZZXXMLA1_CL_BW_HIERARCHY_COPY (run with sapcli class execute) creates the tables of ZCLDIAG, ZCLPAT and
 ZCLSERV if they have none, copies each of their plain hierarchies (refilled if BW's is newer) and prints per hierarchy
 its tables, the HIESID/SVER it is a copy of, whether it was refilled, the SIDs of its All member and of its not-assigned node, whether that is
-shown, its node rows, inner nodes, closure rows, depth, the values of the All member and of the not-assigned node.
+shown, its node rows, inner nodes, closure rows, depth, the values of the All member and of the not-assigned node
+(read from the not-assigned view when the hierarchy shows that node, else from the closure table), the time of
+current, the identity rows (one per leaf value), the All member's rows of the closure table and the closure read.
 
 The class checks every copy against BW itself (a node's distinct values against BW's rows and correction factors) and
-refuses what olap4abap refuses; here a second run must refill nothing, and per hierarchy the copy is compared with BW's
+refuses what olap4abap refuses; here a second run must refill nothing, every leaf value has its identity row, the
+All member's values are the table's ones and, where the node is shown, the view's not-assigned ones, and per hierarchy
+the copy is compared with BW's
 own MDX (ZZXXMLA1_CL_BW_HIERARCHY_PROBE, as scripts/bw_hierarchy_test.py asks it): BW shows a member per node row but
 the virtual root before the not-assigned node REST_H, and the not-assigned node, where BW shows it, with as many
-values as the copy reads live.
+values as the copy's view reads live.
 
     "$LOCALAPPDATA/pipx/pipx/venvs/sapcli/Scripts/python.exe" scripts/hierarchy_copy_test.py
 """
@@ -23,7 +27,7 @@ import bw_hierarchy_test  # noqa: E402
 COPY = "ZZXXMLA1_CL_BW_HIERARCHY_COPY"
 FIELDS = ["characteristic", "hierarchy", "status", "node_table", "closure_table", "copy", "refilled", "root_sid",
           "rest_top_sid", "rest_shown", "nodes", "inner_nodes", "closure", "depth", "all_values", "rest_values",
-          "microseconds"]
+          "microseconds", "identity", "root_rows", "closure_read"]
 
 
 def copies():
@@ -63,6 +67,16 @@ def main():
             failures.append(f"{name}: refilled again although BW's hierarchy did not change")
         if first[key].get("copy") != row["copy"]:
             failures.append(f"{name}: the copy of {first[key].get('copy')} became one of {row['copy']}")
+        shown = row["rest_shown"] == "X"
+        if row["identity"] != row["root_rows"]:
+            failures.append(f"{name}: {row['identity']} identity rows, {row['root_rows']} values below the All member")
+        expected_all = int(row["root_rows"]) + (int(row["rest_values"]) if shown else 0)
+        if int(row["all_values"]) != expected_all:
+            failures.append(f"{name}: the All member has {row['all_values']} values, expected {expected_all}")
+        if not shown and int(row["rest_values"]) != 0:
+            failures.append(f"{name}: {row['rest_values']} not-assigned values although the node is suppressed")
+        if row["closure_read"][:9] != ("ZZXXMLA1R" if shown else "ZZXXMLA1C"):
+            failures.append(f"{name}: read from {row['closure_read']}")
         members = bw.get(key)
         if members is None:
             print(f"{name}: OK, {row['nodes']} node rows, {row['closure']} closure rows (no member from BW's MDX)")
@@ -78,7 +92,7 @@ def main():
             failures.append(f"{name}: {row['rest_values']} not-assigned values, BW's MDX shows "
                             f"{members[rest]['children']}")
         print(f"{name}: copy of {row['copy']}, {row['nodes']} node rows, {row['inner_nodes']} inner, {row['closure']} closure rows, "
-              f"depth {row['depth']}, All {row['all_values']} values, not assigned "
+              f"depth {row['depth']}, {row['identity']} leaves, read from {row['closure_read']}, All {row['all_values']} values, not assigned "
               f"{row['rest_values'] if row['rest_shown'] == 'X' else 'suppressed'}, {row['microseconds']} us")
     for failure in failures:
         print(f"FAIL {failure}")

@@ -148,9 +148,10 @@ the not-assigned values as the hierarchy's BW setting says; everything the queri
 consistently. The schema, the names, the engine and the UI (open 2 to 5) build on it.
 
 Done (2026-10-15): `ZZXXMLA1_CL_BW_HIERARCHY_COPY` (`create_tables`, `current`, `values_of`), the directory
-`ZZXXMLA1_HIEDIR` (a row per hierarchy, keyed by BW's `HIEID`, with the `HIESID` and `SVER` copied and the `SVER`
-before) and the registry `ZZXXMLA1_HIETAB` (an InfoObject's tables `ZZXXMLA1H` and `ZZXXMLA1C` followed by the same
-7 digits; `create_tables` makes tables of an older layout again under their names), bound parameters in
+`ZZXXMLA1_HIEDIR` (a row per copy, keyed by `HIEID`, `HIESID` and `SVER`, with the `TIMESTMP` it was copied from)
+and the registry `ZZXXMLA1_HIETAB` (an InfoObject's tables `ZZXXMLA1H` and `ZZXXMLA1C` and its not-assigned view
+`ZZXXMLA1R`, DDL source `ZZXXMLA1_R`, followed by the same 7 digits; `create_tables` makes objects of an older layout
+or with one missing again under their names), bound parameters in
 `ZZXXMLA1_CL_SQL` (`params`, `execute`), the fault `ZZXXMLA1_CX_BW_HIERARCHY`. `python
 scripts/hierarchy_copy_test.py`: the four plain hierarchies of the clinic demo copy and pass the cross-check with
 BW, a second run refills none (a query's check of a current copy: 4 to 9 ms), and node rows and not-assigned values
@@ -161,8 +162,8 @@ are the members BW's MDX shows. Settled while implementing:
   BETWEEN ? AND ?`). BW does not change a structure once its `SVER` is written; a change, also of the not-assigned
   setting, is a new `SVER` (up to 33 per hierarchy, then given again), and a time-dependent hierarchy has a `HIESID`
   per time slice. So the staleness check compares `HIESID` and `SVER` only.
-- Built so far, changed by the decisions below: the closure has rows of inner node occurrences only, and the
-  not-assigned values are a statement of the class (`values_of` the `RESTTOPSID`). Switching the setting makes a new
+- Built first and replaced by the decisions below: the closure had rows of inner node occurrences only, and the
+  not-assigned values were a statement of the class (`values_of` the `RESTTOPSID`). Switching the setting makes a new
   `SVER` (`COPY_OF_ZCLSERV_CAT`: `SVER` 3 without the rows of `LISTNO` 999999998 and 999999999).
   `RSRHIEDIR_OLAP-CARDREST` is no count of the not-assigned values (0 on `ZCLSERV_CAT`, where BW's MDX shows `#`
   under REST_H as the copy does).
@@ -172,7 +173,9 @@ are the members BW's MDX shows. Settled while implementing:
 - Accept does not create the tables yet: the schema does not name BW hierarchies before open 2; until then the test
   creates them.
 
-Decided with the user 2026-10-15, to be built next:
+Decided with the user 2026-10-15 and built the same day (`python scripts/hierarchy_copy_test.py`: the four plain
+hierarchies pass; every leaf value has its identity row, the All member's values are the table's ones plus, where the
+node is shown, the view's not-assigned ones):
 - **Identity rows.** The closure has a row (`ANCESTOR_SID` = `SID`) for every leaf, so that every member, node or
   leaf, is an ancestor and every fact read is the same join (facts to the closure on `SID`, filtered on `HIESID`,
   `SVER` and `ANCESTOR_SID IN (...)`, grouped by `ANCESTOR_SID`), never a read for the nodes and another for the
@@ -187,7 +190,9 @@ Decided with the user 2026-10-15, to be built next:
   anti-join, the SID table left-outer-joined to the root's rows of the closure (no `DISTINCT`: the closure's key
   lists each SID below the root once) where none is found (7.50's CDS has no `NOT EXISTS`); the hierarchies and their
   `HIESID`, `SVER`, `ROOT_SID` and `REST_TOP_SID` come from the directory, so the view has no parameters, follows a
-  new `SVER` once the directory names it, and follows master data loads without a refill. No row of the view is
+  new `SVER` once the directory names it, and follows master data loads without a refill. The directory is joined to
+  the SID table on `s.sid > d.root_sid`, true for every pair (node SIDs are negative), as 7.50's CDS has no cross
+  join; the anti-join compares `NORESTNODES <> 'X'`, not with a blank literal, which HANA would not trim. No row of the view is
   twice. The executor reads the table for a hierarchy that suppresses not assigned and the view for one that shows
   it (the directory row says which). HANA pushes a filter on `ANCESTOR_SID` through the union and the joins, so a
   query that does not ask for the not-assigned node pays next to nothing for the anti-join (to be measured). The
@@ -274,7 +279,9 @@ Decided with the user 2026-10-15, to be built next:
   in `RSRHIEDIR_OLAP`, current or old, and deletes a copy once BW's row is gone, checked at every refill under the
   lock. A query pinned to an old `SVER` keeps its copy as long as BW keeps its own, however many changes (up to 33)
   came in between. The directory gets a row per copy, keyed by `HIESID` and `SVER`, with the `TIMESTMP` it was
-  copied from, instead of a row per hierarchy with the `SVER` before. BW gives an `SVER` again only after its row is
+  copied from, instead of a row per hierarchy with the `SVER` before. Built with `HIEID` before them in the key
+  (a `HIESID` belongs to one hierarchy): DDIC activation refuses to make the old key field `HIEID` a non-key field
+  while the table has rows, and adding key fields after it needs no conversion. BW gives an `SVER` again only after its row is
   gone; a copy whose `HIESID` and `SVER` are BW's current row's but whose `TIMESTMP` is not is of an earlier use of
   that `SVER`, and is deleted and refilled. A query reads BW's current row as now and the copy of its `HIESID`,
   `SVER` and `TIMESTMP`, refilled if there is none. (This replaces deleting the `SVER` before at the next refill and

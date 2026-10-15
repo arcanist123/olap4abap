@@ -345,13 +345,16 @@ Read before designing anything:
 - BW hierarchies (in progress, `docs/next-steps.md`, Now: time-independent BW hierarchies): part one, the copies, is
   done. `ZZXXMLA1_CL_BW_HIERARCHY_COPY` keeps per InfoObject a node table and a closure table (generated DDIC tables
   in `$TMP`, `ZZXXMLA1H`/`ZZXXMLA1C` and 7 digits, registered in `ZZXXMLA1_HIETAB`, made by `create_tables`) holding
-  all its hierarchies, keyed by BW's `HIESID` and `SVER` (directory `ZZXXMLA1_HIEDIR`): the occurrences of `/BIC/I`
-  with BW's node SIDs, depth-first numbers and subtree ends, and per inner node the distinct SIDs below it. `current`
-  compares the copy's `HIESID`/`SVER` with BW's current row of `RSRHIEDIR_OLAP` and refills a stale one in the database under
-  `ENQUEUE_E_TABLE`, cross-checked with BW's correction factors; the refusals are faults of the query
-  (`ZZXXMLA1_CX_BW_HIERARCHY`). `values_of` gives a node's SIDs as a statement with bound parameters
-  (`ZZXXMLA1_CL_SQL`'s `params`), the not-assigned ones read live as `RSHIEDIR-NORESTNODES` says
-  (`scripts/hierarchy_copy_test.py`). Not yet in the schema, the engine or accept.
+  all its hierarchies, keyed by BW's `HIESID` and `SVER` (directory `ZZXXMLA1_HIEDIR`, a row per copy): the
+  occurrences of `/BIC/I` with BW's node SIDs, depth-first numbers and subtree ends, and per inner node the distinct
+  SIDs below it plus an identity row per leaf, so every member is an ancestor. A view per InfoObject (`ZZXXMLA1R`, the
+  same digits, a CDS view) adds the not-assigned values live for the copies whose hierarchy shows them
+  (`RSHIEDIR-NORESTNODES`): REST_H, the All member and the identity row per SID under no leaf; a query reads the view
+  for such a hierarchy, else the table (`ty_hierarchy-closure`). `current` looks for a copy of BW's current row of
+  `RSRHIEDIR_OLAP` (`HIESID`, `SVER`, `TIMESTMP`) and refills a missing one in the database under `ENQUEUE_E_TABLE`,
+  cross-checked with BW's correction factors; a copy lives as long as BW keeps its version. The refusals are faults
+  of the query (`ZZXXMLA1_CX_BW_HIERARCHY`). `values_of` gives a member's SIDs as a statement with bound parameters
+  (`ZZXXMLA1_CL_SQL`'s `params`) (`scripts/hierarchy_copy_test.py`). Not yet in the schema, the engine or accept.
 - Reference: eMondrian built from source and running in Docker; captured exchanges are in `reference/`.
 
 ## Syncing ABAP code with git

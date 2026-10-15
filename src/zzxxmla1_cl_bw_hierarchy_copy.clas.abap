@@ -10,8 +10,9 @@
 * Copyright (C) 2005-2021 Hitachi Vantara and others, Copyright (C) 2021-2025 Sergei Semenkov. See the NOTICE file.
 *----------------------------------------------------------------------------------------------------------------------*
 "! The copies of BW's time-independent hierarchies that the engine reads (docs/next-steps.md, Now: time-independent BW
-"! hierarchies, part one): per InfoObject a node table and a closure table holding all of its hierarchies, as BW's
-"! SID structure /BIC/I of the characteristic does, and per hierarchy a row of the directory ZZXXMLA1_HIEDIR.
+"! hierarchies, part one): per InfoObject a node table, a closure table and a view of the closure with the
+"! not-assigned values, holding all of its hierarchies, as BW's SID structure /BIC/I of the characteristic does, and
+"! per copy a row of the directory ZZXXMLA1_HIEDIR (keyed by HIEID, HIESID and SVER).
 "! - Node table (ZZXXMLA1H followed by 7 digits): a row per occurrence, the shared subtrees expanded as BW's SID
 "!   structure /BIC/I holds them, keyed by HIESID, SVER, PARENT_SID and SID. An inner node has its own negative node SID of
 "!   /BIC/K (also each occurrence inside an expanded link, the postable nodes and the virtual root ROOTSID of
@@ -21,22 +22,30 @@
 "!   (0HIER_NODE and the text node's name, or the characteristic and the key of a postable node, whose own value
 "!   VALUE_SID is its first leaf); a leaf is named by the characteristic's view.
 "! - Closure table (ZZXXMLA1C, the same digits): per inner node occurrence the distinct SIDs of the leaves below it,
-"!   keyed by HIESID, SVER, ANCESTOR_SID and SID, so that a value reached by two paths counts once. A leaf member needs no
-"!   row: it is its SID.
+"!   and per leaf its identity row (ANCESTOR_SID = SID), keyed by HIESID, SVER, ANCESTOR_SID and SID, so that every
+"!   member, node or leaf, is an ancestor, a fact read is one join (facts to the closure on SID, grouped by
+"!   ANCESTOR_SID) and a value reached by two paths counts once. Leaf SIDs are positive, node SIDs negative. The table
+"!   holds the assigned values only, whether the hierarchy shows the not-assigned node or not.
+"! - Not-assigned view (database view ZZXXMLA1R, DDL source ZZXXMLA1_R, the same digits): the table's rows and, for
+"!   every copy of the directory whose hierarchy shows the not-assigned node (BW's setting RSHIEDIR-NORESTNODES, the UI
+"!   offers no switch), three rows per SID of the SID table under no leaf: the not-assigned node REST_H
+"!   (REST_TOP_SID) to it, the All member (ROOT_SID) to it and its identity row. These SIDs are an anti-join, the SID
+"!   table left-outer-joined to the All member's rows; the hierarchies come from the directory, so the view has no
+"!   parameters, follows a new copy once the directory names it and follows master data loads without a refill. A
+"!   query reads the view for a hierarchy that shows the not-assigned node, else the table (ty_hierarchy-closure).
 "! - A copy is keyed by BW's HIESID and SVER (RSRHIEDIR_OLAP), so that it compares with /BIC/I row by row: BW does
 "!   not change a structure once its SVER is written, a change is a new SVER (up to 33 per hierarchy, then given
-"!   again). A refill writes the new SVER next to the current one, commits and switches the directory row; the rows
-"!   of the SVER before are deleted by the refill after next, so a query that read the directory row before keeps
-"!   its rows (HANA's read consistency is per statement, not per query).
-"! - Not assigned: the values of the characteristic's SID table under no leaf are not copied; they are read live
-"!   (values_of the rest node REST_H, RESTTOPSID), so that they follow master data loads. Whether the hierarchy shows
-"!   them is BW's setting, RSHIEDIR-NORESTNODES (the UI offers no switch).
-"! The tables are DDIC tables in $TMP (as the generated views; ADBC's tables need HANA's enterprise license and are
-"! hard to transport), client-independent as BW's, created by create_tables when a schema that names a hierarchy of
-"! the InfoObject is accepted, never by a query. A query calls current: one key read each of the directory and
-"! RSRHIEDIR_OLAP; when the copy is not one of BW's current row (HIESID, SVER), it is refilled
-"! under the lock ENQUEUE_E_TABLE on ZZXXMLA1_HIEDIR, which another query of the hierarchy waits for. The refill stays
-"! in the database (INSERT ... SELECT from /BIC/I and /BIC/K) and refuses, as a fault of the query
+"!   again). BW keeps an old SVER (its row with DELETETIMESTMP set) until no query needs it; the copy of every HIESID and
+"!   SVER with a row in RSRHIEDIR_OLAP of the same TIMESTMP is kept, the others are deleted by the next refill of the
+"!   hierarchy (a copy of BW's current HIESID and SVER but another TIMESTMP is of an earlier use of that SVER). A
+"!   refill writes the new copy next to the old ones and commits it with its directory row, so a query that read a
+"!   directory row keeps its rows (HANA's read consistency is per statement, not per query).
+"! The tables and the view are DDIC objects in $TMP (as the generated views; ADBC's tables need HANA's enterprise
+"! license and are hard to transport), client-independent as BW's, created by create_tables when a schema that names a
+"! hierarchy of the InfoObject is accepted, never by a query. A query calls current: one key read each of the directory
+"! and RSRHIEDIR_OLAP; when there is no copy of BW's current row (HIESID, SVER, TIMESTMP), it is refilled under the
+"! lock ENQUEUE_E_TABLE on ZZXXMLA1_HIEDIR, which another query of the hierarchy waits for. The refill stays in the
+"! database (INSERT ... SELECT from /BIC/I and /BIC/K) and refuses, as a fault of the query
 "! (ZZXXMLA1_CX_BW_HIERARCHY): a value both an inner node and a leaf, a value twice as an inner node with different
 "! subtrees, more than one current row of RSRHIEDIR_OLAP, a time- or version-dependent hierarchy; and a copy whose
 "! distinct values per node differ from BW's (its leaf rows plus the correction rows, LISTNO 0, of it and the inner
@@ -54,17 +63,23 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
     CONSTANTS c_default_package TYPE devclass VALUE '$TMP'.
     CONSTANTS c_node_prefix TYPE string VALUE `ZZXXMLA1H`.
     CONSTANTS c_closure_prefix TYPE string VALUE `ZZXXMLA1C`.
+    "! The not-assigned view: its database view and its DDL source.
+    CONSTANTS c_rest_view_prefix TYPE string VALUE `ZZXXMLA1R`.
+    CONSTANTS c_rest_ddl_prefix TYPE string VALUE `ZZXXMLA1_R`.
     "! The node name of BW's text nodes and of the not-assigned node (/BIC/K-NIOBJNM).
     CONSTANTS c_text_node TYPE rsniobjnm VALUE '0HIER_NODE'.
 
     TYPES:
-      "! the generated tables of an InfoObject
+      "! the generated objects of an InfoObject
       BEGIN OF ty_tables,
-        node    TYPE tabname,
-        closure TYPE tabname,
+        node      TYPE tabname,
+        closure   TYPE tabname,
+        rest_view TYPE tabname,
+        rest_ddl  TYPE ddlname,
       END OF ty_tables.
     TYPES:
-      "! a hierarchy's current copy, as a query reads it: its tables, BW's HIESID and SVER it is a copy of (to bind
+      "! a hierarchy's current copy, as a query reads it: its tables, the closure a query reads (the not-assigned view
+      "! when the hierarchy shows that node, else the closure table), BW's HIESID and SVER it is a copy of (to bind
       "! in each statement), the SIDs of its All member and of its not-assigned node, and whether it shows that node
       BEGIN OF ty_hierarchy,
         hieid          TYPE rshieid,
@@ -72,7 +87,7 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
         name           TYPE rshienm,
         node_table     TYPE tabname,
         closure_table  TYPE tabname,
-        sid_table      TYPE tabname,
+        closure        TYPE tabname,
         hiesid         TYPE i,
         sver           TYPE rsrsver,
         root_sid       TYPE i,
@@ -90,8 +105,8 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
     "! package: the package new tables are created in.
     METHODS constructor
       IMPORTING package TYPE devclass DEFAULT c_default_package.
-    "! Creates the node and closure tables of an InfoObject if it has none (accept of a schema that names one of its
-    "! hierarchies); an InfoObject that has them keeps them.
+    "! Creates the node and closure tables and the not-assigned view of an InfoObject if it has none (accept of a
+    "! schema that names one of its hierarchies); an InfoObject that has them keeps them.
     METHODS create_tables
       IMPORTING characteristic TYPE rsiobjnm
       RETURNING VALUE(result)  TYPE ty_tables.
@@ -101,9 +116,9 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
       IMPORTING characteristic TYPE rsiobjnm
                 name           TYPE rshienm
       RETURNING VALUE(result)  TYPE ty_hierarchy.
-    "! The statement of the SIDs below a node of the copy, one column SID: the closure's rows of the node; for the
-    "! not-assigned node the values of the SID table under no leaf, read live; for the All member, when the hierarchy
-    "! shows the not-assigned node, every value of the SID table.
+    "! The statement of the SIDs below a member of the copy, node or leaf, one column SID: its rows of the closure the
+    "! hierarchy is read from (the not-assigned node's and the All member's with the values under no leaf when the
+    "! hierarchy shows the not-assigned node).
     CLASS-METHODS values_of
       IMPORTING hierarchy     TYPE ty_hierarchy
                 node_sid      TYPE i
@@ -132,6 +147,15 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
         rest_top_sid TYPE i,
       END OF ty_bw_state.
     TYPES ty_directory TYPE zzxxmla1_hiedir.
+    TYPES ty_t_directory TYPE STANDARD TABLE OF zzxxmla1_hiedir WITH EMPTY KEY.
+    TYPES:
+      "! a version of a hierarchy BW keeps: a row of RSRHIEDIR_OLAP, current or old
+      BEGIN OF ty_version,
+        hiesid   TYPE i,
+        sver     TYPE rsrsver,
+        timestmp TYPE rstimestmp,
+      END OF ty_version,
+      ty_t_version TYPE STANDARD TABLE OF ty_version WITH EMPTY KEY.
     TYPES:
       "! a column of a generated table: name, data element, key
       BEGIN OF ty_column,
@@ -146,6 +170,7 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
     CONSTANTS c_rest_listno TYPE i VALUE 999999998.
 
     DATA package TYPE devclass.
+    DATA handler TYPE REF TO if_dd_ddl_handler.
 
     "! BW's current state of a hierarchy: its row of RSHIEDIR (time-independent, not version dependent) and its
     "! current row of RSRHIEDIR_OLAP (DELETETIMESTMP 0, which must be one).
@@ -156,36 +181,45 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
     METHODS bw_tables
       IMPORTING characteristic TYPE rsiobjnm
       RETURNING VALUE(result)  TYPE ty_bw_tables.
+    "! The objects of the registry ZZXXMLA1_HIETAB; initial if the InfoObject has none.
     METHODS registered_tables
       IMPORTING characteristic TYPE rsiobjnm
       RETURNING VALUE(result)  TYPE ty_tables.
+    "! Whether the node and closure tables and the not-assigned view are active in the DDIC.
+    METHODS tables_exist
+      IMPORTING tables        TYPE ty_tables
+      RETURNING VALUE(result) TYPE abap_bool.
     "! Whether the directory row is a copy of BW's current state.
     CLASS-METHODS up_to_date
       IMPORTING directory     TYPE ty_directory
                 bw            TYPE ty_bw_state
       RETURNING VALUE(result) TYPE abap_bool.
+    "! The copies of a hierarchy that BW keeps no version of (its HIESID, SVER and TIMESTMP).
+    CLASS-METHODS stale_copies
+      IMPORTING copies        TYPE ty_t_directory
+                versions      TYPE ty_t_version
+      RETURNING VALUE(result) TYPE ty_t_directory.
     "! The hierarchy as a query reads it from its directory row.
     CLASS-METHODS hierarchy_of
       IMPORTING directory     TYPE ty_directory
                 tables        TYPE ty_tables
-                bw_tables     TYPE ty_bw_tables
       RETURNING VALUE(result) TYPE ty_hierarchy.
     METHODS lock
       IMPORTING hieid TYPE rshieid.
     METHODS unlock
       IMPORTING hieid TYPE rshieid.
-    "! Writes the copy of BW's current SVER, checks it, commits and switches the directory row; a refusal rolls back.
+    "! Deletes the copies BW keeps no version of, writes the copy of BW's current SVER, checks it, commits it with its
+    "! directory row; a refusal rolls back.
     METHODS refill
       IMPORTING bw            TYPE ty_bw_state
-                directory     TYPE ty_directory
                 tables        TYPE ty_tables
                 bw_tables     TYPE ty_bw_tables
       RETURNING VALUE(result) TYPE ty_directory.
-    "! Deletes the rows of a copy: of one HIESID and SVER, or of every SVER of a HIESID.
+    "! Deletes the rows of a copy, of one HIESID and SVER.
     METHODS delete_copy
       IMPORTING tables TYPE ty_tables
                 hiesid TYPE i
-                sver   TYPE rsrsver OPTIONAL.
+                sver   TYPE rsrsver.
     "! The checks of a new copy: a refusal or a difference from BW raises ZZXXMLA1_CX_BW_HIERARCHY.
     METHODS check
       IMPORTING bw        TYPE ty_bw_state
@@ -207,7 +241,7 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
     CLASS-METHODS end_pos_sql
       IMPORTING tables        TYPE ty_tables
       RETURNING VALUE(result) TYPE string.
-    "! closure: HIESID, SVER
+    "! closure, the inner nodes' rows and the leaves' identity rows: HIESID, SVER, HIESID, SVER
     CLASS-METHODS closure_sql
       IMPORTING tables        TYPE ty_tables
       RETURNING VALUE(result) TYPE string.
@@ -234,9 +268,32 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
       IMPORTING name        TYPE tabname
                 description TYPE as4text
                 columns     TYPE ty_t_column.
+    "! Creates (or writes again) the not-assigned view and activates it.
+    METHODS create_rest_view
+      IMPORTING characteristic TYPE rsiobjnm
+                tables         TYPE ty_tables.
+    "! Deletes the not-assigned view if it exists.
+    METHODS delete_rest_view
+      IMPORTING tables TYPE ty_tables.
+    "! The DDL source of the not-assigned view of an InfoObject whose SID table is sid_table.
+    CLASS-METHODS rest_view_source
+      IMPORTING characteristic TYPE rsiobjnm
+                tables         TYPE ty_tables
+                sid_table      TYPE tabname
+      RETURNING VALUE(result)  TYPE string.
+    "! The description of the not-assigned view.
+    CLASS-METHODS rest_view_description
+      IMPORTING characteristic TYPE rsiobjnm
+      RETURNING VALUE(result)  TYPE ddtext.
+    METHODS ddl_handler
+      RETURNING VALUE(result) TYPE REF TO if_dd_ddl_handler.
     "! the next number after the highest one of a generated node or closure table
     METHODS next_table_number
       RETURNING VALUE(result) TYPE i.
+    "! the generated objects of a number
+    CLASS-METHODS tables_of_number
+      IMPORTING number        TYPE i
+      RETURNING VALUE(result) TYPE ty_tables.
     CLASS-METHODS table_name
       IMPORTING prefix        TYPE string
                 number        TYPE i
@@ -271,23 +328,30 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
           GET RUN TIME FIELD DATA(stopped).
           DATA(hiesid) = NEW i( hierarchy-hiesid ).
           DATA(sver) = NEW string( hierarchy-sver ).
+          DATA(root_sid) = NEW i( hierarchy-root_sid ).
+          DATA(node) = quote( tables-node ).
+          DATA(closure) = quote( tables-closure ).
           DATA(counts) = zzxxmla1_cl_sql=>query(
-            sql     = |SELECT ( SELECT COUNT( * ) FROM { quote( tables-node ) } WHERE "HIESID" = ? AND "SVER" = ? ), | &&
-                      |( SELECT COUNT( * ) FROM { quote( tables-node ) } WHERE "HIESID" = ? AND "SVER" = ? AND "SID" < 0 ), | &&
-                      |( SELECT COUNT( * ) FROM { quote( tables-closure ) } WHERE "HIESID" = ? AND "SVER" = ? ), | &&
-                      |( SELECT MAX( "DEPTH" ) FROM { quote( tables-node ) } WHERE "HIESID" = ? AND "SVER" = ? ) FROM DUMMY|
-            columns = 4
-            params  = VALUE #( ( hiesid ) ( sver ) ( hiesid ) ( sver ) ( hiesid ) ( sver ) ( hiesid ) ( sver ) ) ).
+            sql     = |SELECT ( SELECT COUNT( * ) FROM { node } WHERE "HIESID" = ? AND "SVER" = ? ), | &&
+                      |( SELECT COUNT( * ) FROM { node } WHERE "HIESID" = ? AND "SVER" = ? AND "SID" < 0 ), | &&
+                      |( SELECT COUNT( * ) FROM { closure } WHERE "HIESID" = ? AND "SVER" = ? ), | &&
+                      |( SELECT MAX( "DEPTH" ) FROM { node } WHERE "HIESID" = ? AND "SVER" = ? ), | &&
+                      |( SELECT COUNT( * ) FROM { closure } WHERE "HIESID" = ? AND "SVER" = ? AND "ANCESTOR_SID" = "SID" ), | &&
+                      |( SELECT COUNT( * ) FROM { closure } WHERE "HIESID" = ? AND "SVER" = ? AND "ANCESTOR_SID" = ? ) | &&
+                      |FROM DUMMY|
+            columns = 6
+            params  = VALUE #( ( hiesid ) ( sver ) ( hiesid ) ( sver ) ( hiesid ) ( sver ) ( hiesid ) ( sver )
+                               ( hiesid ) ( sver ) ( hiesid ) ( sver ) ( root_sid ) ) ).
           DATA(root) = values_of( hierarchy = hierarchy node_sid = hierarchy-root_sid ).
           DATA(rest) = values_of( hierarchy = hierarchy node_sid = hierarchy-rest_top_sid ).
           DATA(root_count) = lines( zzxxmla1_cl_sql=>query( sql = root-sql columns = 1 params = root-params ) ).
-          DATA(rest_count) = COND i( WHEN hierarchy-rest_shown = abap_true
-                                     THEN lines( zzxxmla1_cl_sql=>query( sql = rest-sql columns = 1 params = rest-params ) ) ).
+          DATA(rest_count) = lines( zzxxmla1_cl_sql=>query( sql = rest-sql columns = 1 params = rest-params ) ).
           DATA(line) = counts[ 1 ].
           out->write( |{ row-iobjnm }\t{ row-hienm }\tOK\t{ tables-node }\t{ tables-closure }\t| &&
                       |{ hierarchy-hiesid }/{ hierarchy-sver }\t{ hierarchy-refilled }\t{ hierarchy-root_sid }\t| &&
                       |{ hierarchy-rest_top_sid }\t{ hierarchy-rest_shown }\t{ line[ 1 ] }\t{ line[ 2 ] }\t| &&
-                      |{ line[ 3 ] }\t{ line[ 4 ] }\t{ root_count }\t{ rest_count }\t{ stopped - started }| ).
+                      |{ line[ 3 ] }\t{ line[ 4 ] }\t{ root_count }\t{ rest_count }\t{ stopped - started }\t| &&
+                      |{ line[ 5 ] }\t{ line[ 6 ] }\t{ hierarchy-closure }| ).
         CATCH zzxxmla1_cx_bw_hierarchy zzxxmla1_cx_sql INTO DATA(error).
           out->write( |{ row-iobjnm }\t{ row-hienm }\tERROR\t{ error->get_text( ) }| ).
       ENDTRY.
@@ -296,19 +360,19 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
 
   METHOD create_tables.
     result = registered_tables( characteristic ).
-    IF result IS NOT INITIAL AND current_columns( result ) = abap_true.
+    IF result IS NOT INITIAL AND tables_exist( result ) = abap_true AND current_columns( result ) = abap_true.
       RETURN.
     ENDIF.
     IF result IS NOT INITIAL.
-      " tables of an older layout: the copies are BW's data, so the tables are made again under their names and the
-      " next query refills them
+      " objects of an older layout, or some of them missing: the copies are BW's data, so the objects are made again
+      " under their names (the view first, it reads the closure table) and the next query refills them
+      result = tables_of_number( CONV i( substring( val = result-node off = strlen( c_node_prefix ) ) ) ).
+      delete_rest_view( result ).
       delete_table( result-node ).
       delete_table( result-closure ).
       DELETE FROM zzxxmla1_hiedir WHERE iobjnm = @characteristic.
     ELSE.
-      DATA(number) = next_table_number( ).
-      result = VALUE #( node    = table_name( prefix = c_node_prefix number = number )
-                        closure = table_name( prefix = c_closure_prefix number = number ) ).
+      result = tables_of_number( next_table_number( ) ).
     ENDIF.
     create_table( name        = result-node
                   description = |BW hierarchy nodes { characteristic }|
@@ -316,9 +380,12 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
     create_table( name        = result-closure
                   description = |BW hierarchy closure { characteristic }|
                   columns     = closure_columns( ) ).
+    create_rest_view( characteristic = characteristic tables = result ).
     DATA(row) = VALUE zzxxmla1_hietab( iobjnm        = characteristic
                                        node_table    = result-node
                                        closure_table = result-closure
+                                       rest_view     = result-rest_view
+                                       rest_ddl      = result-rest_ddl
                                        changed_by    = sy-uname ).
     GET TIME STAMP FIELD row-changed_at.
     MODIFY zzxxmla1_hietab FROM @row.
@@ -365,40 +432,45 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD registered_tables.
-    SELECT SINGLE node_table, closure_table FROM zzxxmla1_hietab WHERE iobjnm = @characteristic
-      INTO (@result-node, @result-closure).
+    SELECT SINGLE node_table, closure_table, rest_view, rest_ddl FROM zzxxmla1_hietab WHERE iobjnm = @characteristic
+      INTO (@result-node, @result-closure, @result-rest_view, @result-rest_ddl).
     IF sy-subrc <> 0.
       CLEAR result.
-      RETURN.
     ENDIF.
-    " both must be active tables of the DDIC
+  ENDMETHOD.
+
+  METHOD tables_exist.
+    " all three must be active in the DDIC
     SELECT COUNT( * ) FROM dd02l
-      WHERE ( tabname = @result-node OR tabname = @result-closure ) AND as4local = 'A'
+      WHERE ( tabname = @tables-node OR tabname = @tables-closure OR tabname = @tables-rest_view ) AND as4local = 'A'
       INTO @DATA(found).
-    IF found <> 2.
-      CLEAR result.
-    ENDIF.
+    result = xsdbool( found = 3 ).
   ENDMETHOD.
 
   METHOD current.
     DATA(bw) = bw_state( characteristic = characteristic name = name ).
     DATA(tables) = registered_tables( bw-iobjnm ).
-    IF tables IS INITIAL.
+    IF tables IS INITIAL OR tables_exist( tables ) = abap_false.
       refuse( |The hierarchy { name } of { characteristic } has no tables: accept a schema that names it| ).
     ENDIF.
-    DATA(bw_tables) = bw_tables( bw-iobjnm ).
-    SELECT SINGLE * FROM zzxxmla1_hiedir WHERE hieid = @bw-hieid INTO @DATA(directory).
+    SELECT SINGLE * FROM zzxxmla1_hiedir WHERE hieid = @bw-hieid AND hiesid = @bw-hiesid AND sver = @bw-sver
+      INTO @DATA(directory).
     IF up_to_date( directory = directory bw = bw ) = abap_false.
       lock( bw-hieid ).
-      " another query may have refilled it while this one waited
-      SELECT SINGLE * FROM zzxxmla1_hiedir WHERE hieid = @bw-hieid INTO @directory.
-      IF up_to_date( directory = directory bw = bw ) = abap_false.
-        directory = refill( bw = bw directory = directory tables = tables bw_tables = bw_tables ).
-        DATA(refilled) = abap_true.
-      ENDIF.
+      TRY.
+          " another query may have refilled it while this one waited
+          SELECT SINGLE * FROM zzxxmla1_hiedir WHERE hieid = @bw-hieid AND hiesid = @bw-hiesid AND sver = @bw-sver
+            INTO @directory.
+          IF up_to_date( directory = directory bw = bw ) = abap_false.
+            directory = refill( bw = bw tables = tables bw_tables = bw_tables( bw-iobjnm ) ).
+            DATA(refilled) = abap_true.
+          ENDIF.
+        CLEANUP.
+          unlock( bw-hieid ).
+      ENDTRY.
       unlock( bw-hieid ).
     ENDIF.
-    result = hierarchy_of( directory = directory tables = tables bw_tables = bw_tables ).
+    result = hierarchy_of( directory = directory tables = tables ).
     result-refilled = refilled.
   ENDMETHOD.
 
@@ -450,42 +522,40 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
 
   METHOD up_to_date.
     " BW does not change a structure once its SVER is written: a change, also of the not-assigned setting, is a new
-    " SVER
+    " SVER; the same SVER of another TIMESTMP is BW's SVER given again
     result = xsdbool( directory-sver IS NOT INITIAL
                       AND directory-hiesid = bw-hiesid
-                      AND directory-sver = bw-sver ).
+                      AND directory-sver = bw-sver
+                      AND directory-timestmp = bw-timestmp ).
+  ENDMETHOD.
+
+  METHOD stale_copies.
+    LOOP AT copies INTO DATA(copy).
+      IF NOT line_exists( versions[ hiesid = copy-hiesid sver = copy-sver timestmp = copy-timestmp ] ).
+        APPEND copy TO result.
+      ENDIF.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD hierarchy_of.
+    DATA(shown) = xsdbool( directory-norestnodes IS INITIAL ).
     result = VALUE #( hieid          = directory-hieid
                       characteristic = directory-iobjnm
                       name           = directory-hienm
                       node_table     = tables-node
                       closure_table  = tables-closure
-                      sid_table      = bw_tables-sids
+                      closure        = COND #( WHEN shown = abap_true THEN tables-rest_view ELSE tables-closure )
                       hiesid         = directory-hiesid
                       sver           = directory-sver
                       root_sid       = directory-root_sid
                       rest_top_sid   = directory-rest_top_sid
-                      rest_shown     = xsdbool( directory-norestnodes IS INITIAL ) ).
+                      rest_shown     = shown ).
   ENDMETHOD.
 
   METHOD values_of.
-    DATA(sids) = quote( hierarchy-sid_table ).
-    DATA(closure) = quote( hierarchy-closure_table ).
-    IF hierarchy-rest_shown = abap_true AND node_sid = hierarchy-rest_top_sid.
-      result = VALUE #(
-        sql    = |SELECT s."SID" FROM { sids } AS s WHERE NOT EXISTS ( SELECT 1 FROM { closure } AS c | &&
-                 |WHERE c."HIESID" = ? AND c."SVER" = ? AND c."ANCESTOR_SID" = ? AND c."SID" = s."SID" )|
-        params = VALUE #( ( NEW i( hierarchy-hiesid ) ) ( NEW string( hierarchy-sver ) )
-                          ( NEW i( hierarchy-root_sid ) ) ) ).
-    ELSEIF hierarchy-rest_shown = abap_true AND node_sid = hierarchy-root_sid.
-      result = VALUE #( sql = |SELECT "SID" FROM { sids }| ).
-    ELSE.
-      result = VALUE #(
-        sql    = |SELECT "SID" FROM { closure } WHERE "HIESID" = ? AND "SVER" = ? AND "ANCESTOR_SID" = ?|
-        params = VALUE #( ( NEW i( hierarchy-hiesid ) ) ( NEW string( hierarchy-sver ) ) ( NEW i( node_sid ) ) ) ).
-    ENDIF.
+    result = VALUE #(
+      sql    = |SELECT "SID" FROM { quote( hierarchy-closure ) } WHERE "HIESID" = ? AND "SVER" = ? AND "ANCESTOR_SID" = ?|
+      params = VALUE #( ( NEW i( hierarchy-hiesid ) ) ( NEW string( hierarchy-sver ) ) ( NEW i( node_sid ) ) ) ).
   ENDMETHOD.
 
   METHOD lock.
@@ -520,32 +590,34 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD refill.
-    IF directory-hiesid IS NOT INITIAL AND directory-hiesid <> bw-hiesid.
-      " BW gave the hierarchy another HIESID: the old copies are no hierarchy of BW any more
-      delete_copy( tables = tables hiesid = directory-hiesid ).
-    ELSEIF directory-prev_sver IS NOT INITIAL AND directory-prev_sver <> bw-sver.
-      " the SVER before the current one: no query reads it any more
-      delete_copy( tables = tables hiesid = directory-hiesid sver = directory-prev_sver ).
-    ENDIF.
-    " rows of this SVER that no directory row names (BW gives a SVER again after its 33 sub-versions)
-    delete_copy( tables = tables hiesid = bw-hiesid sver = bw-sver ).
+    DATA versions TYPE ty_t_version.
+    DATA copies TYPE ty_t_directory.
+    SELECT * FROM zzxxmla1_hiedir WHERE hieid = @bw-hieid INTO TABLE @copies.
+    SELECT hiesid, sver, timestmp FROM rsrhiedir_olap WHERE hieid = @bw-hieid AND objvers = 'A'
+      INTO CORRESPONDING FIELDS OF TABLE @versions.
     DATA(key) = VALUE zzxxmla1_cl_sql=>ty_t_param( ( NEW i( bw-hiesid ) ) ( NEW string( bw-sver ) ) ).
     TRY.
+        " the copies of versions BW does not keep any more: no query reads them
+        DATA(stales) = stale_copies( copies = copies versions = versions ).
+        LOOP AT stales INTO DATA(stale).
+          delete_copy( tables = tables hiesid = stale-hiesid sver = stale-sver ).
+          DELETE FROM zzxxmla1_hiedir WHERE hieid = @stale-hieid AND hiesid = @stale-hiesid AND sver = @stale-sver.
+        ENDLOOP.
+        " rows of this SVER that no directory row names (a refill that did not finish)
+        delete_copy( tables = tables hiesid = bw-hiesid sver = bw-sver ).
         zzxxmla1_cl_sql=>execute( sql    = nodes_sql( tables = tables bw_tables = bw_tables )
                                   params = VALUE #( BASE key ( NEW i( bw-root_sid ) ) ) ).
         zzxxmla1_cl_sql=>execute( sql = end_pos_sql( tables ) params = key ).
-        zzxxmla1_cl_sql=>execute( sql = closure_sql( tables ) params = key ).
+        zzxxmla1_cl_sql=>execute( sql = closure_sql( tables ) params = VALUE #( BASE key ( LINES OF key ) ) ).
         check( bw = bw tables = tables bw_tables = bw_tables ).
       CLEANUP.
         ROLLBACK WORK.
     ENDTRY.
-    result = VALUE #( BASE directory
+    result = VALUE #( hiesid       = bw-hiesid
+                      sver         = bw-sver
                       hieid        = bw-hieid
                       iobjnm       = bw-iobjnm
                       hienm        = bw-hienm
-                      hiesid       = bw-hiesid
-                      sver         = bw-sver
-                      prev_sver    = COND #( WHEN directory-hiesid = bw-hiesid THEN directory-sver )
                       timestmp     = bw-timestmp
                       norestnodes  = bw-norestnodes
                       root_sid     = bw-root_sid
@@ -557,14 +629,9 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD delete_copy.
-    DATA(key) = VALUE zzxxmla1_cl_sql=>ty_t_param( ( NEW i( hiesid ) ) ).
-    DATA(condition) = `"HIESID" = ?`.
-    IF sver IS NOT INITIAL.
-      APPEND NEW string( sver ) TO key.
-      condition = `"HIESID" = ? AND "SVER" = ?`.
-    ENDIF.
-    zzxxmla1_cl_sql=>execute( sql = |DELETE FROM { quote( tables-node ) } WHERE { condition }| params = key ).
-    zzxxmla1_cl_sql=>execute( sql = |DELETE FROM { quote( tables-closure ) } WHERE { condition }| params = key ).
+    DATA(key) = VALUE zzxxmla1_cl_sql=>ty_t_param( ( NEW i( hiesid ) ) ( NEW string( sver ) ) ).
+    zzxxmla1_cl_sql=>execute( sql = |DELETE FROM { quote( tables-node ) } WHERE "HIESID" = ? AND "SVER" = ?| params = key ).
+    zzxxmla1_cl_sql=>execute( sql = |DELETE FROM { quote( tables-closure ) } WHERE "HIESID" = ? AND "SVER" = ?| params = key ).
   ENDMETHOD.
 
   METHOD check.
@@ -621,11 +688,14 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD closure_sql.
+    " per inner node the distinct leaves of its subtree, per leaf (a value under two parents once) its identity row
     DATA(node) = quote( tables-node ).
     result = |INSERT INTO { quote( tables-closure ) } ( "HIESID", "SVER", "ANCESTOR_SID", "SID" ) | &&
              |SELECT DISTINCT n."HIESID", n."SVER", n."SID", l."SID" FROM { node } AS n | &&
              |INNER JOIN { node } AS l ON l."HIESID" = n."HIESID" AND l."SVER" = n."SVER" AND l."POS" > n."POS" AND l."POS" <= n."END_POS" | &&
-             |WHERE n."HIESID" = ? AND n."SVER" = ? AND n."SID" < 0 AND l."SID" >= 0|.
+             |WHERE n."HIESID" = ? AND n."SVER" = ? AND n."SID" < 0 AND l."SID" >= 0 | &&
+             |UNION ALL SELECT DISTINCT "HIESID", "SVER", "SID", "SID" FROM { node } | &&
+             |WHERE "HIESID" = ? AND "SVER" = ? AND "SID" >= 0|.
   ENDMETHOD.
 
   METHOD node_and_leaf_sql.
@@ -754,6 +824,96 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
+  METHOD create_rest_view.
+    DATA(sid_table) = NEW zzxxmla1_cl_bw_view_gen( )->tables( characteristic )-sids.
+    IF sid_table IS INITIAL.
+      refuse( |BW has no SID table of { characteristic }| ).
+    ENDIF.
+    DATA(description) = rest_view_description( characteristic ).
+    TRY.
+        ddl_handler( )->save( name         = tables-rest_ddl
+                              put_state    = 'N'
+                              ddddlsrcv_wa = VALUE #( ddlname    = tables-rest_ddl
+                                                      ddlanguage = sy-langu
+                                                      ddtext     = description
+                                                      source     = rest_view_source( characteristic = characteristic
+                                                                                     tables         = tables
+                                                                                     sid_table      = sid_table ) ) ).
+        cl_dd_ddl_handler=>if_dd_ddl_handler~write_tadir( objectname = tables-rest_ddl
+                                                          devclass   = package
+                                                          prid       = -1 ).
+        ddl_handler( )->activate( tables-rest_ddl ).
+      CATCH cx_dd_ddl_exception INTO DATA(error).
+        refuse( |View { tables-rest_ddl } cannot be activated: { error->get_text( ) }| ).
+    ENDTRY.
+    SELECT SINGLE tabname FROM dd02l WHERE tabname = @tables-rest_view AND as4local = 'A' INTO @DATA(active).
+    IF sy-subrc <> 0.
+      refuse( |View { tables-rest_ddl } cannot be activated| ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD delete_rest_view.
+    SELECT SINGLE ddlname FROM ddddlsrc WHERE ddlname = @tables-rest_ddl INTO @DATA(found).
+    IF sy-subrc <> 0.
+      RETURN.
+    ENDIF.
+    TRY.
+        ddl_handler( )->delete( found ).
+      CATCH cx_dd_ddl_exception INTO DATA(error).
+        refuse( |View { tables-rest_ddl } cannot be deleted: { error->get_text( ) }| ).
+    ENDTRY.
+  ENDMETHOD.
+
+  METHOD rest_view_source.
+    " the closure table's rows, then per copy that shows the not-assigned node (NORESTNODES not X) and SID of the SID
+    " table under no leaf (none of the All member's rows): the not-assigned node, the All member and the identity
+    " row. The directory is joined to the SID table by a condition that holds for every pair (a hierarchy's SIDs are
+    " negative, the characteristic's positive), as 7.50's CDS has no cross join; the anti-join is a left outer join
+    " where none is found, as it has no NOT EXISTS
+    DATA(nl) = cl_abap_char_utilities=>newline.
+    DATA(closure) = to_lower( tables-closure ).
+    DATA(rest) = ``.
+    DATA(ancestors) = VALUE string_table( ( `d.rest_top_sid` ) ( `d.root_sid` ) ( `s.sid` ) ).
+    LOOP AT ancestors INTO DATA(ancestor).
+      rest = rest &&
+             |union all select from zzxxmla1_hiedir as d| && nl &&
+             |  inner join { to_lower( sid_table ) } as s on s.sid > d.root_sid| && nl &&
+             |  left outer join { closure } as r on r.hiesid = d.hiesid and r.sver = d.sver | &&
+             |and r.ancestor_sid = d.root_sid and r.sid = s.sid| && nl &&
+             |\{| && nl &&
+             |  d.hiesid,| && nl &&
+             |  d.sver,| && nl &&
+             |  { ancestor } as ancestor_sid,| && nl &&
+             |  s.sid| && nl &&
+             |\}| && nl &&
+             |where d.iobjnm = '{ characteristic }' and d.norestnodes <> 'X' and r.sid is null| && nl.
+    ENDLOOP.
+    result = |@AbapCatalog.sqlViewName: '{ tables-rest_view }'| && nl &&
+             |@AbapCatalog.compiler.compareFilter: true| && nl &&
+             |@AccessControl.authorizationCheck: #NOT_REQUIRED| && nl &&
+             |@EndUserText.label: '{ rest_view_description( characteristic ) }'| && nl &&
+             |define view { tables-rest_ddl }| && nl &&
+             |  as select from { closure } as c| && nl &&
+             |\{| && nl &&
+             |  c.hiesid,| && nl &&
+             |  c.sver,| && nl &&
+             |  c.ancestor_sid,| && nl &&
+             |  c.sid| && nl &&
+             |\}| && nl &&
+             rest.
+  ENDMETHOD.
+
+  METHOD rest_view_description.
+    result = |BW hierarchy closure { characteristic }: with not assigned|.
+  ENDMETHOD.
+
+  METHOD ddl_handler.
+    IF handler IS NOT BOUND.
+      handler = cl_dd_ddl_handler_factory=>create( ).
+    ENDIF.
+    result = handler.
+  ENDMETHOD.
+
   METHOD next_table_number.
     DATA(highest) = 0.
     DATA(node_pattern) = |{ c_node_prefix }%|.
@@ -775,6 +935,13 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
     result = highest + 1.
+  ENDMETHOD.
+
+  METHOD tables_of_number.
+    result = VALUE #( node      = table_name( prefix = c_node_prefix number = number )
+                      closure   = table_name( prefix = c_closure_prefix number = number )
+                      rest_view = table_name( prefix = c_rest_view_prefix number = number )
+                      rest_ddl  = table_name( prefix = c_rest_ddl_prefix number = number ) ).
   ENDMETHOD.
 
   METHOD table_name.
