@@ -98,10 +98,12 @@ The steps:
      schema editor can switch any dimension's caption to the key.
    Regenerated on SAP 2026-10-16: the plain views of FoodMart, the clinic, the wide demo and `0D_NW_C01`; the
    filtered views of `0D_NW_C01`'s fiscal defaults follow at its next accept. The schemas are unchanged, so nothing
-   names the new columns yet (step 3); what is expected to change in the answers (`xmla_test.py` not yet run) is a
-   blank text where BW has none (a member
+   names the new columns yet (step 3); what changes in the answers is a blank text where BW has none (a member
    property `Text`, a drill-through `(Text)` column) and the name and caption of a compounded characteristic's
-   SID 0 (`''`, was `#/#`), until the reference database's views are rebuilt (step 6).
+   SID 0 (`''`, was `#/#`), until the reference database's views are rebuilt (step 6). HANA holds the blanks as
+   `N''` (length 0, not a space). Checked: `xmla_test.py` 368 of 372, the new failure
+   `execute_hier_drillthrough_subselect` (patient `000000` and physician `000`, SID 0, have no text: their `(Text)`
+   column is blank, the reference's still the key); `compare-applicable.py` 394 of 395 as before.
 3. The proposal (`ZZXXMLA1_CL_SCHEMA_PROPOSAL`) and the schema builder: each characteristic's key attribute gets its
    text as `NameColumn` (the caption of a level with `sourceAttribute`, step 1; not a `captionColumn`, which the
    reference ignores there), the medium text, else the long, else the short one, the key caption column if it has
