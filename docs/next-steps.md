@@ -28,10 +28,12 @@ The rules (decided 2026-10-16):
   (`NullProcessing` `ZeroOrBlank`: `''` for a string, `0` for a number) applies to BW's initial value (SID 0, BW's
   "not assigned"): it is named `''` for every key type, CHAR, NUMC, DATS and TIMS alike (`[ZCLDIAG].[]`); its key
   (`MEMBER_KEY`) stays BW's value (`0000`). NUMC is a string of fixed length (SSAS `WChar`), not a number.
-- **A compounded characteristic is named by the concatenation of its key fields**, compounding first, each at its full
-  length, as BW concatenates them: CHAR parts padded with blanks, NUMC parts with zeros (as BW stores them), no
-  separator (`K42024001`). Strings stay uniform: a name keeps its trailing blanks where its last parts are initial
-  (`1000` and a blank cost centre is `1000` followed by ten blanks). Fully initial (SID 0) it is `''`, as above.
+- **A compounded characteristic is named by its key fields separated by `/`**, compounding first, each as BW holds
+  it (NUMC with its zeros), an initial CHAR part empty (`K4/2024001`, `1000/` for a blank cost centre); fully initial
+  (SID 0) it is `''`, as above. Decided 2026-10-16 for the medium term, instead of BW's concatenation at full length
+  (`K42024001`, CHAR parts padded with blanks): CDS cannot write blanks inside a string (tested 2026-10-16 through
+  ADBC: `rpad`, `concat` and `replace` trim them in the SQL HANA runs, only `concat_with_space` with a literal count
+  keeps them); the blank handling is to be investigated (Later).
 - **The caption of a characteristic with texts is its text field** as configured (short, medium or long), a value
   without text `''`, the initial value too. Blank captions are the modeller's to fix, not the engine's (step 4).
 - **The caption of a characteristic without texts is its key**, `#` for the initial value; a compounded one is
@@ -69,8 +71,8 @@ The steps:
      data, so the reference shows the same: it falls back to the name for a NULL caption), for the characteristic
      and for every attribute with texts;
    - a name column with `''` for SID 0 where the key is not CHAR (CHAR's initial value is `''` already);
-   - `COMPOUND_KEY` the concatenation above (CDS `concat` drops trailing blanks: `rpad` each CHAR part; check on
-     7.50 and that HANA, ADBC and the XMLA answer keep the blanks), its present form a caption column of its own;
+   - `COMPOUND_KEY` the name above (an initial part empty, SID 0 `''`), its present form (`#` for an initial part)
+     a caption column of its own;
    - a key caption column for characteristics without texts (the key, `#` for SID 0).
 3. The proposal (`ZZXXMLA1_CL_SCHEMA_PROPOSAL`) and the schema builder: each characteristic's level gets its text as
    `captionColumn`, the medium text, else the long, else the short one, the key caption column if it has none; the
@@ -1282,6 +1284,14 @@ evaluation (`MemberArrayValueCalc`; before, `([Measures].[Foo], [Time].CurrentMe
 
 ## Later
 
+- Blank handling in HANA and CDS (decided 2026-10-16 to look into later): a compounded characteristic's name with its
+  parts at full length, as BW concatenates them (`next-steps.md`, Now: texts and captions), needs blanks inside a
+  string. CDS gives its string functions ABAP's blank semantics in the SQL it generates: `rpad( 'AB', 6, ' ' )` is
+  `AB`, `concat( rpad( 'AB', 6, ' ' ), 'C' )` and `replace( concat( rpad( 'AB', 6, '~' ), 'C' ), '~', ' ' )` are
+  `ABC` in HANA, `concat_with_space( 'AB', 'C', 4 )` is `AB    C` (a throwaway view read through ADBC). To try: a CDS
+  table function (AMDP, SQLScript is HANA's own), a `<NameExpression>` with native SQL in the schema (the reader
+  refuses expressions; the reference database needs its dialect), `concat_with_space` with a CASE per length of a
+  part; and whether trailing blanks survive HANA, ADBC, the XMLA answer and Excel.
 - The Discover cache not seeing BW loads is debt (`known-issues.md`): clear it, or the answers of the cube
   concerned, when BW activates master data of a characteristic or loads a request into a provider of a catalog.
 - Done: compound slicer (a set of several tuples in WHERE); Mondrian aggregates over the slicer tuples
