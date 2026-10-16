@@ -41,9 +41,12 @@ The rules (decided 2026-10-16):
   subcube's `label_predicate`) and the native label filter (`get_level_members_where`), as SSAS does. The reference's
   patched subcube filter compares the level's column there (`scripts/patches/subcube-filter-member-caption.patch`), so
   these answers have no oracle where caption and name differ.
-- **The texts are no member properties any more**, nowhere: the `Text` property, the attributes' text properties and
-  the drill-through's `(Text)` columns go (to be revisited on user feedback). The key stays a member property `Key`
-  on every dimension, an aDSO's too.
+- **The characteristic's own text is its caption, no member property any more:** its `Text` property and its
+  drill-through `(Text)` column go (to be revisited on user feedback). The key stays a member property `Key` on
+  every dimension, an aDSO's too. A display attribute keeps both its properties, its key and its text: a property
+  has a caption (`PROPERTY_CAPTION`) but its values have none, so its text property is the only way to show an
+  attribute's text (corrected 2026-10-16). A navigation attribute's hierarchy (`<char>__<attr>`) is captioned by the
+  attribute's text like any other.
 - **NUMC as numbers leaves the schema builder:** "As numbers" and `intColumns` of the API go; the views keep their
   `COLUMN_INT` columns for FoodMart's schemas, which name numbers as the reference's tests do (`mvp-scope.md`, NUMC
   decision). Restored if a user needs it.
@@ -71,11 +74,13 @@ The steps:
    - a key caption column for characteristics without texts (the key, `#` for SID 0).
 3. The proposal (`ZZXXMLA1_CL_SCHEMA_PROPOSAL`) and the schema builder: each characteristic's level gets its text as
    `captionColumn`, the medium text, else the long, else the short one, the key caption column if it has none; the
-   name stays the key and `Key` is a member property; no text properties, no `(Text)` drill-through columns. The
-   schema editor switches a dimension's caption between the key and each text field the view has. "As numbers"
-   goes.
+   name stays the key and `Key` is a member property; no `Text` property and no `(Text)` drill-through column of the
+   characteristic itself, while each display attribute keeps its key and its text as properties (and its drill-through
+   columns). The schema editor switches a dimension's caption between the key and each text field the view has.
+   "As numbers" goes.
 4. A schema check against blank texts: the schema API's `check` (and accept) reports, per dimension, the members whose
-   caption is blank (a count and examples), so the modeller sees them; open whether it warns or refuses.
+   caption is blank (a count and examples), so the modeller sees them. A warning, never a refusal (decided
+   2026-10-16): a modeller who wants blank captions keeps them.
 5. BW hierarchies: a leaf is named and captioned as the characteristic's member (`levels_sql`, `c_initial_name` `#`
    goes: SID 0 is `''`); text nodes keep their technical name, their captions (RSTHIENODE's texts) come later. The
    reference's `ZCLDIAG_ICD` names its initial leaf `#` (`build-bw-reference-db.py`): rebuilt, and the cases that name
