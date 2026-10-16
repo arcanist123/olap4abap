@@ -35,6 +35,9 @@ CLASS ltc_schema DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT
     "! the annotation olap4abap.omitEmptyCells of a cube: false without it, refused with a value other than true or
     "! false
     METHODS omit_empty_cells FOR TESTING RAISING cx_static_check.
+    "! the annotation olap4abap.bwHierarchy of a Hierarchy: refused with levels, on a table that is no characteristic's
+    "! view and for a hierarchy BW does not have
+    METHODS bw_hierarchy_refused FOR TESTING.
     METHODS read
       IMPORTING xml           TYPE string
       RETURNING VALUE(result) TYPE REF TO zzxxmla1_cl_schema
@@ -420,6 +423,42 @@ CLASS ltc_schema IMPLEMENTATION.
         cl_abap_unit_assert=>assert_equals(
           act = fault->description
           exp = `olap4abap Error:Cube 'A': the annotation olap4abap.omitEmptyCells must be true or false` ).
+    ENDTRY.
+  ENDMETHOD.
+
+  METHOD bw_hierarchy_refused.
+    DATA(key) = `<DimensionAttribute name="K" usage="Key"><KeyColumn dataType="Integer" columnName="SID"/></DimensionAttribute>`.
+    DATA(hierarchy) = `<Hierarchy name="H" hasAll="true">` &&
+                      `<Annotations><Annotation name="olap4abap.bwHierarchy">ZZNONE_H</Annotation></Annotations>`.
+    DATA(cube) = `<Cube name="C"><Table name="F"/><DimensionUsage name="D" source="D" foreignKey="X"/>` &&
+                 `<Measure name="M" column="M" aggregator="sum"/></Cube>`.
+    TRY.
+        read( |<Schema name="S"><Dimension name="D" table="ZZXXMLA1_C_ZZNONE">{ key }| &&
+              |{ hierarchy }<Level name="L" column="SID"/></Hierarchy></Dimension>{ cube }</Schema>| ).
+        cl_abap_unit_assert=>fail( `no fault` ).
+      CATCH zzxxmla1_cx_xmla INTO DATA(fault).
+        cl_abap_unit_assert=>assert_equals( act = fault->description
+                                            exp = |olap4abap Error:Hierarchy 'H' of dimension 'D': a BW hierarchy | &&
+                                                  |(olap4abap.bwHierarchy) has no levels, they are made from its depth| ).
+    ENDTRY.
+    TRY.
+        read( |<Schema name="S"><Dimension name="D" table="T">{ key }{ hierarchy }</Hierarchy></Dimension>| &&
+              |{ cube }</Schema>| ).
+        cl_abap_unit_assert=>fail( `no fault` ).
+      CATCH zzxxmla1_cx_xmla INTO fault.
+        cl_abap_unit_assert=>assert_equals( act = fault->description
+                                            exp = |olap4abap Error:Hierarchy 'H' of dimension 'D': the BW hierarchy | &&
+                                                  |ZZNONE_H needs the view of a characteristic as the dimension's table, | &&
+                                                  |not T| ).
+    ENDTRY.
+    TRY.
+        read( |<Schema name="S"><Dimension name="D" table="ZZXXMLA1_C_ZZNONE">{ key }{ hierarchy }</Hierarchy>| &&
+              |</Dimension>{ cube }</Schema>| ).
+        cl_abap_unit_assert=>fail( `no fault` ).
+      CATCH zzxxmla1_cx_xmla INTO fault.
+        cl_abap_unit_assert=>assert_equals( act = fault->description
+                                            exp = |olap4abap Error:Hierarchy 'H' of dimension 'D': BW has no active | &&
+                                                  |hierarchy ZZNONE_H of ZZNONE| ).
     ENDTRY.
   ENDMETHOD.
 

@@ -55,7 +55,7 @@ HIERARCHIES = {
 NOT_ASSIGNED = "1HIER_REST"
 # --reference: the reference server, its catalog and the hierarchies it serves
 REFERENCE_URL = "http://localhost:8080/emondrian/xmla"
-REFERENCE_CATALOG = "ZCLVISIT"
+REFERENCE_CATALOG = "ZCLHIER"
 REFERENCE_HIERARCHIES = [("ZCLDIAG", "ZCLDIAG_ICD")]
 
 EXECUTE = """<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/"><SOAP-ENV:Body>
@@ -213,7 +213,7 @@ def main():
     parser.add_argument("--with-facts", action="store_true", help="compare only the members with a value")
     parser.add_argument("--bw-only", action="store_true", help="only BW's answer and its own checks")
     parser.add_argument("--reference", action="store_true",
-                        help="check the reference server's hierarchies (catalog ZCLVISIT) against BW's")
+                        help="check the reference server's hierarchies (catalog ZCLHIER) against BW's")
     parser.add_argument("--show", type=int, default=10, help="differences shown per hierarchy")
     args = parser.parse_args()
     global CATALOG

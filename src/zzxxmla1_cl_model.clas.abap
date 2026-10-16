@@ -40,6 +40,9 @@ CLASS zzxxmla1_cl_model DEFINITION
         typed           TYPE abap_bool,
         "! the columns of the dimension table that are numbers in the database, which orders and compares them as such
         numeric_columns TYPE string_table,
+        "! the copy of a BW hierarchy (the annotation olap4abap.bwHierarchy of ZZXXMLA1_CL_SCHEMA) at BW's version the
+        "! schema was read at; initial for any other hierarchy
+        bw_hierarchy    TYPE zzxxmla1_cl_bw_hierarchy_copy=>ty_hierarchy,
       END OF ty_hierarchy,
       ty_t_hierarchy TYPE STANDARD TABLE OF ty_hierarchy WITH EMPTY KEY.
     TYPES:
@@ -93,6 +96,8 @@ CLASS zzxxmla1_cl_model DEFINITION
     "! with facts (the dimension's annotation olap4abap.membersWithFacts, our extension: a BW characteristic is shared by
     "! many providers and has many more values than one of them uses), the rows of the dimension table whose key is in
     "! the fact table, as a derived table. Fact queries join the dimension table itself: the facts restrict it anyway.
+    "! The members of a BW hierarchy are not read from the dimension table: until the engine reads them from the
+    "! hierarchy's copy (docs/next-steps.md, step 7), a read of them fails (ZZXXMLA1_CX_BW_HIERARCHY).
     CLASS-METHODS member_table
       IMPORTING hierarchy     TYPE ty_hierarchy
       RETURNING VALUE(result) TYPE string.
@@ -167,7 +172,8 @@ CLASS zzxxmla1_cl_model DEFINITION
                 rows          TYPE zzxxmla1_cl_sql=>ty_t_row
       RETURNING VALUE(result) TYPE ty_t_member.
     "! The number of members of a level as the reference counts it (SqlMemberSource.getLevelMemberCount): the distinct
-    "! values of the level's column, or of the columns of the levels down to it if its members are not unique.
+    "! values of the level's column, or of the columns of the levels down to it if its members are not unique. A level
+    "! of a BW hierarchy: the members of the copy on the level's depth.
     CLASS-METHODS level_cardinality
       IMPORTING hierarchy     TYPE ty_hierarchy
                 level_no      TYPE i
@@ -247,13 +253,20 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
                         key_column      = dim-key_column
                         dim_type        = dim-dim_type
                         fact_table      = the_cube-fact_table
-                        members_with_facts = dim-members_with_facts ) TO result.
+                        members_with_facts = dim-members_with_facts
+                        bw_hierarchy    = hier-bw_hierarchy ) TO result.
       ENDLOOP.
     ENDLOOP.
     key_types( CHANGING hierarchies = result ).
   ENDMETHOD.
 
   METHOD member_table.
+    IF hierarchy-bw_hierarchy IS NOT INITIAL.
+      RAISE EXCEPTION TYPE zzxxmla1_cx_bw_hierarchy
+        EXPORTING
+          error_message = |The members of the BW hierarchy { hierarchy-bw_hierarchy-name } of | &&
+                          |{ hierarchy-bw_hierarchy-characteristic } ({ hierarchy-unique_name }) are not supported yet|.
+    ENDIF.
     result = zzxxmla1_cl_sql=>quote( hierarchy-dim_table ).
     IF hierarchy-members_with_facts = abap_true.
       result = |( SELECT * FROM { result } WHERE { zzxxmla1_cl_sql=>quote( hierarchy-key_column ) } IN | &&
@@ -551,6 +564,10 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD level_cardinality.
+    IF hierarchy-bw_hierarchy IS NOT INITIAL.
+      result = zzxxmla1_cl_bw_hierarchy_copy=>level_cardinality( hierarchy = hierarchy-bw_hierarchy level = level_no ).
+      RETURN.
+    ENDIF.
     DATA(level) = hierarchy-levels[ level_no ].
     DATA(table) = member_table( hierarchy ).
     IF level-unique_members = abap_true OR level_no = 1.

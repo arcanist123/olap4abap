@@ -5,7 +5,7 @@ A catalog or a schema is added by writing files, without any new ABAP object.
 
     python scripts/sap-files.py put my/Schema.xml /WEB-INF/schema/Schema.xml
     python scripts/sap-files.py put reference/schema/datasources-sap.xml /WEB-INF/datasources.xml
-    python scripts/sap-files.py deploy               # FoodmartBW.xml, FoodmartBWDrill.xml and their catalogs (below)
+    python scripts/sap-files.py deploy               # the test schemas (DEPLOY) and their catalogs (below)
     python scripts/sap-files.py list
     python scripts/sap-files.py get /WEB-INF/datasources.xml
     python scripts/sap-files.py delete /WEB-INF/schema/Old.xml
@@ -35,6 +35,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 DEPLOY = [
     ("reference/schema/FoodmartBW.xml", "/WEB-INF/schema/FoodmartBW.xml"),
     ("reference/schema/FoodmartBWDrill.xml", "/WEB-INF/schema/FoodmartBWDrill.xml"),
+    ("reference/schema/ClinicBW-sap.xml", "/WEB-INF/schema/ClinicBW.xml"),
 ]
 # the data sources file `deploy` merges its catalogs from
 DATASOURCES = ("reference/schema/datasources-sap.xml", "/WEB-INF/datasources.xml")

@@ -1,6 +1,6 @@
 <SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
 <SOAP-ENV:Body>
 <Execute xmlns="urn:schemas-microsoft-com:xml-analysis" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
-<Command><Statement>SELECT {[Measures].[ZCLVISNO], [Measures].[ZCLCHRG]} ON 0, {[ZCLDIAG.ZCLDIAG_ICD].[Level 01].Members, [ZCLDIAG.ZCLDIAG_ICD].[Level 02].Members, [ZCLDIAG.ZCLDIAG_ICD].[Level 04].Members} DIMENSION PROPERTIES PARENT_UNIQUE_NAME, DEPTH, CHILDREN_CARDINALITY ON 1 FROM [ZCLVISIT]</Statement></Command>
-<Properties><PropertyList><DataSourceInfo>ABAP BW</DataSourceInfo><Catalog>ZCLVISIT</Catalog><Format>Multidimensional</Format><AxisFormat>TupleFormat</AxisFormat><Content>SchemaData</Content></PropertyList></Properties>
+<Command><Statement>SELECT {[Measures].[ZCLVISNO], [Measures].[ZCLCHRG]} ON 0, {[ZCLDIAG.ZCLDIAG_ICD].[Level 01].Members, [ZCLDIAG.ZCLDIAG_ICD].[Level 02].Members, [ZCLDIAG.ZCLDIAG_ICD].[Level 04].Members} DIMENSION PROPERTIES PARENT_UNIQUE_NAME, DEPTH, CHILDREN_CARDINALITY ON 1 FROM [ZCLHIER]</Statement></Command>
+<Properties><PropertyList><DataSourceInfo>ABAP BW</DataSourceInfo><Catalog>ZCLHIER</Catalog><Format>Multidimensional</Format><AxisFormat>TupleFormat</AxisFormat><Content>SchemaData</Content></PropertyList></Properties>
 </Execute></SOAP-ENV:Body></SOAP-ENV:Envelope>

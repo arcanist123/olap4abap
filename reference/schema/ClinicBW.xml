@@ -1,12 +1,14 @@
 <?xml version="1.0"?>
 <!--
   The reference's schema of the clinic InfoCube ZCLVISIT (docs/clinic-demo.md), the reference scenario for BW
-  hierarchies (docs/next-steps.md, Reference scenario). It is SAP's accepted schema of the catalog ZCLVISIT (the
-  schema generator's proposal) without its annotations (olap4abap's extensions, which the reference does not know) and
-  with the dimension tables named by their placeholders (ZZXXMLA1_C_<characteristic>, as in FoodmartBW.xml), plus the
-  BW hierarchy ZCLDIAG_ICD of the diagnosis as a balanced level hierarchy, Level 01 to Level 04, a member on the level
-  of its depth as olap4abap serves it (docs/next-steps.md, Reference scenario, decided 2026-10-16). SAP serves its own
-  schema of ZCLVISIT; the test compares the answers of the catalogs of the same name.
+  hierarchies (docs/next-steps.md, Reference scenario), as the test catalog and cube ZCLHIER (the demo's own catalog
+  ZCLVISIT is SAP's, and a cube name is one cube of the server). It is SAP's accepted schema of the catalog ZCLVISIT
+  (the schema generator's proposal) without its annotations (olap4abap's extensions, which the reference does not
+  know) and with the dimension tables named by their placeholders (ZZXXMLA1_C_<characteristic>, as in FoodmartBW.xml),
+  plus the BW hierarchy ZCLDIAG_ICD of the diagnosis as a balanced level hierarchy, Level 01 to Level 04, a member on
+  the level of its depth as olap4abap serves it (docs/next-steps.md, Reference scenario, decided 2026-10-16). SAP
+  serves ClinicBW-sap.xml as ZCLHIER: the same schema with the hierarchy in olap4abap's form; the test compares the
+  answers of the catalogs of the same name.
 
   The reference database (scripts/build-bw-reference-db.py) holds BW's tables of the cube, the characteristics' views
   and, computed from the copy of the hierarchy (ZZXXMLA1_CL_BW_HIERARCHY_COPY) at the version current at the export,
@@ -20,7 +22,7 @@
   table (RolapHierarchy), so each hierarchy names its own; the flat one is first, so the drill-through's attributes
   (sourceAttribute) bind to the characteristic's view.
 -->
-<Schema name="ZCLVISIT">
+<Schema name="ZCLHIER">
   <Dimension visible="true" highCardinality="false" table="ZZXXMLA1_C_ZCLPAT" name="ZCLPAT" caption="Patient">
     <DimensionAttribute name="ZCLPAT SID" usage="Key" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="Integer" columnName="SID"/>
@@ -430,7 +432,7 @@
       </Level>
     </Hierarchy>
   </Dimension>
-  <Cube name="ZCLVISIT" caption="Clinic Visits" visible="true" defaultMeasure="ZCLVISNO" cache="true" enabled="true">
+  <Cube name="ZCLHIER" caption="Clinic Visits" visible="true" defaultMeasure="ZCLVISNO" cache="true" enabled="true">
     <Table name="/BIC/FZCLVISIT"/>
     <DimensionUsage source="ZCLPAT" name="ZCLPAT" caption="Patient" visible="true" foreignKey="SID_ZCLPAT" highCardinality="false"/>
     <DimensionUsage source="ZCLDOC" name="ZCLDOC" caption="Physician" visible="true" foreignKey="SID_ZCLDOC" highCardinality="false"/>

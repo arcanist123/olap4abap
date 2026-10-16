@@ -7,9 +7,9 @@
   <return>
     <root xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
       <row>
-        <CATALOG_NAME>ZCLVISIT</CATALOG_NAME>
-        <SCHEMA_NAME>ZCLVISIT</SCHEMA_NAME>
-        <CUBE_NAME>ZCLVISIT</CUBE_NAME>
+        <CATALOG_NAME>ZCLHIER</CATALOG_NAME>
+        <SCHEMA_NAME>ZCLHIER</SCHEMA_NAME>
+        <CUBE_NAME>ZCLHIER</CUBE_NAME>
         <DIMENSION_UNIQUE_NAME>[ZCLDIAG]</DIMENSION_UNIQUE_NAME>
         <HIERARCHY_NAME>ZCLDIAG.ZCLDIAG_ICD</HIERARCHY_NAME>
         <HIERARCHY_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD]</HIERARCHY_UNIQUE_NAME>
@@ -18,7 +18,7 @@
         <HIERARCHY_CARDINALITY>73</HIERARCHY_CARDINALITY>
         <DEFAULT_MEMBER>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</DEFAULT_MEMBER>
         <ALL_MEMBER>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</ALL_MEMBER>
-        <DESCRIPTION>ZCLVISIT Cube - ZCLDIAG.ZCLDIAG_ICD Hierarchy</DESCRIPTION>
+        <DESCRIPTION>ZCLHIER Cube - ZCLDIAG.ZCLDIAG_ICD Hierarchy</DESCRIPTION>
         <STRUCTURE>0</STRUCTURE>
         <IS_VIRTUAL>false</IS_VIRTUAL>
         <IS_READWRITE>false</IS_READWRITE>

@@ -26,6 +26,9 @@
       <Catalog name="ZFMDRILL">
         <Definition>/WEB-INF/schema/FoodmartBWDrill.xml</Definition>
       </Catalog>
+      <Catalog name="ZCLHIER">
+        <Definition>/WEB-INF/schema/ClinicBW.xml</Definition>
+      </Catalog>
     </Catalogs>
   </DataSource>
 </DataSources>

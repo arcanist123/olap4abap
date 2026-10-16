@@ -189,10 +189,12 @@ refill none, and per hierarchy the node rows but the virtual root and the not-as
 MDX shows before and below REST_H.
 
 Hierarchies in which every node occurs once (`ZCLDIAG_ICD`) are also served by the reference, as a balanced level
-hierarchy on a flattened table of an export of the clinic InfoCube and the hierarchy's copy (catalog `ZCLVISIT`,
-`reference/schema/ClinicBW.xml`, exported by `build-bw-reference-db.py`), and their MDX cases are captured and replayed
-like FoodMart's (`next-steps.md`, Reference scenario): `execute_hier_*`, `members_hier_*`, `mdschema_hierarchies_hier`
-and `mdschema_levels_hier`, 71 cases, which fail on SAP until the engine serves the hierarchy. Before capture,
+hierarchy on a flattened table of an export of the clinic InfoCube and the hierarchy's copy (catalog and cube
+`ZCLHIER`, `reference/schema/ClinicBW.xml`, exported by `build-bw-reference-db.py`), and their MDX cases are captured
+and replayed like FoodMart's (`next-steps.md`, Reference scenario): `execute_hier_*`, `members_hier_*`,
+`mdschema_hierarchies_hier` and `mdschema_levels_hier`, 71 cases. On SAP they run against the test catalog `ZCLHIER`
+(`reference/schema/ClinicBW-sap.xml`, the hierarchy annotated `olap4abap.bwHierarchy`, `sap-files.py deploy`); the
+two rowsets pass, the others fail until the engine reads the hierarchy's members. Before capture,
 
     python scripts/bw_hierarchy_test.py --reference
 

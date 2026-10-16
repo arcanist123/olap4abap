@@ -278,6 +278,11 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
     CLASS-METHODS characteristic_of_placeholder
       IMPORTING table         TYPE csequence
       RETURNING VALUE(result) TYPE string.
+    "! The characteristic of a table a schema names for a dimension: of a placeholder, or of a generated view (its row
+    "! of ZZXXMLA1_VIEW, filtered or not); initial for any other table.
+    CLASS-METHODS characteristic_of_view
+      IMPORTING table         TYPE csequence
+      RETURNING VALUE(result) TYPE string.
     "! The view column of a table field: the field without its namespace (/BIC/ZFMSNAME -> ZFMSNAME).
     CLASS-METHODS view_column
       IMPORTING field         TYPE csequence
@@ -1342,6 +1347,22 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
     DATA(length) = strlen( c_placeholder_prefix ).
     IF strlen( table ) > length AND substring( val = table len = length ) = c_placeholder_prefix.
       result = substring( val = table off = length ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD characteristic_of_view.
+    result = characteristic_of_placeholder( table ).
+    IF result IS NOT INITIAL.
+      RETURN.
+    ENDIF.
+    DATA(view_name) = CONV viewname( to_upper( table ) ).
+    SELECT object_name FROM zzxxmla1_view
+      WHERE kind = @c_kind-characteristic AND view_name = @view_name
+      ORDER BY object_name ASCENDING
+      INTO TABLE @DATA(rows)
+      UP TO 1 ROWS.
+    IF rows IS NOT INITIAL.
+      result = rows[ 1 ]-object_name.
     ENDIF.
   ENDMETHOD.
 

@@ -22,6 +22,10 @@
 "! refused when the schema is read. A level's member properties (Property) are columns of the dimension's table: the
 "! key column of their sourceAttribute, or their own column. A TimeDimension needs time level types on all its levels, a standard dimension none
 "! (RolapLevel, RolapDimension); without a type the first level decides.
+"! A Hierarchy annotated c_bw_hierarchy (our extension) is a BW hierarchy of the dimension's characteristic, served
+"! from its copy (ZZXXMLA1_CL_BW_HIERARCHY_COPY) at BW's current version: it has no levels in the schema, they are
+"! Level 01 to Level nn, nn the copy's depth, a member on the level of its depth as SSAS serves a parent-child
+"! hierarchy (docs/next-steps.md, Reference scenario, decided 2026-10-16).
 CLASS zzxxmla1_cl_schema DEFINITION
   PUBLIC
   FINAL
@@ -73,6 +77,9 @@ CLASS zzxxmla1_cl_schema DEFINITION
         all_member_name TYPE string,
         default_member  TYPE string,  " unique name of the default member; empty: the All member or the first member
         origin          TYPE i,       " HIERARCHY_ORIGIN: 1 user-defined, 2 attribute, 6 key attribute
+        "! the copy of the BW hierarchy the annotation c_bw_hierarchy names, current when the schema was read; initial
+        "! for any other hierarchy
+        bw_hierarchy    TYPE zzxxmla1_cl_bw_hierarchy_copy=>ty_hierarchy,
       END OF ty_hier,
       ty_t_hier TYPE STANDARD TABLE OF ty_hier WITH EMPTY KEY.
     TYPES:
@@ -139,6 +146,12 @@ CLASS zzxxmla1_cl_schema DEFINITION
     "! (MDDataSet_Multidimensional.emitCell): the reference writes every empty cell with its format string, so a grid
     "! of few cells with facts is mostly empty cells. Default false, the reference's answer.
     CONSTANTS c_omit_empty_cells TYPE string VALUE `olap4abap.omitEmptyCells`.
+    "! The annotation of a Hierarchy (our extension, which the reference ignores) whose value names a BW hierarchy
+    "! (RSHIEDIR-HIENM) of the characteristic of the dimension's table (ZZXXMLA1_CL_BW_VIEW_GEN=>characteristic_of_view):
+    "! the hierarchy has no Level elements, its levels are made from the copy's depth.
+    CONSTANTS c_bw_hierarchy TYPE string VALUE `olap4abap.bwHierarchy`.
+    "! The names of a BW hierarchy's levels: Level 01, Level 02, ...
+    CONSTANTS c_bw_level_prefix TYPE string VALUE `Level `.
 
     "! The schemas of all catalogs of the server, read once per session.
     CLASS-METHODS get
@@ -256,6 +269,18 @@ CLASS zzxxmla1_cl_schema DEFINITION
                 hierarchy TYPE zzxxmla1_cl_schema_def=>ty_hierarchy
                 position  TYPE i
       RAISING   zzxxmla1_cx_xmla.
+    "! A Hierarchy element annotated c_bw_hierarchy: the copy of the BW hierarchy it names and its levels by depth.
+    METHODS add_bw_hierarchy
+      IMPORTING hier      TYPE ty_hier
+                dimension TYPE zzxxmla1_cl_schema_def=>ty_dimension
+                hierarchy TYPE zzxxmla1_cl_schema_def=>ty_hierarchy
+                bw_name   TYPE string
+      RAISING   zzxxmla1_cx_xmla.
+    "! The value of an annotation, initial without it.
+    CLASS-METHODS annotation
+      IMPORTING annotations   TYPE REF TO zzxxmla1_cl_schema_def=>ty_annotations
+                name          TYPE string
+      RETURNING VALUE(result) TYPE string.
     "! Adds a hierarchy; fails if the dimension has one of that name already.
     METHODS append_hierarchy
       IMPORTING hierarchy TYPE ty_hier
@@ -597,23 +622,29 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
     IF hierarchy-relation IS NOT INITIAL OR hierarchy-member_reader_class IS NOT INITIAL.
       fail( |{ where }: only the table of the dimension is supported| ).
     ENDIF.
+    DATA(hier) = VALUE ty_hier( cube_name       = cube
+                                dim_name        = dim_name
+                                hier_name       = hier_name
+                                name            = COND #( WHEN hierarchy-name IS INITIAL THEN dim_name
+                                                          ELSE |{ dim_name }.{ hier_name }| )
+                                seq_no          = position
+                                caption         = COND #( WHEN hierarchy-caption IS NOT INITIAL THEN hierarchy-caption
+                                                          ELSE hier_name )
+                                has_all         = hierarchy-has_all
+                                all_member_name = COND #( WHEN hierarchy-all_member_name IS NOT INITIAL
+                                                          THEN hierarchy-all_member_name
+                                                          ELSE all_member_name( dim_name = dim_name hier_name = hier_name ) )
+                                default_member  = hierarchy-default_member
+                                origin          = 1 ).
+    DATA(bw_name) = condense( annotation( annotations = hierarchy-annotations name = c_bw_hierarchy ) ).
+    IF bw_name IS NOT INITIAL.
+      add_bw_hierarchy( hier = hier dimension = dimension hierarchy = hierarchy bw_name = bw_name ).
+      RETURN.
+    ENDIF.
     IF hierarchy-levels IS INITIAL.
       fail( |{ where }: a hierarchy needs levels| ).
     ENDIF.
-    append_hierarchy( VALUE #( cube_name       = cube
-                               dim_name        = dim_name
-                               hier_name       = hier_name
-                               name            = COND #( WHEN hierarchy-name IS INITIAL THEN dim_name
-                                                         ELSE |{ dim_name }.{ hier_name }| )
-                               seq_no          = position
-                               caption         = COND #( WHEN hierarchy-caption IS NOT INITIAL THEN hierarchy-caption
-                                                         ELSE hier_name )
-                               has_all         = hierarchy-has_all
-                               all_member_name = COND #( WHEN hierarchy-all_member_name IS NOT INITIAL
-                                                         THEN hierarchy-all_member_name
-                                                         ELSE all_member_name( dim_name = dim_name hier_name = hier_name ) )
-                               default_member  = hierarchy-default_member
-                               origin          = 1 ) ).
+    append_hierarchy( hier ).
 
     LOOP AT hierarchy-levels INTO DATA(level).
       DATA(level_no) = sy-tabix.
@@ -664,6 +695,53 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
                       properties     = level_properties( level = level dimension = dimension
                                                          location = |{ where }, level '{ level-name }'| ) ) TO all_levels.
     ENDLOOP.
+  ENDMETHOD.
+
+  METHOD add_bw_hierarchy.
+    DATA(where) = |Hierarchy '{ hier-hier_name }' of dimension '{ hier-dim_name }'|.
+    IF hierarchy-levels IS NOT INITIAL.
+      fail( |{ where }: a BW hierarchy ({ c_bw_hierarchy }) has no levels, they are made from its depth| ).
+    ENDIF.
+    DATA(characteristic) = zzxxmla1_cl_bw_view_gen=>characteristic_of_view( dimension-table ).
+    IF characteristic IS INITIAL.
+      fail( |{ where }: the BW hierarchy { bw_name } needs the view of a characteristic as the dimension's table, | &&
+            |not { dimension-table }| ).
+    ENDIF.
+    READ TABLE dimension-attributes INTO DATA(key) WITH KEY usage = `Key`.
+    DATA(row) = hier.
+    TRY.
+        row-bw_hierarchy = NEW zzxxmla1_cl_bw_hierarchy_copy( )->current( characteristic = CONV #( characteristic )
+                                                                          name           = CONV #( bw_name ) ).
+        DATA(depth) = zzxxmla1_cl_bw_hierarchy_copy=>depth( row-bw_hierarchy ).
+      CATCH zzxxmla1_cx_bw_hierarchy INTO DATA(error).
+        fail( |{ where }: { error->get_text( ) }| ).
+    ENDTRY.
+    append_hierarchy( row ).
+    " a member's key is its SID: a node's negative one, a value's the characteristic's (the key column of the view)
+    DO depth TIMES.
+      DATA(level_name) = |{ c_bw_level_prefix }{ sy-index WIDTH = 2 ALIGN = RIGHT PAD = `0` }|.
+      APPEND VALUE #( cube_name      = hier-cube_name
+                      dim_name       = hier-dim_name
+                      hier_name      = hier-hier_name
+                      level_no       = sy-index
+                      level_name     = level_name
+                      caption        = level_name
+                      key_column     = key-key_column->column_name
+                      name_column    = key-key_column->column_name
+                      data_type      = `Numeric`
+                      unique_members = abap_true
+                      level_type     = `Regular` ) TO all_levels.
+    ENDDO.
+  ENDMETHOD.
+
+  METHOD annotation.
+    IF annotations IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    READ TABLE annotations->array INTO DATA(found) WITH KEY name = name.
+    IF sy-subrc = 0.
+      result = found-cdata.
+    ENDIF.
   ENDMETHOD.
 
   METHOD level_properties.

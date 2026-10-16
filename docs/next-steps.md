@@ -490,6 +490,26 @@ Done (2026-10-15): the reference serves `ZCLDIAG_ICD`.
      and capture the statements it sends as cases.
   7. The engine (open 4) serves members on the levels by depth; the level-dependent expectations then hold on SAP,
      and Excel against olap4abap (port 8082) is the last check.
+     1. Done (2026-10-16): the annotation, the levels and the test catalog. A `<Hierarchy>` annotated
+        `olap4abap.bwHierarchy` names a BW hierarchy (`RSHIEDIR-HIENM`, value only, decided with the user); its
+        InfoObject is the characteristic of the dimension's table (a placeholder or a view registered in
+        `ZZXXMLA1_VIEW`, `ZZXXMLA1_CL_BW_VIEW_GEN=>characteristic_of_view`), and it has no `<Level>`.
+        `ZZXXMLA1_CL_SCHEMA` reads the copy's `current` when it reads the schema (a refusal fails the catalog) and makes
+        `Level 01` to `Level nn` from `ZZXXMLA1_CL_BW_HIERARCHY_COPY=>depth` (the deepest node row; 2 at least when
+        REST_H is shown), keyed by the dimension's key column (the SID), and `ty_hier-bw_hierarchy` keeps the copy;
+        `ZZXXMLA1_CL_MODEL` carries it, counts a level's members in the copy (`level_cardinality`: the node rows of
+        that depth, REST_H and its values when shown) and refuses a read of its members (`member_table`, a fault)
+        until step 7.2. The test catalog is `ZCLHIER` on both sides (decided with the user: SAP's `ZCLVISIT` is the
+        demo's, annotated, and a cube name is one cube of the server): the reference's catalog and cube renamed, the
+        71 cases rewritten (names only; all pass against the reference), `reference/schema/ClinicBW-sap.xml` on SAP
+        (`sap-files.py deploy`; the dimension `ZCLDIAG` has its table there). `mdschema_hierarchies_hier` and
+        `mdschema_levels_hier` pass on SAP. Fixed on the way: a property given twice in a request (12 captured
+        requests carry `Catalog` twice) has its last value, as in the reference's `DefaultXmlaRequest` (a map).
+     2. The members of a BW hierarchy from the copy (children by parent, a level by depth, descendants by `POS`
+        range, names from `NODE_NAME` and the characteristic's view, unique names as paths), so the `members_hier_*`
+        cases pass.
+     3. The cells: the closure in the fact reads (open 4), the planner marking such members computed first; then
+        the `execute_hier_*` cases and Excel.
 - Simplified (2026-10-16, with the user): the reference cannot be the oracle of REST_H (it needed placeholders and the
   cases kept out of its branch), so it no longer pretends to be. `ZCLDIAG_ICD` assigns every value explicitly, the
   initial one (337 visits) as the leaf `#` under the chapter `NOT_RECORDED` (Not recorded) and the group

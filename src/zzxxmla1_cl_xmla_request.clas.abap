@@ -237,8 +237,15 @@ CLASS zzxxmla1_cl_xmla_request IMPLEMENTATION.
                     element = `PropertyList` count = lines( lists ) ).
     ENDIF.
     IF lists IS NOT INITIAL.
+      " DefaultXmlaRequest.initProperties: a map, so a property given twice has its last value
       LOOP AT elements( parent = lists[ 1 ] namespace = c_ns_xmla ) INTO DATA(property).
-        APPEND VALUE #( name = property->get_name( ) value = property->get_value( ) ) TO result.
+        DATA(name) = property->get_name( ).
+        READ TABLE result ASSIGNING FIELD-SYMBOL(<given>) WITH KEY name = name.
+        IF sy-subrc = 0.
+          <given>-value = property->get_value( ).
+        ELSE.
+          APPEND VALUE #( name = name value = property->get_value( ) ) TO result.
+        ENDIF.
       ENDLOOP.
     ENDIF.
   ENDMETHOD.

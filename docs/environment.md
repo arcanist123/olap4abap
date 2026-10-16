@@ -117,7 +117,8 @@ eMondrian and our engine. Its database (the HSQLDB jar) therefore holds copies o
 and the generated characteristic views with the SQL HANA has for them, named by their placeholders
 (`ZZXXMLA1_C_ZFMSTORE`, the schema's names; SAP's `ZZXXMLA1V...` is found in table `ZZXXMLA1_VIEW`). The catalog `ZFMDRILL` (`reference/schema/FoodmartBWDrill.xml`, drill-through
 actions) needs no tables of its own: its cube is on ZFMSALES's. On SAP it is a catalog of `/WEB-INF/datasources.xml` next
-to the ones the schema builder added there. Only views over copied tables are taken; SAP has views of other providers too:
+to the ones the schema builder added there. So is the clinic's test catalog `ZCLHIER`, from
+`reference/schema/ClinicBW-sap.xml` (the reference's `ClinicBW.xml` with the BW hierarchy in olap4abap's form). Only views over copied tables are taken; SAP has views of other providers too:
 
     python scripts/add-empty-members.py           # FoodMart data with the empty members (once, from the original jar)
     sapcli class execute ZZXXMLA1_CL_BW_VIEW_GEN  # the CDS views of the characteristics (logon as in sap-sync.sh)
@@ -135,7 +136,7 @@ rejects long statements, so the columns are read per table. Run it again after t
 the export finds by their new numbers. After the switch (2026-10-04) all 152 reference cases
 gave the same answers as with the FoodMart tables, and the same 59 statements of Mondrian's tests apply.
 
-The same run exports the clinic InfoCube `ZCLVISIT` (catalog `ZCLVISIT`, `reference/schema/ClinicBW.xml`; 69 tables
+The same run exports the clinic InfoCube `ZCLVISIT` (catalog and cube `ZCLHIER`, `reference/schema/ClinicBW.xml`; 69 tables
 with its text tables, which the views read) and the copy of its hierarchy `ZCLDIAG_ICD` at BW's current version (the
 rows of `ZZXXMLA1H...` and `ZZXXMLA1R...` for its `HIESID` and `SVER`; run `ZZXXMLA1_HIERARCHY_COPY` first if the copy
 is older), and builds from them the flattened table of the hierarchy, `ZZXXMLA1_HL_ZCLDIAG_ICD` (a row per value SID

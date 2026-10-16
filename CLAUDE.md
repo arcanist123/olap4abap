@@ -360,16 +360,22 @@ Read before designing anything:
   of the query (`ZZXXMLA1_CX_BW_HIERARCHY`). `values_of` gives a member's SIDs as a statement with bound parameters
   (`ZZXXMLA1_CL_SQL`'s `params`) (`scripts/hierarchy_copy_test.py`). Program `ZZXXMLA1_HIERARCHY_COPY` (SE38)
   creates the objects of the characteristics selected and copies their hierarchies (`run`), listing per hierarchy the
-  copy or its refusal and its counts. Not yet in the schema, the engine or accept.
+  copy or its refusal and its counts. The schema names a BW hierarchy by a `<Hierarchy>` annotated
+  `olap4abap.bwHierarchy` (its name, `RSHIEDIR-HIENM`, of the characteristic of the dimension's view,
+  `ZZXXMLA1_CL_BW_VIEW_GEN=>characteristic_of_view`) without levels: `ZZXXMLA1_CL_SCHEMA` reads the copy's `current`
+  and makes `Level 01` to `Level nn` from its `depth`, the model carries the copy (`bw_hierarchy`) and counts a
+  level's members in it (`level_cardinality`), so `MDSCHEMA_HIERARCHIES` and `MDSCHEMA_LEVELS` show it; a read of its
+  members fails (`member_table`) until the engine reads them from the copy. Not yet in accept.
   The reference serves `ZCLDIAG_ICD` as a balanced level hierarchy (`Level 01`-`Level 04` on the flattened table
-  `ZZXXMLA1_HL_ZCLDIAG_ICD`; catalog `ZCLVISIT`, `reference/schema/ClinicBW.xml`, built by
+  `ZZXXMLA1_HL_ZCLDIAG_ICD`; catalog and cube `ZCLHIER`, `reference/schema/ClinicBW.xml`, built by
   `build-bw-reference-db.py` from an export of the InfoCube and the copy, checked against BW by
   `bw_hierarchy_test.py --reference`). The reference cannot model REST_H, so `ZCLDIAG_ICD` assigns every value (the
   initial one as leaf `#` under `NOT_RECORDED` > `NO_DIAGNOSIS`) and suppresses the not-assigned node (decided
   2026-10-16). Its 71 cases (`execute_hier_*`, `members_hier_*`, `mdschema_*_hier`; the Excel ones from a live
-  session against it) are what the engine work has to pass, on a test catalog of SAP: `ClinicBW.xml` with the
-  hierarchy in olap4abap's form (annotation `olap4abap.bwHierarchy`, no levels), no other annotation
-  (`docs/next-steps.md`, Reference scenario). Decided 2026-10-16 after Excel failed on the parent-child form: the
+  session against it) are what the engine work has to pass, on the test catalog `ZCLHIER` of SAP
+  (`reference/schema/ClinicBW-sap.xml`, written by `sap-files.py deploy`): `ClinicBW.xml` with the hierarchy in
+  olap4abap's form (annotation `olap4abap.bwHierarchy`, no levels), no other annotation (`docs/next-steps.md`,
+  Reference scenario); the demo's own catalog `ZCLVISIT` stays as the setup made it. Decided 2026-10-16 after Excel failed on the parent-child form: the
   reference is the oracle for everything but parent-child hierarchies and is not patched any more: its patches stay
   as they are, an answer it gets wrong (Expand Entire Field, Top 10 value filter, a label filter on an upper level)
   waits for SSAS (2016, the version olap4abap reports), the spec for hierarchies and Excel's behaviour; olap4abap puts each member of a BW hierarchy on the level of its depth, as SSAS does (Excel

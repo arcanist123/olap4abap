@@ -7,9 +7,9 @@
   <return>
     <root xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
       <row>
-        <CATALOG_NAME>ZCLVISIT</CATALOG_NAME>
-        <SCHEMA_NAME>ZCLVISIT</SCHEMA_NAME>
-        <CUBE_NAME>ZCLVISIT</CUBE_NAME>
+        <CATALOG_NAME>ZCLHIER</CATALOG_NAME>
+        <SCHEMA_NAME>ZCLHIER</SCHEMA_NAME>
+        <CUBE_NAME>ZCLHIER</CUBE_NAME>
         <DIMENSION_UNIQUE_NAME>[ZCLDIAG]</DIMENSION_UNIQUE_NAME>
         <HIERARCHY_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD]</HIERARCHY_UNIQUE_NAME>
         <LEVEL_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[Level 01]</LEVEL_UNIQUE_NAME>

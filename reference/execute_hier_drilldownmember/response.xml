@@ -174,7 +174,7 @@
       <OlapInfo>
         <CubeInfo>
           <Cube>
-            <CubeName>ZCLVISIT</CubeName>
+            <CubeName>ZCLHIER</CubeName>
             <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T08:50:24</LastDataUpdate>
             <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T08:50:24</LastSchemaUpdate>
           </Cube>

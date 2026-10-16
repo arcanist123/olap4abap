@@ -149,6 +149,18 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
       IMPORTING hierarchy     TYPE ty_hierarchy
                 node_sid      TYPE i
       RETURNING VALUE(result) TYPE ty_statement.
+    "! The number of levels of a copy, below its All member: the depth of its deepest node row (BW's TLEVEL, the roots
+    "! 1), at least 2 when the hierarchy shows the not-assigned node (REST_H a root, its values one level below it).
+    "! The schema makes the levels Level 01 to Level nn of it (ZZXXMLA1_CL_SCHEMA).
+    CLASS-METHODS depth
+      IMPORTING hierarchy     TYPE ty_hierarchy
+      RETURNING VALUE(result) TYPE i.
+    "! The number of members on a level of a copy (1: the roots): its node rows of that depth, every occurrence; when
+    "! the hierarchy shows the not-assigned node, REST_H on level 1 and its values on level 2 as well.
+    CLASS-METHODS level_cardinality
+      IMPORTING hierarchy     TYPE ty_hierarchy
+                !level        TYPE i
+      RETURNING VALUE(result) TYPE i.
     "! Creates the objects of each characteristic and copies each of its time-independent hierarchies that are not
     "! version dependent (program ZZXXMLA1_HIERARCHY_COPY, the class run for scripts/hierarchy_copy_test.py).
     METHODS run
@@ -623,6 +635,38 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
     result = VALUE #(
       sql    = |SELECT "SID" FROM { quote( hierarchy-closure ) } WHERE "HIESID" = ? AND "SVER" = ? AND "ANCESTOR_SID" = ?|
       params = VALUE #( ( NEW i( hierarchy-hiesid ) ) ( NEW string( hierarchy-sver ) ) ( NEW i( node_sid ) ) ) ).
+  ENDMETHOD.
+
+  METHOD depth.
+    DATA(rows) = zzxxmla1_cl_sql=>query(
+      sql     = |SELECT COALESCE( MAX( "DEPTH" ), 0 ) FROM { quote( hierarchy-node_table ) } | &&
+                |WHERE "HIESID" = ? AND "SVER" = ?|
+      columns = 1
+      params  = VALUE #( ( NEW i( hierarchy-hiesid ) ) ( NEW string( hierarchy-sver ) ) ) ).
+    result = rows[ 1 ][ 1 ].
+    IF hierarchy-rest_shown = abap_true AND result < 2.
+      result = 2.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD level_cardinality.
+    DATA(rows) = zzxxmla1_cl_sql=>query(
+      sql     = |SELECT COUNT( * ) FROM { quote( hierarchy-node_table ) } | &&
+                |WHERE "HIESID" = ? AND "SVER" = ? AND "DEPTH" = ?|
+      columns = 1
+      params  = VALUE #( ( NEW i( hierarchy-hiesid ) ) ( NEW string( hierarchy-sver ) ) ( NEW i( level ) ) ) ).
+    result = rows[ 1 ][ 1 ].
+    IF hierarchy-rest_shown = abap_false.
+      RETURN.
+    ENDIF.
+    IF level = 1.
+      result = result + 1.
+    ELSEIF level = 2.
+      DATA(rest) = values_of( hierarchy = hierarchy node_sid = hierarchy-rest_top_sid ).
+      rows = zzxxmla1_cl_sql=>query( sql = |SELECT COUNT( * ) FROM ( { rest-sql } ) AS rest| columns = 1
+                                     params = rest-params ).
+      result = result + rows[ 1 ][ 1 ].
+    ENDIF.
   ENDMETHOD.
 
   METHOD lock.

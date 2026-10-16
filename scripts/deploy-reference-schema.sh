@@ -22,4 +22,4 @@ else
   echo "note: data/foodmart-bw/hsqldb-foodmart.jar not found, the container keeps its original data" >&2
 fi
 docker restart "$CONTAINER" >/dev/null
-echo "deployed ZFOODMART, ZFMDRILL and ZCLVISIT as the only catalogs of $CONTAINER; give it ~30 s to start"
+echo "deployed ZFOODMART, ZFMDRILL and ZCLHIER as the only catalogs of $CONTAINER; give it ~30 s to start"
