@@ -45,11 +45,19 @@ def main():
 
     status, body, _ = call(args.url, args.client, "GET", "proposal", {"provider": "ZFMSALES"})
     zfmsales_xml = body.get("xml", "")
-    numbers = {(c["column"], c["intColumn"], c["dataType"]) for c in body.get("intColumns", [])}
-    check("proposal: NUMC as BW holds it, its number listed for the UI",
-          '<NameColumn dataType="String" columnName="ZFMSTORE">' in zfmsales_xml
-          and ("ZFMSTORE", "ZFMSTORE_INT", "Integer") in numbers and ("ZFMYEAR", "ZFMYEAR_INT", "Numeric") in numbers,
-          body.get("intColumns"))
+    store = re.search(r'<Dimension [^>]*name="ZFMSTORE".*?</Dimension>', zfmsales_xml, re.S)
+    store = store.group(0) if store else ""
+    key = re.search(r'<DimensionAttribute name="ZFMSTORE SID".*?</DimensionAttribute>', store, re.S)
+    key = key.group(0) if key else ""
+    table = (re.search(r'table="([^"]+)"', store) or [None, ""])[1]
+    captions = [c["column"] for c in body.get("captionColumns", []) if c["table"] == table]
+    level = (re.search(r'<Level [^>]*name="ZFMSTORE"[^>]*>', store) or [""])[0]
+    check("proposal: named by the key, captioned by the text or the key, the caption columns listed for the UI",
+          'nameColumn="KEY_NAME"' in level
+          and re.search(r'<NameColumn dataType="String" columnName="(TXTMD|TXTLG|TXTSH|KEY_CAPTION)"', key) is not None
+          and "KEY_CAPTION" in captions and '<Property name="Key"' in store and '<Property name="Text"' not in store
+          and "(Text)" not in zfmsales_xml[zfmsales_xml.find("<DrillThroughAction"):],
+          (level, key, captions))
     outline = body.get("outline", {})
     cube = (outline.get("cubes") or [{}])[0]
     check("proposal of an InfoCube", status == 200 and body["xml"].startswith("<Schema name=\"ZFMSALES\"")
@@ -115,10 +123,10 @@ def main():
         stored = body.get("xml", "")
         if name == "ZFOODMART":
             # the view's number depends on the system's other views (scripts/sap-files.py deploy)
-            numbers = {(c["column"], c["intColumn"]) for c in body.get("intColumns", [])
-                       if re.fullmatch(r"ZZXXMLA1V\d{7}", c["table"])}
-            check("schema of ZFOODMART: the numbers of its views' NUMC columns",
-                  ("ZFMSQFT", "ZFMSQFT_INT") in numbers, body.get("intColumns"))
+            captions = {c["column"] for c in body.get("captionColumns", [])
+                        if re.fullmatch(r"ZZXXMLA1V\d{7}", c["table"])}
+            check("schema of ZFOODMART: the caption columns of its views",
+                  "KEY_CAPTION" in captions, body.get("captionColumns"))
         check(f"schema of {name}", status == 200 and body.get("file") == entry["file"]
               and stored.lstrip().startswith(("<Schema", "<?xml")) and body.get("outline", {}).get("cubes"), body)
         status, body, _ = call(args.url, args.client, "POST", "check", {"catalog": name}, stored)

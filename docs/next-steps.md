@@ -104,7 +104,7 @@ The steps:
    `N''` (length 0, not a space). Checked: `xmla_test.py` 368 of 372, the new failure
    `execute_hier_drillthrough_subselect` (patient `000000` and physician `000`, SID 0, have no text: their `(Text)`
    column is blank, the reference's still the key); `compare-applicable.py` 394 of 395 as before.
-3. The proposal (`ZZXXMLA1_CL_SCHEMA_PROPOSAL`) and the schema builder: each characteristic's key attribute gets its
+3. Done (2026-10-16): the proposal (`ZZXXMLA1_CL_SCHEMA_PROPOSAL`) and the schema builder: each characteristic's key attribute gets its
    text as `NameColumn` (the caption of a level with `sourceAttribute`, step 1; not a `captionColumn`, which the
    reference ignores there), the medium text, else the long, else the short one, the key caption column if it has
    none; the level's `nameColumn` stays the key (written since step 1), and so does a BW hierarchy's leaf name, which
@@ -113,6 +113,26 @@ The steps:
    characteristic itself, while each display attribute keeps its key and its text as properties (and its drill-through
    columns). The schema editor switches a dimension's caption between the key and each text field the view has.
    "As numbers" goes.
+   Built: the provider reads the view's `KEY_NAME`, `KEY_CAPTION` and the characteristic's text columns
+   (`key_name_column`, `caption_column`, `text_columns`); the level's `nameColumn` is `COMPOUND_KEY`, else `KEY_NAME`,
+   else the key (`name_column_of`; an aDSO's CHAR key has none, the key names it), so SID 0 of a NUMC key is named
+   `''`; the key attribute's `NameColumn` the text, else `KEY_CAPTION` (`caption_column_of`); the property `Key` on
+   every dimension (on an aDSO the key attribute itself); a navigation attribute's attribute captioned by its
+   `<ATTR>_TXT`, no `... Text` attribute and no `Text` property for it. `intColumns` of the API became
+   `captionColumns` (`{table, column}`: `KEY_CAPTION`, `TXTMD`, `TXTLG`, `TXTSH` of a view, from the provider or the
+   dictionary), the dimension pane's "Member caption" sets the key attribute's `NameColumn`, and a level the UI adds
+   over an attribute is named as another level over it is. `ZZXXMLA1_CL_SCHEMA_FIX` names a characteristic whose
+   compounding becomes fixed by `KEY_NAME` and leaves its caption; `ZZXXMLA1_CL_SCHEMA` names a BW hierarchy's leaves
+   by the `nameColumn` of the level over the key attribute (`value_name_column`). Found on the way: a property on
+   the key column read the column twice, which HANA refuses in the `ORDER BY` ("column ambiguously defined"); a
+   column read again is aliased now (`ZZXXMLA1_CL_MODEL=>level_columns`). The accepted catalogs on SAP (clinic, wide
+   demo) are unchanged until they are proposed again (the setup) or edited; the reference copies follow in step 6.
+   Checked: the unit tests of `ZZXXMLA1_CL_SCHEMA_PROPOSAL` (19), `_SCHEMA_FIX` (8, `captions` new), `_SCHEMA` (13)
+   and `_SCHEMA_API` (27) pass; `schema_api_test.py`, `fixed_selection_test.py`, `fiscal_default_test.py` (both now
+   compare member names, from the unique names: the captions are texts, blank for `0FISCYEAR`) and `clinic_test.py`
+   pass; `schema_ui_test.py` passes but for the fiscal defaults' period selection, which it still expects as the
+   twelve-row preset (the defaults are `I BT` with five `E CP` rows since 2026-10-15, a stale test); `xmla_test.py`
+   368 of 372 (the four of step 2); `compare-applicable.py` 394 of 395 as before.
 4. A schema check against blank texts: the schema API's `check` (and accept) reports, per dimension, the members whose
    caption is blank (a count and examples), so the modeller sees them. A warning, never a refusal (decided
    2026-10-16): a modeller who wants blank captions keeps them.

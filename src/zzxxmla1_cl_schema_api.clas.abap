@@ -14,8 +14,8 @@
 "! a refused request is {"error": "..."} with a 4xx or 5xx status.
 "! - GET providers: the InfoCubes and cube-type aDSOs (ZZXXMLA1_CL_BW_PROVIDER);
 "! - GET proposal?provider=X: the proposed schema (ZZXXMLA1_CL_SCHEMA_PROPOSAL) as XML and as an outline for the UI,
-"!   with the notes, the time suggestions and the NUMC columns of its views that have a number (COLUMN_INT), which the
-"!   UI names in their place when a dimension is switched to numbers, and the cube's characteristics (below). Only
+"!   with the notes, the time suggestions, the columns of its views that can caption a characteristic (KEY_CAPTION,
+"!   TXTMD, TXTLG, TXTSH), between which the UI switches a dimension's caption, and the cube's characteristics (below). Only
 "!   the defaults are restricted (ZZXXMLA1_CL_SCHEMA_DEFAULTS: with 0FISCYEAR or 0FISCPER the variant fixed to K4, the
 "!   periods restricted to the regular ones, both time dimensions; its notes join the proposal's); any other
 "!   selection is an edit (fix);
@@ -27,15 +27,14 @@
 "!   are more), under the selection of its compounding where the parameters give one;
 "! - POST fix?cube=X&filter.CHARACTERISTIC=rows...: the body is the edited schema XML; the cube (without cube the
 "!   first one) restricts characteristics by the given selection, all it restricts, its tables and columns following
-"!   (ZZXXMLA1_CL_SCHEMA_FIX); answers the new XML and outline, the tables replaced, the NUMC numbers of the
+"!   (ZZXXMLA1_CL_SCHEMA_FIX); answers the new XML and outline, the tables replaced, the caption columns of the
 "!   characteristics' tables and the cube's characteristics; 400 if the selection or the schema is refused, or if the
 "!   probe of the cube's facts refuses the selection (ZZXXMLA1_CL_SCHEMA_PROBE: its facts hold a value that a
 "!   selection in restrict members excludes). Nothing is changed on the server;
 "! - GET schemas: the catalogs of /WEB-INF/datasources.xml, each name once (its first definition, as the XMLA endpoint
 "!   reads them), with their schema files;
 "! - GET schema?catalog=X: the catalog's schema as XML and as an outline, to edit an accepted schema again, with the
-"!   columns of its tables that have a number (a column COLUMN_INT next to COLUMN, from the dictionary) and the
-"!   cube's characteristics;
+"!   caption columns of its tables (from the dictionary) and the cube's characteristics;
 "!   The cube's characteristics (of its first cube) are those of its provider that can be restricted, with the
 "!   dimension of the cube on each and its selection (mode filter or members, rows, their text; fixed and value for
 "!   one I EQ value); none if the provider is not found (a schema not on BW's tables);
@@ -391,13 +390,14 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
     METHODS delete_unused_views
       IMPORTING datasources   TYPE string
       RETURNING VALUE(result) TYPE string_table.
-    "! The columns of the tables that have a number, a column COLUMN_INT next to COLUMN (DD03L), with its data type.
-    METHODS int_columns
+    "! The columns of the tables that can caption a characteristic's members (DD03L): KEY_CAPTION and the texts
+    "! TXTMD, TXTLG and TXTSH, in this order.
+    METHODS caption_columns
       IMPORTING tables        TYPE string_table
-      RETURNING VALUE(result) TYPE zzxxmla1_cl_schema_proposal=>ty_t_int_column.
-    METHODS int_columns_json
-      IMPORTING int_columns   TYPE zzxxmla1_cl_schema_proposal=>ty_t_int_column
-      RETURNING VALUE(result) TYPE string.
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_schema_proposal=>ty_t_caption_column.
+    METHODS caption_columns_json
+      IMPORTING caption_columns TYPE zzxxmla1_cl_schema_proposal=>ty_t_caption_column
+      RETURNING VALUE(result)   TYPE string.
     "! The schema as the UI shows it: dimensions with attributes and hierarchies, cubes with dimensions and measures.
     METHODS outline
       IMPORTING !schema       TYPE zzxxmla1_cl_schema_def=>ty_schema
@@ -532,7 +532,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
              |"factTable":{ json( provider-fact_table ) }\},| &&
              |"xml":{ json( proposal-xml ) },"outline":{ outline( proposal-schema ) },| &&
              |"notes":{ json_array( notes ) },"suggestions":{ json_array( suggestions ) },| &&
-             |"intColumns":{ int_columns_json( proposal-int_columns ) },| &&
+             |"captionColumns":{ caption_columns_json( proposal-caption_columns ) },| &&
              |{ characteristics_json( schema = proposal-schema provider = provider ) }\}|.
   ENDMETHOD.
 
@@ -569,7 +569,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     ENDLOOP.
     result = |\{"xml":{ json( zzxxmla1_cl_schema_def=>to_xml( parsed ) ) },| &&
              |"outline":{ outline( parsed ) },"tables":{ json_array( tables ) },| &&
-             |"intColumns":{ int_columns_json( changes-int_columns ) },| &&
+             |"captionColumns":{ caption_columns_json( changes-caption_columns ) },| &&
              |{ characteristics_json( schema = parsed provider = changes-provider ) }\}|.
   ENDMETHOD.
 
@@ -693,11 +693,11 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     ENDTRY.
     DATA(outline) = outline( parsed ).
     " the tables as the schema names them: without views, nothing is replaced
-    DATA(numbers) = int_columns( map_tables( CHANGING schema = parsed ) ).
+    DATA(captions) = caption_columns( map_tables( CHANGING schema = parsed ) ).
     result = |\{"catalog":{ json( entry-name ) },"dataSource":{ json( entry-data_source ) },| &&
              |"file":{ json( entry-definition ) },"changedAt":{ json_timestamp( file-changed_at ) },| &&
              |"changedBy":{ json( file-changed_by ) },"xml":{ json( file-content ) },"outline":{ outline },| &&
-             |"intColumns":{ int_columns_json( numbers ) },{ characteristics_json( parsed ) }\}|.
+             |"captionColumns":{ caption_columns_json( captions ) },{ characteristics_json( parsed ) }\}|.
   ENDMETHOD.
 
   METHOD check.
@@ -800,11 +800,12 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
       APPEND |\{"characteristic":{ json( view-characteristic ) },"ddlName":{ json( view-ddl_name ) },| &&
              |"viewName":{ json( view-view_name ) },"selection":{ json( view-selection ) }\}| TO view_list.
     ENDLOOP.
-    " the tables with the views put in, whose numbers the UI switches to
+    " the tables with the views put in, whose captions the UI switches between
     DATA(accepted_tables) = map_tables( CHANGING schema = schema ).
     result = |\{"catalog":{ json( catalog ) },"file":{ json( path ) },"views":{ json_array( view_list ) },| &&
              |"deletedViews":{ json_array( deleted_views ) },| &&
-             |"xml":{ json( xml ) },"intColumns":{ int_columns_json( int_columns( accepted_tables ) ) }\}|.
+             |"xml":{ json( xml ) },| &&
+             |"captionColumns":{ caption_columns_json( caption_columns( accepted_tables ) ) }\}|.
   ENDMETHOD.
 
   METHOD remove.
@@ -1474,34 +1475,30 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
-  METHOD int_columns.
+  METHOD caption_columns.
     IF tables IS INITIAL.
       RETURN.
     ENDIF.
     DATA names TYPE RANGE OF tabname.
     names = VALUE #( FOR t IN tables ( sign = 'I' option = 'EQ' low = t ) ).
-    SELECT tabname, fieldname, datatype, leng FROM dd03l
+    SELECT tabname, fieldname FROM dd03l
       WHERE tabname IN @names AND as4local = 'A'
       INTO TABLE @DATA(fields).
     LOOP AT tables INTO DATA(table).
-      LOOP AT fields INTO DATA(field) WHERE tabname = table.
-        READ TABLE fields INTO DATA(number) WITH KEY tabname = table fieldname = |{ field-fieldname }_INT|.
-        IF sy-subrc = 0.
-          APPEND VALUE #( table      = table
-                          column     = field-fieldname
-                          int_column = number-fieldname
-                          data_type  = zzxxmla1_cl_schema_proposal=>data_type(
-                                         VALUE #( datatype = number-datatype length = number-leng ) ) ) TO result.
+      LOOP AT VALUE string_table( ( zzxxmla1_cl_bw_view_gen=>c_key_caption ) ( `TXTMD` ) ( `TXTLG` ) ( `TXTSH` ) )
+           INTO DATA(column).
+        IF line_exists( fields[ tabname = table fieldname = column ] )
+            AND NOT line_exists( result[ table = table column = column ] ).
+          APPEND VALUE #( table = table column = column ) TO result.
         ENDIF.
       ENDLOOP.
     ENDLOOP.
   ENDMETHOD.
 
-  METHOD int_columns_json.
+  METHOD caption_columns_json.
     DATA entries TYPE string_table.
-    LOOP AT int_columns INTO DATA(entry).
-      APPEND |\{"table":{ json( entry-table ) },"column":{ json( entry-column ) },| &&
-             |"intColumn":{ json( entry-int_column ) },"dataType":{ json( entry-data_type ) }\}| TO entries.
+    LOOP AT caption_columns INTO DATA(entry).
+      APPEND |\{"table":{ json( entry-table ) },"column":{ json( entry-column ) }\}| TO entries.
     ENDLOOP.
     result = json_array( entries ).
   ENDMETHOD.

@@ -54,6 +54,9 @@ CLASS ltc_schema_fix DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION S
     METHODS members_mode FOR TESTING RAISING cx_static_check.
     "! two selections of a characteristic are refused
     METHODS two_selections FOR TESTING RAISING cx_static_check.
+    "! a schema of the proposal with captions: the period captioned by its text, which stays; fixed, its level named
+    "! by KEY_NAME ('' for SID 0), compounded again by COMPOUND_KEY; the caption columns of the new views listed
+    METHODS captions FOR TESTING RAISING cx_static_check.
 ENDCLASS.
 
 
@@ -265,6 +268,40 @@ CLASS ltc_schema_fix IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals(
       act = result-tables
       exp = VALUE zzxxmla1_cl_schema_fix=>ty_t_replaced( ( from = `ZZXXMLA1V0000002` to = `ZZXXMLA1_C_ZCLFISCPR` ) ) ).
+  ENDMETHOD.
+
+  METHOD captions.
+    DATA(schema) = plain_schema( ).
+    DATA(period) = REF #( schema-dimensions[ name = `ZCLFISCPR` ] ).
+    period->attributes[ name = `ZCLFISCPR SID` ]-name_column->column_name = `TXTMD`.
+    DATA(plain) = zzxxmla1_cl_schema_def=>to_xml( schema ).
+    DATA(old) = plain_provider( ).
+    old-characteristics[ 2 ]-caption_column = VALUE #( name = `KEY_CAPTION` datatype = `CHAR` length = 10 ).
+    old-characteristics[ 2 ]-text_columns = VALUE #( ( `TXTMD` ) ( `TXTSH` ) ).
+    DATA(new) = k4_provider( ).
+    new-characteristics[ 2 ]-key_name_column = VALUE #( name = `KEY_NAME` datatype = `CHAR` length = 7 ).
+    new-characteristics[ 2 ]-caption_column = VALUE #( name = `KEY_CAPTION` datatype = `CHAR` length = 7 ).
+    new-characteristics[ 2 ]-text_columns = VALUE #( ( `TXTMD` ) ( `TXTSH` ) ).
+    DATA(result) = zzxxmla1_cl_schema_fix=>apply( EXPORTING cube   = `ZCLVISIT`
+                                                            old    = old
+                                                            new    = new
+                                                  CHANGING  schema = schema ).
+    DATA(fixed) = dimension( schema = schema name = `ZCLFISCPR` ).
+    DATA(key) = fixed-attributes[ name = `ZCLFISCPR SID` ].
+    cl_abap_unit_assert=>assert_equals( act = key-name_column->column_name exp = `TXTMD` ).
+    cl_abap_unit_assert=>assert_not_bound( key-order_by_column ).
+    cl_abap_unit_assert=>assert_equals( act = fixed-hierarchies[ 1 ]-levels[ 1 ]-name_column exp = `KEY_NAME` ).
+    cl_abap_unit_assert=>assert_equals(
+      act = result-caption_columns
+      exp = VALUE zzxxmla1_cl_schema_proposal=>ty_t_caption_column(
+              ( table = `ZZXXMLA1_C_ZCLFISCPR` column = `KEY_CAPTION` )
+              ( table = `ZZXXMLA1_C_ZCLFISCPR` column = `TXTMD` )
+              ( table = `ZZXXMLA1_C_ZCLFISCPR` column = `TXTSH` ) ) ).
+    zzxxmla1_cl_schema_fix=>apply( EXPORTING cube   = `ZCLVISIT`
+                                             old    = new
+                                             new    = old
+                                   CHANGING  schema = schema ).
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_schema_def=>to_xml( schema ) exp = plain ).
   ENDMETHOD.
 
   METHOD two_selections.

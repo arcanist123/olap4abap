@@ -229,34 +229,27 @@ function suggestionKeys(doc, suggestions) {
 }
 const suggestionFor = (suggestions, dim, attribute) => suggestions.get(`${attr(dim, 'table')}|${keyColumn(attribute)}`);
 
-// The NUMC columns of the views that have a number too (COLUMN_INT, ZZXXMLA1_CL_BW_VIEW_GEN), keyed by the table and
-// column, both ways: a column as BW holds it (0042, String) to its number (42) and back.
-function numberKeys(intColumns) {
+// The columns of the views that can caption a characteristic's members (ZZXXMLA1_CL_BW_VIEW_GEN): the key as a caption
+// (KEY_CAPTION, # for BW's initial value) and its texts, per table in the server's order.
+function captionKeys(captionColumns) {
   const keys = new Map();
-  for (const c of intColumns || []) {
-    keys.set(`${c.table}|${c.column}`, { column: c.intColumn, dataType: c.dataType, number: true });
-    keys.set(`${c.table}|${c.intColumn}`, { column: c.column, dataType: 'String', number: false });
-  }
+  for (const c of captionColumns || []) keys.set(c.table, [...(keys.get(c.table) || []), c.column]);
   return keys;
 }
-// the column elements of a dimension's attributes that name a NUMC column or its number
-const numberColumns = (dim, numbers) => attributesOf(dim)
-  .flatMap((a) => ['KeyColumn', 'NameColumn', 'OrderByColumn'].flatMap((tag) => kids(a, tag)))
-  .map((el) => ({ el, other: numbers.get(`${attr(dim, 'table')}|${attr(el, 'columnName')}`) }))
-  .filter(({ other }) => other);
-// whether the dimension names the numbers: some column is one
-const namesNumbers = (dim, numbers) => numberColumns(dim, numbers).some(({ other }) => !other.number);
-function setNumbers(dim, on, numbers) {
-  for (const { el, other } of numberColumns(dim, numbers)) {
-    if (other.number !== on) continue;
-    el.setAttribute('columnName', other.column);
-    el.setAttribute('dataType', other.dataType);
+const CAPTION_LABELS = { KEY_CAPTION: 'Key', TXTMD: 'Medium text', TXTLG: 'Long text', TXTSH: 'Short text' };
+const keyAttributeOf = (dim) => attributesOf(dim).find((a) => attr(a, 'usage') === 'Key');
+// the column that captions the dimension's members: its key attribute's NameColumn (the levels over it are named by
+// their nameColumn, docs/next-steps.md, Now: texts and captions)
+const captionOf = (dim) => attr(kids(keyAttributeOf(dim), 'NameColumn')[0], 'columnName');
+function setCaption(doc, dim, column) {
+  const key = keyAttributeOf(dim);
+  let name = kids(key, 'NameColumn')[0];
+  if (!name) {
+    name = create(doc, 'NameColumn', {});
+    key.appendChild(name);
   }
-  // a level's nameColumn names its members (the attribute's NameColumn only captions them)
-  for (const level of hierarchiesOf(dim).flatMap((h) => kids(h, 'Level'))) {
-    const other = numbers.get(`${attr(dim, 'table')}|${attr(level, 'nameColumn')}`);
-    if (other && other.number === on) level.setAttribute('nameColumn', other.column);
-  }
+  name.setAttribute('dataType', 'String');
+  name.setAttribute('columnName', column);
 }
 
 function setTimeDimension(dim, on, suggestions) {
@@ -907,9 +900,10 @@ function SelectionField({ doc, dim, characteristics, onFix }) {
     </span>`;
 }
 
-function DimensionPane({ doc, edit, dim, sel, select, suggestions, numbers, characteristics, onFix }) {
+function DimensionPane({ doc, edit, dim, sel, select, suggestions, captions, characteristics, onFix }) {
   const time = isTime(dim);
-  const numeric = numberColumns(dim, numbers).length > 0;
+  const captionColumns = keyAttributeOf(dim) ? captions.get(attr(dim, 'table')) || [] : [];
+  const caption = captionOf(dim) || '';
   const attributes = attributesOf(dim);
   const hierarchies = hierarchiesOf(dim);
   const usages = isShared(dim) ? usagesOf(doc, dim) : [];
@@ -953,10 +947,14 @@ function DimensionPane({ doc, edit, dim, sel, select, suggestions, numbers, char
         <${Check} checked=${time} label="Time dimension" onChange=${(on) => edit(() => setTimeDimension(dim, on, suggestions))} />
         <span class="muted small">enables the time functions (Ytd, ParallelPeriod, …); every level then needs a time level type</span>
       </span>
-      ${numeric && html`<label>NUMC values</label>
+      ${captionColumns.length > 0 && html`<label>Member caption</label>
       <span class="row">
-        <${Check} checked=${namesNumbers(dim, numbers)} label="As numbers" onChange=${(on) => edit(() => setNumbers(dim, on, numbers))} />
-        <span class="muted small">members named 42 instead of 0042, BW's value: the view's number of each NUMC column (COLUMN_INT); on an aDSO the key too</span>
+        <select value=${caption} title="The column that captions the members (the key attribute's NameColumn); they stay named by their key"
+          onChange=${(e) => edit(() => setCaption(doc, dim, e.target.value))}>
+          ${!captionColumns.includes(caption) && html`<option value=${caption}>${caption || '–'}</option>`}
+          ${captionColumns.map((c) => html`<option value=${c}>${CAPTION_LABELS[c] || c} (${c})</option>`)}
+        </select>
+        <span class="muted small">members are named by their key; the caption is what reports show</span>
       </span>`}
       ${isShared(dim) && html`<label>Used by</label>
         <span>${usages.length ? usages.map(({ cube, usage }, i) => html`${i > 0 && ', '}<button class="link"
@@ -1015,11 +1013,13 @@ function DimensionPane({ doc, edit, dim, sel, select, suggestions, numbers, char
 }
 
 // A level over an attribute is named by its key unless it names a column (the reference's RolapLevel: the
-// attribute's NameColumn only captions it): one over an attribute with a NameColumn is named by that column, as the
-// proposal's levels are.
-function setLevelSource(level, attribute) {
+// attribute's NameColumn only captions it): one over an attribute another level is over is named as that one is (the
+// proposal's level over the key attribute by KEY_NAME or COMPOUND_KEY), else by the key.
+function setLevelSource(dim, level, attribute) {
   level.setAttribute('sourceAttribute', attr(attribute, 'name'));
-  const nameColumn = attr(kids(attribute, 'NameColumn')[0], 'columnName');
+  const other = hierarchiesOf(dim).flatMap((h) => kids(h, 'Level'))
+    .find((l) => l !== level && attr(l, 'sourceAttribute') === attr(attribute, 'name'));
+  const nameColumn = other && attr(other, 'nameColumn');
   if (nameColumn) level.setAttribute('nameColumn', nameColumn);
   else level.removeAttribute('nameColumn');
 }
@@ -1046,7 +1046,7 @@ function HierarchyEditor({ doc, edit, dim, h, others }) {
       sourceAttribute: source,
       levelType: time ? attr(a, 'levelType') || 'TimeUndefined' : '',
     });
-    if (a) setLevelSource(level, a);
+    if (a) setLevelSource(dim, level, a);
     h.appendChild(level);
   });
 
@@ -1079,7 +1079,7 @@ function HierarchyEditor({ doc, edit, dim, h, others }) {
               onCommit=${(v) => edit(() => l.setAttribute('name', v))} /></td>
             <td><${Select} value=${attr(l, 'sourceAttribute')} options=${attrNames} onChange=${(v) => edit(() => {
               const a = attributes.find((x) => attr(x, 'name') === v);
-              if (a) setLevelSource(l, a); else l.setAttribute('sourceAttribute', v);
+              if (a) setLevelSource(dim, l, a); else l.setAttribute('sourceAttribute', v);
             })} /></td>
             ${time && html`<td><${Select} value=${attr(l, 'levelType')} options=${TIME_TYPES} onChange=${(v) => edit(() => l.setAttribute('levelType', v))} /></td>`}
             <td><input type="checkbox" checked=${isTrue(l, 'uniqueMembers', false)} aria-label="Unique members"
@@ -1188,8 +1188,8 @@ function Editor({ session, onClose, onAccepted }) {
   const [version, setVersion] = useState(0);
   const [source, setSource] = useState(session.source);
   const [catalog, setCatalog] = useState(session.catalog);
-  // accept puts the views in place of the placeholders the numbers were keyed by
-  const [numbers, setNumberKeys] = useState(session.numbers);
+  // accept puts the views in place of the placeholders the caption columns were keyed by
+  const [captions, setCaptionKeys] = useState(session.captions);
   // fixing replaces the tables the suggestions are keyed by
   const [suggestions, setSuggestions] = useState(session.suggestions);
   // the characteristics of the cube's provider with their foreign keys, which fixing changes (POST fix answers them)
@@ -1220,7 +1220,7 @@ function Editor({ session, onClose, onAccepted }) {
     const d = await api('POST', 'fix', { cube, ...selectionParams(selections) }, serialize(doc));
     const next = parseXml(d.xml);
     setCharacteristics(d.characteristics);
-    setNumberKeys((old) => new Map([...old, ...numberKeys(d.intColumns)]));
+    setCaptionKeys((old) => new Map([...old, ...captionKeys(d.captionColumns)]));
     setSuggestions((old) => {
       const keys = new Map(old);
       for (const { from, to } of d.tables) {
@@ -1289,7 +1289,7 @@ function Editor({ session, onClose, onAccepted }) {
       const result = await api('POST', 'accept', { catalog }, xml);
       undoStack.current = [];
       setDoc(parseXml(result.xml));
-      setNumberKeys(numberKeys(result.intColumns));
+      setCaptionKeys(captionKeys(result.captionColumns));
       setVersion((v) => v + 1);
       setDirty(false);
       const reopened = { kind: 'schema', name: result.catalog, file: result.file, changedAt: new Date().toISOString(), changedBy: '' };
@@ -1337,7 +1337,7 @@ function Editor({ session, onClose, onAccepted }) {
           : shownSel.kind === 'cube' ? html`<${CubePane} key=${JSON.stringify(shownSel)} doc=${doc} edit=${edit} cube=${target} select=${setSel}
               characteristics=${characteristics} />`
             : shownSel.kind === 'dim' ? html`<${DimensionPane} key=${JSON.stringify(shownSel)} doc=${doc} edit=${edit} dim=${target} sel=${shownSel}
-                select=${setSel} suggestions=${suggestions} numbers=${numbers} characteristics=${characteristics} onFix=${fix} />`
+                select=${setSel} suggestions=${suggestions} captions=${captions} characteristics=${characteristics} onFix=${fix} />`
               : html`<${SchemaPane} doc=${doc} edit=${edit} source=${source} catalog=${catalog} notes=${session.notes} />`}
       </main>
     </div>
@@ -1410,7 +1410,7 @@ function App() {
           characteristics: d.characteristics || [],
           notes: d.notes || [],
           suggestions: suggestionKeys(doc, d.suggestions),
-          numbers: numberKeys(d.intColumns),
+          captions: captionKeys(d.captionColumns),
         };
       } else {
         const d = await api('GET', 'schema', { catalog: what.name });
@@ -1421,7 +1421,7 @@ function App() {
           characteristics: d.characteristics || [],
           notes: [],
           suggestions: new Map(),
-          numbers: numberKeys(d.intColumns),
+          captions: captionKeys(d.captionColumns),
         };
       }
       next.id = ++counter.current;

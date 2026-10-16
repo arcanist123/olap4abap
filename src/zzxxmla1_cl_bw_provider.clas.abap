@@ -92,9 +92,15 @@ CLASS zzxxmla1_cl_bw_provider DEFINITION
         key_int_column TYPE ty_column,
         "! compounded: the view's column of the compounding and the value (K4/2024001), initial for any other
         name_column TYPE ty_column,
+        "! a NUMC, DATS or TIMS key: the view's key with '' for SID 0 (KEY_NAME), initial for any other
+        key_name_column TYPE ty_column,
+        "! the view's key as a caption, # for an initial value (KEY_CAPTION)
+        caption_column TYPE ty_column,
         "! the fact column is the SID: always on an InfoCube, on an aDSO for a compounded characteristic (its fact view's)
         fact_sid    TYPE abap_bool,
         text_column TYPE string,     " the column of its text, initial if it has none
+        "! the columns of all its texts, the medium, long and short one as far as it has them (TXTMD, TXTLG, TXTSH)
+        text_columns TYPE string_table,
         attributes  TYPE ty_t_attribute,
         "! the characteristics its basic one is compounded with, in BW's order
         compounding TYPE string_table,
@@ -608,7 +614,19 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
       result-name_column = VALUE #( name = compound_key-name datatype = compound_key-datatype
                                     length = compound_key-length ).
     ENDIF.
+    READ TABLE layout-columns INTO DATA(key_name) WITH KEY name = zzxxmla1_cl_bw_view_gen=>c_key_name.
+    IF sy-subrc = 0.
+      result-key_name_column = VALUE #( name = key_name-name datatype = key_name-datatype length = key_name-length ).
+    ENDIF.
+    READ TABLE layout-columns INTO DATA(key_caption) WITH KEY name = zzxxmla1_cl_bw_view_gen=>c_key_caption.
+    IF sy-subrc = 0.
+      result-caption_column = VALUE #( name = key_caption-name datatype = key_caption-datatype
+                                       length = key_caption-length ).
+    ENDIF.
     result-text_column = VALUE #( layout-columns[ iobjnm = result-basic preferred = abap_true ]-name OPTIONAL ).
+    LOOP AT layout-columns INTO DATA(own_text) WHERE iobjnm = result-basic AND text = abap_true.
+      APPEND own_text-name TO result-text_columns.
+    ENDLOOP.
 
     " the attributes of its basic characteristic, in BW's order
     LOOP AT layout-columns INTO DATA(column) WHERE text = abap_false AND iobjnm IS NOT INITIAL

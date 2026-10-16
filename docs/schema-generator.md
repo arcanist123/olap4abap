@@ -55,16 +55,21 @@ catalogs `NWCOMPANY` and `NWPRODUCT` (`examples/bw-schema/`):
   acceptance replaces (and so generates the view again, under its number);
 - its `DimensionAttribute`s describe the view's columns, none is an attribute hierarchy
   (`attributeHierarchyEnabled="false"`): the key attribute `<char> SID` on an InfoCube (keyed by the view's `SID`,
-  named by the key with `NameColumn`, and next to it the value as attribute `<char> Key`, so that the drill-through
-  can name it) or `<char> Key` on an aDSO (keyed by the value); the text `<char> Text`; each
-  attribute (named by its InfoObject, or `<char>__<attribute>` for a navigation attribute the provider switches on)
+  and next to it the value as attribute `<char> Key`, so that the drill-through and the property `Key` can name it)
+  or `<char> Key` on an aDSO (keyed by the value), captioned by its `NameColumn`: the characteristic's text, the
+  medium, else the long, else the short one (`TXTMD`, ...), `KEY_CAPTION` (the key, `#` for SID 0) if it has none
+  (`next-steps.md`, Now: texts and captions); each attribute (named by its InfoObject, or `<char>__<attribute>` for a
+  navigation attribute the provider switches on, captioned by its text with `NameColumn`), a display attribute
   followed by its text `... Text`. The key attribute is never named like its dimension, so it cannot clash with the
   unnamed hierarchy;
 - the dimension's first `Hierarchy` is unnamed, so it is the default and `[0D_NW_CODE]` is its unique name: All
-  (`All <text>`) and one level named by the characteristic, uniqueMembers, with the text as property `Text` and every
-  display attribute (and navigation attribute the provider does not switch on) as properties, key and text;
+  (`All <text>`) and one level named by the characteristic, uniqueMembers, its members named by the key (the level's
+  `nameColumn`: `COMPOUND_KEY` of a compounded characteristic, `KEY_NAME` of a NUMC, DATS or TIMS key, `''` for SID 0,
+  else the key; the key attribute's `NameColumn` only captions them), with the key as property `Key` and every
+  display attribute (and navigation attribute the provider does not switch on) as properties, key and text; the
+  characteristic's own text is the caption, no property;
 - each navigation attribute the provider switches on is a flat `Hierarchy` `<char>__<attribute>` of the dimension
-  (`[0D_NW_CODE.0D_NW_CODE__0D_NW_CNTRY]`), its level named by the attribute, its text as property `Text`;
+  (`[0D_NW_CODE.0D_NW_CODE__0D_NW_CNTRY]`), its level named by the attribute's key and captioned by its text;
 - no user hierarchies and no nesting: BW's metadata does not say which attributes nest in which order, and BW does not
   nest them. The UI builds user hierarchies from the attributes, after the flat ones;
 - key figures with aggregation SUM, MIN or MAX become measures with that aggregator (`min` and `max` are not
@@ -73,8 +78,8 @@ catalogs `NWCOMPANY` and `NWPRODUCT` (`examples/bw-schema/`):
   decimals). Exception aggregation and non-cumulative key figures are listed as not proposed rather than mapped
   wrongly. The first measure is the default;
 - a default `DrillThroughAction` `Details`: the columns of the fact rows a double click on a cell shows (Excel's
-  "Show Details"), per characteristic its value (`<char> Key`, named by the characteristic's text) and, if it has one,
-  its text (`<char> Text`, "... (Text)"); a characteristic without text gives its value only. It names no measure, so
+  "Show Details"), per characteristic its value (`<char> Key`, named by the characteristic's text; its text is its
+  caption, no column). It names no measure, so
   a row shows the measure of the clicked cell (the statement's coordinates carry it). Without the action a double
   click would show every level column of every dimension. The value of an aDSO is read from the fact table, a text or
   an InfoCube's value from the view (one join per characteristic). In the UI the cube's section "Double-click
@@ -105,11 +110,12 @@ BW has; no dimension is built on the fact table's own columns, and the proposal 
   (`19971`, `199701`). The aDSO joins compare the view's key with the fact column, both NUMC as BW holds them; a
   dimension switched to numbers compares the view's `_INT` column with the fact column (NUMC text), which HANA
   converts, checked with queries on `ZFMSALESA` (quarters, months, weeks and stores give FoodMart's numbers).
-- **NUMC values** are proposed as BW holds them (`0042`, `dataType="String"`; `docs/mvp-scope.md`, NUMC decision). The
-  proposal lists the NUMC columns whose view has a number (`COLUMN_INT`), and so do a reopened schema (from the
-  dictionary) and an accept (`intColumns` of the API); the UI's "As numbers" of a dimension names the numbers in
-  their place in every `KeyColumn`, `NameColumn` and `OrderByColumn` of its attributes (`42`, `Integer` or
-  `Numeric`; on an aDSO the key too), and back.
+- **NUMC values** are proposed as BW holds them (`0042`, `dataType="String"`; `docs/mvp-scope.md`, NUMC decision);
+  "As numbers" left the UI (2026-10-16).
+- **Member caption**: the proposal lists the columns of each view that can caption its characteristic
+  (`KEY_CAPTION`, `TXTMD`, `TXTLG`, `TXTSH`), and so do a reopened schema (from the dictionary), a fix and an accept
+  (`captionColumns` of the API); the dimension pane's "Member caption" sets the key attribute's `NameColumn` to one of
+  them. The members stay named by their key.
 - **Any dimension can be marked as time** in the UI, like `ZFMDATE` of the reference schema: a switch writes
   `type="TimeDimension"`, every attribute gets a level type (pre-selected from the suggestions, else `TimeUndefined`,
   because Mondrian requires one on every level of a time dimension, the attribute hierarchies included), hierarchies
@@ -159,7 +165,8 @@ a refused request is `{"error": "..."}` with 400 (the request is wrong), 404 (no
 
 - `GET providers`: `{"providers": [{name, kind, text, infoarea}]}`.
 - `GET proposal?provider=X`: `{provider: {name, kind, text, infoarea, factTable}, xml, outline, notes: [{iobjnm,
-  reason}], suggestions: [{dimension, attribute, levelType}], intColumns, providerName, cube, characteristics}`. The
+  reason}], suggestions: [{dimension, attribute, levelType}], captionColumns: [{table, column}], providerName, cube,
+  characteristics}`. The
   proposal fixes nothing but its fiscal defaults (`ZZXXMLA1_CL_SCHEMA_DEFAULTS`: K4, the regular periods, notes on
   both); any other fixing is an edit (`POST fix`). `characteristics` are those of the cube's provider that
   can be fixed (a SID table): `{name, text, compounding: [characteristic], foreignKey, dimension, shared, fixed,
@@ -180,8 +187,8 @@ a refused request is `{"error": "..."}` with 400 (the request is wrong), 404 (no
   400 for a characteristic without SID table.
 - `POST fix?cube=X&<selection>`: the body is the edited schema XML; the cube (without `cube` the first) restricts the
   given characteristics, all it restricts, none to remove the selection (Fixing). Answer `{xml, outline, tables:
-  [{from, to}], intColumns, providerName, cube, characteristics}`: the schema rewritten, the tables replaced (the UI
-  re-keys its suggestions and numbers by them), the NUMC numbers of the characteristics' tables and the
+  [{from, to}], captionColumns, providerName, cube, characteristics}`: the schema rewritten, the tables replaced (the
+  UI re-keys its suggestions by them), the caption columns of the characteristics' tables and the
   characteristics for the new selection. 400 if the selection is refused (not a characteristic of the provider, rows
   the selection class refuses, a quote in a value, an `EQ` value without SID under the selection of the compounding,
   referenced by another characteristic of the provider) or the cube does not read its provider's tables. Nothing is
@@ -189,7 +196,7 @@ a refused request is `{"error": "..."}` with 400 (the request is wrong), 404 (no
 - `GET schemas`: `{"schemas": [{catalog, dataSource, file, exists, changedAt, changedBy}]}`, the catalogs of the data
   sources file, each name once with its first definition (the one the XMLA endpoint reads); `changedAt` is UTC ISO
   8601 or null.
-- `GET schema?catalog=X`: `{catalog, dataSource, file, changedAt, changedBy, xml, outline, intColumns, providerName,
+- `GET schema?catalog=X`: `{catalog, dataSource, file, changedAt, changedBy, xml, outline, captionColumns, providerName,
   cube, characteristics}`, an accepted schema to edit again (404 if the catalog or its file is missing); no
   characteristics if its first cube's provider is not found (`providerName` null).
 - `POST check?catalog=X`: the body is the edited schema XML; the checks of `accept` (Accepting, steps 1 to 3), nothing

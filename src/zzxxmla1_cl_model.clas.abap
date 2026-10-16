@@ -424,6 +424,17 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
         APPEND zzxxmla1_cl_sql=>quote( property-column ) TO columns.
       ENDLOOP.
     ENDLOOP.
+    " a column read again (a property Key on the key column, a property of the caption's column) under an alias of
+    " its own: the rows are read by position, and a name twice in the select list makes ORDER BY by it ambiguous
+    DATA(seen) = VALUE string_table( ).
+    LOOP AT columns ASSIGNING FIELD-SYMBOL(<column>).
+      DATA(position) = sy-tabix.
+      IF line_exists( seen[ table_line = <column> ] ).
+        <column> = |{ <column> } AS "C{ position }"|.
+      ELSE.
+        APPEND <column> TO seen.
+      ENDIF.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD read_members.

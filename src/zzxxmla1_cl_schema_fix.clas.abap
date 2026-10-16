@@ -23,9 +23,10 @@
 "!   view for the selection (or its placeholder, generated on accept), filtered on its own selection if it is
 "!   restricted itself, so it is a dimension with the members of its selection (a fixed one with one member);
 "! - a characteristic whose compounding becomes all fixed to one value (I EQ, either mode) is named by its own key
-"!   (2024001): every NameColumn of its dimension on COMPOUND_KEY becomes its key column, an OrderByColumn on
-"!   COMPOUND_KEY goes; one that becomes compounded again is named and ordered by COMPOUND_KEY on its key attribute,
-"!   where that was named by its key.
+"!   (2024001): every level's nameColumn and NameColumn of its dimension on COMPOUND_KEY becomes the column that names
+"!   its key (KEY_NAME, else the key column), an OrderByColumn on COMPOUND_KEY goes; one that becomes compounded again
+"!   is named by COMPOUND_KEY on the levels over its key attribute and ordered by it there, where these were named by
+"!   its key.
 "! The provider is the one whose facts the cube reads (a fact placeholder, a fact view of table ZZXXMLA1_VIEW or BW's
 "! table), read for the old selection (the cube's annotations) and for the new one, as the proposal reads it; a table
 "! of the schema is replaced only where it is the provider's or the characteristic's for the old one.
@@ -43,13 +44,13 @@ CLASS zzxxmla1_cl_schema_fix DEFINITION
       END OF ty_replaced,
       ty_t_replaced TYPE STANDARD TABLE OF ty_replaced WITH EMPTY KEY.
     TYPES:
-      "! what fixing changed besides the schema: the tables replaced, and the NUMC columns of the characteristics' tables
-      "! that have a number (COLUMN_INT), which the UI names when a dimension is switched to numbers; and the provider
-      "! read for the new selection (fix only)
+      "! what fixing changed besides the schema: the tables replaced, and the columns of the characteristics' tables
+      "! that can caption them (KEY_CAPTION and the texts), between which the UI switches a dimension's caption; and the
+      "! provider read for the new selection (fix only)
       BEGIN OF ty_result,
-        tables      TYPE ty_t_replaced,
-        int_columns TYPE zzxxmla1_cl_schema_proposal=>ty_t_int_column,
-        provider    TYPE zzxxmla1_cl_bw_provider=>ty_provider,
+        tables          TYPE ty_t_replaced,
+        caption_columns TYPE zzxxmla1_cl_schema_proposal=>ty_t_caption_column,
+        provider        TYPE zzxxmla1_cl_bw_provider=>ty_provider,
       END OF ty_result.
     TYPES:
       "! a characteristic of the cube's provider that can be restricted (it has a SID table): what its basic one is
@@ -304,9 +305,9 @@ CLASS zzxxmla1_cl_schema_fix IMPLEMENTATION.
     ENDLOOP.
 
     LOOP AT new-characteristics INTO new_characteristic WHERE has_sids = abap_true.
-      LOOP AT zzxxmla1_cl_schema_proposal=>int_columns_of( new_characteristic ) INTO DATA(numeric).
-        IF NOT line_exists( result-int_columns[ table = numeric-table column = numeric-column ] ).
-          APPEND numeric TO result-int_columns.
+      LOOP AT zzxxmla1_cl_schema_proposal=>caption_columns_of( new_characteristic ) INTO DATA(caption).
+        IF NOT line_exists( result-caption_columns[ table = caption-table column = caption-column ] ).
+          APPEND caption TO result-caption_columns.
         ENDIF.
       ENDLOOP.
     ENDLOOP.
@@ -327,10 +328,11 @@ CLASS zzxxmla1_cl_schema_fix IMPLEMENTATION.
 
     IF old-name_column IS NOT INITIAL AND new-name_column IS INITIAL.
       " its compounding all fixed: named by its own key
+      DATA(key_name) = zzxxmla1_cl_schema_proposal=>name_column_of( new ).
       LOOP AT dimension-attributes ASSIGNING FIELD-SYMBOL(<attribute>).
         IF <attribute>-name_column IS BOUND AND <attribute>-name_column->column_name = old-name_column-name.
-          <attribute>-name_column->column_name = new-key_column-name.
-          <attribute>-name_column->data_type = zzxxmla1_cl_schema_proposal=>data_type( new-key_column ).
+          <attribute>-name_column->column_name = key_name-name.
+          <attribute>-name_column->data_type = zzxxmla1_cl_schema_proposal=>data_type( key_name ).
         ENDIF.
         IF <attribute>-order_by_column IS BOUND AND <attribute>-order_by_column->column_name = old-name_column-name.
           CLEAR <attribute>-order_by_column.
@@ -339,16 +341,22 @@ CLASS zzxxmla1_cl_schema_fix IMPLEMENTATION.
       " the levels named by it (nameColumn: the attribute's NameColumn only captions them)
       LOOP AT dimension-hierarchies ASSIGNING FIELD-SYMBOL(<hierarchy>).
         LOOP AT <hierarchy>-levels ASSIGNING FIELD-SYMBOL(<level>) WHERE name_column = old-name_column-name.
-          <level>-name_column = new-key_column-name.
+          <level>-name_column = key_name-name.
         ENDLOOP.
       ENDLOOP.
     ELSEIF old-name_column IS INITIAL AND new-name_column IS NOT INITIAL.
-      " compounded again: its key attribute named and ordered by COMPOUND_KEY, unless the user named it otherwise
+      " compounded again: its key attribute ordered by COMPOUND_KEY, and named by it where it was named by its key
+      " (a schema before captions; its caption, a text or KEY_CAPTION, stays), unless the user named it otherwise
+      DATA(old_names) = VALUE string_table( ( old-key_column-name ) ).
+      IF old-key_name_column IS NOT INITIAL.
+        APPEND old-key_name_column-name TO old_names.
+      ENDIF.
+      IF old-key_int_column IS NOT INITIAL.
+        APPEND old-key_int_column-name TO old_names.
+      ENDIF.
       LOOP AT dimension-attributes ASSIGNING <attribute> WHERE usage = `Key`.
-        IF <attribute>-name_column IS NOT BOUND
-            OR <attribute>-name_column->column_name = old-key_column-name
-            OR ( old-key_int_column IS NOT INITIAL
-                 AND <attribute>-name_column->column_name = old-key_int_column-name ).
+        IF <attribute>-name_column IS BOUND
+            AND line_exists( old_names[ table_line = <attribute>-name_column->column_name ] ).
           <attribute>-name_column = NEW #( data_type   = zzxxmla1_cl_schema_proposal=>data_type( new-name_column )
                                            column_name = new-name_column-name ).
         ENDIF.
@@ -360,8 +368,7 @@ CLASS zzxxmla1_cl_schema_fix IMPLEMENTATION.
         DATA(key_attribute) = <attribute>-name.
         LOOP AT dimension-hierarchies ASSIGNING <hierarchy>.
           LOOP AT <hierarchy>-levels ASSIGNING <level> WHERE source_attribute = key_attribute.
-            IF <level>-name_column IS INITIAL OR <level>-name_column = old-key_column-name
-                OR ( old-key_int_column IS NOT INITIAL AND <level>-name_column = old-key_int_column-name ).
+            IF <level>-name_column IS INITIAL OR line_exists( old_names[ table_line = <level>-name_column ] ).
               <level>-name_column = new-name_column-name.
             ENDIF.
           ENDLOOP.

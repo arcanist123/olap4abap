@@ -49,7 +49,7 @@ def api(base, client, method, resource, params=None, body=None):
 
 
 def captions(base, client, catalog, statement):
-    """The captions of Axis1, or the fault."""
+    """The names of the members of Axis1 (from their unique names; the captions are texts), or the fault."""
     request = urllib.request.Request(
         f"{base}?sap-client={client}",
         data=EXECUTE.format(statement=html.escape(statement, quote=False), catalog=catalog).encode("utf-8"),
@@ -64,7 +64,7 @@ def captions(base, client, catalog, statement):
     if found:
         return None, html.unescape(found.group(1))
     axis = re.search(r'<Axis name="Axis1">(.*?)</Axis>', text, re.S)
-    return [html.unescape(c) for c in re.findall(r"<Caption>([^<]*)</Caption>", axis.group(1))] if axis else [], None
+    return [html.unescape(c) for c in re.findall(r"<UName>[^<]*\.\[([^<\]]*)\]</UName>", axis.group(1))] if axis else [], None
 
 
 def dimension(xml, name):

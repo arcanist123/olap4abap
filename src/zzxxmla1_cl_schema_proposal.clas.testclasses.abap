@@ -35,8 +35,11 @@ CLASS ltc_proposal DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHO
     METHODS drill_through_action FOR TESTING RAISING cx_static_check.
     METHODS view_not_generated_yet FOR TESTING RAISING cx_static_check.
     METHODS suggestions FOR TESTING RAISING cx_static_check.
-    "! NUMC values as BW holds them; the numbers the views have of them are listed for the UI
-    METHODS int_columns FOR TESTING RAISING cx_static_check.
+    "! NUMC values as BW holds them; the columns that can caption each characteristic are listed for the UI
+    METHODS caption_columns FOR TESTING RAISING cx_static_check.
+    "! names are keys, captions texts: the level named by KEY_NAME, else by the key; the key attribute captioned by
+    "! the text, else by KEY_CAPTION, else not at all
+    METHODS names_and_captions FOR TESTING RAISING cx_static_check.
     METHODS data_types FOR TESTING.
     METHODS format_strings FOR TESTING.
 ENDCLASS.
@@ -49,9 +52,11 @@ CLASS ltc_proposal IMPLEMENTATION.
       fact_table = `/BIC/AZFMSALESA7`
       characteristics = VALUE #(
         ( iobjnm = `ZFMSTORE` text = `Store` iobjtp = `CHA` basic = `ZFMSTORE` has_sids = abap_true
-          view = `ZZXXMLA1V0000003` text_column = `TXTMD`
+          view = `ZZXXMLA1V0000003` text_column = `TXTMD` text_columns = VALUE #( ( `TXTMD` ) ( `TXTLG` ) )
           fact_column = VALUE #( name = `/BIC/ZFMSTORE` datatype = `NUMC` length = 10 )
           key_column = VALUE #( name = `ZFMSTORE` datatype = `NUMC` length = 10 )
+          key_name_column = VALUE #( name = `KEY_NAME` datatype = `CHAR` length = 10 )
+          caption_column = VALUE #( name = `KEY_CAPTION` datatype = `CHAR` length = 10 )
           key_int_column = VALUE #( name = `ZFMSTORE_INT` datatype = `INT8` length = 19 )
           attributes = VALUE #( ( iobjnm = `ZFMSNAME` text = `Store Name`
                                   column = VALUE #( name = `ZFMSNAME` datatype = `CHAR` length = 60 ) )
@@ -67,11 +72,15 @@ CLASS ltc_proposal IMPLEMENTATION.
           fact_column = VALUE #( name = `CALDAY` datatype = `DATS` length = 8 ) )
         ( iobjnm = `0CALWEEK` text = `Calendar Year/Week` iobjtp = `TIM` basic = `0CALWEEK` has_sids = abap_true
           fact_column = VALUE #( name = `CALWEEK` datatype = `NUMC` length = 6 )
-          key_column = VALUE #( name = `CALWEEK` datatype = `NUMC` length = 6 ) )
+          key_column = VALUE #( name = `CALWEEK` datatype = `NUMC` length = 6 )
+          key_name_column = VALUE #( name = `KEY_NAME` datatype = `CHAR` length = 6 )
+          caption_column = VALUE #( name = `KEY_CAPTION` datatype = `CHAR` length = 6 ) )
         ( iobjnm = `0CALMONTH` text = `Calendar Year/Month` iobjtp = `TIM` basic = `0CALMONTH` has_sids = abap_true
-          text_column = `TXTLG`
+          text_column = `TXTLG` text_columns = VALUE #( ( `TXTLG` ) )
           fact_column = VALUE #( name = `CALMONTH` datatype = `NUMC` length = 6 )
-          key_column = VALUE #( name = `CALMONTH` datatype = `NUMC` length = 6 ) )
+          key_column = VALUE #( name = `CALMONTH` datatype = `NUMC` length = 6 )
+          key_name_column = VALUE #( name = `KEY_NAME` datatype = `CHAR` length = 6 )
+          caption_column = VALUE #( name = `KEY_CAPTION` datatype = `CHAR` length = 6 ) )
         ( iobjnm = `0CALYEAR` text = `Calendar Year` iobjtp = `TIM` basic = `0CALYEAR` has_sids = abap_true
           fact_column = VALUE #( name = `CALYEAR` datatype = `NUMC` length = 4 )
           key_column = VALUE #( name = `CALYEAR` datatype = `NUMC` length = 4 ) ) )
@@ -97,15 +106,17 @@ CLASS ltc_proposal IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = store-table exp = `ZZXXMLA1V0000003` ).
     cl_abap_unit_assert=>assert_equals(
       act = VALUE string_table( FOR a IN store-attributes ( |{ a-name }: { a-key_column->column_name }| ) )
-      exp = VALUE string_table( ( `ZFMSTORE Key: ZFMSTORE` ) ( `ZFMSTORE Text: TXTMD` ) ( `ZFMSNAME: ZFMSNAME` )
-                                ( `ZFMSQFT: ZFMSQFT` ) ( `ZFMOPEN: ZFMOPEN` ) ( `ZFMSTORE__ZFMREGIO: ZFMREGIO` )
-                                ( `ZFMSTORE__ZFMREGIO Text: ZFMREGIO_TXT` ) ) ).
-    " the key: the characteristic's value, the column the aDSO's fact column joins
+      exp = VALUE string_table( ( `ZFMSTORE Key: ZFMSTORE` ) ( `ZFMSNAME: ZFMSNAME` ) ( `ZFMSQFT: ZFMSQFT` )
+                                ( `ZFMOPEN: ZFMOPEN` ) ( `ZFMSTORE__ZFMREGIO: ZFMREGIO` ) ) ).
+    " the key: the characteristic's value, the column the aDSO's fact column joins, captioned by its text
     DATA(key) = store-attributes[ 1 ].
     cl_abap_unit_assert=>assert_equals( act = key-usage exp = `Key` ).
     cl_abap_unit_assert=>assert_equals( act = key-key_column->data_type exp = `String` ).
-    cl_abap_unit_assert=>assert_not_bound( key-name_column ).
+    cl_abap_unit_assert=>assert_equals( act = key-name_column->column_name exp = `TXTMD` ).
+    cl_abap_unit_assert=>assert_equals( act = key-name_column->data_type exp = `String` ).
     cl_abap_unit_assert=>assert_equals( act = store-attributes[ 2 ]-key_column->data_type exp = `String` ).
+    " the navigation attribute captioned by its text
+    cl_abap_unit_assert=>assert_equals( act = store-attributes[ 5 ]-name_column->column_name exp = `ZFMREGIO_TXT` ).
     " what users see are the hierarchies: no attribute is one
     LOOP AT store-attributes INTO DATA(attribute).
       cl_abap_unit_assert=>assert_equals( act = attribute-attribute_hierarchy_enabled exp = abap_false
@@ -131,8 +142,9 @@ CLASS ltc_proposal IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD hierarchies.
-    " the characteristic first and unnamed, so it is the default; display attributes are its properties, key and
-    " text; the navigation attribute is a flat hierarchy of its own, named as BW names it
+    " the characteristic first and unnamed, so it is the default, named by its key; its key and the display
+    " attributes are its properties, key and text; the navigation attribute is a flat hierarchy of its own, named as
+    " BW names it
     DATA(schema) = NEW zzxxmla1_cl_schema_proposal( )->propose( adso( ) )-schema.
     DATA(store) = schema-dimensions[ 1 ].
     cl_abap_unit_assert=>assert_equals( act = lines( store-hierarchies ) exp = 2 ).
@@ -146,10 +158,11 @@ CLASS ltc_proposal IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = level-name exp = `ZFMSTORE` ).
     cl_abap_unit_assert=>assert_equals( act = level-caption exp = `Store` ).
     cl_abap_unit_assert=>assert_equals( act = level-source_attribute exp = `ZFMSTORE Key` ).
+    cl_abap_unit_assert=>assert_equals( act = level-name_column exp = `KEY_NAME` ).
     cl_abap_unit_assert=>assert_equals( act = level-unique_members exp = abap_true ).
     cl_abap_unit_assert=>assert_equals(
       act = VALUE string_table( FOR p IN level-properties ( |{ p-name }/{ p-caption }/{ p-source_attribute }| ) )
-      exp = VALUE string_table( ( `Text/Store (Text)/ZFMSTORE Text` ) ( `ZFMSNAME/Store Name/ZFMSNAME` )
+      exp = VALUE string_table( ( `Key/Store (Key)/ZFMSTORE Key` ) ( `ZFMSNAME/Store Name/ZFMSNAME` )
                                 ( `ZFMSQFT/Store Sqft/ZFMSQFT` ) ( `ZFMOPEN/Opened/ZFMOPEN` ) ) ).
     DATA(region) = store-hierarchies[ 2 ].
     cl_abap_unit_assert=>assert_equals( act = region-name exp = `ZFMSTORE__ZFMREGIO` ).
@@ -158,12 +171,13 @@ CLASS ltc_proposal IMPLEMENTATION.
     level = region-levels[ 1 ].
     cl_abap_unit_assert=>assert_equals( act = level-name exp = `ZFMREGIO` ).
     cl_abap_unit_assert=>assert_equals( act = level-source_attribute exp = `ZFMSTORE__ZFMREGIO` ).
-    cl_abap_unit_assert=>assert_equals(
-      act = VALUE string_table( FOR p IN level-properties ( |{ p-name }/{ p-source_attribute }| ) )
-      exp = VALUE string_table( ( `Text/ZFMSTORE__ZFMREGIO Text` ) ) ).
-    " a characteristic without text has no Text property
+    cl_abap_unit_assert=>assert_initial( level-name_column ).
+    cl_abap_unit_assert=>assert_initial( level-properties ).
+    " a characteristic without text has its key as property only
     DATA(week) = schema-dimensions[ 2 ].
-    cl_abap_unit_assert=>assert_initial( week-hierarchies[ 1 ]-levels[ 1 ]-properties ).
+    cl_abap_unit_assert=>assert_equals(
+      act = VALUE string_table( FOR p IN week-hierarchies[ 1 ]-levels[ 1 ]-properties ( p-name ) )
+      exp = VALUE string_table( ( `Key` ) ) ).
     cl_abap_unit_assert=>assert_equals( act = lines( week-attributes ) exp = 1 ).
   ENDMETHOD.
 
@@ -176,10 +190,17 @@ CLASS ltc_proposal IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = key-name exp = `ZFMSTORE SID` ).
     cl_abap_unit_assert=>assert_equals( act = key-key_column->column_name exp = `SID` ).
     cl_abap_unit_assert=>assert_equals( act = key-key_column->data_type exp = `Integer` ).
-    cl_abap_unit_assert=>assert_equals( act = key-name_column->column_name exp = `ZFMSTORE` ).
+    cl_abap_unit_assert=>assert_equals( act = key-name_column->column_name exp = `TXTMD` ).
     cl_abap_unit_assert=>assert_equals( act = key-name_column->data_type exp = `String` ).
-    cl_abap_unit_assert=>assert_equals( act = schema-dimensions[ 1 ]-hierarchies[ 1 ]-levels[ 1 ]-source_attribute
-                                        exp = `ZFMSTORE SID` ).
+    DATA(level) = schema-dimensions[ 1 ]-hierarchies[ 1 ]-levels[ 1 ].
+    cl_abap_unit_assert=>assert_equals( act = level-source_attribute exp = `ZFMSTORE SID` ).
+    " named by the key, not by the SID: a CHAR key by itself
+    cl_abap_unit_assert=>assert_equals( act = level-name_column exp = `KEY_NAME` ).
+    CLEAR provider-characteristics[ 1 ]-key_name_column.
+    provider-characteristics[ 1 ]-key_column-datatype = `CHAR`.
+    schema = NEW zzxxmla1_cl_schema_proposal( )->propose( provider )-schema.
+    cl_abap_unit_assert=>assert_equals( act = schema-dimensions[ 1 ]-hierarchies[ 1 ]-levels[ 1 ]-name_column
+                                        exp = `ZFMSTORE` ).
     DATA(usage) = CAST zzxxmla1_cl_schema_def=>ty_dimension_usage( schema-cubes[ 1 ]-dimensions[ 1 ]-def ).
     cl_abap_unit_assert=>assert_equals( act = usage->foreign_key exp = `SID_ZFMSTORE` ).
   ENDMETHOD.
@@ -192,25 +213,26 @@ CLASS ltc_proposal IMPLEMENTATION.
         fact_sid = abap_true view = `ZZXXMLA1V0000090` text_column = `TXTLG`
         fact_column = VALUE #( name = `SID_FISCPER` datatype = `INT4` length = 10 )
         key_column = VALUE #( name = `FISCPER` datatype = `NUMC` length = 7 )
-        name_column = VALUE #( name = `COMPOUND_KEY` datatype = `CHAR` length = 10 ) ) ).
+        name_column = VALUE #( name = `COMPOUND_KEY` datatype = `CHAR` length = 10 )
+        caption_column = VALUE #( name = `KEY_CAPTION` datatype = `CHAR` length = 10 ) ) ).
     DATA(schema) = NEW zzxxmla1_cl_schema_proposal( )->propose( provider )-schema.
     DATA(period) = schema-dimensions[ 1 ].
     cl_abap_unit_assert=>assert_equals(
       act = VALUE string_table( FOR a IN period-attributes
                                 ( |{ a-name }: { a-key_column->column_name }| &&
                                   |{ COND string( WHEN a-name_column IS BOUND THEN |/{ a-name_column->column_name }| ) }| ) )
-      exp = VALUE string_table( ( `0FISCPER SID: SID/COMPOUND_KEY` ) ( `0FISCPER Key: FISCPER` )
-                                ( `0FISCPER Text: TXTLG` ) ) ).
+      exp = VALUE string_table( ( `0FISCPER SID: SID/TXTLG` ) ( `0FISCPER Key: FISCPER` ) ) ).
     cl_abap_unit_assert=>assert_equals( act = period-attributes[ 1 ]-name_column->data_type exp = `String` ).
     " in the order of the names, not of the SIDs
     cl_abap_unit_assert=>assert_equals( act = period-attributes[ 1 ]-order_by_column->column_name exp = `COMPOUND_KEY` ).
     cl_abap_unit_assert=>assert_not_bound( period-attributes[ 2 ]-order_by_column ).
     DATA(level) = period-hierarchies[ 1 ]-levels[ 1 ].
     cl_abap_unit_assert=>assert_equals( act = level-source_attribute exp = `0FISCPER SID` ).
+    " named by its compounding and key (K4/2024001)
+    cl_abap_unit_assert=>assert_equals( act = level-name_column exp = `COMPOUND_KEY` ).
     cl_abap_unit_assert=>assert_equals(
       act = VALUE string_table( FOR p IN level-properties ( |{ p-name }/{ p-caption }/{ p-source_attribute }| ) )
-      exp = VALUE string_table( ( `Text/Fiscal Year/Period (Text)/0FISCPER Text` )
-                                ( `Key/Fiscal Year/Period (Key)/0FISCPER Key` ) ) ).
+      exp = VALUE string_table( ( `Key/Fiscal Year/Period (Key)/0FISCPER Key` ) ) ).
     DATA(cube) = schema-cubes[ 1 ].
     DATA(fact) = CAST zzxxmla1_cl_schema_def=>ty_table( cube-fact-def ).
     cl_abap_unit_assert=>assert_equals( act = fact->name
@@ -271,7 +293,7 @@ CLASS ltc_proposal IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = lines( month-hierarchies ) exp = 1 ).
     cl_abap_unit_assert=>assert_equals(
       act = VALUE string_table( FOR p IN month-hierarchies[ 1 ]-levels[ 1 ]-properties ( p-name ) )
-      exp = VALUE string_table( ( `Text` ) ( `0CALMONTH2` ) ) ).
+      exp = VALUE string_table( ( `Key` ) ( `0CALMONTH2` ) ) ).
     DATA(adso_usage) = CAST zzxxmla1_cl_schema_def=>ty_dimension_usage(
                          adso_proposal-schema-cubes[ 1 ]-dimensions[ 3 ]-def ).
     cl_abap_unit_assert=>assert_equals( act = adso_usage->foreign_key exp = `CALMONTH` ).
@@ -301,8 +323,8 @@ CLASS ltc_proposal IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = month-type exp = `TimeDimension` ).
     cl_abap_unit_assert=>assert_equals(
       act = VALUE string_table( FOR a IN month-attributes ( |{ a-name }:{ a-level_type }| ) )
-      exp = VALUE string_table( ( `0CALMONTH Key:TimeMonths` ) ( `0CALMONTH Text:TimeUndefined` )
-                                ( `0CALMONTH2:TimeUndefined` ) ( `0CALYEAR:TimeYears` ) ( `0DATEFROM:TimeDays` ) ) ).
+      exp = VALUE string_table( ( `0CALMONTH Key:TimeMonths` ) ( `0CALMONTH2:TimeUndefined` )
+                                ( `0CALYEAR:TimeYears` ) ( `0DATEFROM:TimeDays` ) ) ).
     cl_abap_unit_assert=>assert_equals( act = month-hierarchies[ 1 ]-levels[ 1 ]-level_type exp = `TimeMonths` ).
     " the other dimensions are no time dimensions and keep members with facts
     cl_abap_unit_assert=>assert_initial( proposal-schema-dimensions[ 2 ]-type ).
@@ -332,8 +354,8 @@ CLASS ltc_proposal IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD drill_through_action.
-    " the default action: per characteristic its value and, if it has one, its text; no measure, so a row shows the
-    " clicked cell's; on an InfoCube the value is an attribute next to the SID key
+    " the default action: per characteristic its value (its text is its caption, no column); no measure, so a row
+    " shows the clicked cell's; on an InfoCube the value is an attribute next to the SID key
     DATA(adso) = adso( ).
     DATA(cube) = adso.
     cube-kind = zzxxmla1_cl_bw_provider=>c_kind-cube.
@@ -353,10 +375,9 @@ CLASS ltc_proposal IMPLEMENTATION.
       ENDLOOP.
       cl_abap_unit_assert=>assert_equals(
         act = columns
-        exp = VALUE string_table( ( `Store: ZFMSTORE.ZFMSTORE Key` ) ( `Store (Text): ZFMSTORE.ZFMSTORE Text` )
+        exp = VALUE string_table( ( `Store: ZFMSTORE.ZFMSTORE Key` )
                                   ( `Calendar Year/Week: 0CALWEEK.0CALWEEK Key` )
                                   ( `Calendar Year/Month: 0CALMONTH.0CALMONTH Key` )
-                                  ( `Calendar Year/Month (Text): 0CALMONTH.0CALMONTH Text` )
                                   ( `Calendar Year: 0CALYEAR.0CALYEAR Key` ) ) ).
     ENDLOOP.
     DATA(store) = schemas[ 2 ]-dimensions[ 1 ].
@@ -387,17 +408,34 @@ CLASS ltc_proposal IMPLEMENTATION.
     cl_abap_unit_assert=>assert_initial( proposal-schema-dimensions[ 1 ]-type ).
   ENDMETHOD.
 
-  METHOD int_columns.
+  METHOD caption_columns.
     DATA(proposal) = NEW zzxxmla1_cl_schema_proposal( )->propose( adso( ) ).
     cl_abap_unit_assert=>assert_equals(
-      act = proposal-int_columns
-      exp = VALUE zzxxmla1_cl_schema_proposal=>ty_t_int_column(
-              ( table = `ZZXXMLA1V0000003` column = `ZFMSTORE` int_column = `ZFMSTORE_INT` data_type = `Integer` )
-              ( table = `ZZXXMLA1V0000003` column = `ZFMSQFT` int_column = `ZFMSQFT_INT` data_type = `Numeric` ) ) ).
+      act = proposal-caption_columns
+      exp = VALUE zzxxmla1_cl_schema_proposal=>ty_t_caption_column(
+              ( table = `ZZXXMLA1V0000003` column = `KEY_CAPTION` )
+              ( table = `ZZXXMLA1V0000003` column = `TXTMD` )
+              ( table = `ZZXXMLA1V0000003` column = `TXTLG` )
+              ( table = `ZZXXMLA1_C_0CALWEEK` column = `KEY_CAPTION` )
+              ( table = `ZZXXMLA1_C_0CALMONTH` column = `KEY_CAPTION` )
+              ( table = `ZZXXMLA1_C_0CALMONTH` column = `TXTLG` ) ) ).
     DATA(store) = proposal-schema-dimensions[ 1 ].
     cl_abap_unit_assert=>assert_equals( act = store-attributes[ 1 ]-key_column->column_name exp = `ZFMSTORE` ).
-    cl_abap_unit_assert=>assert_equals( act = store-attributes[ 4 ]-key_column->column_name exp = `ZFMSQFT` ).
-    cl_abap_unit_assert=>assert_equals( act = store-attributes[ 4 ]-key_column->data_type exp = `String` ).
+    cl_abap_unit_assert=>assert_equals( act = store-attributes[ 3 ]-key_column->column_name exp = `ZFMSQFT` ).
+    cl_abap_unit_assert=>assert_equals( act = store-attributes[ 3 ]-key_column->data_type exp = `String` ).
+  ENDMETHOD.
+
+  METHOD names_and_captions.
+    DATA(schema) = NEW zzxxmla1_cl_schema_proposal( )->propose( adso( ) )-schema.
+    " without text: captioned by the key as a caption (# for the initial value)
+    DATA(week) = schema-dimensions[ 2 ].
+    cl_abap_unit_assert=>assert_equals( act = week-attributes[ 1 ]-name_column->column_name exp = `KEY_CAPTION` ).
+    cl_abap_unit_assert=>assert_equals( act = week-hierarchies[ 1 ]-levels[ 1 ]-name_column exp = `KEY_NAME` ).
+    " a view without KEY_NAME and KEY_CAPTION: named by the key, no caption of its own
+    DATA(year) = schema-dimensions[ 4 ].
+    cl_abap_unit_assert=>assert_equals( act = year-name exp = `0CALYEAR` ).
+    cl_abap_unit_assert=>assert_not_bound( year-attributes[ 1 ]-name_column ).
+    cl_abap_unit_assert=>assert_initial( year-hierarchies[ 1 ]-levels[ 1 ]-name_column ).
   ENDMETHOD.
 
   METHOD data_types.
@@ -452,7 +490,7 @@ CLASS ltc_bw IMPLEMENTATION.
     DATA(hierarchies) = schema->hierarchies( cube = `ZFMSALES` dim = `ZFMSTORE` ).
     cl_abap_unit_assert=>assert_equals( act = lines( hierarchies ) exp = 1 ).
     DATA(levels) = schema->levels( cube = `ZFMSALES` dim = `ZFMSTORE` hier = hierarchies[ 1 ]-hier_name ).
-    cl_abap_unit_assert=>assert_equals( act = levels[ 1 ]-name_column exp = `ZFMSTORE` ).
+    cl_abap_unit_assert=>assert_equals( act = levels[ 1 ]-name_column exp = `KEY_NAME` ).
     cl_abap_unit_assert=>assert_true( xsdbool( line_exists( levels[ 1 ]-properties[ name = `ZFMSNAME` ] ) ) ).
     cl_abap_unit_assert=>assert_equals( act = lines( schema->measures( `ZFMSALES` ) ) exp = 3 ).
   ENDMETHOD.
@@ -477,7 +515,7 @@ CLASS ltc_bw IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = lines( ship-hierarchies ) exp = 1 ).
     cl_abap_unit_assert=>assert_true( xsdbool( line_exists( ship-hierarchies[ 1 ]-levels[ 1 ]-properties[ name = `0D_NW_CNTRY` ] ) ) ).
     cl_abap_unit_assert=>assert_char_cp( act = ship-table exp = 'ZZXXMLA1*' ).
-    cl_abap_unit_assert=>assert_equals( act = ship-attributes[ 1 ]-name_column->column_name exp = `D_NW_CUST` ).
+    cl_abap_unit_assert=>assert_equals( act = ship-hierarchies[ 1 ]-levels[ 1 ]-name_column exp = `D_NW_CUST` ).
   ENDMETHOD.
 
 ENDCLASS.

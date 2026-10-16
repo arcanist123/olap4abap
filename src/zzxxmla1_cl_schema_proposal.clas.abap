@@ -16,16 +16,18 @@
 "!   acceptance replaces by the view); a reference characteristic is a dimension of its own on the view of the one it
 "!   references. Its DimensionAttributes describe the view's columns, none is an attribute hierarchy: the key
 "!   attribute CHARACTERISTIC SID (an InfoCube's, keyed by the view's SID, the fact table's SID column being the
-"!   foreign key) or CHARACTERISTIC Key (an aDSO's, keyed by the value, the fact column), both named by the internal
-"!   BW key; on an InfoCube the value as attribute CHARACTERISTIC Key too; the text CHARACTERISTIC Text; each
-"!   attribute and its text. A compounded characteristic is keyed by the SID on an aDSO too (its fact view's,
-"!   ZZXXMLA1_CL_BW_PROVIDER) and named by its compounding and key (K4/2024001) and ordered by these names, its key a member property Key
-"!   (docs/bw-schema-design-guide.md, section 3.7);
+"!   foreign key) or CHARACTERISTIC Key (an aDSO's, keyed by the value, the fact column), captioned by its NameColumn,
+"!   the characteristic's text (the medium, else the long, else the short one), the key (KEY_CAPTION) if it has none
+"!   (docs/next-steps.md, Now: texts and captions); on an InfoCube the value as attribute CHARACTERISTIC Key too;
+"!   each attribute and its text. A compounded characteristic is keyed by the SID on an aDSO too (its fact view's,
+"!   ZZXXMLA1_CL_BW_PROVIDER), ordered by its name (docs/bw-schema-design-guide.md, section 3.7);
 "! - its first Hierarchy, unnamed so that it is the dimension's default, is flat: All and one level of the
-"!   characteristic, with the text as member property Text and every display attribute (and navigation attribute
-"!   the provider does not switch on) as member properties, key and text;
+"!   characteristic, named by the key (the level's nameColumn: COMPOUND_KEY K4/2024001 of a compounded one, KEY_NAME
+"!   of a NUMC, DATS or TIMS key, '' for BW's initial value, else the key itself), with the key as member property
+"!   Key and every display attribute (and navigation attribute the provider does not switch on) as member
+"!   properties, key and text; the characteristic's own text is the caption, no property;
 "! - every navigation attribute the provider switches on is a flat Hierarchy CHARACTERISTIC__ATTRIBUTE of the
-"!   dimension, as BW names it, its level named by the attribute, with its text as property Text. Nothing is nested
+"!   dimension, as BW names it, its level named by the attribute's key and captioned by its text. Nothing is nested
 "!   that BW does not nest: no user hierarchies, no time hierarchy; BW's time characteristics (0CALMONTH, ...) are
 "!   characteristics like the others. No dimension is a TimeDimension but those the caller names (the fiscal defaults,
 "!   ZZXXMLA1_CL_SCHEMA_DEFAULTS): every attribute and level of one has its suggested level type, TimeUndefined where
@@ -36,7 +38,7 @@
 "!   non-cumulative, named by the key figure, captioned by its text, formatted by the decimals of its column; the
 "!   first one is the default measure;
 "! - a default DrillThroughAction, the columns of the rows a double click on a cell shows (with the cell's measure):
-"!   per characteristic its value and its text, if it has one, named by the characteristic's text.
+"!   per characteristic its value, named by the characteristic's text.
 "! Identifiers are BW's technical names, so they are unique and never change; captions are texts. Whatever is not
 "! proposed is a note with its reason; a level type the user may want when marking a dimension as time is a
 "! suggestion. Every dimension of the cube shows only its members with facts (the annotation olap4abap.membersWithFacts
@@ -51,8 +53,9 @@
 "! (the provider reads it so: no name column). The schema builder proposes without a selection
 "! (ZZXXMLA1_CL_SCHEMA_FIX applies one to a schema as an edit) but its defaults: the API reads the provider for them
 "! (ZZXXMLA1_CL_SCHEMA_DEFAULTS, the fiscal year variant fixed to K4); the demo generators give their own.
-"! A NUMC value is proposed as BW holds it (0042, typed String; docs/mvp-scope.md, NUMC decision); where the view has
-"! its number too (COLUMN_INT) the proposal lists it, so the UI can switch a dimension to numbers (42).
+"! A NUMC value is proposed as BW holds it (0042, typed String; docs/mvp-scope.md, NUMC decision). The proposal lists
+"! the columns of each view that can caption its characteristic (KEY_CAPTION and the texts), between which the UI
+"! switches a dimension's caption.
 "! Run (F9): prints the proposals for the FoodMart providers ZFMSALESA and ZFMSALES.
 CLASS zzxxmla1_cl_schema_proposal DEFINITION
   PUBLIC
@@ -72,22 +75,19 @@ CLASS zzxxmla1_cl_schema_proposal DEFINITION
       END OF ty_suggestion,
       ty_t_suggestion TYPE STANDARD TABLE OF ty_suggestion WITH EMPTY KEY.
     TYPES:
-      "! a NUMC column of a dimension's table and its number, which the UI may name in its place, with the number's
-      "! data type
-      BEGIN OF ty_int_column,
-        table      TYPE string,
-        column     TYPE string,
-        int_column TYPE string,
-        data_type  TYPE string,
-      END OF ty_int_column,
-      ty_t_int_column TYPE STANDARD TABLE OF ty_int_column WITH EMPTY KEY.
+      "! a column of a dimension's table that can caption the characteristic's members: KEY_CAPTION or a text
+      BEGIN OF ty_caption_column,
+        table  TYPE string,
+        column TYPE string,
+      END OF ty_caption_column,
+      ty_t_caption_column TYPE STANDARD TABLE OF ty_caption_column WITH EMPTY KEY.
     TYPES:
       BEGIN OF ty_proposal,
         schema      TYPE zzxxmla1_cl_schema_def=>ty_schema,
         xml         TYPE string,
         notes       TYPE zzxxmla1_cl_bw_provider=>ty_t_note,
-        suggestions TYPE ty_t_suggestion,
-        int_columns TYPE ty_t_int_column,
+        suggestions     TYPE ty_t_suggestion,
+        caption_columns TYPE ty_t_caption_column,
       END OF ty_proposal.
 
     "! The proposal for a provider's metadata; time: the characteristics whose dimensions are time dimensions.
@@ -114,10 +114,21 @@ CLASS zzxxmla1_cl_schema_proposal DEFINITION
     CLASS-METHODS table_of
       IMPORTING characteristic TYPE zzxxmla1_cl_bw_provider=>ty_characteristic
       RETURNING VALUE(result)  TYPE string.
-    "! The NUMC columns of a characteristic's table that have a number (its key and its attributes).
-    CLASS-METHODS int_columns_of
+    "! The columns of a characteristic's table that can caption its members: its key as a caption (KEY_CAPTION) and
+    "! its texts.
+    CLASS-METHODS caption_columns_of
       IMPORTING characteristic TYPE zzxxmla1_cl_bw_provider=>ty_characteristic
-      RETURNING VALUE(result)  TYPE ty_t_int_column.
+      RETURNING VALUE(result)  TYPE ty_t_caption_column.
+    "! The column that names a characteristic's members: COMPOUND_KEY of a compounded one, KEY_NAME of a NUMC, DATS or
+    "! TIMS key ('' for SID 0), else the key.
+    CLASS-METHODS name_column_of
+      IMPORTING characteristic TYPE zzxxmla1_cl_bw_provider=>ty_characteristic
+      RETURNING VALUE(result)  TYPE zzxxmla1_cl_bw_provider=>ty_column.
+    "! The column that captions a characteristic's members: its text (the medium, else the long, else the short one),
+    "! else its key as a caption (KEY_CAPTION); initial if the view has neither.
+    CLASS-METHODS caption_column_of
+      IMPORTING characteristic TYPE zzxxmla1_cl_bw_provider=>ty_characteristic
+      RETURNING VALUE(result)  TYPE zzxxmla1_cl_bw_provider=>ty_column.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -159,7 +170,7 @@ CLASS zzxxmla1_cl_schema_proposal DEFINITION
     DATA depth TYPE i.
     DATA notes TYPE zzxxmla1_cl_bw_provider=>ty_t_note.
     DATA suggestions TYPE ty_t_suggestion.
-    DATA int_columns TYPE ty_t_int_column.
+    DATA caption_columns TYPE ty_t_caption_column.
     "! the characteristics whose dimensions are time dimensions
     DATA time_dimensions TYPE string_table.
     "! the dimension being written is a time dimension: its attributes and levels have level types
@@ -170,12 +181,11 @@ CLASS zzxxmla1_cl_schema_proposal DEFINITION
       IMPORTING kind           TYPE string
                 characteristic TYPE zzxxmla1_cl_bw_provider=>ty_characteristic
       RETURNING VALUE(result)  TYPE string.
-    "! Adds the key and the text of a characteristic to the default drill-through action, named by the
-    "! characteristic's text (by the InfoObject if it has none or another characteristic has the same).
-    METHODS add_drill_columns
+    "! Adds the value of a characteristic to the default drill-through action, named by the characteristic's text (by
+    "! the InfoObject if it has none or another characteristic has the same).
+    METHODS add_drill_column
       IMPORTING characteristic TYPE zzxxmla1_cl_bw_provider=>ty_characteristic
-                key            TYPE string
-                text           TYPE string.
+                key            TYPE string.
     "! Writes the default drill-through action: the columns double-clicking a cell shows, with the cell's measure.
     METHODS write_drill_through.
     "! Writes a DimensionAttribute of one column, not an attribute hierarchy; in a time dimension with the level
@@ -187,19 +197,18 @@ CLASS zzxxmla1_cl_schema_proposal DEFINITION
                 order_by_column TYPE zzxxmla1_cl_bw_provider=>ty_column OPTIONAL
                 usage           TYPE string OPTIONAL
                 iobjnm          TYPE string OPTIONAL.
-    "! Writes a flat Hierarchy: All and one level, the level's text as property Text; in a time dimension the level
-    "! has the level type of its attribute's characteristic (iobjnm, column).
+    "! Writes a flat Hierarchy: All and one level; in a time dimension the level has the level type of its
+    "! attribute's characteristic (iobjnm, column).
     "! @parameter name_column | the level's nameColumn, the column that names the members; initial: the attribute's
     "! KeyColumn names them (RolapLevel: its NameColumn only captions them)
     METHODS open_hierarchy
-      IMPORTING name           TYPE string OPTIONAL
-                caption        TYPE string
-                level          TYPE string
-                attribute      TYPE string
-                text_attribute TYPE string OPTIONAL
-                iobjnm         TYPE string OPTIONAL
-                column         TYPE zzxxmla1_cl_bw_provider=>ty_column OPTIONAL
-                name_column    TYPE string OPTIONAL.
+      IMPORTING name        TYPE string OPTIONAL
+                caption     TYPE string
+                level       TYPE string
+                attribute   TYPE string
+                iobjnm      TYPE string OPTIONAL
+                column      TYPE zzxxmla1_cl_bw_provider=>ty_column OPTIONAL
+                name_column TYPE string OPTIONAL.
     METHODS close_hierarchy.
     "! Writes a member property.
     METHODS property
@@ -273,7 +282,7 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD propose.
-    CLEAR: xml, depth, notes, suggestions, drill_columns, int_columns, in_time.
+    CLEAR: xml, depth, notes, suggestions, drill_columns, caption_columns, in_time.
     notes = provider-notes.
     time_dimensions = time.
     DATA usages TYPE ty_t_usage.
@@ -297,7 +306,7 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
     result-xml = zzxxmla1_cl_schema_def=>to_xml( result-schema ).
     result-notes = notes.
     result-suggestions = suggestions.
-    result-int_columns = int_columns.
+    result-caption_columns = caption_columns.
   ENDMETHOD.
 
   METHOD write_dimension.
@@ -320,62 +329,63 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
                                                    ( name = `table` value = table )
                                                    ( name  = `type`
                                                      value = COND #( WHEN in_time = abap_true THEN `TimeDimension` ) ) ) ).
-    LOOP AT int_columns_of( characteristic ) INTO DATA(numeric).
-      IF NOT line_exists( int_columns[ table = numeric-table column = numeric-column ] ).
-        APPEND numeric TO int_columns.
+    LOOP AT caption_columns_of( characteristic ) INTO DATA(caption_column).
+      IF NOT line_exists( caption_columns[ table = caption_column-table column = caption_column-column ] ).
+        APPEND caption_column TO caption_columns.
       ENDIF.
     ENDLOOP.
 
     " the key attribute: keyed by the SID where the facts have it (an InfoCube's, an aDSO's compounded characteristic),
-    " else by the value; named by the internal BW key, a compounded one by its compounding and its key
+    " else by the value; captioned by the text, the key if there is none
     DATA(key) = COND string( WHEN by_sid = abap_true THEN |{ result } SID| ELSE |{ result } Key| ).
-    " the value as an attribute of its own when keyed by the SID: the drill-through reads a column by its attribute
+    " the value as an attribute of its own when keyed by the SID: the drill-through and the property Key read it
     DATA(value) = |{ result } Key|.
+    DATA(caption) = caption_column_of( characteristic ).
     IF by_sid = abap_true.
       write_attribute( name        = key
                        usage       = `Key`
                        iobjnm      = characteristic-iobjnm
                        key_column  = VALUE #( name = `SID` datatype = `INT4` length = 10 )
-                       name_column = COND #( WHEN compounded = abap_true THEN characteristic-name_column
-                                             ELSE characteristic-key_column )
+                       name_column = caption
                        " a compounded one in the order of its names: the SIDs are in the order BW made them
                        order_by_column = COND #( WHEN compounded = abap_true THEN characteristic-name_column ) ).
       write_attribute( name = value key_column = characteristic-key_column ).
     ELSE.
-      write_attribute( name = key usage = `Key` key_column = characteristic-key_column iobjnm = characteristic-iobjnm ).
+      write_attribute( name        = key
+                       usage       = `Key`
+                       key_column  = characteristic-key_column
+                       name_column = caption
+                       iobjnm      = characteristic-iobjnm ).
     ENDIF.
     suggest( dimension = result attribute = key iobjnm = characteristic-iobjnm column = characteristic-key_column ).
-    DATA(text) = COND string( WHEN characteristic-text_column IS NOT INITIAL THEN |{ result } Text| ).
-    IF text IS NOT INITIAL.
-      write_attribute( name = text key_column = VALUE #( name = characteristic-text_column datatype = `CHAR` ) ).
-    ENDIF.
-    add_drill_columns( characteristic = characteristic key = value text = text ).
-    " a navigation attribute switched on is named as BW names it, <characteristic>__<attribute>; the others by the
-    " attribute
+    add_drill_column( characteristic = characteristic key = value ).
+    " a navigation attribute switched on is named as BW names it, <characteristic>__<attribute>, and captioned by its
+    " text; the others by the attribute, their texts attributes of their own (properties)
     LOOP AT characteristic-attributes INTO DATA(attribute).
       DATA(name) = COND string( WHEN attribute-navigation = abap_true THEN |{ result }__{ attribute-iobjnm }|
                                 ELSE attribute-iobjnm ).
-      write_attribute( name = name key_column = attribute-column iobjnm = attribute-iobjnm ).
+      write_attribute( name        = name
+                       key_column  = attribute-column
+                       name_column = COND #( WHEN attribute-navigation = abap_true AND attribute-text_column IS NOT INITIAL
+                                             THEN VALUE #( name = attribute-text_column datatype = `CHAR` ) )
+                       iobjnm      = attribute-iobjnm ).
       suggest( dimension = result attribute = name iobjnm = attribute-iobjnm column = attribute-column ).
-      IF attribute-text_column IS NOT INITIAL.
+      IF attribute-navigation = abap_false AND attribute-text_column IS NOT INITIAL.
         write_attribute( name = |{ name } Text| key_column = VALUE #( name = attribute-text_column datatype = `CHAR` ) ).
       ENDIF.
     ENDLOOP.
 
-    " the characteristic: flat, the other attributes as properties; keyed by the SID, named by the BW key (the key
-    " attribute's NameColumn only captions it)
-    open_hierarchy( caption        = characteristic-text
-                    level          = result
-                    attribute      = key
-                    text_attribute = text
-                    iobjnm         = characteristic-iobjnm
-                    column         = characteristic-key_column
-                    name_column    = COND #( WHEN by_sid = abap_true AND compounded = abap_true
-                                               THEN characteristic-name_column-name
-                                             WHEN by_sid = abap_true THEN characteristic-key_column-name ) ).
-    IF compounded = abap_true.
-      property( name = `Key` caption = |{ characteristic-text } (Key)| attribute = value ).
-    ENDIF.
+    " the characteristic: flat, named by the key (the key attribute's NameColumn only captions it), the key and the
+    " other attributes as properties
+    DATA(name_column) = name_column_of( characteristic ).
+    open_hierarchy( caption     = characteristic-text
+                    level       = result
+                    attribute   = key
+                    iobjnm      = characteristic-iobjnm
+                    column      = characteristic-key_column
+                    name_column = COND #( WHEN by_sid = abap_true OR name_column <> characteristic-key_column
+                                          THEN name_column-name ) ).
+    property( name = `Key` caption = |{ characteristic-text } (Key)| attribute = value ).
     LOOP AT characteristic-attributes INTO attribute WHERE navigation = abap_false.
       property( name = attribute-iobjnm caption = attribute-text attribute = attribute-iobjnm ).
       IF attribute-text_column IS NOT INITIAL.
@@ -388,13 +398,12 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
     " each navigation attribute switched on: a flat hierarchy of its own
     LOOP AT characteristic-attributes INTO attribute WHERE navigation = abap_true.
       name = |{ result }__{ attribute-iobjnm }|.
-      open_hierarchy( name           = name
-                      caption        = attribute-text
-                      level          = attribute-iobjnm
-                      attribute      = name
-                      text_attribute = COND #( WHEN attribute-text_column IS NOT INITIAL THEN |{ name } Text| )
-                      iobjnm         = attribute-iobjnm
-                      column         = attribute-column ).
+      open_hierarchy( name      = name
+                      caption   = attribute-text
+                      level     = attribute-iobjnm
+                      attribute = name
+                      iobjnm    = attribute-iobjnm
+                      column    = attribute-column ).
       close_hierarchy( ).
     ENDLOOP.
     close( `Dimension` ).
@@ -433,9 +442,6 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
                                                ( name = `nameColumn` value = name_column )
                                                ( name  = `levelType`
                                                  value = time_level_type_of( iobjnm = iobjnm column = column ) ) ) ).
-    IF text_attribute IS NOT INITIAL.
-      property( name = `Text` caption = |{ caption } (Text)| attribute = text_attribute ).
-    ENDIF.
   ENDMETHOD.
 
   METHOD close_hierarchy.
@@ -520,16 +526,13 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
     close( `Cube` ).
   ENDMETHOD.
 
-  METHOD add_drill_columns.
+  METHOD add_drill_column.
     DATA(name) = COND string( WHEN characteristic-text IS NOT INITIAL THEN characteristic-text
                               ELSE characteristic-iobjnm ).
     IF line_exists( drill_columns[ name = name ] ).
       name = characteristic-iobjnm.
     ENDIF.
     APPEND VALUE #( name = name dimension = characteristic-iobjnm attribute = key ) TO drill_columns.
-    IF text IS NOT INITIAL.
-      APPEND VALUE #( name = |{ name } (Text)| dimension = characteristic-iobjnm attribute = text ) TO drill_columns.
-    ENDIF.
   ENDMETHOD.
 
   METHOD write_drill_through.
@@ -622,19 +625,26 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
                      ELSE zzxxmla1_cl_bw_view_gen=>placeholder( characteristic-basic ) ).
   ENDMETHOD.
 
-  METHOD int_columns_of.
+  METHOD caption_columns_of.
     DATA(table) = table_of( characteristic ).
-    DATA(columns) = VALUE zzxxmla1_cl_bw_provider=>ty_t_attribute(
-      ( column = characteristic-key_column int_column = characteristic-key_int_column )
-      ( LINES OF characteristic-attributes ) ).
-    LOOP AT columns INTO DATA(column) WHERE int_column IS NOT INITIAL.
-      IF NOT line_exists( result[ column = column-column-name ] ).
-        APPEND VALUE #( table      = table
-                        column     = column-column-name
-                        int_column = column-int_column-name
-                        data_type  = data_type( column-int_column ) ) TO result.
-      ENDIF.
+    DATA(columns) = VALUE string_table( ( characteristic-caption_column-name ) ( LINES OF characteristic-text_columns ) ).
+    LOOP AT columns INTO DATA(column) WHERE table_line IS NOT INITIAL.
+      APPEND VALUE #( table = table column = column ) TO result.
     ENDLOOP.
+  ENDMETHOD.
+
+  METHOD name_column_of.
+    result = COND #( WHEN characteristic-name_column IS NOT INITIAL THEN characteristic-name_column
+                     WHEN characteristic-key_name_column IS NOT INITIAL THEN characteristic-key_name_column
+                     ELSE characteristic-key_column ).
+  ENDMETHOD.
+
+  METHOD caption_column_of.
+    IF characteristic-text_column IS NOT INITIAL.
+      result = VALUE #( name = characteristic-text_column datatype = `CHAR` ).
+    ELSE.
+      result = characteristic-caption_column.
+    ENDIF.
   ENDMETHOD.
 
 ENDCLASS.

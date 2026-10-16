@@ -84,7 +84,8 @@ CLASS zzxxmla1_cl_schema DEFINITION
         "! the copy of the BW hierarchy the annotation c_bw_hierarchy names, current when the schema was read; initial
         "! for any other hierarchy
         bw_hierarchy    TYPE zzxxmla1_cl_bw_hierarchy_copy=>ty_hierarchy,
-        "! of a BW hierarchy: the column of the dimension's table that names a leaf (the key attribute's name)
+        "! of a BW hierarchy: the column of the dimension's table that names a leaf, as it names the characteristic's
+        "! members (the nameColumn of a level over the key attribute)
         bw_value_name   TYPE string,
       END OF ty_hier,
       ty_t_hier TYPE STANDARD TABLE OF ty_hier WITH EMPTY KEY.
@@ -325,8 +326,14 @@ CLASS zzxxmla1_cl_schema DEFINITION
                 location      TYPE string
       RETURNING VALUE(result) TYPE ty_t_property
       RAISING   zzxxmla1_cx_xmla.
-    "! An attribute's NameColumn, else its KeyColumn: the column of a BW hierarchy's leaf names, and the one orderBy
-    "! Name orders by.
+    "! The column that names the members of a dimension's key attribute: the nameColumn of the first level over it,
+    "! its KeyColumn if that has none (RolapLevel: the attribute's NameColumn only captions it); without a level over
+    "! it its NameColumn, else its KeyColumn. A BW hierarchy's leaves are named by it.
+    CLASS-METHODS value_name_column
+      IMPORTING dimension     TYPE zzxxmla1_cl_schema_def=>ty_dimension
+                key           TYPE zzxxmla1_cl_schema_def=>ty_dimension_attribute
+      RETURNING VALUE(result) TYPE string.
+    "! An attribute's NameColumn, else its KeyColumn: the one orderBy Name orders by.
     CLASS-METHODS attribute_name_column
       IMPORTING attribute     TYPE zzxxmla1_cl_schema_def=>ty_dimension_attribute
       RETURNING VALUE(result) TYPE string.
@@ -746,7 +753,7 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
       CATCH zzxxmla1_cx_bw_hierarchy INTO DATA(error).
         fail( |{ where }: { error->get_text( ) }| ).
     ENDTRY.
-    row-bw_value_name = attribute_name_column( key ).
+    row-bw_value_name = value_name_column( dimension = dimension key = key ).
     append_hierarchy( row ).
     " the levels are the columns of the copy's members as a level hierarchy (ZZXXMLA1_CL_MODEL=>member_table): a
     " member's key its SID (a node's negative one, a value's the characteristic's), named by the copy, in BW's order
@@ -864,6 +871,17 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
     IF result IS INITIAL.
       result = `Standard`.
     ENDIF.
+  ENDMETHOD.
+
+  METHOD value_name_column.
+    LOOP AT dimension-hierarchies INTO DATA(hierarchy).
+      LOOP AT hierarchy-levels INTO DATA(level) WHERE source_attribute = key-name.
+        result = COND #( WHEN level-name_column IS NOT INITIAL THEN level-name_column
+                         WHEN key-key_column IS BOUND THEN key-key_column->column_name ).
+        RETURN.
+      ENDLOOP.
+    ENDLOOP.
+    result = attribute_name_column( key ).
   ENDMETHOD.
 
   METHOD attribute_name_column.

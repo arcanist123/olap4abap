@@ -125,25 +125,34 @@ def main():
         check("with the suggested level type", page.locator("tr:has(.kind) select").input_value() == "TimeMonths")
         shot(page, "4-adso-time")
 
-        # NUMC as numbers: the store's NUMC columns (the aDSO's key too) switch to the views' numbers, and back
-        page.click(".tree .item:has-text('ZFMSTORE')")
-        page.click("text=As numbers")
+        # the member caption: the month's switches between its texts and the key (KEY_CAPTION); its members stay
+        # named by the key (the level's nameColumn)
+        def month_xml():
+            page.click("role=tab[name='XML']")
+            xml = page.input_value("textarea.xml")
+            page.click("role=tab[name='Outline']")
+            found = re.search(r'<Dimension [^>]*name="0CALMONTH".*?</Dimension>', xml, re.S)
+            return found.group(0) if found else ""
+
+        def key_caption(dimension):
+            key = re.search(r'<DimensionAttribute name="0CALMONTH Key".*?</DimensionAttribute>', dimension, re.S)
+            found = key and re.search(r'<NameColumn dataType="String" columnName="([^"]+)"', key.group(0))
+            return found.group(1) if found else None
+
+        page.click(".tree .item:has-text('0CALMONTH')")
+        caption = page.locator("select:has(option[value='KEY_CAPTION'])")
+        proposed = caption.input_value()
+        options = caption.locator("option").evaluate_all("os => os.map(o => o.value)")
+        check("caption proposed as the medium text, the key and the long text offered",
+              proposed == "TXTMD" and options == ["KEY_CAPTION", "TXTMD", "TXTLG"], (proposed, options))
+        caption.select_option("KEY_CAPTION")
         page.wait_for_selector(".status.busy", timeout=5000)
         loads = "Loads" in status(page)
-        page.click("role=tab[name='XML']")
-        xml = page.input_value("textarea.xml")
-        check("NUMC as numbers loads", loads and re.search(
-            r'<DimensionAttribute name="ZFMSTORE Key"[^>]*>\s*<KeyColumn dataType="Integer" columnName="ZFMSTORE_INT"', xml)
-            is not None and 'columnName="ZFMSQFT_INT"' in xml,
-            [line.strip() for line in xml.splitlines() if "ZFMSTORE" in line and "Column" in line])
-        page.click("role=tab[name='Outline']")
-        page.click("text=As numbers")
-        page.click("role=tab[name='XML']")
-        xml = page.input_value("textarea.xml")
-        check("and back as BW holds them", "_INT" not in xml and re.search(
-            r'<DimensionAttribute name="ZFMSTORE Key"[^>]*>\s*<KeyColumn dataType="String" columnName="ZFMSTORE"', xml)
-            is not None)
-        page.click("role=tab[name='Outline']")
+        month = month_xml()
+        check("caption by the key loads", loads and key_caption(month) == "KEY_CAPTION"
+              and re.search(r'<Level [^>]*nameColumn="KEY_NAME"', month) is not None, month[:800])
+        page.locator("select:has(option[value='KEY_CAPTION'])").select_option(proposed)
+        check("and back to the text", key_caption(month_xml()) == proposed)
 
         # members with facts: proposed on every dimension of the cube, dropped from the one marked time (the server
         # refuses it there); switched off for the store, its annotation goes
@@ -181,13 +190,13 @@ def main():
         page.click("role=tab[name='Outline']")
 
         # the double-click columns: the proposal's default drill-through action (each characteristic's value, its
-        # text where it has one); a measure added; a renamed dimension's columns follow
+        # text is its caption); a measure added; a renamed dimension's columns follow
         page.click(".tree .item:has-text('ZFMSALESA') >> nth=1")
         drill = page.locator("section:has(h3:text('Double-click columns'))")
         names = [drill.locator("tbody tr").nth(i).locator("input[type=text]").input_value()
                  for i in range(drill.locator("tbody tr").count())]
         check("the proposal's double-click columns", names[:4] == ["Product", "Customer", "Store", "Promotion"]
-              and "Calendar Year/Month (Text)" in names and len(names) == 10, names)
+              and not any("(Text)" in n for n in names), names)
         drill.locator("select[aria-label='Add a column']").select_option("m|ZFMUNITS")
         page.wait_for_selector(".status.busy", timeout=5000)
         check("a measure column loads", "Loads" in status(page)

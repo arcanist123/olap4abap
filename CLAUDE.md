@@ -94,10 +94,14 @@ Read before designing anything:
   the time ones too, a dimension on its CDS view (no dimensions on fact columns; `0CALDAY` has no SID table and is not
   supported); a time dimension only if the user marks one, but for the fiscal defaults below. The proposal follows `docs/bw-schema-design-guide.md`
   (BW's model): technical names as identifiers, texts as captions; per characteristic a flat unnamed hierarchy
-  (members keyed by SID, named by the key, the EN text and the display attributes as member properties) and a flat
-  hierarchy `<char>__<attribute>` per navigation attribute the provider switches on; no attribute hierarchies, no
-  user hierarchies (the user makes them in the UI); a default drill-through action with each characteristic's value
-  and text, which the UI's "Double-click columns" adjusts; every dimension of the cube annotated
+  (members keyed by SID, named by the key: the level's `nameColumn` `KEY_NAME`, `COMPOUND_KEY` or the key; captioned
+  by the EN text, the key attribute's `NameColumn` the medium, else long, else short text, `KEY_CAPTION` without
+  texts, which the dimension pane's "Member caption" switches between the view's caption columns, `captionColumns` of
+  the API; the key as member property `Key`, the display attributes as member properties, key and text, no `Text`
+  property of the characteristic itself) and a flat hierarchy `<char>__<attribute>` per navigation attribute the
+  provider switches on, captioned by the attribute's text; no attribute hierarchies, no user hierarchies (the user
+  makes them in the UI); a default drill-through action with each characteristic's value, which the UI's
+  "Double-click columns" adjusts; every dimension of the cube annotated
   `olap4abap.membersWithFacts`, which the UI's "Members with facts" switches per dimension (not on time ones); the cube
   annotated `olap4abap.omitEmptyCells`, which the cube pane's "Omit empty cells" switches. The views (`ZZXXMLA1_CL_BW_VIEW_GEN`, one per basic
   characteristic) carry the EN texts (every text field its own column, `TXTMD`, `TXTLG`, `TXTSH`, an attribute's
@@ -105,10 +109,10 @@ Read before designing anything:
   SID 0, of a NUMC, DATS or TIMS key) and as caption (`KEY_CAPTION`, `#` for SID 0) and the time-dependent attributes
   at 9999-12-31, and every column as BW holds it,
   NUMC with its zeros, each NUMC column followed by its number `COLUMN_INT`: the proposal names BW's values (`0042`,
-  String), the UI's "As numbers" switches a dimension to the `_INT` columns (`intColumns` of the API; on an aDSO the
-  key too), FoodMart's schemas name the numbers (`docs/mvp-scope.md`, NUMC decision). A compounded characteristic
-  (`0FISCPER` with `0FISCVARNT`) is named and ordered by `COMPOUND_KEY` of its view (`K4/2024001`, SID 0 `''`; `KEY_CAPTION` `#/#`; the key
-  attribute's `NameColumn` and `OrderByColumn`), and an aDSO with one is read from its fact view
+  String), FoodMart's schemas name the numbers (`docs/mvp-scope.md`, NUMC decision; "As numbers" left the UI). A
+  compounded characteristic (`0FISCPER` with `0FISCVARNT`) is named and ordered by `COMPOUND_KEY` of its view
+  (`K4/2024001`, SID 0 `''`; `KEY_CAPTION` `#/#`; the level's `nameColumn`, the key attribute's `OrderByColumn`), and
+  an aDSO with one is read from its fact view
   (`ZZXXMLA1_CL_BW_VIEW_GEN=>generate_fact_view`: the reporting view with `SID_<field>` per compounded characteristic,
   placeholder `ZZXXMLA1_F_<aDSO>` until accept), so it is keyed by the SID as on an InfoCube
   (`docs/bw-schema-design-guide.md`, section 3.7). A cube can restrict characteristics by a selection, a BW range
