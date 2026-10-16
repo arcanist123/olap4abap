@@ -412,7 +412,9 @@ Done (2026-10-15): the reference serves `ZCLDIAG_ICD`.
 - Decided with the user 2026-10-16:
   - The reference is the oracle for everything but parent-child hierarchies. It is patched only to fix an answer
     that is wrong by its own rules with a small fix (as `parent-child-closure.patch`), never to change its model
-    (levels by depth in its parent-child engine would be that).
+    (levels by depth in its parent-child engine would be that). Changed later that day (with the user): the
+    reference is not patched any more; its patches stay, and an answer it gets wrong waits for SSAS, the spec for
+    hierarchies and Excel's behaviour (step 6).
   - olap4abap serves a BW hierarchy as SSAS serves a parent-child one: unbalanced, nothing hidden, every member one
     level below its parent and on the level of its depth (`Level 01` the roots, `LNum` the depth), which
     `MDSCHEMA_LEVELS` lists and MDX resolves; so Excel nests `DrilldownMember` per level and `DrilldownLevel` of a

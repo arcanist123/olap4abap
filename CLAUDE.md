@@ -366,8 +366,9 @@ Read before designing anything:
   none inside REST_H's branch; the Excel ones from a live session against it) are what the engine work has
   to pass
   (`docs/next-steps.md`, Reference scenario). Decided 2026-10-16 after Excel failed on the parent-child form: the
-  reference is the oracle for everything but parent-child hierarchies and is patched only to fix wrong answers, not
-  to change its model; olap4abap puts each member of a BW hierarchy on the level of its depth, as SSAS does (Excel
+  reference is the oracle for everything but parent-child hierarchies and is not patched any more: its patches stay
+  as they are, an answer it gets wrong (Expand Entire Field, Top 10 value filter, a label filter on an upper level)
+  waits for SSAS (2016, the version olap4abap reports), the spec for hierarchies and Excel's behaviour; olap4abap puts each member of a BW hierarchy on the level of its depth, as SSAS does (Excel
   needs it); BW's MDX is the oracle for hierarchies without a level form.
 - Reference: eMondrian built from source and running in Docker; captured exchanges are in `reference/`.
 

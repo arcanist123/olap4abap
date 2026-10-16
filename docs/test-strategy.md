@@ -203,8 +203,9 @@ drill-through of a node, which the reference answered wrong, is answered right s
 (next-steps.md, Reference scenario).
 
 The reference is not the oracle of parent-child hierarchies (decided 2026-10-16, next-steps.md, Reference scenario):
-it puts every member of one on a single level, which Excel cannot expand (a live session), and it is patched only to
-fix answers wrong by its own rules, not to change its model. olap4abap puts a member on the level of its depth, as
+it puts every member of one on a single level, which Excel cannot expand (a live session). It is not patched any
+more: its patches stay as they are, and an answer it gets wrong waits for SSAS, the spec for hierarchies and Excel's
+behaviour (next-steps.md, Reference scenario, step 6). olap4abap puts a member on the level of its depth, as
 SSAS does. A BW hierarchy with a level form (`ZCLDIAG_ICD`) is therefore served by the reference as a balanced level
 hierarchy (`Level 01` to `Level 04`, placeholder members under REST_H so nothing is hidden), whose layout is
 olap4abap's; the cases stay out of REST_H's branch, which BW's MDX checks. Hierarchies without a level form (shared
