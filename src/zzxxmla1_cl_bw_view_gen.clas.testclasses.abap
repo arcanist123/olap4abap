@@ -26,8 +26,9 @@ CLASS ltc_bw_view_gen DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION 
     "! the number of a NUMC column whose name would be longer than 30 characters is left out with a note; the number
     "! says which column it is the number of and is no value of an InfoObject
     METHODS numc_numbers FOR TESTING.
-    "! texts in EN at the key date with the key in their place where there is none, time-dependent attributes at the
-    "! key date (docs/bw-schema-design-guide.md, section 4)
+    "! texts in EN at the key date, each text field its own column and blank where there is none, an attribute's
+    "! preferred text also as ATTRIBUTE_TXT; time-dependent attributes at the key date
+    "! (docs/bw-schema-design-guide.md, section 4)
     METHODS texts_and_time_dependent FOR TESTING.
     "! the columns say whose value or text they are
     METHODS columns_of_product FOR TESTING.
@@ -39,6 +40,10 @@ CLASS ltc_bw_view_gen DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION 
     METHODS compound_key_two FOR TESTING.
     "! compounded twice: a branch per set of initial values, the larger sets first, literals joined
     METHODS compound_key_three FOR TESTING.
+    "! the name of a compounded value: its key fields as BW holds them, '' for SID 0; KEY_CAPTION the form with #
+    METHODS compound_name FOR TESTING.
+    "! a NUMC key compounded with a fixed variant is named by KEY_NAME, '' for SID 0
+    METHODS key_name_of_fixed_compounding FOR TESTING.
     "! a room compounded with its site, in the clinic aDSO
     METHODS fact_metadata_of_room
       RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_view_gen=>ty_fact_metadata.
@@ -163,6 +168,8 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
             |  key s.sid as SID,| && nl &&
             |      s./bic/zfmstore as ZFMSTORE,| && nl &&
             |      cast( s./bic/zfmstore as abap.int8 ) as ZFMSTORE_INT,| && nl &&
+            |      case when s.sid = 0 then '' else cast( s./bic/zfmstore as abap.char(10) ) end as KEY_NAME,| && nl &&
+            |      case when s.sid = 0 then '#' else cast( s./bic/zfmstore as abap.char(10) ) end as KEY_CAPTION,| && nl &&
             |      p./bic/zfmsname as ZFMSNAME,| && nl &&
             |      p./bic/zfmyear as ZFMYEAR,| && nl &&
             |      cast( p./bic/zfmyear as abap.int4 ) as ZFMYEAR_INT,| && nl &&
@@ -214,21 +221,30 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
             |\{{ nl }| &&
             |  key s.sid as SID,{ nl }| &&
             |      s.d_nw_prod as D_NW_PROD,{ nl }| &&
-            |      coalesce( t.txtmd, s.d_nw_prod ) as TXTMD,{ nl }| &&
+            |      case when s.sid = 0 then '##' else s.d_nw_prod end as KEY_CAPTION,{ nl }| &&
+            |      coalesce( t.txtmd, '' ) as TXTMD,{ nl }| &&
+            |      coalesce( t.txtsh, '' ) as TXTSH,{ nl }| &&
             |      p.d_nw_prdct as D_NW_PRDCT,{ nl }| &&
-            |      coalesce( t1.txtmd, p.d_nw_prdct ) as D_NW_PRDCT_TXT,{ nl }| &&
+            |      coalesce( t1.txtmd, '' ) as D_NW_PRDCT_TXT,{ nl }| &&
+            |      coalesce( t1.txtmd, '' ) as D_NW_PRDCT_TXTMD,{ nl }| &&
+            |      coalesce( t1.txtsh, '' ) as D_NW_PRDCT_TXTSH,{ nl }| &&
             |      q.d_nw_prdgp as D_NW_PRDGP,{ nl }| &&
-            |      coalesce( t2.txtlg, q.d_nw_prdgp ) as D_NW_PRDGP_TXT{ nl }| &&
+            |      coalesce( t2.txtlg, '' ) as D_NW_PRDGP_TXT,{ nl }| &&
+            |      coalesce( t2.txtlg, '' ) as D_NW_PRDGP_TXTLG{ nl }| &&
             |\}{ nl }| ).
   ENDMETHOD.
 
   METHOD columns_of_product.
     DATA(columns) = zzxxmla1_cl_bw_view_gen=>build_layout( product( ) )-columns.
     cl_abap_unit_assert=>assert_equals(
-      act = VALUE string_table( FOR c IN columns ( |{ c-name } { c-iobjnm } { c-text } { c-navigation }| ) )
-      exp = VALUE string_table( ( `SID   ` ) ( `D_NW_PROD 0D_NW_PROD  ` ) ( `TXTMD 0D_NW_PROD X ` )
-                                ( `D_NW_PRDCT 0D_NW_PRDCT  X` ) ( `D_NW_PRDCT_TXT 0D_NW_PRDCT X ` )
-                                ( `D_NW_PRDGP 0D_NW_PRDGP  X` ) ( `D_NW_PRDGP_TXT 0D_NW_PRDGP X ` ) ) ).
+      act = VALUE string_table( FOR c IN columns
+                                ( |{ c-name } { c-iobjnm } { c-text } { c-navigation } { c-text_field } { c-preferred }| ) )
+      exp = VALUE string_table( ( `SID     ` ) ( `D_NW_PROD 0D_NW_PROD    ` ) ( `KEY_CAPTION     ` )
+                                ( `TXTMD 0D_NW_PROD X  TXTMD X` ) ( `TXTSH 0D_NW_PROD X  TXTSH ` )
+                                ( `D_NW_PRDCT 0D_NW_PRDCT  X  ` ) ( `D_NW_PRDCT_TXT 0D_NW_PRDCT X  TXTMD X` )
+                                ( `D_NW_PRDCT_TXTMD 0D_NW_PRDCT X  TXTMD ` ) ( `D_NW_PRDCT_TXTSH 0D_NW_PRDCT X  TXTSH ` )
+                                ( `D_NW_PRDGP 0D_NW_PRDGP  X  ` ) ( `D_NW_PRDGP_TXT 0D_NW_PRDGP X  TXTLG X` )
+                                ( `D_NW_PRDGP_TXTLG 0D_NW_PRDGP X  TXTLG ` ) ) ).
   ENDMETHOD.
 
   METHOD texts_left_out.
@@ -279,7 +295,7 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals(
       act = VALUE string_table( FOR c IN layout-columns ( |{ c-name } { c-iobjnm }| ) )
       exp = VALUE string_table( ( `SID ` ) ( `D_NW_CNTRY ` ) ( `D_NW_REGIO 0D_NW_REGIO` ) ( `COMPOUND_KEY ` )
-                                ( `TXTMD 0D_NW_REGIO` ) ) ).
+                                ( `KEY_CAPTION ` ) ( `TXTMD 0D_NW_REGIO` ) ) ).
     DATA(compound_key) = layout-columns[ name = zzxxmla1_cl_bw_view_gen=>c_compound_key ].
     cl_abap_unit_assert=>assert_equals( act = compound_key-datatype exp = `CHAR` ).
     cl_abap_unit_assert=>assert_equals( act = compound_key-length exp = 7 ).
@@ -316,6 +332,38 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
               ( `when s.b = ' ' then concat( concat( s.a, '/#/' ), s.c )` )
               ( `when s.c = ' ' then concat( concat( concat( s.a, '/' ), s.b ), '/#' )` )
               ( `else concat( concat( concat( concat( s.a, '/' ), s.b ), '/' ), s.c ) end` ) ) ).
+  ENDMETHOD.
+
+  METHOD compound_name.
+    DATA(columns) = VALUE zzxxmla1_cl_bw_view_gen=>ty_t_column(
+                      ( field = 'FISCVARNT' datatype = 'CHAR' length = 2 key = abap_true )
+                      ( field = 'FISCPER'   datatype = 'NUMC' length = 7 key = abap_true ) ).
+    cl_abap_unit_assert=>assert_equals(
+      act = zzxxmla1_cl_bw_view_gen=>compound_name_expression( columns )
+      exp = `case when s.sid = 0 then '' else concat( concat( s.fiscvarnt, '/' ), s.fiscper ) end` ).
+    APPEND VALUE #( field = 'ROOM' datatype = 'CHAR' length = 4 key = abap_true ) TO columns.
+    cl_abap_unit_assert=>assert_equals(
+      act = zzxxmla1_cl_bw_view_gen=>compound_name_expression( columns )
+      exp = `case when s.sid = 0 then '' else ` &&
+            `concat( concat( concat( concat( s.fiscvarnt, '/' ), s.fiscper ), '/' ), s.room ) end` ).
+  ENDMETHOD.
+
+  METHOD key_name_of_fixed_compounding.
+    DATA(layout) = zzxxmla1_cl_bw_view_gen=>build_layout(
+      metadata  = VALUE #( characteristic = '0FISCPER'
+                           tables         = VALUE #( basic = '0FISCPER' sids = '/BI0/SFISCPER' key_field = 'FISCPER' )
+                           sid_columns    = VALUE #( ( field = 'FISCVARNT' datatype = 'CHAR' length = 2 key = abap_true )
+                                                     ( field = 'FISCPER'   datatype = 'NUMC' length = 7 key = abap_true )
+                                                     ( field = 'SID'       datatype = 'INT4' length = 10 ) )
+                           compounding    = VALUE #( ( iobjnm = '0FISCVARNT' field = 'FISCVARNT' ) ) )
+      selection = VALUE #( ( fixed( iobjnm = '0FISCVARNT' value = `K4` ) ) ) ).
+    cl_abap_unit_assert=>assert_equals(
+      act = VALUE string_table( FOR c IN layout-columns ( |{ c-name }: { c-expression }| ) )
+      exp = VALUE string_table(
+              ( `SID: s.sid` ) ( `FISCVARNT: s.fiscvarnt` ) ( `FISCPER: s.fiscper` )
+              ( `FISCPER_INT: cast( s.fiscper as abap.int4 )` )
+              ( `KEY_NAME: case when s.sid = 0 then '' else cast( s.fiscper as abap.char(7) ) end` )
+              ( `KEY_CAPTION: case when s.sid = 0 then '#' else cast( s.fiscper as abap.char(7) ) end` ) ) ).
   ENDMETHOD.
 
   METHOD fact_metadata_of_room.
@@ -401,7 +449,8 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
             |\{{ nl }| &&
             |  key s.sid as SID,{ nl }| &&
             |      s.fiscvarnt as FISCVARNT,{ nl }| &&
-            |      s.fiscper as FISCPER{ nl }| &&
+            |      s.fiscper as FISCPER,{ nl }| &&
+            |      case when s.sid = 0 then '#' else s.fiscper end as KEY_CAPTION{ nl }| &&
             |\}{ nl }| &&
             |where s.fiscvarnt = 'K4'{ nl }| ).
     " fixed, but not its compounding: the plain view, compounded
@@ -596,7 +645,8 @@ CLASS ltc_bw_view_gen IMPLEMENTATION.
     cl_abap_unit_assert=>assert_char_cp(
       act = act
       exp = |*define view ZZXXMLA1_C0000010{ nl }  as select from /abc/szdoc as s{ nl }\{{ nl }| &&
-            |  key s.sid as SID,{ nl }      s./abc/zdoc as ZDOC{ nl }\}*| ).
+            |  key s.sid as SID,{ nl }      s./abc/zdoc as ZDOC,{ nl }| &&
+            |      case when s.sid = 0 then '##' else s./abc/zdoc end as KEY_CAPTION{ nl }\}*| ).
     cl_abap_unit_assert=>assert_char_np( act = act exp = '*join*' ).
   ENDMETHOD.
 

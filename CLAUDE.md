@@ -100,11 +100,14 @@ Read before designing anything:
   and text, which the UI's "Double-click columns" adjusts; every dimension of the cube annotated
   `olap4abap.membersWithFacts`, which the UI's "Members with facts" switches per dimension (not on time ones); the cube
   annotated `olap4abap.omitEmptyCells`, which the cube pane's "Omit empty cells" switches. The views (`ZZXXMLA1_CL_BW_VIEW_GEN`, one per basic
-  characteristic) carry the EN texts and the time-dependent attributes at 9999-12-31, and every column as BW holds it,
+  characteristic) carry the EN texts (every text field its own column, `TXTMD`, `TXTLG`, `TXTSH`, an attribute's
+  `<ATTR>_TXTMD`, ... and its preferred `<ATTR>_TXT`, blank where BW has none), the key as name (`KEY_NAME`, `''` for
+  SID 0, of a NUMC, DATS or TIMS key) and as caption (`KEY_CAPTION`, `#` for SID 0) and the time-dependent attributes
+  at 9999-12-31, and every column as BW holds it,
   NUMC with its zeros, each NUMC column followed by its number `COLUMN_INT`: the proposal names BW's values (`0042`,
   String), the UI's "As numbers" switches a dimension to the `_INT` columns (`intColumns` of the API; on an aDSO the
   key too), FoodMart's schemas name the numbers (`docs/mvp-scope.md`, NUMC decision). A compounded characteristic
-  (`0FISCPER` with `0FISCVARNT`) is named and ordered by `COMPOUND_KEY` of its view (`K4/2024001`, `#/#`; the key
+  (`0FISCPER` with `0FISCVARNT`) is named and ordered by `COMPOUND_KEY` of its view (`K4/2024001`, SID 0 `''`; `KEY_CAPTION` `#/#`; the key
   attribute's `NameColumn` and `OrderByColumn`), and an aDSO with one is read from its fact view
   (`ZZXXMLA1_CL_BW_VIEW_GEN=>generate_fact_view`: the reporting view with `SID_<field>` per compounded characteristic,
   placeholder `ZZXXMLA1_F_<aDSO>` until accept), so it is keyed by the SID as on an InfoCube

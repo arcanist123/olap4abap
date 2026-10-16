@@ -608,7 +608,7 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
       result-name_column = VALUE #( name = compound_key-name datatype = compound_key-datatype
                                     length = compound_key-length ).
     ENDIF.
-    result-text_column = VALUE #( layout-columns[ iobjnm = result-basic text = abap_true ]-name OPTIONAL ).
+    result-text_column = VALUE #( layout-columns[ iobjnm = result-basic preferred = abap_true ]-name OPTIONAL ).
 
     " the attributes of its basic characteristic, in BW's order
     LOOP AT layout-columns INTO DATA(column) WHERE text = abap_false AND iobjnm IS NOT INITIAL
@@ -619,7 +619,8 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
                       text        = text_of( CONV #( column-iobjnm ) )
                       column      = VALUE #( name = column-name datatype = column-datatype length = column-length )
                       int_column  = int_column( layout = layout column = column-name )
-                      text_column = VALUE #( layout-columns[ iobjnm = column-iobjnm text = abap_true ]-name OPTIONAL )
+                      text_column = VALUE #( layout-columns[ iobjnm = column-iobjnm preferred = abap_true ]-name
+                                                    OPTIONAL )
                       navigation  = navigation ) TO result-attributes.
     ENDLOOP.
 

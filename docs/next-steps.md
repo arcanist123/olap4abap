@@ -82,15 +82,26 @@ The steps:
    `execute_hier_hierarchize_post` and `execute_hier_visualtotals`, `_pattern` fail, `known-issues.md`),
    `compare-applicable.py` 394 of 395 as before, `schema_api_test.py`, `fixed_selection_test.py`, `clinic_test.py`
    and `schema_ui_test.py` pass, the unit tests of `ZZXXMLA1_CL_SCHEMA`, `_MODEL` and `_SCHEMA_FIX` pass.
-2. The views (`ZZXXMLA1_CL_BW_VIEW_GEN`), so that changing a caption needs no new view:
-   - every text BW has, short, medium and long (`TXTSH`, `TXTMD`, `TXTLG` of the text table, as far as the
-     characteristic has them), each its own column, `coalesce( text, '' )` instead of `coalesce( text, key )` (as
-     data, so the reference shows the same: it falls back to the name for a NULL caption), for the characteristic
-     and for every attribute with texts;
-   - a name column with `''` for SID 0 where the key is not CHAR (CHAR's initial value is `''` already);
-   - `COMPOUND_KEY` the name above (an initial part empty, SID 0 `''`), its present form (`#` for an initial part)
-     a caption column of its own;
-   - a key caption column for characteristics without texts (the key, `#` for SID 0).
+2. Done (2026-10-16): the views (`ZZXXMLA1_CL_BW_VIEW_GEN`), so that changing a caption needs no new view. A view
+   only gains columns, none is renamed: a view is shared by every catalog whose cube has the characteristic, and
+   accepting one schema regenerates it under the others.
+   - every text BW has, each its own column, `coalesce( text, '' )` instead of `coalesce( text, key )` (as data, so
+     the reference shows the same: it falls back to the name for a NULL caption): the characteristic's `TXTMD`,
+     `TXTLG`, `TXTSH` (as far as it has them, in this order), each attribute's `<ATTR>_TXTMD`, `_TXTLG`, `_TXTSH`, and
+     `<ATTR>_TXT`, the medium, else long, else short text, kept under the name views had before; the layout marks
+     each text's field (`text_field`) and the one a value is shown with (`preferred`, which the provider reads);
+   - `KEY_NAME`, the key with `''` for SID 0, where the key is NUMC, DATS or TIMS (CHAR's initial value is `''`
+     already; also for `0FISCPER` under one fixed variant, which has no `COMPOUND_KEY` there);
+   - `COMPOUND_KEY` is the name (`K4/2024001`, an initial CHAR part empty, NUMC with its zeros, SID 0 `''`), and
+     `KEY_CAPTION` the form with `#` for an initial part (`#/#`);
+   - `KEY_CAPTION` for every characteristic, not only those without texts (the key, `#` for SID 0), so that the
+     schema editor can switch any dimension's caption to the key.
+   Regenerated on SAP 2026-10-16: the plain views of FoodMart, the clinic, the wide demo and `0D_NW_C01`; the
+   filtered views of `0D_NW_C01`'s fiscal defaults follow at its next accept. The schemas are unchanged, so nothing
+   names the new columns yet (step 3); what is expected to change in the answers (`xmla_test.py` not yet run) is a
+   blank text where BW has none (a member
+   property `Text`, a drill-through `(Text)` column) and the name and caption of a compounded characteristic's
+   SID 0 (`''`, was `#/#`), until the reference database's views are rebuilt (step 6).
 3. The proposal (`ZZXXMLA1_CL_SCHEMA_PROPOSAL`) and the schema builder: each characteristic's key attribute gets its
    text as `NameColumn` (the caption of a level with `sourceAttribute`, step 1; not a `captionColumn`, which the
    reference ignores there), the medium text, else the long, else the short one, the key caption column if it has

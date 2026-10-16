@@ -16,20 +16,28 @@
 "! - the time-independent attributes (/BI0/P..., OBJVERS 'A') and the time-dependent ones (/BI0/Q..., OBJVERS 'A',
 "!   valid on the key date 9999-12-31), joined on all their key fields;
 "! - the texts of the characteristic and of every attribute that is a characteristic with texts (/BI0/T...), in
-"!   language EN, valid on 9999-12-31, coalesce( text, key ) so that a value without text is named by its key. A text
+"!   language EN, valid on 9999-12-31, coalesce( text, '' ) so that a value without text has a blank text, not its
+"!   key (docs/next-steps.md, Now: texts and captions). A text
 "!   table is left out (a note) if it is client-dependent (the engine reads with native SQL, which filters no client,
 "!   so a client-dependent table counts every fact once per client) or if a key field of it is not in the view.
-"! The columns are SID, the key with its compounding (from the SID table), the characteristic's text (named like the
-"! text field, TXTMD), then each attribute followed by its text (ATTRIBUTE_TXT), all as BW holds them and named
+"! The columns are SID, the key with its compounding (from the SID table), the member's name and caption made of the
+"! key (KEY_NAME, COMPOUND_KEY, KEY_CAPTION, below), every text field of the characteristic (named like the text field,
+"! the medium text first, then the long and the short one: TXTMD, TXTLG, TXTSH), then each attribute followed by its
+"! texts (ATTRIBUTE_TXT the medium, else long, else short text, as views before had it, then ATTRIBUTE_TXTMD,
+"! ATTRIBUTE_TXTLG, ATTRIBUTE_TXTSH), all as BW holds them and named
 "! without their namespace (/BIC/ or another). A NUMC column is followed by its value as a number, COLUMN_INT (INT4 up
 "! to 9 digits, INT8 up to 18, else DEC 31), for a schema that wants the number as the member's key or name; BW's value
 "! is the NUMC one, the default (docs/mvp-scope.md, NUMC decision). The table and field names are BW's (RSD_CHKTAB_GET_FOR_CHA_BAS, RSDIOBJ-FIELDNM),
 "! never built: their prefix depends on the namespace.
 "! A reference characteristic (RSDCHA-CHABASNM, 0SOLD_TO -> 0CUSTOMER) has no tables of its own: its view is the one of
 "! the basic characteristic, which schemas name for both.
+"! A member is named by its key, the same in every hierarchy, BW's initial value (SID 0) '' for every key type: a key
+"! that is NUMC, DATS or TIMS (initial all zeros) gets KEY_NAME, the key with '' for SID 0 (a CHAR key is '' already).
 "! A compounded characteristic (0FISCPER with 0FISCVARNT) is unique only by all key fields of its SID table: its view
-"! also has COMPOUND_KEY, the compounding and the own key separated by / with BW's # for an initial value (K4/2024001,
-"! #/#), which schemas name its members by (docs/bw-schema-design-guide.md, section 3.7).
+"! also has COMPOUND_KEY, the compounding and the own key separated by /, each as BW holds it (an initial CHAR part
+"! empty, NUMC with its zeros), '' for SID 0 (K4/2024001, K4/), which schemas name its members by
+"! (docs/bw-schema-design-guide.md, section 3.7). KEY_CAPTION is the key as a caption, for a characteristic without
+"! texts: the key with # for SID 0, a compounded one with # for each initial part (K4/2024001, #/#).
 "! The facts of a cube-type aDSO hold values, not SIDs, so the value of a compounded characteristic does not find one
 "! row of its view: an aDSO with a compounded characteristic gets a fact view too, the reporting view with every field
 "! (named without namespace) and SID_FIELD per compounded characteristic, from a left outer join to its SID table on
@@ -65,6 +73,10 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
     CONSTANTS c_default_package TYPE devclass VALUE '$TMP'.
     "! The view column that names a compounded characteristic's values by all their key fields.
     CONSTANTS c_compound_key TYPE string VALUE `COMPOUND_KEY`.
+    "! The view column that names the values of a NUMC, DATS or TIMS key, '' for SID 0.
+    CONSTANTS c_key_name TYPE string VALUE `KEY_NAME`.
+    "! The view column of the key as a caption, # for an initial value.
+    CONSTANTS c_key_caption TYPE string VALUE `KEY_CAPTION`.
     "! The length of a selection in table ZZXXMLA1_VIEW (SSTRING).
     CONSTANTS c_selection_length TYPE i VALUE 1333.
     CONSTANTS:
@@ -147,7 +159,8 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
       "! A column of the view: its name, its expression in the DDL source, the DDIC type of the field it is made of
       "! (INT4, INT8 or DEC for the number of a NUMC column), the InfoObject whose value it is or, with text, whose
       "! text it is (initial for SID, compounding and numbers), whether that is a navigation attribute in BW, and for
-      "! the number of a NUMC column the column it is the number of.
+      "! the number of a NUMC column the column it is the number of; for a text the text field it is made of (TXTSH,
+      "! TXTMD, TXTLG), and whether it is the one a value is shown with (the medium, else the long, else the short).
       BEGIN OF ty_view_column,
         name       TYPE string,
         expression TYPE string,
@@ -157,6 +170,8 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
         text       TYPE abap_bool,
         navigation TYPE abap_bool,
         int_of     TYPE string,
+        text_field TYPE string,
+        preferred  TYPE abap_bool,
       END OF ty_view_column,
       ty_t_view_column TYPE STANDARD TABLE OF ty_view_column WITH EMPTY KEY.
     TYPES:
@@ -330,10 +345,15 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
                 view_name      TYPE viewname
                 layout         TYPE ty_layout
       RETURNING VALUE(result)  TYPE string.
-    "! The expression of COMPOUND_KEY: the key fields of the SID table (alias s) from the first compounding to the own
-    "! key, separated by /, an initial value as #. CDS allows no CASE in concat, so it is one CASE with a branch per
-    "! set of initial values, the larger sets first.
+    "! The expression of KEY_CAPTION of a compounded characteristic: the key fields of the SID table (alias s) from the
+    "! first compounding to the own key, separated by /, an initial value as #. CDS allows no CASE in concat, so it is
+    "! one CASE with a branch per set of initial values, the larger sets first.
     CLASS-METHODS compound_key_expression
+      IMPORTING columns       TYPE ty_t_column
+      RETURNING VALUE(result) TYPE string.
+    "! The expression of COMPOUND_KEY: the key fields of the SID table (alias s) separated by /, as BW holds them (an
+    "! initial CHAR part is empty), '' for SID 0.
+    CLASS-METHODS compound_name_expression
       IMPORTING columns       TYPE ty_t_column
       RETURNING VALUE(result) TYPE string.
 
@@ -554,8 +574,9 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
       IMPORTING column        TYPE ty_column
                 source        TYPE string
       RETURNING VALUE(result) TYPE string.
-    "! The join of a text table to a value (value_source.value_field), in language EN at the key date; reason is set
-    "! instead if the text table cannot be joined to one row per value.
+    "! The join of a text table to a value (value_source.value_field), in language EN at the key date, and its text
+    "! fields, the medium, the long and the short one as far as it has them; reason is set instead if the text table
+    "! cannot be joined to one row per value.
     CLASS-METHODS text_join
       IMPORTING texts        TYPE ty_text_table
                 alias        TYPE string
@@ -563,9 +584,16 @@ CLASS zzxxmla1_cl_bw_view_gen DEFINITION
                 value_source TYPE string
                 sources      TYPE ty_t_source
       EXPORTING join         TYPE ty_join
-                text_field   TYPE fieldname
+                text_fields  TYPE string_table
                 reason       TYPE string.
-    "! The column of a text, joined to a value; a note if it cannot be.
+    "! The columns of the key as name and caption: COMPOUND_KEY of a compounded characteristic (more than one key
+    "! column), else KEY_NAME of a NUMC, DATS or TIMS key; KEY_CAPTION of every one.
+    CLASS-METHODS add_key_names
+      IMPORTING key_columns TYPE ty_t_column
+      CHANGING  layout      TYPE ty_layout.
+    "! The columns of the texts of a value, joined to it: name initial for the characteristic's own texts (named like
+    "! the text fields), else the attribute's column, its preferred text name_TXT and each text name_TXTMD, ...; a
+    "! note for a text that cannot be.
     CLASS-METHODS add_text
       IMPORTING texts   TYPE ty_text_table
                 iobjnm  TYPE csequence
@@ -1128,13 +1156,7 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
         APPEND column TO key_columns.
       ENDIF.
     ENDLOOP.
-    IF lines( key_columns ) > 1.
-      APPEND VALUE #( name       = c_compound_key
-                      expression = compound_key_expression( key_columns )
-                      datatype   = `CHAR`
-                      length     = REDUCE i( INIT n = lines( key_columns ) - 1
-                                             FOR c IN key_columns NEXT n = n + c-length ) ) TO result-columns.
-    ENDIF.
+    add_key_names( EXPORTING key_columns = key_columns CHANGING layout = result ).
     IF metadata-texts IS NOT INITIAL.
       add_text( EXPORTING texts   = metadata-texts
                           iobjnm  = metadata-tables-basic
@@ -1163,16 +1185,58 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
                             iobjnm  = attribute-iobjnm
                             value   = column
                             source  = source-alias
-                            name    = |{ name }_TXT|
+                            name    = name
                             sources = sources
                   CHANGING  layout  = result ).
       ENDIF.
     ENDLOOP.
   ENDMETHOD.
 
+  METHOD add_key_names.
+    IF key_columns IS INITIAL.
+      RETURN.
+    ENDIF.
+    IF lines( key_columns ) > 1.
+      DATA(length) = REDUCE i( INIT n = lines( key_columns ) - 1 FOR c IN key_columns NEXT n = n + c-length ).
+      APPEND VALUE #( name       = c_compound_key
+                      expression = compound_name_expression( key_columns )
+                      datatype   = `CHAR`
+                      length     = length ) TO layout-columns.
+      APPEND VALUE #( name       = c_key_caption
+                      expression = compound_key_expression( key_columns )
+                      datatype   = `CHAR`
+                      length     = length ) TO layout-columns.
+      RETURN.
+    ENDIF.
+    " one key: NUMC, DATS and TIMS are all zeros where BW's value is initial, CHAR is '' already
+    DATA(key) = key_columns[ 1 ].
+    DATA(value) = as_text( column = key source = `s` ).
+    IF value IS INITIAL.
+      RETURN.
+    ENDIF.
+    IF key-datatype = 'NUMC' OR key-datatype = 'DATS' OR key-datatype = 'TIMS'.
+      APPEND VALUE #( name       = c_key_name
+                      expression = |case when s.sid = 0 then '' else { value } end|
+                      datatype   = `CHAR`
+                      length     = key-length ) TO layout-columns.
+    ENDIF.
+    APPEND VALUE #( name       = c_key_caption
+                    expression = |case when s.sid = 0 then '#' else { value } end|
+                    datatype   = `CHAR`
+                    length     = key-length ) TO layout-columns.
+  ENDMETHOD.
+
+  METHOD compound_name_expression.
+    DATA(value) = |s.{ to_lower( columns[ 1 ]-field ) }|.
+    LOOP AT columns INTO DATA(column) FROM 2.
+      value = |concat( concat( { value }, '/' ), s.{ to_lower( column-field ) } )|.
+    ENDLOOP.
+    result = |case when s.sid = 0 then '' else { value } end|.
+  ENDMETHOD.
+
   METHOD add_text.
     DATA join TYPE ty_join.
-    DATA text_field TYPE fieldname.
+    DATA text_fields TYPE string_table.
     DATA reason TYPE string.
     " the characteristic's text is t, the attributes' texts t1, t2, ...
     DATA(alias) = `t`.
@@ -1189,31 +1253,55 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
                          value_source = source
                          sources      = sources
                IMPORTING join         = join
-                         text_field   = text_field
+                         text_fields  = text_fields
                          reason       = reason ).
-    DATA(column_name) = COND string( WHEN name IS INITIAL THEN view_column( text_field ) ELSE name ).
-    IF reason IS INITIAL AND strlen( column_name ) > 30.
-      reason = |text column { column_name } is longer than 30 characters|.
-    ELSEIF reason IS INITIAL AND line_exists( layout-columns[ name = column_name ] ).
-      reason = |text column { column_name } is the name of another column|.
-    ENDIF.
     IF reason IS NOT INITIAL.
       APPEND VALUE #( iobjnm = iobjnm reason = |text not in the view: { reason }| ) TO layout-notes.
       RETURN.
     ENDIF.
-    APPEND join TO layout-joins.
-    DATA(text) = |{ alias }.{ to_lower( text_field ) }|.
-    DATA(key) = as_text( column = value source = source ).
-    APPEND VALUE #( name       = column_name
-                    expression = COND #( WHEN key IS INITIAL THEN text ELSE |coalesce( { text }, { key } )| )
-                    datatype   = `CHAR`
-                    length     = texts-columns[ field = text_field ]-length
-                    iobjnm     = iobjnm
-                    text       = abap_true ) TO layout-columns.
+    " the columns and their text fields: an attribute's preferred text first under the name views before had
+    DATA columns TYPE ty_t_view_column.
+    IF name IS NOT INITIAL.
+      APPEND VALUE #( name = |{ name }_TXT| text_field = text_fields[ 1 ] preferred = abap_true ) TO columns.
+    ENDIF.
+    LOOP AT text_fields INTO DATA(text_field).
+      APPEND VALUE #( name       = COND #( WHEN name IS INITIAL THEN text_field ELSE |{ name }_{ text_field }| )
+                      text_field = text_field
+                      preferred  = xsdbool( name IS INITIAL AND sy-tabix = 1 ) ) TO columns.
+    ENDLOOP.
+    " each column in the view unless its name cannot be; the preferred one decides whether the texts are in at all
+    DATA(added) = abap_false.
+    LOOP AT columns INTO DATA(column).
+      CLEAR reason.
+      IF strlen( column-name ) > 30.
+        reason = |text column { column-name } is longer than 30 characters|.
+      ELSEIF line_exists( layout-columns[ name = column-name ] ).
+        reason = |text column { column-name } is the name of another column|.
+      ENDIF.
+      IF reason IS NOT INITIAL.
+        APPEND VALUE #( iobjnm = iobjnm reason = |text not in the view: { reason }| ) TO layout-notes.
+        IF column-preferred = abap_true.
+          RETURN.
+        ENDIF.
+        CONTINUE.
+      ENDIF.
+      IF added = abap_false.
+        APPEND join TO layout-joins.
+        added = abap_true.
+      ENDIF.
+      APPEND VALUE #( name       = column-name
+                      expression = |coalesce( { alias }.{ to_lower( column-text_field ) }, '' )|
+                      datatype   = `CHAR`
+                      length     = texts-columns[ field = column-text_field ]-length
+                      iobjnm     = iobjnm
+                      text       = abap_true
+                      text_field = column-text_field
+                      preferred  = column-preferred ) TO layout-columns.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD text_join.
-    CLEAR: join, text_field, reason.
+    CLEAR: join, text_fields, reason.
     join = VALUE #( table = texts-name alias = alias ).
     LOOP AT texts-columns INTO DATA(column) WHERE key = abap_true.
       DATA(field) = |{ alias }.{ to_lower( column-field ) }|.
@@ -1236,14 +1324,15 @@ CLASS zzxxmla1_cl_bw_view_gen IMPLEMENTATION.
         APPEND |{ field } = { source-alias }.{ to_lower( column-field ) }| TO join-conditions.
       ENDIF.
     ENDLOOP.
-    " the medium text, else the long, else the short one
+    " the medium text, the long and the short one: the first one is the one a value is shown with
     LOOP AT VALUE string_table( ( `TXTMD` ) ( `TXTLG` ) ( `TXTSH` ) ) INTO DATA(candidate).
       IF line_exists( texts-columns[ field = candidate key = abap_false ] ).
-        text_field = candidate.
-        RETURN.
+        APPEND candidate TO text_fields.
       ENDIF.
     ENDLOOP.
-    reason = |{ texts-name } has no text field|.
+    IF text_fields IS INITIAL.
+      reason = |{ texts-name } has no text field|.
+    ENDIF.
   ENDMETHOD.
 
   METHOD as_text.
