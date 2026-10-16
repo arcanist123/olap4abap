@@ -359,7 +359,7 @@ Read before designing anything:
   copy or its refusal and its counts. Not yet in the schema, the engine or accept.
   The reference serves `ZCLDIAG_ICD` as a parent-child hierarchy with a closure (catalog `ZCLVISIT`,
   `reference/schema/ClinicBW.xml`, built by `build-bw-reference-db.py` from an export of the InfoCube and the copy,
-  checked against BW by `bw_hierarchy_test.py --reference`); its 60 cases (`execute_hier_*`, `members_hier_*`,
+  checked against BW by `bw_hierarchy_test.py --reference`); its 68 cases (`execute_hier_*`, `members_hier_*`,
   `mdschema_*_hier`) are what the engine work has to pass (`docs/next-steps.md`, Reference scenario).
 - Reference: eMondrian built from source and running in Docker; captured exchanges are in `reference/`.
 

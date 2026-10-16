@@ -80,7 +80,13 @@ slicer of several tuples had empty axes and no cells (Mondrian's own tests expec
 `MEMBER_NAME` as `Caption` and `Name`. `subcube-filter-label.patch` (2026-10-13), our extension: the subcube also
 accepts Excel's other label filters (`<`, `<=`, `>`, `>=`, `Left`/`Right(..., Len("s")) = "s"`, `InStr(1, ..., "s")`
 compared to 0) as a `LabelColumnPredicate` in `Query.java` (comparison or `LIKE ... ESCAPE ''`, the column cast to a
-string for names and captions); olap4abap does the same (`ZZXXMLA1_CL_MDX_ENGINE=>label_predicate`). To put a patched jar into the running container without a full rebuild:
+string for names and captions); olap4abap does the same (`ZZXXMLA1_CL_MDX_ENGINE=>label_predicate`). `parent-child-closure.patch` (2026-10-16): a
+member of a parent-child level in a subselect (`Query.addSetToSubcubePredicates`) constrained the fact's key to the
+member's own key, so a node had no facts; the patch constrains it to the keys of the member and its descendants (read
+without the subcube), not to the closure's parent column (a set of a node and a member below it would join the closure
+twice, and a node on an axis under the subselect of its ancestor would find no closure row). And
+`RolapCubeLevel.ParentChildLevelReaderImpl` constrained a drill-through to the member's data member, its own facts
+only, so a node's drill-through had no rows; the patch constrains it by the closure as a cell is. To put a patched jar into the running container without a full rebuild:
 
     git -C mondrian apply ../scripts/patches/compound-slicer.patch
     (cd mondrian/mondrian && mvn -B -o install -DskipTests)     # about 30 s

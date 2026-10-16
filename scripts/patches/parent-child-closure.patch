@@ -1,0 +1,74 @@
+diff --git a/mondrian/src/main/java/mondrian/olap/Query.java b/mondrian/src/main/java/mondrian/olap/Query.java
+index a53f8c2d1..cdc91a120 100644
+--- a/mondrian/src/main/java/mondrian/olap/Query.java
++++ b/mondrian/src/main/java/mondrian/olap/Query.java
+@@ -3480,8 +3480,27 @@ public class Query extends QueryPart {
+                         RolapCubeMember rolapCubeMember = (RolapCubeMember) memberWalk;
+                         RolapStar.Column column =
+                             rolapCubeMember.getLevel().getBaseStarKeyColumn(baseCube);
+-                        memberAndList.add(
+-                            new MemberColumnPredicate(column, rolapCubeMember));
++                        if (rolapCubeMember.getLevel().isParentChild()) {
++                            // A member of a parent-child level stands for its
++                            // descendants too: constrain the fact's key to
++                            // the keys of the member and its descendants. Not
++                            // the closure's parent column: a set of a node and
++                            // a member below it would join the closure twice,
++                            // and a node in the context besides it none.
++                            List<StarPredicate> keyList =
++                                new ArrayList<StarPredicate>();
++                            for (Member member
++                                : getParentChildSubtree(rolapCubeMember))
++                            {
++                                keyList.add(
++                                    new MemberColumnPredicate(
++                                        column, (RolapCubeMember) member));
++                            }
++                            memberAndList.add(new OrPredicate(keyList));
++                        } else {
++                            memberAndList.add(
++                                new MemberColumnPredicate(column, rolapCubeMember));
++                        }
+                     }
+                     levelLast = memberWalk.getLevel();
+                     memberWalk = memberWalk.getParentMember();
+@@ -3502,6 +3521,21 @@ public class Query extends QueryPart {
+         }
+     }
+ 
++    /**
++     * The member and its descendants, read without the subcube (the query's
++     * schema reader restricts members to it).
++     */
++    private List<Member> getParentChildSubtree(Member member) {
++        final SchemaReader schemaReader =
++            cube.getSchemaReader(null).withLocus();
++        final List<Member> subtree = new ArrayList<Member>();
++        subtree.add(member);
++        for (int i = 0; i < subtree.size(); i++) {
++            subtree.addAll(schemaReader.getMemberChildren(subtree.get(i)));
++        }
++        return subtree;
++    }
++
+ }
+ 
+ // End Query.java
+diff --git a/mondrian/src/main/java/mondrian/rolap/RolapCubeLevel.java b/mondrian/src/main/java/mondrian/rolap/RolapCubeLevel.java
+index 8794030c3..3138aa1d7 100644
+--- a/mondrian/src/main/java/mondrian/rolap/RolapCubeLevel.java
++++ b/mondrian/src/main/java/mondrian/rolap/RolapCubeLevel.java
+@@ -541,10 +541,10 @@ public class RolapCubeLevel extends RolapLevel {
+                 // it be. We don't want to aggregate.
+                 return regularLevelReader.constrainRequest(
+                     member, baseCube, request);
+-            } else if (request.drillThrough) {
+-                return regularLevelReader.constrainRequest(
+-                    member.getDataMember(), baseCube, request);
+             } else {
++                // A drill-through is constrained by the closure too, so that
++                // it gives the rows the cell's value adds up (the data member
++                // has the member's own facts only).
+                 // isn't creating a member on the fly a bad idea?
+                 RolapMember wrappedMember =
+                     new RolapMemberBase(

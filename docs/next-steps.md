@@ -389,10 +389,15 @@ Done (2026-10-15): the reference serves `ZCLDIAG_ICD`.
   member of the same depth in hierarchy order, a compound slicer or an `Aggregate` of a node and a member below it
   counts that member twice (the reference sums the tuples; BW would count it once). It has no `IsLeaf` and no
   `IsAncestor` (`Children.Count = 0` and `Ascendants` stand in for them in the cases).
-- Not captured, the reference is wrong there: a subselect of a node (Excel's filter on a hierarchy) constrains the
-  facts to the node's own key, not to the closure, so a node has no facts (`{RESPIRATORY, J06}` keeps J06 only), and
-  a drill-through of a node gives no rows (a leaf's gives them). Open: fix the reference (as its subcube patches, in
-  `scripts/patches/`) or take these from BW's MDX.
+- Fixed in the reference (2026-10-16, `scripts/patches/parent-child-closure.patch`, `docs/environment.md`): a
+  subselect of a node (Excel's filter on a hierarchy) constrained the facts to the node's own key, so a node had no
+  facts (`{RESPIRATORY, J06}` kept J06 only), and a drill-through of a node gave no rows (a leaf's gave them). Now a
+  node in a subselect is its own key and the keys of its descendants on the fact's column, and a drill-through is
+  constrained by the closure as the cell is. 8 more cases: `execute_hier_subselect` (`_node_leaf`, `_rows`,
+  `_nested`, `_minus`, `_excel`) and `execute_hier_drillthrough` (`_subselect`); their values checked against the
+  same members in the slicer and on the axes, a drill-through's rows without `MAXROWS` against its cell (834). A
+  binary `-` (`{All} - {node}`) in a subselect is not understood by the reference on any hierarchy (only Excel's
+  unary `- {...}`), so it is not a case.
 - SAP's answers on the clinic catalog differ from the reference's besides the hierarchy: member unique names by the
   name, not the key (`[ZCLDOC].[000]` where the reference has `[ZCLDOC].[0]`), the measure's name as its caption
   (`ZCLVISNO`, the reference `Visits`), the default drill-through with the measure; and SAP's schema annotates
