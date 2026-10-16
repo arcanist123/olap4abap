@@ -434,9 +434,13 @@ Done (2026-10-15): the reference serves `ZCLDIAG_ICD`.
     postable nodes; their subselects are checked as the node in the slicer, their drill-throughs by the facts' count
     under the closure. The reference gets no export of these hierarchies.
 - Next (the reference as a level hierarchy):
-  1. `build-bw-reference-db.py`: a flattened table of `ZCLDIAG_ICD` instead of the node and closure tables, a row per
-     SID with each level's name and position among its siblings (BW's order), the placeholders under REST_H; it
-     fails if a leaf of the real tree is not at depth 4.
+  1. Done (2026-10-16): `build-bw-reference-db.py` builds `ZZXXMLA1_HL_ZCLDIAG_ICD` (`hierarchy_levels`, computed
+     from the exported copy) instead of the copy's node and closure tables and the views `ZZXXMLA1_HN_`/`_HC_`: a
+     row per value SID (37: 36 diagnoses and `#` under REST_H), per level `Lnn_SID` (the key, the node's SID; REST_H's
+     placeholders -37), `Lnn_NAME` and `Lnn_POS` (rank among its siblings in BW's order; REST_H 2 on `Level 01`). It
+     fails if a leaf of the real tree is not at the depth of the others, a text node is a leaf, a node occurs twice,
+     a value has children or a value of the SID table has no row. Until step 2 the jar does not fit `ClinicBW.xml`
+     (its views are gone): deploy both together.
   2. `ClinicBW.xml`: the hierarchy with the levels `Level 01` to `Level 04` (name column, `ordinalColumn`).
   3. `bw_hierarchy_test.py --reference` passes on the members outside REST_H's branch (depth, children, name, values,
      order) and REST_H's value.
@@ -1156,6 +1160,15 @@ evaluation (`MemberArrayValueCalc`; before, `([Measures].[Foo], [Time].CurrentMe
   layout is unusual, but a crossjoin of two characteristics on rows is not.
 - Long term: other databases reached from ABAP, DuckDB first. The engine's SQL stays standard for it (no HANA-only
   features such as BW's cached column hierarchy views; decided 2026-10-15 with the BW hierarchies).
+- Long term (decided 2026-10-16): the project transpiles to JavaScript with the abaplint transpiler
+  (`@abaplint/transpiler`, runtime `open-abap`) and runs outside SAP too, on the transpiler's databases. The transpiler
+  has no CDS views, and the model reads the generated characteristic and fact views (`ZZXXMLA1_CL_BW_VIEW_GEN`), so it
+  needs a plugin of ours that makes simple CDS views (`define view` on one table or a join of tables, a projection
+  with aliases, `cast`, literals, `where`; no associations, parameters or annotations that change the result) a valid
+  target: transpiled to a `CREATE VIEW` of the target database, created with the tables and selectable by ABAP SQL
+  and native SQL alike. The code stays transpilable for it: 7.50 syntax as now, no kernel features the runtime lacks,
+  and the native SQL through ADBC (`ZZXXMLA1_CL_SQL`) standard, as for DuckDB above; what blocks transpilation is
+  found by running the transpiler over `src/` and kept as a list here.
 - The result limit is a class attribute; a setting (per system, like Mondrian's property file) would let it be changed
   without a transport.
 - Done: the native NON EMPTY crossjoin. Not yet: its context constraint with calculated members (Aggregate members

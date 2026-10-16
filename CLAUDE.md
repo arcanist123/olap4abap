@@ -9,6 +9,8 @@ procedures live here, not in any per-machine memory.
 own MDX engine ("Mondrian in ABAP") that runs on an SAP system and serves cubes defined
 on top of SAP BW data. The reference implementation is eMondrian (a Mondrian fork), run locally in Docker. SAP BW's
 native MDX/XMLA engine is deliberately NOT used: it supports little of modern MDX and its lexer cannot parse some of it.
+Long term the project is also transpiled to JavaScript with the abaplint transpiler, with a plugin of ours for simple
+CDS views as a transpilation and execution target (`docs/next-steps.md`, Later).
 
 **The BW cube `ZFMSALES` (FoodMart Sales, InfoArea `ZFOODMART`, generated and loaded by
 `ZZXXMLA1_CL_BW_FOODMART_GEN`) is the main data source of this project.** Develop and test the engine against it first:
