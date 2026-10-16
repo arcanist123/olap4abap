@@ -175,8 +175,8 @@
         <CubeInfo>
           <Cube>
             <CubeName>ZCLHIER</CubeName>
-            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T15:15:34</LastDataUpdate>
-            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T15:15:34</LastSchemaUpdate>
+            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T15:42:35</LastDataUpdate>
+            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T15:42:35</LastSchemaUpdate>
           </Cube>
         </CubeInfo>
         <AxesInfo>
@@ -269,7 +269,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[UPPER_RESPIRATORY_INFECTIONS].[J06]</UName>
-                <Caption>J06</Caption>
+                <Caption>Upper respiratory infection</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
@@ -278,7 +278,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[UPPER_RESPIRATORY_INFECTIONS].[J02]</UName>
-                <Caption>J02</Caption>
+                <Caption>Sore throat</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>131072</DisplayInfo>
@@ -287,7 +287,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[UPPER_RESPIRATORY_INFECTIONS].[J01]</UName>
-                <Caption>J01</Caption>
+                <Caption>Sinusitis</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>131072</DisplayInfo>
@@ -305,7 +305,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[INFLUENZA].[J11]</UName>
-                <Caption>J11</Caption>
+                <Caption>Influenza</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
@@ -323,7 +323,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[LOWER_RESPIRATORY_DISEASES].[J20]</UName>
-                <Caption>J20</Caption>
+                <Caption>Acute bronchitis</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
@@ -332,7 +332,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[LOWER_RESPIRATORY_DISEASES].[J18]</UName>
-                <Caption>J18</Caption>
+                <Caption>Pneumonia</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>131072</DisplayInfo>
@@ -350,7 +350,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[CHRONIC_LOWER_RESPIRATORY_DISEAS].[J45]</UName>
-                <Caption>J45</Caption>
+                <Caption>Asthma</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
@@ -359,7 +359,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[CHRONIC_LOWER_RESPIRATORY_DISEAS].[J44]</UName>
-                <Caption>J44</Caption>
+                <Caption>COPD</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>131072</DisplayInfo>
@@ -386,7 +386,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY].[HYPERTENSIVE_DISEASES].[I10]</UName>
-                <Caption>I10</Caption>
+                <Caption>Hypertension</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
@@ -404,7 +404,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY].[ISCHAEMIC_HEART_DISEASES].[I20]</UName>
-                <Caption>I20</Caption>
+                <Caption>Angina</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
@@ -413,7 +413,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY].[ISCHAEMIC_HEART_DISEASES].[I25]</UName>
-                <Caption>I25</Caption>
+                <Caption>Chronic ischaemic heart disease</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>131072</DisplayInfo>
@@ -431,7 +431,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY].[OTHER_HEART_DISEASES].[I48]</UName>
-                <Caption>I48</Caption>
+                <Caption>Atrial fibrillation</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
@@ -440,7 +440,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY].[OTHER_HEART_DISEASES].[I50]</UName>
-                <Caption>I50</Caption>
+                <Caption>Heart failure</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>131072</DisplayInfo>
@@ -467,7 +467,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[ENDOCRINE_AND_METABOLIC].[DIABETES].[E11]</UName>
-                <Caption>E11</Caption>
+                <Caption>Type 2 diabetes</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
@@ -485,7 +485,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[ENDOCRINE_AND_METABOLIC].[METABOLIC_DISORDERS].[E78]</UName>
-                <Caption>E78</Caption>
+                <Caption>Lipid disorder</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
@@ -503,7 +503,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[ENDOCRINE_AND_METABOLIC].[THYROID_DISORDERS].[E03]</UName>
-                <Caption>E03</Caption>
+                <Caption>Hypothyroidism</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
@@ -530,7 +530,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MUSCULOSKELETAL].[BACK_PROBLEMS].[M54]</UName>
-                <Caption>M54</Caption>
+                <Caption>Back pain</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
@@ -548,7 +548,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MUSCULOSKELETAL].[JOINT_DISORDERS].[M17]</UName>
-                <Caption>M17</Caption>
+                <Caption>Knee osteoarthritis</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
@@ -557,7 +557,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MUSCULOSKELETAL].[JOINT_DISORDERS].[M25]</UName>
-                <Caption>M25</Caption>
+                <Caption>Joint pain</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>131072</DisplayInfo>
@@ -575,7 +575,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MUSCULOSKELETAL].[SOFT_TISSUE_DISORDERS].[M75]</UName>
-                <Caption>M75</Caption>
+                <Caption>Shoulder disorder</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
@@ -602,7 +602,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[SKIN].[DERMATITIS].[L20]</UName>
-                <Caption>L20</Caption>
+                <Caption>Atopic dermatitis</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
@@ -611,7 +611,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[SKIN].[DERMATITIS].[L30]</UName>
-                <Caption>L30</Caption>
+                <Caption>Other dermatitis</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>131072</DisplayInfo>
@@ -629,7 +629,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[SKIN].[OTHER_SKIN_DISEASES].[L70]</UName>
-                <Caption>L70</Caption>
+                <Caption>Acne</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
@@ -638,7 +638,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[SKIN].[OTHER_SKIN_DISEASES].[L40]</UName>
-                <Caption>L40</Caption>
+                <Caption>Psoriasis</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>131072</DisplayInfo>
@@ -665,7 +665,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INFECTIONS].[INTESTINAL_INFECTIONS].[A09]</UName>
-                <Caption>A09</Caption>
+                <Caption>Gastroenteritis</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
@@ -683,7 +683,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INFECTIONS].[VIRAL_INFECTIONS].[B34]</UName>
-                <Caption>B34</Caption>
+                <Caption>Viral infection</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
@@ -692,7 +692,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INFECTIONS].[VIRAL_INFECTIONS].[B01]</UName>
-                <Caption>B01</Caption>
+                <Caption>Chickenpox</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>131072</DisplayInfo>
@@ -719,7 +719,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INJURIES].[INJURIES_OF_LIMBS].[S93]</UName>
-                <Caption>S93</Caption>
+                <Caption>Ankle sprain</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
@@ -728,7 +728,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INJURIES].[INJURIES_OF_LIMBS].[S52]</UName>
-                <Caption>S52</Caption>
+                <Caption>Forearm fracture</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>131072</DisplayInfo>
@@ -737,7 +737,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INJURIES].[INJURIES_OF_LIMBS].[S61]</UName>
-                <Caption>S61</Caption>
+                <Caption>Hand wound</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>131072</DisplayInfo>
@@ -755,7 +755,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INJURIES].[HEAD_INJURIES].[S06]</UName>
-                <Caption>S06</Caption>
+                <Caption>Concussion</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
@@ -782,7 +782,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MENTAL_HEALTH].[MOOD_DISORDERS].[F32]</UName>
-                <Caption>F32</Caption>
+                <Caption>Depression</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
@@ -800,7 +800,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MENTAL_HEALTH].[ANXIETY_DISORDERS].[F41]</UName>
-                <Caption>F41</Caption>
+                <Caption>Anxiety disorder</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
@@ -827,7 +827,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CHECK_UPS].[EXAMINATIONS].[Z00]</UName>
-                <Caption>Z00</Caption>
+                <Caption>General check-up</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
@@ -836,7 +836,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CHECK_UPS].[EXAMINATIONS].[Z23]</UName>
-                <Caption>Z23</Caption>
+                <Caption>Vaccination</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>131072</DisplayInfo>
@@ -854,7 +854,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CHECK_UPS].[FOLLOW_UP_CARE].[Z09]</UName>
-                <Caption>Z09</Caption>
+                <Caption>Follow-up examination</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>

@@ -193,10 +193,10 @@ hierarchy on a flattened table of an export of the clinic InfoCube and the hiera
 `ZCLHIER`, `reference/schema/ClinicBW.xml`, exported by `build-bw-reference-db.py`), and their MDX cases are captured
 and replayed like FoodMart's (`next-steps.md`, Reference scenario): `execute_hier_*`, `members_hier_*`,
 `mdschema_hierarchies_hier` and `mdschema_levels_hier`, 71 cases. On SAP they run against the test catalog `ZCLHIER`
-(`reference/schema/ClinicBW-sap.xml`, the hierarchy annotated `olap4abap.bwHierarchy`, `sap-files.py deploy`); the
-two rowsets and the `members_hier_*` cases pass (the members read from the copy, step 7.2); the `execute_hier_*`
-cases have the reference's cells since the facts are read through the closure (step 7.3), most still fail on the
-measure caption and `sourceAttribute` names (`known-issues.md`). Before capture,
+(`reference/schema/ClinicBW-sap.xml`, the hierarchy annotated `olap4abap.bwHierarchy`, `sap-files.py deploy`); all
+pass. Both schemas name and caption members as the proposal does (texts step 3: named by the key, `KEY_NAME` for
+a NUMC or DATS key, captioned by the text, the property `Key`), and the flattened table captions the hierarchy's
+members by `Lnn_CAPTION` (a leaf's text, a text node's technical name), as olap4abap does. Before capture,
 
     python scripts/bw_hierarchy_test.py --reference
 
@@ -522,7 +522,9 @@ captions go to their own places (axes, `MDSCHEMA_MEMBERS`, `.Name`, `.Caption`, 
 and that a member is looked up by its name only (`execute_caption_lookup_by_caption*` are the reference's faults). The
 subselect label filters on `Name` and `Caption` (`execute_caption_subcube_*`) are hand-made: the reference compares
 the level's key column there (`known-issues.md`, deliberate deviations), so `capture-execute.py --answer-of` takes the
-answer of an equivalent member set, kept in the case's `equivalent.txt` (`recapture-cases.py` asks that one).
+answer of an equivalent member set, kept in the case's `equivalent.txt` (`recapture-cases.py` asks that one). So
+are Excel's label filters on the clinic's hierarchy, `execute_hier_excel_label_begins` and `_between` (since texts
+step 7 the captions of its leaves are the diagnoses' texts, which the reference does not compare).
 
 Drill-through actions (`execute_drillthrough_action*`, catalog `ZFMDRILL`, `reference/schema/FoodmartBWDrill.xml`: a
 cube on ZFMSALES's facts with a non-default action and a default one): without `RETURN` the default action's columns

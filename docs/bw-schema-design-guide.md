@@ -27,8 +27,9 @@ Related documents: [bw-to-schema-mapping.md](bw-to-schema-mapping.md) (the BW ta
 | BW | Schema | MDX name | Excel shows |
 |---|---|---|---|
 | Characteristic `0D_NW_CODE` | `Dimension name="0D_NW_CODE"` with one flat `Hierarchy` (All + one level) | `[0D_NW_CODE]` | Company |
-| Characteristic value (internal key) | member, keyed by the SID, named by the key | `[0D_NW_CODE].[1111]` | 1111 |
-| Text (EN) | member property `Text` | `.Properties("Text")` | Company Name (via *Show Properties*) |
+| Characteristic value (internal key) | member, keyed by the SID, named by the key | `[0D_NW_CODE].[1111]` | its text |
+| Text (EN) | the member's caption (the key attribute's `NameColumn`) | `.Caption` | the member |
+| Key | member property `Key` | `.Properties("Key")` | the key (via *Show Properties*) |
 | Navigation attribute switched on in the provider | flat `Hierarchy name="0D_NW_CODE__0D_NW_CNTRY"` in the characteristic's dimension | `[0D_NW_CODE.0D_NW_CODE__0D_NW_CNTRY]` | Country of Company |
 | Display attribute, or navigation attribute not switched on in the provider | member properties (key and text) of the characteristic's level | `.Properties("0D_NW_CNTRY")` | Country, Country Name |
 | Reference characteristic (`0D_NW_SHIP` -> `0D_NW_CUST`) | a dimension of its own on the basic characteristic's view | `[0D_NW_SHIP]` | Ship-to Party |
@@ -66,15 +67,16 @@ navigation attributes, a time hierarchy over separate time characteristics. They
 <Dimension name="0D_NW_CODE" caption="Company" table="ZZXXMLA1VNWCOMP">
   <DimensionAttribute name="0D_NW_CODE SID" usage="Key" attributeHierarchyEnabled="false">
     <KeyColumn dataType="Integer" columnName="SID"/>
-    <NameColumn dataType="String" columnName="D_NW_CODE"/>
+    <NameColumn dataType="String" columnName="TXTMD"/>
   </DimensionAttribute>
-  <DimensionAttribute name="0D_NW_CODE Text" attributeHierarchyEnabled="false">
-    <KeyColumn dataType="String" columnName="TXTMD"/>
+  <DimensionAttribute name="0D_NW_CODE Key" attributeHierarchyEnabled="false">
+    <KeyColumn dataType="String" columnName="D_NW_CODE"/>
   </DimensionAttribute>
   ...
   <Hierarchy hasAll="true" allMemberName="All Companies" caption="Company">
-    <Level name="0D_NW_CODE" caption="Company" uniqueMembers="true" sourceAttribute="0D_NW_CODE SID">
-      <Property name="Text" caption="Company Name" sourceAttribute="0D_NW_CODE Text"/>
+    <Level name="0D_NW_CODE" caption="Company" uniqueMembers="true" sourceAttribute="0D_NW_CODE SID"
+           nameColumn="D_NW_CODE">
+      <Property name="Key" caption="Company (Key)" sourceAttribute="0D_NW_CODE Key"/>
     </Level>
   </Hierarchy>
 </Dimension>
@@ -82,8 +84,9 @@ navigation attributes, a time hierarchy over separate time characteristics. They
 
 - The `DimensionAttribute`s describe the view's columns. All of them have `attributeHierarchyEnabled="false"`: what
   users see are the `Hierarchy` elements, so that each can carry properties and a proper All member name.
-- The key attribute is keyed by `SID` (the join) and named by the BW key in its **internal format** (`0000001000`,
-  not BW's display `1000`): the internal key is what BW stores and what never changes.
+- The key attribute is keyed by `SID` (the join) and its `NameColumn` is the member's caption, the text (section
+  3.4). The level's `nameColumn` names the member by the BW key in its **internal format** (`0000001000`, not BW's
+  display `1000`): the internal key is what BW stores and what never changes. The key is also the property `Key`.
 - The one-level `Hierarchy` is flat. It is written out only because a member property needs a level; an attribute
   hierarchy (`attributeHierarchyEnabled="true"`) cannot carry properties, and its All member gets a generated name
   ("All Company.Countrys").
@@ -99,11 +102,12 @@ hierarchy of the characteristic's dimension, named as BW names it:
 <Hierarchy name="0D_NW_CODE__0D_NW_CNTRY" caption="Country of Company" hasAll="true"
            allMemberName="All Countries of Companies">
   <Level name="0D_NW_CNTRY" caption="Country of Company" uniqueMembers="true"
-         sourceAttribute="0D_NW_CODE__0D_NW_CNTRY">
-    <Property name="Text" caption="Country Name" sourceAttribute="0D_NW_CODE__0D_NW_CNTRY Text"/>
-  </Level>
+         sourceAttribute="0D_NW_CODE__0D_NW_CNTRY"/>
 </Hierarchy>
 ```
+
+The attribute `0D_NW_CODE__0D_NW_CNTRY` is keyed and named by the attribute's value (`D_NW_CNTRY`) and captioned by
+its text (`NameColumn` `D_NW_CNTRY_TXT`), like the characteristic itself.
 
 What the demos showed:
 
@@ -126,7 +130,7 @@ characteristic's level, as key and text:
 
 ```xml
 <Level name="0D_NW_SHIP" caption="Ship-to Party" uniqueMembers="true" sourceAttribute="0D_NW_SHIP SID">
-  <Property name="Text" caption="Ship-to Party Name" sourceAttribute="0D_NW_SHIP Text"/>
+  <Property name="Key" caption="Ship-to Party (Key)" sourceAttribute="0D_NW_SHIP Key"/>
   <Property name="0D_NW_CNTRY" caption="Country" sourceAttribute="0D_NW_CNTRY"/>
   <Property name="0D_NW_CNTRY Text" caption="Country Name" sourceAttribute="0D_NW_CNTRY Text"/>
   <Property name="0D_NW_IND" caption="Industry" sourceAttribute="0D_NW_IND"/>
@@ -136,8 +140,8 @@ characteristic's level, as key and text:
 
 In `0D_NW_C01`, `0D_NW_SHIP` has no navigation attribute switched on although customer has two (Country, Industry), so
 they are properties. Excel shows them with right-click > *Show Properties in Report* or in the tooltip. Excel lists
-only declared properties: the member key is not offered, which is why the text and every attribute must be a
-`Property`.
+only declared properties: the member key is not offered, which is why the key (`Key`) and every attribute must be a
+`Property`. An attribute keeps its text as a property of its own: a property's values have no caption.
 
 ### 3.4 Names: technical keys, texts as captions
 
@@ -148,11 +152,16 @@ only declared properties: the member key is not offered, which is why the text a
   `[0D_NW_CODE].[1111]` stays valid when the company's text changes. Saved queries, Excel filters and calculated
   members refer to keys that never change. Named by text, they break with every text maintenance, and two members with
   the same text under one parent collide.
-- **Texts are properties** (`Text`, the EN medium text), shown next to the key on request.
-- **Texts become captions** (decided 2026-10-16, being built: `next-steps.md`, Now: texts and captions): a member is
-  named by its key and captioned by its text (`captionColumn`), the key a property `Key`, no text properties; the
-  initial value is named `''` for every key type and, without texts, captioned `#`; a compounded characteristic is
-  named by its key fields concatenated at full length. Until then the caption shown for a member is its name.
+- **Texts are captions** (`next-steps.md`, Now: texts and captions): the key attribute's `NameColumn` is the EN
+  text, the medium one, else the long, else the short (`TXTMD`, `TXTLG`, `TXTSH` of the view), a value without text
+  `''`; a characteristic without texts is captioned by its key (`KEY_CAPTION`, `#` for the initial value). Excel shows
+  only captions, `.Caption` and Excel's label filters compare them, typed MDX and unique names use the names.
+- **The initial value** (SID 0, BW's "not assigned") is named `''` for every key type (`KEY_NAME` of the view for a
+  NUMC, DATS or TIMS key; CHAR's initial value is `''` already): `[ZCLDIAG].[]`. Its `MEMBER_KEY` stays BW's value.
+- **The key is the property `Key`**; the characteristic's own text is no property and no drill-through column.
+- **Key display** is the modeller's choice per dimension in the schema builder, each a form of the schema: text as
+  caption and key as property (the proposal's), key as caption (`KEY_CAPTION`) and text as property `Text`, or key
+  only.
 
 ### 3.5 What BW does not have, and when to add it
 
@@ -174,7 +183,8 @@ only declared properties: the member key is not offered, which is why the text a
   hierarchy; a hierarchy named like the dimension but defined later cannot be reached that way.
 - **An unnamed `Hierarchy` and an attribute named like the dimension** get the same unique name; the reader refuses it.
   Name key attributes `<char> SID`, as above.
-- **BW's "not assigned" value (SID 0)** is a member with an empty key; it appears without `NON EMPTY`.
+- **BW's "not assigned" value (SID 0)** is a member named `''` (`[0D_NW_CODE].[]`), captioned by its text (`''`
+  without one) or `#`; it appears without `NON EMPTY`.
 - **Hierarchy unique names** of non-default hierarchies are `[Dimension.Hierarchy]`, not `[Dimension].[Hierarchy]`.
 
 ### 3.7 Compounded characteristics
@@ -195,9 +205,10 @@ The model, for both kinds of provider:
 |---|---|---|
 | Key (join) | `SID` | InfoCube `SID`, aDSO the value |
 | aDSO fact table | the aDSO's fact view: `/BIC/A<adso>7` with `SID_<field>` from a left outer join to the SID table on all key fields | the reporting view's field (in the fact view if the aDSO has one) |
-| Name | `COMPOUND_KEY` of the characteristic's view: the compounding keys and the own key, separated by `/` (`K4/2024001`); BW's initial value is `#`, so `#/#` | the own key |
+| Name | `COMPOUND_KEY` of the characteristic's view: the compounding keys and the own key, separated by `/`, each as BW holds it (`K4/2024001`, an initial CHAR part empty: `1000/`); SID 0 `''` | the own key (`KEY_NAME`, `''` for SID 0) |
+| Caption | the text, else `KEY_CAPTION`: `COMPOUND_KEY` with `#` for an initial part (`#/#`) | the text, else `KEY_CAPTION` (`#` for SID 0) |
 | Order | `COMPOUND_KEY` as `OrderByColumn` of the key attribute: SIDs are in the order BW made them | the key |
-| Member properties | `Key` (the own key), `Text` | `Text` |
+| Member properties | `Key` (the own key) | `Key` |
 
 ```sql
 -- the aDSO's fact view (ZZXXMLA1_CL_BW_VIEW_GEN), only if the aDSO has a compounded characteristic
@@ -479,7 +490,8 @@ Checklist:
 
 - [ ] One dimension per characteristic of the provider (technical ones such as package and request left out), named by
       the InfoObject, captioned by its text.
-- [ ] Members keyed by SID, named by the internal BW key, the EN text as property `Text`.
+- [ ] Members keyed by SID, named by the internal BW key (`''` for the initial value), captioned by the EN text, the
+      key as property `Key`.
 - [ ] Each navigation attribute switched on in the provider is a flat hierarchy `<char>__<attribute>`; display
       attributes and attributes not switched on are properties (key and text).
 - [ ] Reference characteristics are dimensions of their own on the basic characteristic's view.
@@ -493,12 +505,13 @@ Current limits of olap4abap:
 - **The schema generator follows this guide** (since 2026-10-08; `schema-generator.md`, The proposal), with these
   differences:
   - NUMC keys and attributes are BW's values, with their leading zeros (`0000001000`); the views also have each as a
-    number (`COLUMN_INT`), which the UI's "As numbers" names per dimension (`1000`; on an aDSO the key too). No
-    conversion exit is applied: CHAR keys are internal (ALPHA's `0000001000`, not `1000`).
+    number (`COLUMN_INT`) for FoodMart's schemas, which name numbers; the proposal and the UI do not use it ("As
+    numbers" left the UI 2026-10-16). No conversion exit is applied: CHAR keys are internal (ALPHA's `0000001000`,
+    not `1000`).
   - Captions are the InfoObject texts in the logon language of the request; member texts are EN.
   - An aDSO switches on the navigation attributes of a characteristic together (`navigational_attr_on`), so all of
     them become hierarchies; an InfoCube switches each on (`RSDDIMEIOBJ`).
-  - Captions are built, not BW's: `All <text>` for the All member, `<text> (Text)` for a text property, the
+  - Captions are built, not BW's: `All <text>` for the All member, `<text> (Key)` for the key property, `<text> (Text)` for an attribute's text, the
     attribute's text for a navigation attribute's hierarchy ("Country", not "Country of Company").
   - Compounded characteristics are named by their compounding and their key, keyed by the SID on an aDSO too
     (its fact view) and ordered by their names (section 3.7). Their texts are joined on all key fields.

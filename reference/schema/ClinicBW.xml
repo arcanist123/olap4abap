@@ -14,9 +14,11 @@
   and, computed from the copy of the hierarchy (ZZXXMLA1_CL_BW_HIERARCHY_COPY) at the version current at the export,
   its flattened table ZZXXMLA1_HL_ZCLDIAG_ICD: a row per value SID (the fact's SID_ZCLDIAG joins it), per level its
   member's key Lnn_SID (the node's SID: negative for a text node, the value's SID for a value), name Lnn_NAME (a text
-  node's technical name or a value's key, '' for the initial value, as the characteristic's members are named) and Lnn_POS (its position
-  among its siblings, BW's order). Every value is a leaf (the initial one under NOT_RECORDED > NO_DIAGNOSIS) and BW
-  suppresses the not-assigned node, so the hierarchy has no REST_H.
+  node's technical name or a value's key, '' for the initial value, as the characteristic's members are named),
+  caption Lnn_CAPTION (a text node's technical name until the node texts come, a value's medium text, '' without one,
+  as the characteristic's members are captioned) and Lnn_POS (its position among its siblings, BW's order). Every
+  value is a leaf (the initial one under NOT_RECORDED > NO_DIAGNOSIS) and BW suppresses the not-assigned node, so the
+  hierarchy has no REST_H.
 
   The dimension ZCLDIAG has no table of its own: the reference gives every hierarchy of a dimension with a table that
   table (RolapHierarchy), so each hierarchy names its own; the flat one is first, so the drill-through's attributes
@@ -26,13 +28,10 @@
   <Dimension visible="true" highCardinality="false" table="ZZXXMLA1_C_ZCLPAT" name="ZCLPAT" caption="Patient">
     <DimensionAttribute name="ZCLPAT SID" usage="Key" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="Integer" columnName="SID"/>
-      <NameColumn dataType="String" columnName="ZCLPAT"/>
+      <NameColumn dataType="String" columnName="TXTMD"/>
     </DimensionAttribute>
     <DimensionAttribute name="ZCLPAT Key" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="String" columnName="ZCLPAT"/>
-    </DimensionAttribute>
-    <DimensionAttribute name="ZCLPAT Text" attributeHierarchyEnabled="false" levelType="Regular">
-      <KeyColumn dataType="String" columnName="TXTMD"/>
     </DimensionAttribute>
     <DimensionAttribute name="ZCLPNAME" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="String" columnName="ZCLPNAME"/>
@@ -83,8 +82,8 @@
       <KeyColumn dataType="String" columnName="ZCLREGIO_TXT"/>
     </DimensionAttribute>
     <Hierarchy visible="true" hasAll="true" allMemberName="All Patient" caption="Patient">
-      <Level sourceAttribute="ZCLPAT SID" nameColumn="ZCLPAT" name="ZCLPAT" visible="true" type="String" uniqueMembers="true" levelType="Regular" hideMemberIf="Never" caption="Patient">
-        <Property name="Text" sourceAttribute="ZCLPAT Text" type="String" caption="Patient (Text)"/>
+      <Level sourceAttribute="ZCLPAT SID" nameColumn="KEY_NAME" name="ZCLPAT" visible="true" type="String" uniqueMembers="true" levelType="Regular" hideMemberIf="Never" caption="Patient">
+        <Property name="Key" sourceAttribute="ZCLPAT Key" type="String" caption="Patient (Key)"/>
         <Property name="ZCLPNAME" sourceAttribute="ZCLPNAME" type="String" caption="Patient Name"/>
         <Property name="ZCLPNAME Text" sourceAttribute="ZCLPNAME Text" type="String" caption="Patient Name (Text)"/>
         <Property name="ZCLSEX" sourceAttribute="ZCLSEX" type="String" caption="Sex"/>
@@ -107,13 +106,10 @@
   <Dimension visible="true" highCardinality="false" table="ZZXXMLA1_C_ZCLDOC" name="ZCLDOC" caption="Physician">
     <DimensionAttribute name="ZCLDOC SID" usage="Key" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="Integer" columnName="SID"/>
-      <NameColumn dataType="String" columnName="ZCLDOC"/>
+      <NameColumn dataType="String" columnName="TXTMD"/>
     </DimensionAttribute>
     <DimensionAttribute name="ZCLDOC Key" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="String" columnName="ZCLDOC"/>
-    </DimensionAttribute>
-    <DimensionAttribute name="ZCLDOC Text" attributeHierarchyEnabled="false" levelType="Regular">
-      <KeyColumn dataType="String" columnName="TXTMD"/>
     </DimensionAttribute>
     <DimensionAttribute name="ZCLDNAME" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="String" columnName="ZCLDNAME"/>
@@ -134,8 +130,8 @@
       <KeyColumn dataType="String" columnName="ZCLEXPER_TXT"/>
     </DimensionAttribute>
     <Hierarchy visible="true" hasAll="true" allMemberName="All Physician" caption="Physician">
-      <Level sourceAttribute="ZCLDOC SID" nameColumn="ZCLDOC" name="ZCLDOC" visible="true" type="String" uniqueMembers="true" levelType="Regular" hideMemberIf="Never" caption="Physician">
-        <Property name="Text" sourceAttribute="ZCLDOC Text" type="String" caption="Physician (Text)"/>
+      <Level sourceAttribute="ZCLDOC SID" nameColumn="KEY_NAME" name="ZCLDOC" visible="true" type="String" uniqueMembers="true" levelType="Regular" hideMemberIf="Never" caption="Physician">
+        <Property name="Key" sourceAttribute="ZCLDOC Key" type="String" caption="Physician (Key)"/>
         <Property name="ZCLDNAME" sourceAttribute="ZCLDNAME" type="String" caption="Physician Name"/>
         <Property name="ZCLDNAME Text" sourceAttribute="ZCLDNAME Text" type="String" caption="Physician Name (Text)"/>
         <Property name="ZCLDEPT" sourceAttribute="ZCLDEPT" type="String" caption="Department"/>
@@ -148,13 +144,10 @@
   <Dimension visible="true" highCardinality="false" name="ZCLDIAG" caption="Diagnosis">
     <DimensionAttribute name="ZCLDIAG SID" usage="Key" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="Integer" columnName="SID"/>
-      <NameColumn dataType="String" columnName="ZCLDIAG"/>
+      <NameColumn dataType="String" columnName="TXTMD"/>
     </DimensionAttribute>
     <DimensionAttribute name="ZCLDIAG Key" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="String" columnName="ZCLDIAG"/>
-    </DimensionAttribute>
-    <DimensionAttribute name="ZCLDIAG Text" attributeHierarchyEnabled="false" levelType="Regular">
-      <KeyColumn dataType="String" columnName="TXTMD"/>
     </DimensionAttribute>
     <DimensionAttribute name="ZCLDTEXT" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="String" columnName="ZCLDTEXT"/>
@@ -177,7 +170,7 @@
     <Hierarchy visible="true" hasAll="true" allMemberName="All Diagnosis" caption="Diagnosis" primaryKey="SID">
       <Table name="ZZXXMLA1_C_ZCLDIAG"/>
       <Level sourceAttribute="ZCLDIAG SID" nameColumn="ZCLDIAG" name="ZCLDIAG" visible="true" type="String" uniqueMembers="true" levelType="Regular" hideMemberIf="Never" caption="Diagnosis">
-        <Property name="Text" sourceAttribute="ZCLDIAG Text" type="String" caption="Diagnosis (Text)"/>
+        <Property name="Key" sourceAttribute="ZCLDIAG Key" type="String" caption="Diagnosis (Key)"/>
         <Property name="ZCLDTEXT" sourceAttribute="ZCLDTEXT" type="String" caption="Diagnosis Name"/>
         <Property name="ZCLDTEXT Text" sourceAttribute="ZCLDTEXT Text" type="String" caption="Diagnosis Name (Text)"/>
         <Property name="ZCLDGRP" sourceAttribute="ZCLDGRP" type="String" caption="Diagnosis Group"/>
@@ -188,22 +181,19 @@
     </Hierarchy>
     <Hierarchy name="ZCLDIAG_ICD" visible="true" hasAll="true" allMemberName="All Diagnoses by ICD-10 Chapter" caption="Diagnoses by ICD-10 Chapter" primaryKey="SID">
       <Table name="ZZXXMLA1_HL_ZCLDIAG_ICD"/>
-      <Level name="Level 01" visible="true" column="L01_SID" nameColumn="L01_NAME" ordinalColumn="L01_POS" type="Integer" uniqueMembers="true" levelType="Regular" hideMemberIf="Never"/>
-      <Level name="Level 02" visible="true" column="L02_SID" nameColumn="L02_NAME" ordinalColumn="L02_POS" type="Integer" uniqueMembers="true" levelType="Regular" hideMemberIf="Never"/>
-      <Level name="Level 03" visible="true" column="L03_SID" nameColumn="L03_NAME" ordinalColumn="L03_POS" type="Integer" uniqueMembers="true" levelType="Regular" hideMemberIf="Never"/>
-      <Level name="Level 04" visible="true" column="L04_SID" nameColumn="L04_NAME" ordinalColumn="L04_POS" type="Integer" uniqueMembers="true" levelType="Regular" hideMemberIf="Never"/>
+      <Level name="Level 01" visible="true" column="L01_SID" nameColumn="L01_NAME" captionColumn="L01_CAPTION" ordinalColumn="L01_POS" type="Integer" uniqueMembers="true" levelType="Regular" hideMemberIf="Never"/>
+      <Level name="Level 02" visible="true" column="L02_SID" nameColumn="L02_NAME" captionColumn="L02_CAPTION" ordinalColumn="L02_POS" type="Integer" uniqueMembers="true" levelType="Regular" hideMemberIf="Never"/>
+      <Level name="Level 03" visible="true" column="L03_SID" nameColumn="L03_NAME" captionColumn="L03_CAPTION" ordinalColumn="L03_POS" type="Integer" uniqueMembers="true" levelType="Regular" hideMemberIf="Never"/>
+      <Level name="Level 04" visible="true" column="L04_SID" nameColumn="L04_NAME" captionColumn="L04_CAPTION" ordinalColumn="L04_POS" type="Integer" uniqueMembers="true" levelType="Regular" hideMemberIf="Never"/>
     </Hierarchy>
   </Dimension>
   <Dimension visible="true" highCardinality="false" table="ZZXXMLA1_C_ZCLVTYPE" name="ZCLVTYPE" caption="Visit Type">
     <DimensionAttribute name="ZCLVTYPE SID" usage="Key" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="Integer" columnName="SID"/>
-      <NameColumn dataType="String" columnName="ZCLVTYPE"/>
+      <NameColumn dataType="String" columnName="TXTMD"/>
     </DimensionAttribute>
     <DimensionAttribute name="ZCLVTYPE Key" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="String" columnName="ZCLVTYPE"/>
-    </DimensionAttribute>
-    <DimensionAttribute name="ZCLVTYPE Text" attributeHierarchyEnabled="false" levelType="Regular">
-      <KeyColumn dataType="String" columnName="TXTMD"/>
     </DimensionAttribute>
     <DimensionAttribute name="ZCLSETNG" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="String" columnName="ZCLSETNG"/>
@@ -213,7 +203,7 @@
     </DimensionAttribute>
     <Hierarchy visible="true" hasAll="true" allMemberName="All Visit Type" caption="Visit Type">
       <Level sourceAttribute="ZCLVTYPE SID" nameColumn="ZCLVTYPE" name="ZCLVTYPE" visible="true" type="String" uniqueMembers="true" levelType="Regular" hideMemberIf="Never" caption="Visit Type">
-        <Property name="Text" sourceAttribute="ZCLVTYPE Text" type="String" caption="Visit Type (Text)"/>
+        <Property name="Key" sourceAttribute="ZCLVTYPE Key" type="String" caption="Visit Type (Key)"/>
         <Property name="ZCLSETNG" sourceAttribute="ZCLSETNG" type="String" caption="Care Setting"/>
         <Property name="ZCLSETNG Text" sourceAttribute="ZCLSETNG Text" type="String" caption="Care Setting (Text)"/>
       </Level>
@@ -222,13 +212,10 @@
   <Dimension visible="true" highCardinality="false" table="ZZXXMLA1_C_ZCLDATE" name="ZCLDATE" caption="Date">
     <DimensionAttribute name="ZCLDATE SID" usage="Key" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="Integer" columnName="SID"/>
-      <NameColumn dataType="String" columnName="ZCLDATE"/>
+      <NameColumn dataType="String" columnName="TXTMD"/>
     </DimensionAttribute>
     <DimensionAttribute name="ZCLDATE Key" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="String" columnName="ZCLDATE"/>
-    </DimensionAttribute>
-    <DimensionAttribute name="ZCLDATE Text" attributeHierarchyEnabled="false" levelType="Regular">
-      <KeyColumn dataType="String" columnName="TXTMD"/>
     </DimensionAttribute>
     <DimensionAttribute name="ZCLTHEDT" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="String" columnName="ZCLTHEDT"/>
@@ -279,8 +266,8 @@
       <KeyColumn dataType="String" columnName="ZCLDAYOM_TXT"/>
     </DimensionAttribute>
     <Hierarchy visible="true" hasAll="true" allMemberName="All Date" caption="Date">
-      <Level sourceAttribute="ZCLDATE SID" nameColumn="ZCLDATE" name="ZCLDATE" visible="true" type="String" uniqueMembers="true" levelType="Regular" hideMemberIf="Never" caption="Date">
-        <Property name="Text" sourceAttribute="ZCLDATE Text" type="String" caption="Date (Text)"/>
+      <Level sourceAttribute="ZCLDATE SID" nameColumn="KEY_NAME" name="ZCLDATE" visible="true" type="String" uniqueMembers="true" levelType="Regular" hideMemberIf="Never" caption="Date">
+        <Property name="Key" sourceAttribute="ZCLDATE Key" type="String" caption="Date (Key)"/>
         <Property name="ZCLTHEDT" sourceAttribute="ZCLTHEDT" type="String" caption="The Date"/>
         <Property name="ZCLTHEDT Text" sourceAttribute="ZCLTHEDT Text" type="String" caption="The Date (Text)"/>
         <Property name="ZCLDAYNM" sourceAttribute="ZCLDAYNM" type="String" caption="Day Name"/>
@@ -303,13 +290,10 @@
   <Dimension visible="true" highCardinality="false" table="ZZXXMLA1_C_ZCLSITE" name="ZCLSITE" caption="Site">
     <DimensionAttribute name="ZCLSITE SID" usage="Key" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="Integer" columnName="SID"/>
-      <NameColumn dataType="String" columnName="ZCLSITE"/>
+      <NameColumn dataType="String" columnName="TXTMD"/>
     </DimensionAttribute>
     <DimensionAttribute name="ZCLSITE Key" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="String" columnName="ZCLSITE"/>
-    </DimensionAttribute>
-    <DimensionAttribute name="ZCLSITE Text" attributeHierarchyEnabled="false" levelType="Regular">
-      <KeyColumn dataType="String" columnName="TXTMD"/>
     </DimensionAttribute>
     <DimensionAttribute name="ZCLCITY" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="String" columnName="ZCLCITY"/>
@@ -319,7 +303,7 @@
     </DimensionAttribute>
     <Hierarchy visible="true" hasAll="true" allMemberName="All Site" caption="Site">
       <Level sourceAttribute="ZCLSITE SID" nameColumn="ZCLSITE" name="ZCLSITE" visible="true" type="String" uniqueMembers="true" levelType="Regular" hideMemberIf="Never" caption="Site">
-        <Property name="Text" sourceAttribute="ZCLSITE Text" type="String" caption="Site (Text)"/>
+        <Property name="Key" sourceAttribute="ZCLSITE Key" type="String" caption="Site (Key)"/>
         <Property name="ZCLCITY" sourceAttribute="ZCLCITY" type="String" caption="City"/>
         <Property name="ZCLCITY Text" sourceAttribute="ZCLCITY Text" type="String" caption="City (Text)"/>
       </Level>
@@ -329,13 +313,10 @@
     <DimensionAttribute name="ZCLROOM SID" usage="Key" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="Integer" columnName="SID"/>
       <OrderByColumn dataType="String" columnName="COMPOUND_KEY"/>
-      <NameColumn dataType="String" columnName="COMPOUND_KEY"/>
+      <NameColumn dataType="String" columnName="TXTMD"/>
     </DimensionAttribute>
     <DimensionAttribute name="ZCLROOM Key" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="String" columnName="ZCLROOM"/>
-    </DimensionAttribute>
-    <DimensionAttribute name="ZCLROOM Text" attributeHierarchyEnabled="false" levelType="Regular">
-      <KeyColumn dataType="String" columnName="TXTMD"/>
     </DimensionAttribute>
     <DimensionAttribute name="ZCLRTYPE" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="String" columnName="ZCLRTYPE"/>
@@ -345,7 +326,6 @@
     </DimensionAttribute>
     <Hierarchy visible="true" hasAll="true" allMemberName="All Room" caption="Room">
       <Level sourceAttribute="ZCLROOM SID" nameColumn="COMPOUND_KEY" name="ZCLROOM" visible="true" type="String" uniqueMembers="true" levelType="Regular" hideMemberIf="Never" caption="Room">
-        <Property name="Text" sourceAttribute="ZCLROOM Text" type="String" caption="Room (Text)"/>
         <Property name="Key" sourceAttribute="ZCLROOM Key" type="String" caption="Room (Key)"/>
         <Property name="ZCLRTYPE" sourceAttribute="ZCLRTYPE" type="String" caption="Room Type"/>
         <Property name="ZCLRTYPE Text" sourceAttribute="ZCLRTYPE Text" type="String" caption="Room Type (Text)"/>
@@ -355,17 +335,14 @@
   <Dimension visible="true" highCardinality="false" table="ZZXXMLA1_C_ZCLFISCVR" name="ZCLFISCVR" caption="Fiscal Year Variant">
     <DimensionAttribute name="ZCLFISCVR SID" usage="Key" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="Integer" columnName="SID"/>
-      <NameColumn dataType="String" columnName="ZCLFISCVR"/>
+      <NameColumn dataType="String" columnName="TXTMD"/>
     </DimensionAttribute>
     <DimensionAttribute name="ZCLFISCVR Key" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="String" columnName="ZCLFISCVR"/>
     </DimensionAttribute>
-    <DimensionAttribute name="ZCLFISCVR Text" attributeHierarchyEnabled="false" levelType="Regular">
-      <KeyColumn dataType="String" columnName="TXTMD"/>
-    </DimensionAttribute>
     <Hierarchy visible="true" hasAll="true" allMemberName="All Fiscal Year Variant" caption="Fiscal Year Variant">
       <Level sourceAttribute="ZCLFISCVR SID" nameColumn="ZCLFISCVR" name="ZCLFISCVR" visible="true" type="String" uniqueMembers="true" levelType="Regular" hideMemberIf="Never" caption="Fiscal Year Variant">
-        <Property name="Text" sourceAttribute="ZCLFISCVR Text" type="String" caption="Fiscal Year Variant (Text)"/>
+        <Property name="Key" sourceAttribute="ZCLFISCVR Key" type="String" caption="Fiscal Year Variant (Key)"/>
       </Level>
     </Hierarchy>
   </Dimension>
@@ -373,17 +350,13 @@
     <DimensionAttribute name="ZCLFISCYR SID" usage="Key" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="Integer" columnName="SID"/>
       <OrderByColumn dataType="String" columnName="COMPOUND_KEY"/>
-      <NameColumn dataType="String" columnName="COMPOUND_KEY"/>
+      <NameColumn dataType="String" columnName="TXTMD"/>
     </DimensionAttribute>
     <DimensionAttribute name="ZCLFISCYR Key" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="String" columnName="ZCLFISCYR"/>
     </DimensionAttribute>
-    <DimensionAttribute name="ZCLFISCYR Text" attributeHierarchyEnabled="false" levelType="Regular">
-      <KeyColumn dataType="String" columnName="TXTMD"/>
-    </DimensionAttribute>
     <Hierarchy visible="true" hasAll="true" allMemberName="All Fiscal Year" caption="Fiscal Year">
       <Level sourceAttribute="ZCLFISCYR SID" nameColumn="COMPOUND_KEY" name="ZCLFISCYR" visible="true" type="String" uniqueMembers="true" levelType="Regular" hideMemberIf="Never" caption="Fiscal Year">
-        <Property name="Text" sourceAttribute="ZCLFISCYR Text" type="String" caption="Fiscal Year (Text)"/>
         <Property name="Key" sourceAttribute="ZCLFISCYR Key" type="String" caption="Fiscal Year (Key)"/>
       </Level>
     </Hierarchy>
@@ -392,17 +365,13 @@
     <DimensionAttribute name="ZCLFISCPR SID" usage="Key" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="Integer" columnName="SID"/>
       <OrderByColumn dataType="String" columnName="COMPOUND_KEY"/>
-      <NameColumn dataType="String" columnName="COMPOUND_KEY"/>
+      <NameColumn dataType="String" columnName="TXTMD"/>
     </DimensionAttribute>
     <DimensionAttribute name="ZCLFISCPR Key" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="String" columnName="ZCLFISCPR"/>
     </DimensionAttribute>
-    <DimensionAttribute name="ZCLFISCPR Text" attributeHierarchyEnabled="false" levelType="Regular">
-      <KeyColumn dataType="String" columnName="TXTMD"/>
-    </DimensionAttribute>
     <Hierarchy visible="true" hasAll="true" allMemberName="All Fiscal Period" caption="Fiscal Period">
       <Level sourceAttribute="ZCLFISCPR SID" nameColumn="COMPOUND_KEY" name="ZCLFISCPR" visible="true" type="String" uniqueMembers="true" levelType="Regular" hideMemberIf="Never" caption="Fiscal Period">
-        <Property name="Text" sourceAttribute="ZCLFISCPR Text" type="String" caption="Fiscal Period (Text)"/>
         <Property name="Key" sourceAttribute="ZCLFISCPR Key" type="String" caption="Fiscal Period (Key)"/>
       </Level>
     </Hierarchy>
@@ -410,13 +379,10 @@
   <Dimension visible="true" highCardinality="false" table="ZZXXMLA1_C_ZCLSERV" name="ZCLSERV" caption="Service">
     <DimensionAttribute name="ZCLSERV SID" usage="Key" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="Integer" columnName="SID"/>
-      <NameColumn dataType="String" columnName="ZCLSERV"/>
+      <NameColumn dataType="String" columnName="TXTMD"/>
     </DimensionAttribute>
     <DimensionAttribute name="ZCLSERV Key" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="String" columnName="ZCLSERV"/>
-    </DimensionAttribute>
-    <DimensionAttribute name="ZCLSERV Text" attributeHierarchyEnabled="false" levelType="Regular">
-      <KeyColumn dataType="String" columnName="TXTMD"/>
     </DimensionAttribute>
     <DimensionAttribute name="ZCLSETNG" attributeHierarchyEnabled="false" levelType="Regular">
       <KeyColumn dataType="String" columnName="ZCLSETNG"/>
@@ -425,8 +391,8 @@
       <KeyColumn dataType="String" columnName="ZCLSETNG_TXT"/>
     </DimensionAttribute>
     <Hierarchy visible="true" hasAll="true" allMemberName="All Service" caption="Service">
-      <Level sourceAttribute="ZCLSERV SID" nameColumn="ZCLSERV" name="ZCLSERV" visible="true" type="String" uniqueMembers="true" levelType="Regular" hideMemberIf="Never" caption="Service">
-        <Property name="Text" sourceAttribute="ZCLSERV Text" type="String" caption="Service (Text)"/>
+      <Level sourceAttribute="ZCLSERV SID" nameColumn="KEY_NAME" name="ZCLSERV" visible="true" type="String" uniqueMembers="true" levelType="Regular" hideMemberIf="Never" caption="Service">
+        <Property name="Key" sourceAttribute="ZCLSERV Key" type="String" caption="Service (Key)"/>
         <Property name="ZCLSETNG" sourceAttribute="ZCLSETNG" type="String" caption="Care Setting"/>
         <Property name="ZCLSETNG Text" sourceAttribute="ZCLSETNG Text" type="String" caption="Care Setting (Text)"/>
       </Level>
@@ -452,27 +418,16 @@
     <Measure name="ZCLCHRG" column="/BIC/ZCLCHRG" formatString="#,##0.000" aggregator="sum" caption="Charges"/>
     <DrillThroughAction default="true" name="Details">
       <DrillThroughAttribute name="Patient" dimension="ZCLPAT" sourceAttribute="ZCLPAT Key"/>
-      <DrillThroughAttribute name="Patient (Text)" dimension="ZCLPAT" sourceAttribute="ZCLPAT Text"/>
       <DrillThroughAttribute name="Physician" dimension="ZCLDOC" sourceAttribute="ZCLDOC Key"/>
-      <DrillThroughAttribute name="Physician (Text)" dimension="ZCLDOC" sourceAttribute="ZCLDOC Text"/>
       <DrillThroughAttribute name="Diagnosis" dimension="ZCLDIAG" sourceAttribute="ZCLDIAG Key"/>
-      <DrillThroughAttribute name="Diagnosis (Text)" dimension="ZCLDIAG" sourceAttribute="ZCLDIAG Text"/>
       <DrillThroughAttribute name="Visit Type" dimension="ZCLVTYPE" sourceAttribute="ZCLVTYPE Key"/>
-      <DrillThroughAttribute name="Visit Type (Text)" dimension="ZCLVTYPE" sourceAttribute="ZCLVTYPE Text"/>
       <DrillThroughAttribute name="Date" dimension="ZCLDATE" sourceAttribute="ZCLDATE Key"/>
-      <DrillThroughAttribute name="Date (Text)" dimension="ZCLDATE" sourceAttribute="ZCLDATE Text"/>
       <DrillThroughAttribute name="Site" dimension="ZCLSITE" sourceAttribute="ZCLSITE Key"/>
-      <DrillThroughAttribute name="Site (Text)" dimension="ZCLSITE" sourceAttribute="ZCLSITE Text"/>
       <DrillThroughAttribute name="Room" dimension="ZCLROOM" sourceAttribute="ZCLROOM Key"/>
-      <DrillThroughAttribute name="Room (Text)" dimension="ZCLROOM" sourceAttribute="ZCLROOM Text"/>
       <DrillThroughAttribute name="Fiscal Year Variant" dimension="ZCLFISCVR" sourceAttribute="ZCLFISCVR Key"/>
-      <DrillThroughAttribute name="Fiscal Year Variant (Text)" dimension="ZCLFISCVR" sourceAttribute="ZCLFISCVR Text"/>
       <DrillThroughAttribute name="Fiscal Year" dimension="ZCLFISCYR" sourceAttribute="ZCLFISCYR Key"/>
-      <DrillThroughAttribute name="Fiscal Year (Text)" dimension="ZCLFISCYR" sourceAttribute="ZCLFISCYR Text"/>
       <DrillThroughAttribute name="Fiscal Period" dimension="ZCLFISCPR" sourceAttribute="ZCLFISCPR Key"/>
-      <DrillThroughAttribute name="Fiscal Period (Text)" dimension="ZCLFISCPR" sourceAttribute="ZCLFISCPR Text"/>
       <DrillThroughAttribute name="Service" dimension="ZCLSERV" sourceAttribute="ZCLSERV Key"/>
-      <DrillThroughAttribute name="Service (Text)" dimension="ZCLSERV" sourceAttribute="ZCLSERV Text"/>
     </DrillThroughAction>
   </Cube>
 </Schema>

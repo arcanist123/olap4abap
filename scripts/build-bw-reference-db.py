@@ -31,8 +31,9 @@ depth, is served by the reference as a balanced level hierarchy (Level 01 to Lev
    Per hierarchy its flattened table (hierarchy_levels), computed from the copy: ZZXXMLA1_HL_<hierarchy>, a row per
    value SID (the fact's SID_<characteristic>, the key) with its member on each level, L01_SID, L01_NAME, L01_POS to
    the level of the values: the node's SID, its NAME (a text node's technical name, a value's key from the SID table,
-   '' for the initial value, as the characteristic's members are named) and its position among its siblings (BW's
-   order). The virtual
+   '' for the initial value, as the characteristic's members are named), its CAPTION (a text node's technical name
+   until the node texts come, a value's medium text in English from the text table, '' without one, as the
+   characteristic's members are captioned) and its position among its siblings (BW's order). The virtual
    root is the All member. The build fails unless the tree is balanced, its leaves values at the same depth, every
    node once, no value with children and every value of the characteristic a leaf (docs/next-steps.md, Reference
    scenario: the reference serves BW hierarchies with a level form as level hierarchies, every value assigned and the
@@ -254,8 +255,8 @@ def statements(data):
 
 
 def hierarchy_levels(data):
-    """The flattened table of a hierarchy: a row per value SID with its member on each level (SID, name and position
-    among its siblings). Fails unless the tree is balanced with every value of the characteristic a leaf, so that it
+    """The flattened table of a hierarchy: a row per value SID with its member on each level (SID, name, caption and
+    position among its siblings). Fails unless the tree is balanced with every value of the characteristic a leaf, so that it
     is a level hierarchy."""
     h, c = data["hierarchy"], data["characteristic"]
     root = int(data["root_sid"])
@@ -266,6 +267,11 @@ def hierarchy_levels(data):
     # texts and captions)
     keys = {int(number(row[sid_fields.index("SID")])): row[sid_fields.index(f"/BIC/{c}")]
             for row in sid_table["rows"]}
+    # and captioned by its medium text, '' without one (the view's TXTMD)
+    text_table = json.loads(table_file(f"/BIC/T{c}").read_text(encoding="utf-8"))
+    text_fields = [f["name"] for f in text_table["fields"]]
+    texts = {row[text_fields.index(f"/BIC/{c}")]: row[text_fields.index("TXTMD")] for row in text_table["rows"]
+             if row[text_fields.index("LANGU")] == "E"}
     nodes, children = {}, {}
     for row in data["nodes"]["rows"]:
         node = {f: row[i] for i, f in enumerate(fields)}
@@ -274,8 +280,11 @@ def hierarchy_levels(data):
             assert sid == root, (h, sid)
             continue
         assert sid not in nodes, f"{h}: {sid} occurs twice, not a level hierarchy"
-        name = node["NODE_NAME"] if node["NODE_IOBJ"].strip() else keys[sid]
-        nodes[sid] = dict(parent=parent, depth=int(number(node["DEPTH"])), pos=int(number(node["POS"])), name=name)
+        text_node = bool(node["NODE_IOBJ"].strip())
+        name = node["NODE_NAME"] if text_node else keys[sid]
+        caption = node["NODE_NAME"] if text_node else texts.get(keys[sid], "")
+        nodes[sid] = dict(parent=parent, depth=int(number(node["DEPTH"])), pos=int(number(node["POS"])), name=name,
+                          caption=caption)
         children.setdefault(parent, []).append(sid)
     rank = {}
     for siblings in children.values():
@@ -296,13 +305,15 @@ def hierarchy_levels(data):
         path = [sid]
         while nodes[path[0]]["parent"] != root:
             path.insert(0, nodes[path[0]]["parent"])
-        rows.append([sid] + [v for s in path for v in (s, nodes[s]["name"], rank[s])])
+        rows.append([sid] + [v for s in path for v in (s, nodes[s]["name"], nodes[s]["caption"], rank[s])])
     assert sorted(row[0] for row in rows) == sorted(keys), f"{h}: values of {c} not leaves or twice"
-    name_length = max(len(row[i]) for row in rows for i in range(2, len(row), 3))
+    name_length = max(len(row[i]) for row in rows for i in range(2, len(row), 4))
+    caption_length = max(len(row[i]) for row in rows for i in range(3, len(row), 4))
     level_fields = [dict(name="SID", key=True, type="INT4", length=10, decimals=0)]
     for level in range(1, depth + 1):
         level_fields += [dict(name=f"L{level:02}_SID", key=False, type="INT4", length=10, decimals=0),
                          dict(name=f"L{level:02}_NAME", key=False, type="CHAR", length=name_length, decimals=0),
+                         dict(name=f"L{level:02}_CAPTION", key=False, type="CHAR", length=caption_length, decimals=0),
                          dict(name=f"L{level:02}_POS", key=False, type="INT4", length=10, decimals=0)]
     return dict(table=LEVELS + h, fields=level_fields, rows=[[str(v) for v in row] for row in rows])
 
@@ -320,7 +331,7 @@ def build():
         c, i = statements(levels)
         creates += c
         inserts += i
-        print(f"{levels['table']}: {len(levels['rows'])} rows, {(len(levels['fields']) - 1) // 3} levels")
+        print(f"{levels['table']}: {len(levels['rows'])} rows, {(len(levels['fields']) - 1) // 4} levels")
     views = json.loads((EXPORT / "views.json").read_text(encoding="utf-8"))
     assert all(name.startswith(PLACEHOLDER) for name in views), "views.json of an earlier run: export again"
     for name, definition in views.items():

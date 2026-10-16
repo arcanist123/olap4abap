@@ -186,8 +186,22 @@ The steps:
    `--catalog ZCLHIER --names` pass, the latter also with `ZCLPAT_PRG` and `ZCLSERV_CAT` added to `ZCLHIER` for the
    run (72, 2,914 and 92 members), with names and with the three key attributes captioned by `TXTMD` (leaves
    captioned by their texts, `[ZCLSERV.ZCLSERV_CAT].[REST_H].[0000]` by `''`).
-7. The reference database's copies of the views rebuilt, the clinic cases recaptured, the docs (`bw-schema-design-guide.md`
-   3.4 and 3.7, `schema-generator.md`) brought to what is built.
+7. Done (2026-10-16): the reference database's copies of the views rebuilt (`build-bw-reference-db.py`, a full
+   export: the views of step 2), and the reference schemas `ClinicBW.xml` and `ClinicBW-sap.xml` moved to step 3's
+   naming (decided with the user 2026-10-16, instead of rebuilding only the view copies), as SAP's proposal for
+   `ZCLVISIT` writes it: the level named by `KEY_NAME` for the NUMC and DATS keys (patient, physician, date,
+   service), `COMPOUND_KEY` for the compounded ones, else the key; the key attribute's `NameColumn` `TXTMD`; the
+   property `Key` first; no `Text` attribute, property or `(Text)` drill-through column of the characteristic itself.
+   The reference's flattened `ZZXXMLA1_HL_ZCLDIAG_ICD` gained `Lnn_CAPTION` (a leaf's medium text from
+   `/BIC/TZCLDIAG`, '' without one; a text node's technical name), the levels' `captionColumn`, so its leaves are
+   captioned as olap4abap's. The 64 clinic answers were recaptured (captions by text). Excel's label filters on the
+   hierarchy (`execute_hier_excel_label_begins`, `_between`) compare captions, which the reference does not (its
+   patched subcube filter compares the level's column): they got an `equivalent.txt` (Joint pain; the eight
+   diagnoses whose texts lie between `E00` and `I99`). Docs: `bw-schema-design-guide.md` 1, 3.1 to 3.4, 3.6, 3.7 and
+   the checklist, `test-strategy.md`; `schema-generator.md` was current.
+   Checked: `xmla_test.py` 372 of 372 (`execute_hier_drillthrough_subselect` passes); `compare-applicable.py` 394 of
+   395 as before; `bw_hierarchy_test.py --reference` and `--catalog ZCLHIER --names` (`ZCLDIAG_ICD`) and
+   `clinic_test.py` pass.
 
 ## Then: time-independent BW hierarchies
 

@@ -175,8 +175,8 @@
         <CubeInfo>
           <Cube>
             <CubeName>ZCLHIER</CubeName>
-            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T12:10:47</LastDataUpdate>
-            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T12:10:47</LastSchemaUpdate>
+            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T15:42:35</LastDataUpdate>
+            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T15:42:35</LastSchemaUpdate>
           </Cube>
         </CubeInfo>
         <AxesInfo>
@@ -258,7 +258,7 @@
               </Member>
               <Member Hierarchy="[ZCLVTYPE]">
                 <UName>[ZCLVTYPE].[Follow-up]</UName>
-                <Caption>Follow-up</Caption>
+                <Caption>Follow-up Visit</Caption>
                 <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
                 <LNum>1</LNum>
                 <DisplayInfo>131072</DisplayInfo>
@@ -275,7 +275,7 @@
               </Member>
               <Member Hierarchy="[ZCLVTYPE]">
                 <UName>[ZCLVTYPE].[Outpatient]</UName>
-                <Caption>Outpatient</Caption>
+                <Caption>Outpatient Visit</Caption>
                 <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
                 <LNum>1</LNum>
                 <DisplayInfo>131072</DisplayInfo>
@@ -292,7 +292,7 @@
               </Member>
               <Member Hierarchy="[ZCLVTYPE]">
                 <UName>[ZCLVTYPE].[Telehealth]</UName>
-                <Caption>Telehealth</Caption>
+                <Caption>Telehealth Consultation</Caption>
                 <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
                 <LNum>1</LNum>
                 <DisplayInfo>131072</DisplayInfo>
@@ -345,7 +345,7 @@
               </Member>
               <Member Hierarchy="[ZCLVTYPE]">
                 <UName>[ZCLVTYPE].[Follow-up]</UName>
-                <Caption>Follow-up</Caption>
+                <Caption>Follow-up Visit</Caption>
                 <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
                 <LNum>1</LNum>
                 <DisplayInfo>131072</DisplayInfo>
@@ -363,7 +363,7 @@
               </Member>
               <Member Hierarchy="[ZCLVTYPE]">
                 <UName>[ZCLVTYPE].[Outpatient]</UName>
-                <Caption>Outpatient</Caption>
+                <Caption>Outpatient Visit</Caption>
                 <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
                 <LNum>1</LNum>
                 <DisplayInfo>131072</DisplayInfo>
@@ -381,7 +381,7 @@
               </Member>
               <Member Hierarchy="[ZCLVTYPE]">
                 <UName>[ZCLVTYPE].[Telehealth]</UName>
-                <Caption>Telehealth</Caption>
+                <Caption>Telehealth Consultation</Caption>
                 <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
                 <LNum>1</LNum>
                 <DisplayInfo>131072</DisplayInfo>
@@ -434,7 +434,7 @@
               </Member>
               <Member Hierarchy="[ZCLVTYPE]">
                 <UName>[ZCLVTYPE].[Follow-up]</UName>
-                <Caption>Follow-up</Caption>
+                <Caption>Follow-up Visit</Caption>
                 <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
                 <LNum>1</LNum>
                 <DisplayInfo>131072</DisplayInfo>
@@ -452,7 +452,7 @@
               </Member>
               <Member Hierarchy="[ZCLVTYPE]">
                 <UName>[ZCLVTYPE].[Outpatient]</UName>
-                <Caption>Outpatient</Caption>
+                <Caption>Outpatient Visit</Caption>
                 <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
                 <LNum>1</LNum>
                 <DisplayInfo>131072</DisplayInfo>
@@ -470,7 +470,7 @@
               </Member>
               <Member Hierarchy="[ZCLVTYPE]">
                 <UName>[ZCLVTYPE].[Telehealth]</UName>
-                <Caption>Telehealth</Caption>
+                <Caption>Telehealth Consultation</Caption>
                 <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
                 <LNum>1</LNum>
                 <DisplayInfo>131072</DisplayInfo>

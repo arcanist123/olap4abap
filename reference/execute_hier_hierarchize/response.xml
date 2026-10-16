@@ -175,8 +175,8 @@
         <CubeInfo>
           <Cube>
             <CubeName>ZCLHIER</CubeName>
-            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T12:10:47</LastDataUpdate>
-            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T12:10:47</LastSchemaUpdate>
+            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T15:42:35</LastDataUpdate>
+            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T15:42:35</LastSchemaUpdate>
           </Cube>
         </CubeInfo>
         <AxesInfo>
@@ -271,7 +271,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[UPPER_RESPIRATORY_INFECTIONS].[J06]</UName>
-                <Caption>J06</Caption>
+                <Caption>Upper respiratory infection</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
                 <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>

@@ -141,7 +141,7 @@ The same run exports the clinic InfoCube `ZCLVISIT` (catalog and cube `ZCLHIER`,
 with its text tables, which the views read) and the copy of its hierarchy `ZCLDIAG_ICD` at BW's current version (the
 rows of `ZZXXMLA1H...` and `ZZXXMLA1R...` for its `HIESID` and `SVER`; run `ZZXXMLA1_HIERARCHY_COPY` first if the copy
 is older), and builds from them the flattened table of the hierarchy, `ZZXXMLA1_HL_ZCLDIAG_ICD` (a row per value SID
-with its member on each level, `L01_SID`, `L01_NAME`, `L01_POS` to `L04_...`; the build fails unless the tree is
+with its member on each level, `L01_SID`, `L01_NAME`, `L01_CAPTION`, `L01_POS` to `L04_...`; the build fails unless the tree is
 balanced) (`next-steps.md`, Reference scenario). The tables a view reads are taken from its
 SQL, listed in `tables.json` of the export; LANG and DATS are VARCHAR too, and a negative number of the data preview
 (`37-`) is turned round. After a regeneration of the clinic demo or of its hierarchies: run it again, check the export
