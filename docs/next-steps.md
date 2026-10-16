@@ -465,7 +465,25 @@ Done (2026-10-15): the reference serves `ZCLDIAG_ICD`.
      `_item_path_rest` (inside REST_H's branch); Excel's own statements replace them. Against the reference
      `xmla_test.py` passes 337 of 344 cases: those three and the `session_*` cases, which fail there by design.
   5. Done: the reference does not need `parent-child-closure.patch` any more (the user, 2026-10-16).
-  6. Repeat the live Excel session against the reference (rows, expand a member, expand entire field, crossjoin,
+  6. Done (2026-10-16, `logs/xmla-proxy/20261016-091021/`): rows, expanding member by member, two chapters,
+     collapsing, crossjoin, show items with no data, the tree filter, Keep Only/Hide (item paths of a group and of a
+     diagnosis), the Filters area, the slicer (Excel offers no level choice: the count is `Level 01`'s), search (the
+     level is chosen at the ▼ of the search box, not by Select field) and the label filters on `Level 04` work, their
+     values checked against the same members in the slicer. New cases from Excel's statements:
+     `execute_hier_excel_search` (now `J` on `Level 04`), `_search_level03`, `_search_pick` (a ticked search hit),
+     `_label_begins`, `_label_between`, `_slicer_count` (now `[Level 01].allmembers.count`) and `_item_path_leaf`
+     (J20; `_item_path_rest` is dropped, it was inside REST_H's branch). Against the reference `xmla_test.py` passes
+     345 of 348, all but the `session_*` cases. Postponed until SSAS is available (decided with the user; the
+     reference stays the oracle for the rest):
+     - Expand Entire Field: the reference answers with duplicates (nested `DrilldownLevel(..., [Level 01])` to
+       `[Level 03]`: 203 tuples of 75 members);
+     - the Top 10 value filter: refused (`Generate(... AS [XL_Filter_Set_0], ...)`: "MDX object '[XL_Filter_Set_0]'
+       not found");
+     - a label filter on an upper level (contains `RESP` on `Level 02`, `Filter([Level 02].AllMembers, InStr(...))`
+       in a subselect): every cell empty, the All member's too, where RESPIRATORY has 9,900 visits; the same filter on
+       an axis and the label filters on `Level 04` are right (`subcube-filter-label.patch`,
+       `Query.getCurrentMemberPropertyReference`).
+     Original plan: repeat the live Excel session against the reference (rows, expand a member, expand entire field, crossjoin,
      the tree filter, Keep Only Selected Items, search, Filters area, slicer, label and value filters, double-click)
      and capture the statements it sends as cases.
   7. The engine (open 4) serves members on the levels by depth; the level-dependent expectations then hold on SAP,

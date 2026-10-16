@@ -175,12 +175,22 @@
         <CubeInfo>
           <Cube>
             <CubeName>ZCLVISIT</CubeName>
-            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-15T21:29:14</LastDataUpdate>
-            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-15T21:29:14</LastSchemaUpdate>
+            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T07:58:28</LastDataUpdate>
+            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T07:58:28</LastSchemaUpdate>
           </Cube>
         </CubeInfo>
         <AxesInfo>
           <AxisInfo name="Axis0">
+            <HierarchyInfo name="[ZCLDIAG.ZCLDIAG_ICD]">
+              <UName name="[ZCLDIAG.ZCLDIAG_ICD].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
+              <Caption name="[ZCLDIAG.ZCLDIAG_ICD].[MEMBER_CAPTION]" type="xsd:string"/>
+              <LName name="[ZCLDIAG.ZCLDIAG_ICD].[LEVEL_UNIQUE_NAME]" type="xsd:string"/>
+              <LNum name="[ZCLDIAG.ZCLDIAG_ICD].[LEVEL_NUMBER]" type="xsd:unsignedInt"/>
+              <DisplayInfo name="[ZCLDIAG.ZCLDIAG_ICD].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
+              <PARENT_UNIQUE_NAME name="[ZCLDIAG.ZCLDIAG_ICD].[PARENT_UNIQUE_NAME]" type="xsd:string"/>
+            </HierarchyInfo>
+          </AxisInfo>
+          <AxisInfo name="SlicerAxis">
             <HierarchyInfo name="[Measures]">
               <UName name="[Measures].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
               <Caption name="[Measures].[MEMBER_CAPTION]" type="xsd:string"/>
@@ -189,64 +199,59 @@
               <DisplayInfo name="[Measures].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
             </HierarchyInfo>
           </AxisInfo>
-          <AxisInfo name="Axis1">
-            <HierarchyInfo name="[ZCLDIAG.ZCLDIAG_ICD]">
-              <UName name="[ZCLDIAG.ZCLDIAG_ICD].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
-              <Caption name="[ZCLDIAG.ZCLDIAG_ICD].[MEMBER_CAPTION]" type="xsd:string"/>
-              <LName name="[ZCLDIAG.ZCLDIAG_ICD].[LEVEL_UNIQUE_NAME]" type="xsd:string"/>
-              <LNum name="[ZCLDIAG.ZCLDIAG_ICD].[LEVEL_NUMBER]" type="xsd:unsignedInt"/>
-              <DisplayInfo name="[ZCLDIAG.ZCLDIAG_ICD].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
-              <MEMBER_TYPE name="[ZCLDIAG.ZCLDIAG_ICD].[MEMBER_TYPE]" type="xsd:string"/>
-            </HierarchyInfo>
-          </AxisInfo>
-          <AxisInfo name="SlicerAxis"/>
         </AxesInfo>
         <CellInfo>
           <Value name="VALUE"/>
+          <FormatString name="FORMAT_STRING" type="xsd:string"/>
+          <Language name="LANGUAGE" type="xsd:unsignedInt"/>
+          <BackColor name="BACK_COLOR" type="xsd:unsignedInt"/>
+          <ForeColor name="FORE_COLOR" type="xsd:unsignedInt"/>
+          <FontFlags name="FONT_FLAGS" type="xsd:int"/>
         </CellInfo>
       </OlapInfo>
       <Axes>
         <Axis name="Axis0">
           <Tuples>
             <Tuple>
-              <Member Hierarchy="[Measures]">
-                <UName>[Measures].[__XlItemPath]</UName>
-                <Caption>__XlItemPath</Caption>
-                <LName>[Measures].[MeasuresLevel]</LName>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</UName>
+                <Caption>All Diagnoses by ICD-10 Chapter</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[(All)]</LName>
                 <LNum>0</LNum>
-                <DisplayInfo>0</DisplayInfo>
+                <DisplayInfo>65538</DisplayInfo>
               </Member>
             </Tuple>
             <Tuple>
-              <Member Hierarchy="[Measures]">
-                <UName>[Measures].[__XlSiblingCount]</UName>
-                <Caption>__XlSiblingCount</Caption>
-                <LName>[Measures].[MeasuresLevel]</LName>
-                <LNum>0</LNum>
-                <DisplayInfo>0</DisplayInfo>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</UName>
+                <Caption>DIAGNOSES</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 01]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>9</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</PARENT_UNIQUE_NAME>
               </Member>
             </Tuple>
             <Tuple>
-              <Member Hierarchy="[Measures]">
-                <UName>[Measures].[__XlChildCount]</UName>
-                <Caption>__XlChildCount</Caption>
-                <LName>[Measures].[MeasuresLevel]</LName>
-                <LNum>0</LNum>
-                <DisplayInfo>0</DisplayInfo>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[REST_H]</UName>
+                <Caption>REST_H</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 01]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</PARENT_UNIQUE_NAME>
               </Member>
             </Tuple>
           </Tuples>
         </Axis>
-        <Axis name="Axis1">
+        <Axis name="SlicerAxis">
           <Tuples>
             <Tuple>
-              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
-                <UName>[ZCLDIAG.ZCLDIAG_ICD].[REST_H].[#]</UName>
-                <Caption>#</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[ZCLDIAG]</LName>
-                <LNum>1</LNum>
+              <Member Hierarchy="[Measures]">
+                <UName>[Measures].[ZCLVISNO]</UName>
+                <Caption>Visits</Caption>
+                <LName>[Measures].[MeasuresLevel]</LName>
+                <LNum>0</LNum>
                 <DisplayInfo>0</DisplayInfo>
-                <MEMBER_TYPE>1</MEMBER_TYPE>
               </Member>
             </Tuple>
           </Tuples>
@@ -254,13 +259,18 @@
       </Axes>
       <CellData>
         <Cell CellOrdinal="0">
-          <Value xsi:type="xsd:string">[ZCLDIAG.ZCLDIAG_ICD].[REST_H].[#]|__XLPATHSEP__|[ZCLDIAG.ZCLDIAG_ICD].[REST_H]|__XLPATHSEP__|[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</Value>
+          <Value xsi:type="xsd:double">8563</Value>
+          <FormatString>#,##0.000</FormatString>
+          <FontFlags>0</FontFlags>
         </Cell>
         <Cell CellOrdinal="1">
-          <Value xsi:type="xsd:string"> 1|__XLPATHSEP__| 2|__XLPATHSEP__| 1</Value>
+          <Value xsi:type="xsd:double">8563</Value>
+          <FormatString>#,##0.000</FormatString>
+          <FontFlags>0</FontFlags>
         </Cell>
         <Cell CellOrdinal="2">
-          <Value xsi:type="xsd:integer">0</Value>
+          <FormatString>#,##0.000</FormatString>
+          <FontFlags>0</FontFlags>
         </Cell>
       </CellData>
     </root>
