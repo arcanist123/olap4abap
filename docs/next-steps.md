@@ -1186,6 +1186,22 @@ evaluation (`MemberArrayValueCalc`; before, `([Measures].[Foo], [Time].CurrentMe
   and native SQL alike. The code stays transpilable for it: 7.50 syntax as now, no kernel features the runtime lacks,
   and the native SQL through ADBC (`ZZXXMLA1_CL_SQL`) standard, as for DuckDB above; what blocks transpilation is
   found by running the transpiler over `src/` and kept as a list here.
+- Long term (decided with the user 2026-10-16): SSAS naming. olap4abap reports itself as SSAS 2016
+  (`ProviderVersion` 13.0.5026.0) but names hierarchies as the reference does with `SsasCompatibleNaming=false`:
+  `[ZCLDIAG.ZCLDIAG_ICD]`, `[Time.Weekly]`, `[Time].[1997]` (`ZZXXMLA1_CL_MDX_SCHEMA_READER`, `lookup_child_of_cube`
+  and `lookup_child_of_dimension`). SSAS names them `[Dim].[Hier]`, members with their hierarchy
+  (`[Time].[Time].[1997]`), and resolves a two-part name to a hierarchy before a level (`[Product].[Product
+  Family].Members` is the attribute hierarchy, All member included, not the level), and a dimension of several
+  hierarchies only with its hierarchy named. It stays as it is: Excel only uses the unique names it is sent, so
+  every captured Excel statement works; SSAS names matter for hand-written MDX and clients that build names. The
+  parser is not affected (both forms are compound identifiers); BW hierarchies' path names of shared nodes keep
+  their shape, only the hierarchy prefix would change. Measured with the reference switched to
+  `mondrian.olap.SsasCompatibleNaming=true` (in `WEB-INF/classes/mondrian.properties`, put back afterwards), 344
+  cases: 84 the same, 98 only names, 25 other members (two-part names resolved to attribute hierarchies), 134
+  requests faulting (81 `[Dim.Hier]`, 37 a bare dimension of several hierarchies, 16 related), 3 session cases as
+  always. The switch would rewrite about 135 requests, recapture about 230 answers and change the Mondrian test
+  statements of `applicable.json`, whose expectations come from the reference's naming. Revisit when a client needs
+  SSAS names, or before a release that claims SSAS compatibility.
 - The result limit is a class attribute; a setting (per system, like Mondrian's property file) would let it be changed
   without a transport.
 - Done: the native NON EMPTY crossjoin. Not yet: its context constraint with calculated members (Aggregate members
