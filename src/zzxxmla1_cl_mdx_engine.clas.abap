@@ -4289,9 +4289,11 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     DATA(axes) = VALUE ty_t_grid_axis( ).
     LOOP AT query_axes INTO DATA(query_axis).
       DATA(axis) = grid_axis( query_axis-expression ).
+      " a BW hierarchy's All member is no grouping set over its members (a value under two paths counts once)
       IF query_axis-non_empty = abap_false OR axis IS INITIAL
           OR axis-grid-level > zzxxmla1_cl_mdx_facts=>c_max_grid_levels
-          OR line_exists( axes[ grid-hierarchy = axis-grid-hierarchy ] ).
+          OR line_exists( axes[ grid-hierarchy = axis-grid-hierarchy ] )
+          OR schema_reader->get_hierarchy( axis-grid-hierarchy )-model-bw_hierarchy IS NOT INITIAL.
         RETURN.
       ENDIF.
       APPEND axis TO axes.

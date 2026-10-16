@@ -104,11 +104,35 @@ CLASS zzxxmla1_cl_model DEFINITION
     CLASS-METHODS member_table
       IMPORTING hierarchy     TYPE ty_hierarchy
       RETURNING VALUE(result) TYPE string.
-    "! The dimension table a fact read joins on the foreign key. The level columns of a BW hierarchy are not columns of
-    "! it: until the facts are read through the copy's closure (docs/next-steps.md, step 7.3), such a read fails
-    "! (ZZXXMLA1_CX_BW_HIERARCHY).
+    "! The dimension table a fact read joins on the foreign key. Of a BW hierarchy, whose level columns are not columns
+    "! of it, the members of a level (from 1) with the SIDs below each (docs/next-steps.md, step 7.3): a derived table
+    "! of a row per member on that level (member_table's columns) and SID of the closure below it, the SID as the key
+    "! column. A fact joins each member it is below once, so a member's value is the sum over its distinct values
+    "! (a value under two paths counts once); a statement joining it groups or filters by the level, never aggregates
+    "! over it (no parent summed from its children).
     CLASS-METHODS fact_join_table
       IMPORTING hierarchy     TYPE ty_hierarchy
+                level_no      TYPE i DEFAULT 0
+      RETURNING VALUE(result) TYPE string.
+    "! Of a BW hierarchy: the condition that a fact (its foreign key column, qualified) is below a member, given by its
+    "! key (the SID of a node occurrence or of a leaf): a semi-join on the closure, as BW counts a selection of nodes.
+    CLASS-METHODS bw_member_condition
+      IMPORTING hierarchy     TYPE ty_hierarchy
+                fact_column   TYPE string
+                !key          TYPE string
+      RETURNING VALUE(result) TYPE string.
+    "! Of a BW hierarchy: the condition that a fact is below a member that meets a condition on member_table's columns
+    "! (qualified m): a semi-join on the closure, each member joined by its own SID (the key of its deepest level), so
+    "! a condition a member meets with its descendants gives its values.
+    CLASS-METHODS bw_members_condition
+      IMPORTING hierarchy     TYPE ty_hierarchy
+                fact_column   TYPE string
+                !condition    TYPE string
+      RETURNING VALUE(result) TYPE string.
+    "! Of a BW hierarchy: the condition that a member's path reaches a level (its key column not NULL); else empty.
+    CLASS-METHODS bw_level_condition
+      IMPORTING hierarchy     TYPE ty_hierarchy
+                level_no      TYPE i
       RETURNING VALUE(result) TYPE string.
     "! The measures of a cube in the order of the schema, plus the count of the fact rows that the reference adds to every
     "! cube as a measure of its own.
@@ -223,10 +247,9 @@ CLASS zzxxmla1_cl_model DEFINITION
       CHANGING hierarchies TYPE ty_t_hierarchy.
 
   PRIVATE SECTION.
-    "! Of a BW hierarchy: the condition that a member's path reaches a level (its key column not NULL); else empty.
-    CLASS-METHODS bw_level_condition
+    "! Of a BW hierarchy: its members as a derived table without alias (ZZXXMLA1_CL_BW_HIERARCHY_COPY=>levels_sql).
+    CLASS-METHODS bw_levels
       IMPORTING hierarchy     TYPE ty_hierarchy
-                level_no      TYPE i
       RETURNING VALUE(result) TYPE string.
     "! The columns of the levels: per level its key, its name if it has a name column of its own, the columns of its
     "! member properties; and the key columns to order by.
@@ -277,11 +300,7 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
 
   METHOD member_table.
     IF hierarchy-bw_hierarchy IS NOT INITIAL.
-      result = |( { zzxxmla1_cl_bw_hierarchy_copy=>levels_sql( hierarchy   = hierarchy-bw_hierarchy
-                                                                depth       = lines( hierarchy-levels )
-                                                                value_table = hierarchy-dim_table
-                                                                sid_column  = hierarchy-key_column
-                                                                name_column = hierarchy-bw_value_name ) } ) AS bw|.
+      result = |{ bw_levels( hierarchy ) } AS bw|.
       RETURN.
     ENDIF.
     result = zzxxmla1_cl_sql=>quote( hierarchy-dim_table ).
@@ -293,13 +312,58 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD fact_join_table.
-    IF hierarchy-bw_hierarchy IS NOT INITIAL.
+    IF hierarchy-bw_hierarchy IS INITIAL.
+      result = zzxxmla1_cl_sql=>quote( hierarchy-dim_table ).
+      RETURN.
+    ENDIF.
+    IF level_no < 1 OR level_no > lines( hierarchy-levels ).
       RAISE EXCEPTION TYPE zzxxmla1_cx_bw_hierarchy
         EXPORTING
-          error_message = |The cells of the BW hierarchy { hierarchy-bw_hierarchy-name } of | &&
-                          |{ hierarchy-bw_hierarchy-characteristic } ({ hierarchy-unique_name }) are not supported yet|.
+          error_message = |The facts of the BW hierarchy { hierarchy-bw_hierarchy-name } of | &&
+                          |{ hierarchy-bw_hierarchy-characteristic } ({ hierarchy-unique_name }) are joined on a level|.
     ENDIF.
-    result = zzxxmla1_cl_sql=>quote( hierarchy-dim_table ).
+    " the members on the level: its key column set, the one below NULL
+    DATA(own) = |m.{ zzxxmla1_cl_sql=>quote( hierarchy-levels[ level_no ]-key_column ) }|.
+    DATA(on_level) = |{ own } IS NOT NULL| &&
+                     COND string( WHEN level_no < lines( hierarchy-levels )
+                                  THEN | AND m.{ zzxxmla1_cl_sql=>quote( hierarchy-levels[ level_no + 1 ]-key_column ) }| &&
+                                       | IS NULL| ).
+    result = |( SELECT c."SID" AS { zzxxmla1_cl_sql=>quote( hierarchy-key_column ) }, m.* | &&
+             |FROM { bw_levels( hierarchy ) } m | &&
+             |INNER JOIN { zzxxmla1_cl_sql=>quote( hierarchy-bw_hierarchy-closure ) } c | &&
+             |ON c."HIESID" = { hierarchy-bw_hierarchy-hiesid } | &&
+             |AND c."SVER" = { zzxxmla1_cl_sql=>literal( CONV string( hierarchy-bw_hierarchy-sver ) ) } | &&
+             |AND c."ANCESTOR_SID" = { own } WHERE { on_level } )|.
+  ENDMETHOD.
+
+  METHOD bw_levels.
+    result = |( { zzxxmla1_cl_bw_hierarchy_copy=>levels_sql( hierarchy   = hierarchy-bw_hierarchy
+                                                              depth       = lines( hierarchy-levels )
+                                                              value_table = hierarchy-dim_table
+                                                              sid_column  = hierarchy-key_column
+                                                              name_column = hierarchy-bw_value_name ) } )|.
+  ENDMETHOD.
+
+  METHOD bw_member_condition.
+    result = |{ fact_column } IN ( SELECT "SID" FROM { zzxxmla1_cl_sql=>quote( hierarchy-bw_hierarchy-closure ) } | &&
+             |WHERE "HIESID" = { hierarchy-bw_hierarchy-hiesid } | &&
+             |AND "SVER" = { zzxxmla1_cl_sql=>literal( CONV string( hierarchy-bw_hierarchy-sver ) ) } | &&
+             |AND "ANCESTOR_SID" = { key } )|.
+  ENDMETHOD.
+
+  METHOD bw_members_condition.
+    " a member's own SID: the key of its deepest level
+    DATA(keys) = VALUE string_table( ).
+    LOOP AT hierarchy-levels INTO DATA(level).
+      INSERT |m.{ zzxxmla1_cl_sql=>quote( level-key_column ) }| INTO keys INDEX 1.
+    ENDLOOP.
+    DATA(own) = COND string( WHEN lines( keys ) = 1 THEN keys[ 1 ]
+                             ELSE |COALESCE( { concat_lines_of( table = keys sep = `, ` ) } )| ).
+    result = |{ fact_column } IN ( SELECT c."SID" FROM { bw_levels( hierarchy ) } m | &&
+             |INNER JOIN { zzxxmla1_cl_sql=>quote( hierarchy-bw_hierarchy-closure ) } c | &&
+             |ON c."HIESID" = { hierarchy-bw_hierarchy-hiesid } | &&
+             |AND c."SVER" = { zzxxmla1_cl_sql=>literal( CONV string( hierarchy-bw_hierarchy-sver ) ) } | &&
+             |AND c."ANCESTOR_SID" = { own } WHERE { condition } )|.
   ENDMETHOD.
 
   METHOD measures.

@@ -370,8 +370,14 @@ Read before designing anything:
   `Lnn_SID` (the key), `Lnn_NAME` (a node's `NODE_NAME`, a leaf's key from the view, `#` for the initial value) and
   `Lnn_POS` (the ordinal, BW's order), the levels below it NULL (a level read asks for its column not NULL); REST_H
   follows the roots with its values below it when shown; a level's `uniqueMembers` is false where a SID repeats
-  (`repeated_levels`). A fact read that joins such a hierarchy fails (`ZZXXMLA1_CL_MODEL=>fact_join_table`) until
-  step 7.3 reads the facts through the closure. Not yet in accept.
+  (`repeated_levels`). The facts are read through the closure (step 7.3): a fact read joins, per BW hierarchy, the
+  members of the level it groups or filters by with the SIDs below each (`ZZXXMLA1_CL_MODEL=>fact_join_table` with
+  the level: `levels_sql`'s rows of that level joined to the closure, the SID as the key column), so a member's value
+  is the sum over its distinct values; a set in the subcube, a compound slicer or a drill-through is a semi-join on
+  the closure (`bw_member_condition`, `bw_members_condition` for label conditions). Never a parent from its children:
+  no `roll_up` across a BW hierarchy's levels, no grouping set of other levels of it in one statement (`bw_pattern`),
+  no defaults of it, no cells-first grid on it. Its levels are no drill-through columns (a `RETURN` of one is a
+  fault). Not yet in accept.
   The reference serves `ZCLDIAG_ICD` as a balanced level hierarchy (`Level 01`-`Level 04` on the flattened table
   `ZZXXMLA1_HL_ZCLDIAG_ICD`; catalog and cube `ZCLHIER`, `reference/schema/ClinicBW.xml`, built by
   `build-bw-reference-db.py` from an export of the InfoCube and the copy, checked against BW by

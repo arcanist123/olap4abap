@@ -521,10 +521,36 @@ Done (2026-10-15): the reference serves `ZCLDIAG_ICD`.
         hierarchy ... are not supported yet" (`ZZXXMLA1_CL_MODEL=>fact_join_table`): 54 `execute_hier_*` cases.
         Also found: `Hierarchize(..., POST)` is not evaluated yet (`execute_hier_hierarchize_post`), and
         `execute_hier_drillthrough_subselect` names `[ZCLVTYPE].[2]` by key (`known-issues.md`, `sourceAttribute`).
-     3. The cells: the closure in the fact reads (open 4), the planner marking such members computed first; then
-        the `execute_hier_*` cases and Excel. `fact_join_table` then goes; the engine's label predicates and
-        drill-through name level columns of the dimension's table, which a BW hierarchy's `Lnn_*` are not.
-        `execute_hier_hierarchize_post` also needs `Hierarchize(..., POST)`.
+     3. Done (2026-10-16): the cells through the closure, in the fact reads themselves rather than by marking the
+        members computed, so every path of the engine (the evaluator's batches, `fast_cells`, the native crossjoin,
+        `TopCount` and `Order`, `NonEmpty`, drill-through) reads them. `ZZXXMLA1_CL_MODEL=>fact_join_table` takes the
+        level a statement groups or filters the hierarchy by and joins, for a BW hierarchy, the members of that level
+        (`levels_sql`'s rows whose level column is set and the one below NULL) to the closure on `ANCESTOR_SID`, the
+        closure's `SID` as the dimension's key column: a fact joins each member of the level it is below once, the
+        groups by the `Lnn_SID` path columns and the constraints on them are the engine's as for any level
+        hierarchy. A hierarchy's All member joins nothing. Members in a predicate (the subcube, a compound slicer, a
+        drill-through's cell) are a semi-join `f.fk IN ( SELECT "SID" FROM closure WHERE ... "ANCESTOR_SID" = <its
+        SID> )` (`bw_member_condition`); a label condition is one on the members' table, each member joined to the
+        closure by its own SID (`bw_members_condition`). `ZZXXMLA1_CL_MDX_FACTS` never derives a BW member from
+        others: `roll_up` only between patterns of the same BW levels (`bw_pattern`), `load_sets` a statement per
+        such pattern (a grouping set must not aggregate over a joined BW hierarchy), no defaults of a BW hierarchy
+        in `load`, `keys_with_facts` only from groups of the same level; the engine's `grid_axes` (cells first)
+        refuses a BW hierarchy's axis; the native operands read a level's members with its column set. A
+        drill-through's BW member restricts the rows by the closure, its levels are no star columns (a `RETURN` of
+        one is a fault for now). Fixed on the way: a drill-through whose items name columns but no measure (the
+        default action of the clinic's schemas) selected the cell's measure, the reference does not
+        (`DrillThroughCellRequest.includeInSelect`). Checked: `xmla_test.py` 301 of 348 (all 277 other cases pass);
+        of the 73 hierarchy cases 26 pass and 70 have the reference's cells and axes (`execute_hier_drillthrough`
+        now passes); 30 fail only on the measure caption and the others on `sourceAttribute` names
+        (`known-issues.md`), `execute_hier_drillthrough_subselect` on `[ZCLVTYPE].[2]`, and
+        `execute_hier_hierarchize_post` waits for `Hierarchize(..., POST)`. `compare-applicable.py` 394 of 395 as
+        before. Shared nodes, links, postable nodes, intervals and REST_H, which no reference case has, against
+        BW's MDX: `bw_hierarchy_test.py --catalog ZCLHIER --names` with `ZCLPAT_PRG` and `ZCLSERV_CAT` added to
+        `ZCLHIER`'s schema for the run (annotated as `ZCLDIAG_ICD`), all members' values BW's (72, 2,914 and 92
+        members). The test read an empty cell's value from the next cell (fixed; it accepts `#` for the initial
+        value with `--names` and has `--catalog`). Open: a test catalog on SAP with the three hierarchies, so the
+        BW check runs without editing the schema; the measure caption (30 cases); a BW hierarchy on an aDSO, whose
+        fact column holds the value, not the SID the closure has; Excel against olap4abap.
 - Simplified (2026-10-16, with the user): the reference cannot be the oracle of REST_H (it needed placeholders and the
   cases kept out of its branch), so it no longer pretends to be. `ZCLDIAG_ICD` assigns every value explicitly, the
   initial one (337 visits) as the leaf `#` under the chapter `NOT_RECORDED` (Not recorded) and the group

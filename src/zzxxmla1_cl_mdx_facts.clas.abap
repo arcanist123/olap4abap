@@ -645,6 +645,20 @@ CLASS zzxxmla1_cl_mdx_facts DEFINITION
                 indexes       TYPE ty_t_index
                 slicer        TYPE ty_t_predicate
       RETURNING VALUE(result) TYPE ty_t_set_groups.
+    "! The join of a hierarchy's dimension table to the facts on the foreign key, as alias and the position of the
+    "! hierarchy (ZZXXMLA1_CL_MODEL=>fact_join_table): of a BW hierarchy the members of the level (from 1) and the SIDs
+    "! below them; none for a BW hierarchy's All member (level 0), which every fact is below.
+    METHODS join_sql
+      IMPORTING id            TYPE i
+                !level        TYPE i
+                !alias        TYPE string
+      RETURNING VALUE(result) TYPE string.
+    "! The levels of the BW hierarchies among the filters ("position:level," each, 0 where a BW hierarchy is not
+    "! among them): groups of patterns of different ones are never derived from each other or read with one
+    "! statement, as a BW hierarchy's member is the sum of its distinct values, not of its children's.
+    METHODS bw_pattern
+      IMPORTING filters       TYPE ty_t_filter
+      RETURNING VALUE(result) TYPE string.
 ENDCLASS.
 
 CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
@@ -909,10 +923,9 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
     ENDLOOP.
     DATA(source) = |{ zzxxmla1_cl_sql=>quote( cube-fact_table ) } f|.
     LOOP AT joins INTO DATA(id).
-      DATA(hierarchy) = hierarchies[ id ].
-      source = source && | INNER JOIN { zzxxmla1_cl_model=>fact_join_table( hierarchy ) } d{ id }| &&
-               | ON d{ id }.{ zzxxmla1_cl_sql=>quote( hierarchy-key_column ) }| &&
-               | = f.{ zzxxmla1_cl_sql=>quote( hierarchy-fk_column ) }|.
+      READ TABLE axes INTO axis WITH KEY hierarchy = id.
+      DATA(join_level) = COND i( WHEN sy-subrc = 0 THEN axis-level ELSE filters[ hierarchy = id ]-level ).
+      source = source && join_sql( id = id level = join_level alias = `d` ).
     ENDLOOP.
 
     " the level columns of each axis, and the row's key components: c_max_grid_levels per axis, '' where unused
@@ -1016,6 +1029,24 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
                                  slicer   = slicer ) TO result.
       RETURN.
     ENDIF.
+    " the patterns of other levels of the BW hierarchies (bw_pattern) with statements of their own: a grouping set
+    " must not aggregate over a BW hierarchy the statement joins
+    DATA(first_bw) = bw_pattern( patterns[ indexes[ 1 ] ]-filters ).
+    DATA(same_bw) = VALUE ty_t_index( ).
+    DATA(other_bw) = VALUE ty_t_index( ).
+    LOOP AT indexes INTO index.
+      IF bw_pattern( patterns[ index ]-filters ) = first_bw.
+        APPEND index TO same_bw.
+      ELSE.
+        APPEND index TO other_bw.
+      ENDIF.
+    ENDLOOP.
+    IF other_bw IS NOT INITIAL.
+      result = load_sets( patterns = patterns constraints = constraints indexes = same_bw slicer = slicer ).
+      APPEND LINES OF load_sets( patterns = patterns constraints = constraints indexes = other_bw
+                                 slicer   = slicer ) TO result.
+      RETURN.
+    ENDIF.
 
     " the level columns of all patterns, each once, and per pattern their positions; one join per hierarchy
     DATA columns TYPE string_table.
@@ -1042,12 +1073,18 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
       RETURN.
     ENDIF.
 
+    " the level of each hierarchy: of a BW hierarchy the same in every pattern
     DATA(source) = |{ zzxxmla1_cl_sql=>quote( cube-fact_table ) } f|.
     LOOP AT joins INTO DATA(id).
-      DATA(hierarchy) = hierarchies[ id ].
-      source = source && | INNER JOIN { zzxxmla1_cl_model=>fact_join_table( hierarchy ) } d{ id }| &&
-               | ON d{ id }.{ zzxxmla1_cl_sql=>quote( hierarchy-key_column ) }| &&
-               | = f.{ zzxxmla1_cl_sql=>quote( hierarchy-fk_column ) }|.
+      DATA(join_level) = 0.
+      LOOP AT result ASSIGNING <set>.
+        READ TABLE patterns[ <set>-pattern ]-filters INTO filter WITH KEY hierarchy = id.
+        IF sy-subrc = 0.
+          join_level = filter-level.
+          EXIT.
+        ENDIF.
+      ENDLOOP.
+      source = source && join_sql( id = id level = join_level alias = `d` ).
     ENDLOOP.
     " per pattern its grouping set, its GROUPING_ID (a bit per column, the first the highest, 1 where the column is
     " aggregated) and its constraint; the facts are those of any pattern's constraint
@@ -1148,6 +1185,24 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
+  METHOD join_sql.
+    DATA(hierarchy) = REF #( hierarchies[ id ] ).
+    IF hierarchy->bw_hierarchy IS NOT INITIAL AND level = 0.
+      RETURN.
+    ENDIF.
+    result = | INNER JOIN { zzxxmla1_cl_model=>fact_join_table( hierarchy = hierarchy->* level_no = level ) } | &&
+             |{ alias }{ id } ON { alias }{ id }.{ zzxxmla1_cl_sql=>quote( hierarchy->key_column ) }| &&
+             | = f.{ zzxxmla1_cl_sql=>quote( hierarchy->fk_column ) }|.
+  ENDMETHOD.
+
+  METHOD bw_pattern.
+    LOOP AT hierarchies TRANSPORTING NO FIELDS WHERE bw_hierarchy IS NOT INITIAL.
+      DATA(id) = sy-tabix.
+      READ TABLE filters INTO DATA(filter) WITH KEY hierarchy = id.
+      result = |{ result }{ id }:{ COND i( WHEN sy-subrc = 0 THEN filter-level ) },|.
+    ENDLOOP.
+  ENDMETHOD.
+
   METHOD add_predicates.
     DATA joined TYPE ty_t_index.
     IF subcube IS NOT INITIAL.
@@ -1156,10 +1211,9 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
     IF slicer IS NOT INITIAL.
       APPEND predicate_sql( EXPORTING predicate = slicer index = 1 CHANGING joined = joined ) TO conditions.
     ENDIF.
+    " a BW hierarchy is no join of a predicate (predicate_sql)
     LOOP AT joined INTO DATA(id).
-      source = source && | INNER JOIN { zzxxmla1_cl_model=>fact_join_table( hierarchies[ id ] ) } s{ id }| &&
-               | ON s{ id }.{ zzxxmla1_cl_sql=>quote( hierarchies[ id ]-key_column ) }| &&
-               | = f.{ zzxxmla1_cl_sql=>quote( hierarchies[ id ]-fk_column ) }|.
+      source = source && join_sql( id = id level = 0 alias = `s` ).
     ENDLOOP.
   ENDMETHOD.
 
@@ -1253,8 +1307,10 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
     ENDLOOP.
     " a default of a hierarchy among the filters is no default
     DATA(own_defaults) = defaults.
+    " nor one of a BW hierarchy: its join would count a fact once per member it is below in the filters' groups
     LOOP AT defaults INTO DATA(default).
-      IF line_exists( entry->filters[ hierarchy = default-hierarchy ] ) OR default-level = 0.
+      IF line_exists( entry->filters[ hierarchy = default-hierarchy ] ) OR default-level = 0
+          OR hierarchies[ default-hierarchy ]-bw_hierarchy IS NOT INITIAL.
         CLEAR own_defaults.
         EXIT.
       ENDIF.
@@ -1319,7 +1375,9 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
       DATA(found) = abap_false.
       LOOP AT <entry>-filters INTO DATA(filter).
         IF filter-hierarchy = hierarchy.
-          found = xsdbool( filter-level >= level ).
+          " a BW hierarchy's groups of a deeper level are of members of that level only
+          found = xsdbool( filter-level = level
+                           OR ( filter-level > level AND hierarchies[ hierarchy ]-bw_hierarchy IS INITIAL ) ).
           position = position + level.
           EXIT.
         ENDIF.
@@ -1386,9 +1444,11 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
 
   METHOD roll_up.
     DATA tokens TYPE string_table.
+    " never a BW hierarchy's member from its children or the members of other levels (bw_pattern)
+    DATA(own_bw) = bw_pattern( entry->filters ).
     LOOP AT cache ASSIGNING FIELD-SYMBOL(<source>)
          WHERE pattern <> entry->pattern AND segments IS NOT INITIAL.
-      IF lines( <source>-groups ) > c_max_roll_up_groups.
+      IF lines( <source>-groups ) > c_max_roll_up_groups OR bw_pattern( <source>-filters ) <> own_bw.
         CONTINUE.
       ENDIF.
       " per column of the entry the same column of the source, which must have each of its hierarchies as deep
@@ -1517,10 +1577,19 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
           RETURN.
         ENDIF.
         DATA(id) = node-member-hierarchy.
+        SPLIT node-member-path AT zzxxmla1_cl_model=>c_separator INTO TABLE DATA(keys).
+        DATA(bw) = xsdbool( qualified = abap_true AND hierarchies[ id ]-bw_hierarchy IS NOT INITIAL ).
+        IF bw = abap_true.
+          " the facts below the member: a semi-join on the closure by its own SID, the key of its level
+          result = zzxxmla1_cl_model=>bw_member_condition(
+                     hierarchy   = hierarchies[ id ]
+                     fact_column = |f.{ zzxxmla1_cl_sql=>quote( hierarchies[ id ]-fk_column ) }|
+                     key         = VALUE #( keys[ node-member-level ] OPTIONAL ) ).
+          RETURN.
+        ENDIF.
         IF NOT line_exists( joined[ table_line = id ] ).
           APPEND id TO joined.
         ENDIF.
-        SPLIT node-member-path AT zzxxmla1_cl_model=>c_separator INTO TABLE DATA(keys).
         DATA(conditions) = VALUE string_table( ).
         LOOP AT hierarchies[ id ]-levels INTO DATA(level) TO node-member-level.
           DATA(key) = COND string( WHEN sy-tabix <= lines( keys ) THEN keys[ sy-tabix ] ).
@@ -1545,10 +1614,13 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
                                          CHANGING  joined    = joined ) } )|.
       WHEN c_predicate-value.
         id = node-column-hierarchy.
-        IF NOT line_exists( joined[ table_line = id ] ).
+        " a BW hierarchy's column is one of its members' (m), the facts below them a semi-join on the closure
+        bw = xsdbool( qualified = abap_true AND hierarchies[ id ]-bw_hierarchy IS NOT INITIAL ).
+        IF bw = abap_false AND NOT line_exists( joined[ table_line = id ] ).
           APPEND id TO joined.
         ENDIF.
-        DATA(column) = COND string( WHEN qualified = abap_true THEN |s{ id }.| ) && zzxxmla1_cl_sql=>quote( node-column-column ).
+        DATA(column) = COND string( WHEN bw = abap_true THEN `m.` WHEN qualified = abap_true THEN |s{ id }.| ) &&
+                       zzxxmla1_cl_sql=>quote( node-column-column ).
         DATA(operator) = COND string( WHEN node-column-operator IS INITIAL THEN `=` ELSE node-column-operator ).
         IF node-column-is_null = abap_true.
           result = |{ column } IS NULL|.
@@ -1569,6 +1641,12 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
           result = |TO_NVARCHAR( { column } ) { operator } { zzxxmla1_cl_sql=>literal( node-column-value ) }|.
         ELSE.
           result = |{ column } { operator } { node-column-value }|.
+        ENDIF.
+        IF bw = abap_true.
+          result = zzxxmla1_cl_model=>bw_members_condition(
+                     hierarchy   = hierarchies[ id ]
+                     fact_column = |f.{ zzxxmla1_cl_sql=>quote( hierarchies[ id ]-fk_column ) }|
+                     condition   = result ).
         ENDIF.
       WHEN c_predicate-true.
         result = `1 = 1`.
@@ -1624,12 +1702,20 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
         APPEND |{ zzxxmla1_cl_sql=>quote( level-ordinal_column ) } AS "O{ sy-tabix }"| TO columns.
       ENDIF.
     ENDLOOP.
+    " a BW hierarchy's members on the level: their key column set (shallower members have none there)
+    DATA(conditions) = VALUE string_table( ).
+    IF operand-ancestor_level > 0.
+      APPEND zzxxmla1_cl_model=>path_condition( hierarchy = hierarchy level_no = operand-ancestor_level
+                                                path      = operand-ancestor_path ) TO conditions.
+    ENDIF.
+    DATA(on_level) = zzxxmla1_cl_model=>bw_level_condition( hierarchy = hierarchy level_no = operand-level ).
+    IF on_level IS NOT INITIAL.
+      APPEND on_level TO conditions.
+    ENDIF.
     result = |SELECT DISTINCT { concat_lines_of( table = columns sep = `, ` ) } | &&
              |FROM { zzxxmla1_cl_model=>member_table( hierarchy ) }| &&
-             COND #( WHEN operand-ancestor_level > 0
-                     THEN | WHERE { zzxxmla1_cl_model=>path_condition( hierarchy = hierarchy
-                                                                        level_no  = operand-ancestor_level
-                                                                        path      = operand-ancestor_path ) }| ).
+             COND #( WHEN conditions IS NOT INITIAL
+                     THEN | WHERE { concat_lines_of( table = conditions sep = ` AND ` ) }| ).
   ENDMETHOD.
 
   METHOD operand_counts.
@@ -1658,9 +1744,9 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
     LOOP AT joined_ids INTO DATA(id).
-      source = source && | INNER JOIN { zzxxmla1_cl_model=>fact_join_table( hierarchies[ id ] ) } d{ id }| &&
-               | ON d{ id }.{ zzxxmla1_cl_sql=>quote( hierarchies[ id ]-key_column ) }| &&
-               | = f.{ zzxxmla1_cl_sql=>quote( hierarchies[ id ]-fk_column ) }|.
+      READ TABLE operands INTO operand WITH KEY hierarchy = id.
+      DATA(join_level) = COND i( WHEN sy-subrc = 0 THEN operand-level ELSE filters[ hierarchy = id ]-level ).
+      source = source && join_sql( id = id level = join_level alias = `d` ).
     ENDLOOP.
     DATA(group_by) = VALUE string_table( ).
     DATA(select_list) = VALUE string_table( ).
@@ -1693,9 +1779,7 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
       DATA subcube_joined TYPE ty_t_index.
       DATA(condition) = predicate_sql( EXPORTING predicate = subcube index = 1 CHANGING joined = subcube_joined ).
       LOOP AT subcube_joined INTO id.
-        source = source && | INNER JOIN { zzxxmla1_cl_model=>fact_join_table( hierarchies[ id ] ) } s{ id }| &&
-                 | ON s{ id }.{ zzxxmla1_cl_sql=>quote( hierarchies[ id ]-key_column ) }| &&
-                 | = f.{ zzxxmla1_cl_sql=>quote( hierarchies[ id ]-fk_column ) }|.
+        source = source && join_sql( id = id level = 0 alias = `s` ).
       ENDLOOP.
       APPEND condition TO conditions.
     ENDIF.
@@ -1836,10 +1920,7 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
     DATA(source) = |{ zzxxmla1_cl_sql=>quote( cube-fact_table ) } f|.
     LOOP AT filters INTO DATA(filter).
       DATA(id) = filter-hierarchy.
-      DATA(hierarchy) = hierarchies[ id ].
-      source = source && | INNER JOIN { zzxxmla1_cl_model=>fact_join_table( hierarchy ) } d{ id }| &&
-               | ON d{ id }.{ zzxxmla1_cl_sql=>quote( hierarchy-key_column ) }| &&
-               | = f.{ zzxxmla1_cl_sql=>quote( hierarchy-fk_column ) }|.
+      source = source && join_sql( id = id level = filter-level alias = `d` ).
     ENDLOOP.
 
     " the level columns of the hierarchies down to the filtered levels, the sums of the measures on a fact column, the
@@ -1860,10 +1941,8 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
     DATA(default_conditions) = VALUE string_table( ).
     LOOP AT defaults INTO DATA(default).
       id = default-hierarchy.
-      hierarchy = hierarchies[ id ].
-      source = source && | INNER JOIN { zzxxmla1_cl_model=>fact_join_table( hierarchy ) } d{ id }| &&
-               | ON d{ id }.{ zzxxmla1_cl_sql=>quote( hierarchy-key_column ) }| &&
-               | = f.{ zzxxmla1_cl_sql=>quote( hierarchy-fk_column ) }|.
+      DATA(hierarchy) = hierarchies[ id ].
+      source = source && join_sql( id = id level = default-level alias = `d` ).
       DATA(default_keys) = path_keys( path = default-path level = default-level ).
       LOOP AT hierarchy-levels INTO level TO default-level.
         APPEND zzxxmla1_cl_sql=>key_condition( column = |d{ id }.{ zzxxmla1_cl_sql=>quote( level-key_column ) }|
@@ -1978,6 +2057,12 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
         APPEND VALUE #( column = attribute_column ) TO drill_items.
         CONTINUE.
       ENDIF.
+      IF hierarchies[ item-hierarchy ]-bw_hierarchy IS NOT INITIAL.
+        RAISE EXCEPTION TYPE zzxxmla1_cx_bw_hierarchy
+          EXPORTING
+            error_message = |The levels of the BW hierarchy { hierarchies[ item-hierarchy ]-unique_name } | &&
+                            |are no drill-through columns yet|.
+      ENDIF.
       DATA(level_column) = level_columns[ hierarchy = item-hierarchy level = item-level ].
       constrain( EXPORTING column = level_column-key CHANGING request = request ).
       APPEND VALUE #( column = level_column-key ) TO drill_items.
@@ -1989,8 +2074,20 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
     " then per member the levels below it, not constrained (addNonConstrainingColumns), and its level and the levels
     " of its ancestors up to a unique level, constrained to their keys (LevelReader.constrainRequest); with a RETURN
     " clause an All member adds nothing
+    DATA bw_conditions TYPE string_table.
     LOOP AT members INTO DATA(member).
       IF items IS NOT INITIAL AND member-level = 0.
+        CONTINUE.
+      ENDIF.
+      " a BW hierarchy's levels are no star columns: its member restricts the facts to the SIDs below it
+      IF hierarchies[ member-hierarchy ]-bw_hierarchy IS NOT INITIAL.
+        IF member-level > 0.
+          SPLIT member-path AT zzxxmla1_cl_model=>c_separator INTO TABLE DATA(member_keys).
+          APPEND zzxxmla1_cl_model=>bw_member_condition(
+                   hierarchy   = hierarchies[ member-hierarchy ]
+                   fact_column = |f.{ zzxxmla1_cl_sql=>quote( hierarchies[ member-hierarchy ]-fk_column ) }|
+                   key         = VALUE #( member_keys[ member-level ] OPTIONAL ) ) TO bw_conditions.
+        ENDIF.
         CONTINUE.
       ENDIF.
       DATA(levels) = hierarchies[ member-hierarchy ]-levels.
@@ -2069,9 +2166,11 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
     DATA conditions TYPE string_table.
     DATA joins TYPE ty_t_index.
     DATA sources TYPE STANDARD TABLE OF ty_column_type WITH EMPTY KEY.   " table and column of each select item
+    APPEND LINES OF bw_conditions TO conditions.
     LOOP AT ordered INTO DATA(select_item).
       IF select_item-measure > 0.
-        IF drill_measures IS NOT INITIAL AND NOT line_exists( drill_measures[ measure = select_item-measure ] ).
+        " the cell's measure only if the items name no column and no measure (DrillThroughCellRequest.includeInSelect)
+        IF drill_items IS NOT INITIAL AND NOT line_exists( drill_measures[ measure = select_item-measure ] ).
           CONTINUE.
         ENDIF.
         DATA(fact_column) = measures[ select_item-measure ]-fact_column.
@@ -2130,9 +2229,7 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
 
     DATA(source) = |{ zzxxmla1_cl_sql=>quote( cube-fact_table ) } f|.
     LOOP AT joins INTO DATA(id).
-      source = source && | INNER JOIN { zzxxmla1_cl_model=>fact_join_table( hierarchies[ id ] ) } d{ id }| &&
-               | ON d{ id }.{ zzxxmla1_cl_sql=>quote( hierarchies[ id ]-key_column ) }| &&
-               | = f.{ zzxxmla1_cl_sql=>quote( hierarchies[ id ]-fk_column ) }|.
+      source = source && join_sql( id = id level = 0 alias = `d` ).
     ENDLOOP.
     " the subcube and the positions of a compound slicer (RolapCell.addSubcubePredicates), with the hierarchies of
     " their members joined once more
@@ -2144,9 +2241,7 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
       APPEND predicate_sql( EXPORTING predicate = slicer index = 1 CHANGING joined = joined ) TO conditions.
     ENDIF.
     LOOP AT joined INTO id.
-      source = source && | INNER JOIN { zzxxmla1_cl_model=>fact_join_table( hierarchies[ id ] ) } s{ id }| &&
-               | ON s{ id }.{ zzxxmla1_cl_sql=>quote( hierarchies[ id ]-key_column ) }| &&
-               | = f.{ zzxxmla1_cl_sql=>quote( hierarchies[ id ]-fk_column ) }|.
+      source = source && join_sql( id = id level = 0 alias = `s` ).
     ENDLOOP.
     " which values are NULL, one character per column (the SQL reads a NULL as an empty string)
     DATA(null_flags) = concat_lines_of(
@@ -2188,6 +2283,10 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
     ENDIF.
     LOOP AT hierarchies INTO DATA(hierarchy).
       DATA(id) = sy-tabix.
+      " the level columns of a BW hierarchy are the copy's, not columns of its dimension's table
+      IF hierarchy-bw_hierarchy IS NOT INITIAL.
+        CONTINUE.
+      ENDIF.
       LOOP AT hierarchy-levels INTO DATA(level).
         DATA(level_column) = VALUE ty_level_column( hierarchy = id level = sy-tabix ).
         " a level with a name column: that column first, named as the level, then its key column, "<level> (Key)"

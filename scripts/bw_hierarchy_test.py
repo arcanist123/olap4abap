@@ -33,6 +33,7 @@ reference serves them as level hierarchies (Level 01 to Level 04); they assign e
     python scripts/bw_hierarchy_test.py --names --with-facts --url http://localhost:50000/zzxxmla1?sap-client=001
     python scripts/bw_hierarchy_test.py --bw-only           # BW's answer and its own checks
     python scripts/bw_hierarchy_test.py --reference         # the reference server's ZCLDIAG_ICD
+    python scripts/bw_hierarchy_test.py --catalog ZCLHIER   # another catalog of olap4abap (its cube of that name)
 """
 import argparse
 import html
@@ -143,8 +144,12 @@ def olap4abap_members(url, hierarchy):
         return None, html.unescape(fault.group(1))
     axis = re.search(r'<Axis name="Axis1">(.*?)</Axis>', text, re.S)
     tuples = re.findall(r"<Tuple>(.*?)</Tuple>", axis.group(1), re.S) if axis else []
-    cells = {int(o): float(v) for o, v in re.findall(
-        r'<Cell CellOrdinal="(\d+)">.*?<Value[^>]*>([^<]*)</Value>', text, re.S)}
+    # each cell's own Value: an empty cell has none (a pattern across cells would take the next cell's)
+    cells = {}
+    for ordinal, cell in re.findall(r'<Cell CellOrdinal="(\d+)">(.*?)</Cell>', text, re.S):
+        value = re.search(r"<Value[^>]*>([^<]*)</Value>", cell)
+        if value:
+            cells[int(ordinal)] = float(value.group(1))
 
     def field(member, tag):
         found = re.search(rf"<{tag}>([^<]*)</{tag}>", member)
@@ -196,6 +201,9 @@ def compare(total, key, expected, actual, args, check):
         if not args.with_facts and bw["children"] != ours["children"]:
             problems.append(f"children {ours['children']} != {bw['children']}")
         captions = {bw["caption"]} | ({bw["name"]} if args.names else set())
+        # the initial value (its key all zeros or empty) olap4abap names # as BW's MDX names it in unique names
+        if args.names and not bw["name"].strip("0 "):
+            captions.add("#")
         if ours["caption"] not in captions:
             problems.append(f"caption {ours['caption']!r} not in {sorted(captions)}")
         if not same_values(bw["values"], ours["values"]):
@@ -207,6 +215,7 @@ def compare(total, key, expected, actual, args, check):
 
 
 def main():
+    global CATALOG
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--url", help="the XMLA endpoint (default SAP's, with --reference the reference server)")
     parser.add_argument("--names", action="store_true", help="accept a node's name or key as its caption")
@@ -215,9 +224,11 @@ def main():
     parser.add_argument("--reference", action="store_true",
                         help="check the reference server's hierarchies (catalog ZCLHIER) against BW's")
     parser.add_argument("--show", type=int, default=10, help="differences shown per hierarchy")
+    parser.add_argument("--catalog", help=f"olap4abap's catalog and cube (default {CATALOG})")
     args = parser.parse_args()
-    global CATALOG
     hierarchies_checked = HIERARCHIES
+    if args.catalog:
+        CATALOG = args.catalog
     if args.reference:
         CATALOG = REFERENCE_CATALOG
         hierarchies_checked = {key: HIERARCHIES[key] for key in REFERENCE_HIERARCHIES}
