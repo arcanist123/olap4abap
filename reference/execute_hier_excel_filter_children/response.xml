@@ -175,8 +175,8 @@
         <CubeInfo>
           <Cube>
             <CubeName>ZCLVISIT</CubeName>
-            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T07:10:04</LastDataUpdate>
-            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T07:10:04</LastSchemaUpdate>
+            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T08:50:24</LastDataUpdate>
+            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T08:50:24</LastSchemaUpdate>
           </Cube>
         </CubeInfo>
         <AxesInfo>
@@ -281,6 +281,15 @@
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
                 <LNum>2</LNum>
                 <DisplayInfo>131074</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>NOT_RECORDED</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
               </Member>
             </Tuple>
           </Tuples>

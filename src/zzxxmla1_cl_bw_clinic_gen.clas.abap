@@ -16,7 +16,8 @@
 "!   department > physician) and ZCLDOC_SITE (all sites > area > site > physician); version dependent, the entire
 "!   hierarchy time dependent, each with two versions of two time slices,
 "! - on the diagnosis ZCLDIAG, also authorization relevant, the plain hierarchy ZCLDIAG_ICD (all diagnoses > chapter >
-"!   group > diagnosis), for authorizations that combine both characteristics,
+"!   group > diagnosis), for authorizations that combine both characteristics; every value is in it (the initial one
+"!   under Not recorded > No diagnosis) and the not-assigned node is suppressed,
 "! - on the patient ZCLPAT the plain hierarchy ZCLPAT_PRG (care programs > program > patient) with link nodes: a
 "!   patient in two programs is a leaf in both (a duplicate node, or a link node), the heart program is under chronic
 "!   care and under senior care, and senior care with it under prevention (link nodes), and parents with their
@@ -222,6 +223,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
         datefrom TYPE d,
         dateto   TYPE d,
         text     TYPE string,
+        "! suppress the not-assigned node (REST_H)
+        norest   TYPE abap_bool,
         nodes    TYPE ty_t_hie_node,
       END OF ty_hierarchy,
       ty_t_hierarchy TYPE STANDARD TABLE OF ty_hierarchy WITH EMPTY KEY.
@@ -321,7 +324,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
                 moves         TYPE ty_t_move
       RETURNING VALUE(result) TYPE ty_t_hie_node.
     "! Appends a node and its subtree to the hierarchy table (NDI format: parent, first child and next sibling).
-    "! The nodes of ZCLDIAG_ICD: all diagnoses > chapter > group > diagnosis.
+    "! The nodes of ZCLDIAG_ICD: all diagnoses > chapter > group > diagnosis; the initial value (no diagnosis recorded)
+    "! a leaf of its own chapter and group, so every value is assigned.
     METHODS diagnosis_nodes RETURNING VALUE(result) TYPE ty_t_hie_node.
     "! The nodes of ZCLPAT_PRG: all care programs > area > program > patient; a program under a second parent is a link
     "! node, a patient in a second program a duplicate node or a link node; in family care a parent is a postable node
@@ -383,6 +387,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     METHODS delete_adso.
     METHODS delete_views.
     METHODS delete_hierarchies.
+    "! Deletes the copies of the characteristics' hierarchies and their objects, which BW's deletion trips over.
+    METHODS delete_hierarchy_copies.
     METHODS delete_infoobjects.
     METHODS ensure_infoarea.
     METHODS create_characteristic IMPORTING cha TYPE ty_cha.
@@ -864,9 +870,10 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
         text = `Clinic Sites (Plan)` nodes = sites_2024 )
       ( name = c_hierarchy_site version = '002' datefrom = '20250101' dateto = '99991231'
         text = `Clinic Sites (Plan)` nodes = sites_plan_2025 ) ).
-    " the diagnoses in a plain hierarchy, neither version nor time dependent
+    " the diagnoses in a plain hierarchy, neither version nor time dependent; every value is in it, the not-assigned
+    " node suppressed
     APPEND VALUE #( iobjnm = 'ZCLDIAG' name = c_hierarchy_diag dateto = '99991231' text = `Diagnoses by ICD-10 Chapter`
-                    nodes = diagnosis_nodes( ) ) TO result.
+                    norest = abap_true nodes = diagnosis_nodes( ) ) TO result.
     " the patients' care programs, plain too, with link nodes
     APPEND VALUE #( iobjnm = 'ZCLPAT' name = c_hierarchy_prg dateto = '99991231' text = `Care Programs`
                     nodes = care_program_nodes( ) ) TO result.
@@ -1068,6 +1075,9 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       ENDIF.
       APPEND VALUE #( name = diagnosis-code parent = group ) TO result.
     ENDLOOP.
+    APPEND VALUE #( name = `NOT_RECORDED` parent = `DIAGNOSES` text = `Not recorded` ) TO result.
+    APPEND VALUE #( name = `NO_DIAGNOSIS` parent = `NOT_RECORDED` text = `No diagnosis` ) TO result.
+    APPEND VALUE #( name = `` parent = `NO_DIAGNOSIS` ) TO result.
   ENDMETHOD.
 
   METHOD node_name.
@@ -1116,8 +1126,9 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     IF node-to IS NOT INITIAL.
       APPEND VALUE #( nodeid = nodeid leaffrom = node-from leafto = node-to ) TO jtab.
     ENDIF.
-    " BW shows a link node's original's subtree below it: it has no children of its own
-    IF node-link = abap_true.
+    " BW shows a link node's original's subtree below it: it has no children of its own; the initial value is a leaf
+    " (its empty name is the root's parent)
+    IF node-link = abap_true OR node-name IS INITIAL.
       RETURN.
     ENDIF.
     LOOP AT nodes INTO DATA(child) WHERE parent = node-name.
@@ -1536,7 +1547,20 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     delete_cube( ).
     delete_views( ).
     delete_hierarchies( ).
+    delete_hierarchy_copies( ).
     delete_infoobjects( ).
+  ENDMETHOD.
+
+  METHOD delete_hierarchy_copies.
+    " the copies' not-assigned views read the SID tables (ZZXXMLA1_CL_BW_HIERARCHY_COPY)
+    DATA(copy) = NEW zzxxmla1_cl_bw_hierarchy_copy( ).
+    LOOP AT characteristics( ) INTO DATA(cha) WHERE hierarchies = abap_true.
+      TRY.
+          copy->delete_tables( cha-name ).
+        CATCH zzxxmla1_cx_bw_hierarchy INTO DATA(error).
+          write( |delete hierarchy copies of { cha-name }: FAILED, { error->get_text( ) }| ).
+      ENDTRY.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD delete_cube.
@@ -2000,6 +2024,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     DATA(header) = VALUE rsndi_s_hierupdate( hienm    = hierarchy-name
                                              version  = hierarchy-version
                                              iobjnm   = hierarchy-iobjnm
+                                             norestnode = hierarchy-norest
                                              datefrom = hierarchy-datefrom
                                              dateto   = hierarchy-dateto ).
     CALL FUNCTION 'RSNDI_SHIE_STRUCTURE_UPDATE4'

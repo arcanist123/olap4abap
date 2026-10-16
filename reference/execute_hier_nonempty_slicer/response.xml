@@ -175,8 +175,8 @@
         <CubeInfo>
           <Cube>
             <CubeName>ZCLVISIT</CubeName>
-            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T07:10:04</LastDataUpdate>
-            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T07:10:04</LastSchemaUpdate>
+            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T08:50:24</LastDataUpdate>
+            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T08:50:24</LastSchemaUpdate>
           </Cube>
         </CubeInfo>
         <AxesInfo>
@@ -366,10 +366,10 @@
                 <DisplayInfo>131072</DisplayInfo>
               </Member>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
-                <UName>[ZCLDIAG.ZCLDIAG_ICD].[REST_H]</UName>
-                <Caption>REST_H</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 01]</LName>
-                <LNum>1</LNum>
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>NOT_RECORDED</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
                 <DisplayInfo>1</DisplayInfo>
               </Member>
             </Tuple>
@@ -386,7 +386,7 @@
                 <Caption>RESPIRATORY</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
                 <LNum>2</LNum>
-                <DisplayInfo>65540</DisplayInfo>
+                <DisplayInfo>196612</DisplayInfo>
               </Member>
             </Tuple>
             <Tuple>
@@ -446,10 +446,10 @@
                 <DisplayInfo>131072</DisplayInfo>
               </Member>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
-                <UName>[ZCLDIAG.ZCLDIAG_ICD].[REST_H]</UName>
-                <Caption>REST_H</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 01]</LName>
-                <LNum>1</LNum>
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>NOT_RECORDED</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
                 <DisplayInfo>1</DisplayInfo>
               </Member>
             </Tuple>
@@ -466,7 +466,7 @@
                 <Caption>RESPIRATORY</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
                 <LNum>2</LNum>
-                <DisplayInfo>65540</DisplayInfo>
+                <DisplayInfo>196612</DisplayInfo>
               </Member>
             </Tuple>
             <Tuple>
@@ -526,10 +526,10 @@
                 <DisplayInfo>131072</DisplayInfo>
               </Member>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
-                <UName>[ZCLDIAG.ZCLDIAG_ICD].[REST_H]</UName>
-                <Caption>REST_H</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 01]</LName>
-                <LNum>1</LNum>
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>NOT_RECORDED</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
                 <DisplayInfo>1</DisplayInfo>
               </Member>
             </Tuple>

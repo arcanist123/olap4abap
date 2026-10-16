@@ -175,8 +175,8 @@
         <CubeInfo>
           <Cube>
             <CubeName>ZCLVISIT</CubeName>
-            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T07:10:04</LastDataUpdate>
-            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T07:10:04</LastSchemaUpdate>
+            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T08:50:24</LastDataUpdate>
+            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T08:50:24</LastSchemaUpdate>
           </Cube>
         </CubeInfo>
         <AxesInfo>
@@ -509,6 +509,18 @@
                 <CHILDREN_CARDINALITY>1</CHILDREN_CARDINALITY>
               </Member>
             </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED].[NO_DIAGNOSIS]</UName>
+                <Caption>NO_DIAGNOSIS</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>1</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>1</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
           </Tuples>
         </Axis>
       </Axes>
@@ -696,6 +708,14 @@
         <Cell CellOrdinal="45">
           <Value xsi:type="xsd:double">190440.5</Value>
           <FmtValue>190,440.500</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="46">
+          <Value xsi:type="xsd:double">337</Value>
+          <FmtValue>337.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="47">
+          <Value xsi:type="xsd:double">51073</Value>
+          <FmtValue>51,073.000</FmtValue>
         </Cell>
       </CellData>
     </root>

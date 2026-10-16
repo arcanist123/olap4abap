@@ -25,18 +25,17 @@ depth, is served by the reference as a balanced level hierarchy (Level 01 to Lev
    data/foodmart-bw/bw/<table>.json (git-ignored), listed in tables.json. Then per hierarchy of HIERARCHIES the copy
    of ZZXXMLA1_CL_BW_HIERARCHY_COPY at BW's current version (the row of RSRHIEDIR_OLAP without DELETETIMESTMP, as
    the copy finds it; run program ZZXXMLA1_HIERARCHY_COPY first if the copy is older): the rows of its node table
-   (ZZXXMLA1H...) and of its not-assigned view (ZZXXMLA1R..., the closure with REST_H and the values under no leaf)
-   for that HIESID and SVER, into hierarchy_<name>.json.
+   (ZZXXMLA1H...) for that HIESID and SVER, into hierarchy_<name>.json.
 2. Build: adds the tables to data/foodmart-bw/hsqldb-foodmart.jar (the FoodMart data with the empty members, see
    scripts/add-empty-members.py): CREATE MEMORY TABLE after the last CREATE of foodmart.script, the rows at its end.
    Per hierarchy its flattened table (hierarchy_levels), computed from the copy: ZZXXMLA1_HL_<hierarchy>, a row per
    value SID (the fact's SID_<characteristic>, the key) with its member on each level, L01_SID, L01_NAME, L01_POS to
    the level of the values: the node's SID, its NAME (a text node's technical name, a value's key from the SID table,
    # for the initial value, as BW's MDX names them) and its position among its siblings (BW's order). The virtual
-   root is the All member. REST_H is a root after the hierarchy with one placeholder REST_H on each level down to the
-   one above the values, which are the values under no leaf (by SID). The build fails unless the real tree is
-   balanced, its leaves values at the same depth, every node once and no value with children (docs/next-steps.md,
-   Reference scenario: the reference serves BW hierarchies with a level form as level hierarchies). The copy's own
+   root is the All member. The build fails unless the tree is balanced, its leaves values at the same depth, every
+   node once, no value with children and every value of the characteristic a leaf (docs/next-steps.md, Reference
+   scenario: the reference serves BW hierarchies with a level form as level hierarchies, every value assigned and the
+   not-assigned node suppressed, so that REST_H is no part of it). The copy's own
    tables are not loaded. Then the characteristic views under their placeholder names, after the tables. Lines of an
    earlier run (they name /BIC/ or ZZXXMLA1 objects) are removed first, so the script can run again.
    Column types: NUMC, CHAR, LANG and DATS are VARCHAR of their length (HANA: NVARCHAR), INT4 is INTEGER, DEC is
@@ -67,8 +66,8 @@ CUBES = {
                   "ZCLFISCYR", "ZCLFISCPR", "ZCLSERV"], "/BIC/_ZCL%"),
 }
 # the BW hierarchies the reference serves as level hierarchies: hierarchy -> characteristic; only balanced
-# hierarchies in which every node occurs once and that show the not-assigned values (docs/next-steps.md, Reference
-# scenario)
+# hierarchies in which every node occurs once, every value is a leaf and the not-assigned node is suppressed
+# (docs/next-steps.md, Reference scenario)
 HIERARCHIES = {"ZCLDIAG_ICD": "ZCLDIAG"}
 CR, NL = "\r", "\n"
 PLACEHOLDER = "ZZXXMLA1_C_"  # + characteristic: the reference schema's name of its view (ZZXXMLA1_CL_BW_VIEW_GEN)
@@ -130,11 +129,11 @@ def export():
 
 
 def export_hierarchy(hierarchy, characteristic):
-    """The copy of the hierarchy at BW's current version: the directory row and the rows of the node table and of
-    the not-assigned view for its HIESID and SVER."""
-    registry = sapcli(f"SELECT node_table, rest_view FROM zzxxmla1_hietab WHERE iobjnm = '{characteristic}'", 10)
+    """The copy of the hierarchy at BW's current version: the directory row and the rows of the node table for its
+    HIESID and SVER."""
+    registry = sapcli(f"SELECT node_table FROM zzxxmla1_hietab WHERE iobjnm = '{characteristic}'", 10)
     assert len(registry) == 1, f"{characteristic} has no copy tables: run program ZZXXMLA1_HIERARCHY_COPY"
-    copies = sapcli("SELECT hieid, hiesid, sver, timestmp, root_sid, rest_top_sid, norestnodes FROM zzxxmla1_hiedir "
+    copies = sapcli("SELECT hieid, hiesid, sver, timestmp, root_sid, norestnodes FROM zzxxmla1_hiedir "
                     f"WHERE iobjnm = '{characteristic}' AND hienm = '{hierarchy}'", 1000)
     assert copies, f"{hierarchy} has no copy: run program ZZXXMLA1_HIERARCHY_COPY"
     # BW's current version, as ZZXXMLA1_CL_BW_HIERARCHY_COPY finds it
@@ -145,11 +144,11 @@ def export_hierarchy(hierarchy, characteristic):
     copy = [c for c in copies if (number(c["HIESID"]), c["SVER"], number(c["TIMESTMP"])) == key]
     assert copy, f"{hierarchy}: no copy of BW's current version {key}: run program ZZXXMLA1_HIERARCHY_COPY"
     copy = copy[0]
-    assert not copy["NORESTNODES"].strip(), f"{hierarchy} suppresses the not-assigned values: not a reference case"
+    assert copy["NORESTNODES"].strip(), f"{hierarchy} shows the not-assigned node: not a reference case"
     hiesid, sver = key[0], key[1]
     data = dict(hierarchy=hierarchy, characteristic=characteristic, hiesid=hiesid, sver=sver, timestmp=key[2],
-                root_sid=number(copy["ROOT_SID"]), rest_top_sid=number(copy["REST_TOP_SID"]))
-    for part, table in (("nodes", registry[0]["NODE_TABLE"]), ("closure", registry[0]["REST_VIEW"])):
+                root_sid=number(copy["ROOT_SID"]))
+    for part, table in (("nodes", registry[0]["NODE_TABLE"]),):
         fields = ddic_fields(sapcli(DD03L + f"tabname = '{table}' ORDER BY position ASCENDING", 1000))
         assert fields, table
         rows = sapcli(f"SELECT * FROM {table} WHERE hiesid = {hiesid} AND sver = '{sver}'", 1000000)
@@ -255,10 +254,10 @@ def statements(data):
 
 def hierarchy_levels(data):
     """The flattened table of a hierarchy: a row per value SID with its member on each level (SID, name and position
-    among its siblings), the values under no leaf below the placeholders of REST_H. Fails unless the real tree is
-    balanced with its values as leaves, so that it is a level hierarchy."""
+    among its siblings). Fails unless the tree is balanced with every value of the characteristic a leaf, so that it
+    is a level hierarchy."""
     h, c = data["hierarchy"], data["characteristic"]
-    root, rest = int(data["root_sid"]), int(data["rest_top_sid"])
+    root = int(data["root_sid"])
     fields = [f["name"] for f in data["nodes"]["fields"]]
     sid_table = json.loads(table_file(f"/BIC/S{c}").read_text(encoding="utf-8"))
     sid_fields = [f["name"] for f in sid_table["fields"]]
@@ -296,15 +295,7 @@ def hierarchy_levels(data):
         while nodes[path[0]]["parent"] != root:
             path.insert(0, nodes[path[0]]["parent"])
         rows.append([sid] + [v for s in path for v in (s, nodes[s]["name"], rank[s])])
-    # REST_H, a root after the hierarchy, its placeholders down to the level above the values, the values below
-    closure_fields = [f["name"] for f in data["closure"]["fields"]]
-    rest_values = sorted(int(number(row[closure_fields.index("SID")])) for row in data["closure"]["rows"]
-                         if int(number(row[closure_fields.index("ANCESTOR_SID")])) == rest)
-    assert all(sid >= 0 for sid in rest_values) and rest not in nodes, (h, rest_values)
-    placeholders = [(rest, "REST_H", len(children[root]) + 1)] + [(rest, "REST_H", 1)] * (depth - 2)
-    for n, sid in enumerate(rest_values, 1):
-        rows.append([sid] + [v for member in placeholders + [(sid, keys[sid], n)] for v in member])
-    assert sorted(row[0] for row in rows) == sorted(keys), f"{h}: values of {c} missing or twice"
+    assert sorted(row[0] for row in rows) == sorted(keys), f"{h}: values of {c} not leaves or twice"
     name_length = max(len(row[i]) for row in rows for i in range(2, len(row), 3))
     level_fields = [dict(name="SID", key=True, type="INT4", length=10, decimals=0)]
     for level in range(1, depth + 1):

@@ -192,13 +192,14 @@ Hierarchies in which every node occurs once (`ZCLDIAG_ICD`) are also served by t
 hierarchy on a flattened table of an export of the clinic InfoCube and the hierarchy's copy (catalog `ZCLVISIT`,
 `reference/schema/ClinicBW.xml`, exported by `build-bw-reference-db.py`), and their MDX cases are captured and replayed
 like FoodMart's (`next-steps.md`, Reference scenario): `execute_hier_*`, `members_hier_*`, `mdschema_hierarchies_hier`
-and `mdschema_levels_hier`, 71 cases (none looks inside REST_H's branch), which fail on SAP until the engine serves the hierarchy. Before capture,
+and `mdschema_levels_hier`, 71 cases, which fail on SAP until the engine serves the hierarchy. Before capture,
 
     python scripts/bw_hierarchy_test.py --reference
 
-checks the reference's members of `ZCLDIAG_ICD` against BW's MDX (depth, children, name, values, order; of REST_H's
-branch only REST_H's value), so the export
-is known to be BW's hierarchy. BW's MDX stays the oracle for shared nodes, intervals and postable nodes. A subselect or a
+checks the reference's members of `ZCLDIAG_ICD` against BW's MDX (depth, children, name, values, order; the All member
+is recognized by `MEMBER_TYPE` 2 and checked against the total), so the export is known to be BW's hierarchy. The
+reference cannot model REST_H, so a reference hierarchy assigns every value (the initial one too) and suppresses the
+not-assigned node (`NORESTNODES`; decided with the user 2026-10-16); `build-bw-reference-db.py` refuses any other. BW's MDX stays the oracle for shared nodes, intervals and postable nodes. A subselect or a
 drill-through of a node, which the reference answered wrong, is answered right since `parent-child-closure.patch`
 (next-steps.md, Reference scenario).
 
@@ -207,8 +208,8 @@ it puts every member of one on a single level, which Excel cannot expand (a live
 more: its patches stay as they are, and an answer it gets wrong waits for SSAS, the spec for hierarchies and Excel's
 behaviour (next-steps.md, Reference scenario, step 6). olap4abap puts a member on the level of its depth, as
 SSAS does. A BW hierarchy with a level form (`ZCLDIAG_ICD`) is therefore served by the reference as a balanced level
-hierarchy (`Level 01` to `Level 04`, placeholder members under REST_H so nothing is hidden), whose layout is
-olap4abap's; the cases stay out of REST_H's branch, which BW's MDX checks. Hierarchies without a level form (shared
+hierarchy (`Level 01` to `Level 04`, every value a leaf, no REST_H), whose layout is olap4abap's; REST_H is checked
+against BW's MDX on the hierarchies that show it (`ZCLPAT_PRG`, `ZCLSERV_CAT`). Hierarchies without a level form (shared
 nodes, intervals, postable nodes) have BW's MDX as oracle; their subselects are checked as the node in the slicer and
 their drill-throughs by the facts' count under the closure. `Aggregate` and compound slicers of a node and a member
 below it count that member twice in the reference, as Microsoft specifies `Aggregate` for Sum, and olap4abap follows

@@ -175,8 +175,8 @@
         <CubeInfo>
           <Cube>
             <CubeName>ZCLVISIT</CubeName>
-            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T07:10:04</LastDataUpdate>
-            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T07:10:04</LastSchemaUpdate>
+            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T08:50:24</LastDataUpdate>
+            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T08:50:24</LastSchemaUpdate>
           </Cube>
         </CubeInfo>
         <AxesInfo>
@@ -250,8 +250,8 @@
             </Tuple>
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
-                <UName>[ZCLDIAG.ZCLDIAG_ICD].[Rest and Thyroid]</UName>
-                <Caption>Rest and Thyroid</Caption>
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[Not recorded and Thyroid]</UName>
+                <Caption>Not recorded and Thyroid</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[(All)]</LName>
                 <LNum>0</LNum>
                 <DisplayInfo>0</DisplayInfo>

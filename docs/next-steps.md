@@ -4,8 +4,8 @@ State on 2026-10-05, after the set functions, compound slicers, the aggregates a
 `Generate`, the member functions, the operators `IN`, `IS`, `MATCHES` and `Existing`, the remaining functions
 (`VisualTotals`, `CurrentDateMember`, `Parameter`, ...), the native crossjoin, the member properties of levels and the
 period functions: all 244 `reference/` cases pass, and of the 395 statements of Mondrian's tests that run on our schema
-(`tests/mdx/applicable.json`) 394 give eMondrian's answer. eMondrian sometimes answers "Internal Error null" while several statements run at once (#2, #171,
-#237, #348 in some runs); run such a statement again on its own. Measure progress with
+(`tests/mdx/applicable.json`) 394 give eMondrian's answer. The reference's own faults and olap4abap's debt are in
+`known-issues.md`. Measure progress with
 
     python scripts/compare-applicable.py                 # eMondrian and SAP side by side, gaps grouped
     python scripts/compare-applicable.py 46 124 126      # some statements
@@ -490,11 +490,28 @@ Done (2026-10-15): the reference serves `ZCLDIAG_ICD`.
      and capture the statements it sends as cases.
   7. The engine (open 4) serves members on the levels by depth; the level-dependent expectations then hold on SAP,
      and Excel against olap4abap (port 8082) is the last check.
-- SAP's answers on the clinic catalog differ from the reference's besides the hierarchy: member unique names by the
-  name, not the key (`[ZCLDOC].[000]` where the reference has `[ZCLDOC].[0]`), the measure's name as its caption
-  (`ZCLVISNO`, the reference `Visits`), the default drill-through with the measure; and SAP's schema annotates
-  `olap4abap.omitEmptyCells` and `olap4abap.membersWithFacts`, which change answers. The engine work and open 2 meet
-  these first.
+- Simplified (2026-10-16, with the user): the reference cannot be the oracle of REST_H (it needed placeholders and the
+  cases kept out of its branch), so it no longer pretends to be. `ZCLDIAG_ICD` assigns every value explicitly, the
+  initial one (337 visits) as the leaf `#` under the chapter `NOT_RECORDED` (Not recorded) and the group
+  `NO_DIAGNOSIS` (No diagnosis), and suppresses the not-assigned node (`NORESTNODES`, set by the clinic generator).
+  This supersedes "single-parent trees that show not assigned" (2026-10-15) above: the reference serves only
+  hierarchies that suppress REST_H and assign every value (`build-bw-reference-db.py` refuses others); REST_H is
+  checked against BW's MDX on `ZCLPAT_PRG` and `ZCLSERV_CAT`. Done: the clinic demo regenerated (its run now deletes
+  the hierarchy copies first, `ZZXXMLA1_CL_BW_HIERARCHY_COPY->delete_tables`, whose not-assigned views blocked BW's
+  deletion of the InfoObjects), the copies refilled (`hierarchy_copy_test.py`: 37 leaves, read from the closure
+  table), the reference rebuilt (37 rows, no placeholders) and `bw_hierarchy_test.py --reference` passes (72
+  members; the All member found by `MEMBER_TYPE`). The 14 requests that named REST_H were rewritten:
+  `Except(... .Members, Descendants([REST_H], ...))` is `.Members` again, a level's members are the level's, REST_H
+  as a node is `[DIAGNOSES].[NOT_RECORDED]`, and `Ascendants` and the slicer take the leaf `#`
+  (`execute_hier_slicer_rest` is now `execute_hier_slicer_initial`). All 71 cases recaptured.
+- Decided (2026-10-16, with the user): the hierarchy's form in the schema (open 2) is a `<Hierarchy>` with the
+  annotation `olap4abap.bwHierarchy` naming the BW hierarchy and no `<Level>`; the schema reader makes `Level 01` to
+  `Level nn` from the copy's depth. The 71 cases run on SAP against a test catalog, as `ZFMDRILL` is one: `ClinicBW.xml`
+  with the hierarchy in that form and no olap4abap annotation (`membersWithFacts`, `omitEmptyCells`), deployed with
+  `sap-files.py deploy`; the demo's own `ZCLVISIT` follows when the proposal offers hierarchies (open 5).
+- SAP's schema of `ZCLVISIT` is `ClinicBW.xml` but for the hierarchy and the annotations (compared 2026-10-16), yet
+  olap4abap names members of a `sourceAttribute` level and shows measure captions differently from the reference:
+  debt (`known-issues.md`), which the hierarchy cases on SAP will show until it is paid.
 
 ## Paused: query planning
 
@@ -679,19 +696,10 @@ Steps:
     catalogs have the variant as a dimension with one member (the demo regenerated). A fix takes about 0.4 s (two
     provider reads).
 
-Open questions, to revisit after the current scope (2026-10-13: accepted for now, the user disagrees with both long
-term):
-
-- **aDSO keyed by SID when the compounding is all fixed.** An aDSO's compounded characteristic stays keyed by its SID
-  (`SID_<field>` in the fact view) even when all its compounding is fixed and its value alone would identify it.
-  Chosen so that fixing never renames the key attribute (`C SID` ↔ `C Key`), only columns. Costs a join to the SID
-  table per such characteristic in the fact view. Long term: key it by its value, and have `POST fix` rename the key
-  attribute and what refers to it (levels, properties, double-click columns).
-- **Reference characteristics and fixing.** A fixed reference characteristic (`0SOLD_TO` → `0CUSTOMER`) keeps its basic
-  characteristic's unfiltered view, because the view is per basic characteristic and other characteristics share it;
-  it shows one member only with members with facts on. Fixing a basic characteristic that another characteristic of
-  the provider references is refused for the same reason. Long term: views (and placeholders) per characteristic and
-  selection, so a reference characteristic gets its own filtered view and both cases work.
+Accepted for now (2026-10-13), the user disagrees with both long term: an aDSO's compounded characteristic keyed by
+its SID when all its compounding is fixed (chosen so that fixing never renames the key attribute, only columns), and
+a fixed reference characteristic left unfiltered (the view is per basic characteristic). Both are debt,
+`known-issues.md`.
 
 ### Selections (decided 2026-10-13)
 
@@ -1175,9 +1183,8 @@ evaluation (`MemberArrayValueCalc`; before, `([Measures].[Foo], [Time].CurrentMe
 
 ## Later
 
-- The Discover cache (`docs/mvp-scope.md`, Discover cache decision) is cleared only by schema changes and expires
-  after 12 hours: clear it, or the answers of the cube concerned, when BW activates master data of a characteristic or
-  loads a request into a provider of a catalog.
+- The Discover cache not seeing BW loads is debt (`known-issues.md`): clear it, or the answers of the cube
+  concerned, when BW activates master data of a characteristic or loads a request into a provider of a catalog.
 - Done: compound slicer (a set of several tuples in WHERE); Mondrian aggregates over the slicer tuples
   (`RolapResult`, `CompoundSlicerRolapMember`).
 - Done: `VisualTotals`, `CurrentDateMember`, `Parameter`, `LastNonEmpty`, `CASE`, `CoalesceEmpty`,

@@ -24,6 +24,8 @@ Read before designing anything:
 - `docs/mondrian-hierarchies-and-time-dependency.md` - background on Mondrian's modelling
 - `docs/environment.md` - systems, ports, build procedures, tool quirks
 - `docs/next-steps.md` - what to do next, in which order, and the open decisions
+- `docs/known-issues.md` - debt (what is wrong within the built scope), deliberate deviations and the reference's
+  known wrong answers; read before comparing answers. Not-yet-built features are scope, not issues
 
 ## Conventions
 
@@ -360,11 +362,13 @@ Read before designing anything:
   creates the objects of the characteristics selected and copies their hierarchies (`run`), listing per hierarchy the
   copy or its refusal and its counts. Not yet in the schema, the engine or accept.
   The reference serves `ZCLDIAG_ICD` as a balanced level hierarchy (`Level 01`-`Level 04` on the flattened table
-  `ZZXXMLA1_HL_ZCLDIAG_ICD`, placeholders under REST_H; catalog `ZCLVISIT`, `reference/schema/ClinicBW.xml`, built by
+  `ZZXXMLA1_HL_ZCLDIAG_ICD`; catalog `ZCLVISIT`, `reference/schema/ClinicBW.xml`, built by
   `build-bw-reference-db.py` from an export of the InfoCube and the copy, checked against BW by
-  `bw_hierarchy_test.py --reference`); its 71 cases (`execute_hier_*`, `members_hier_*`, `mdschema_*_hier`;
-  none inside REST_H's branch; the Excel ones from a live session against it) are what the engine work has
-  to pass
+  `bw_hierarchy_test.py --reference`). The reference cannot model REST_H, so `ZCLDIAG_ICD` assigns every value (the
+  initial one as leaf `#` under `NOT_RECORDED` > `NO_DIAGNOSIS`) and suppresses the not-assigned node (decided
+  2026-10-16). Its 71 cases (`execute_hier_*`, `members_hier_*`, `mdschema_*_hier`; the Excel ones from a live
+  session against it) are what the engine work has to pass, on a test catalog of SAP: `ClinicBW.xml` with the
+  hierarchy in olap4abap's form (annotation `olap4abap.bwHierarchy`, no levels), no other annotation
   (`docs/next-steps.md`, Reference scenario). Decided 2026-10-16 after Excel failed on the parent-child form: the
   reference is the oracle for everything but parent-child hierarchies and is not patched any more: its patches stay
   as they are, an answer it gets wrong (Expand Entire Field, Top 10 value filter, a label filter on an upper level)

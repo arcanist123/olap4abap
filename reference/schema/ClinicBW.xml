@@ -13,9 +13,8 @@
   its flattened table ZZXXMLA1_HL_ZCLDIAG_ICD: a row per value SID (the fact's SID_ZCLDIAG joins it), per level its
   member's key Lnn_SID (the node's SID: negative for a text node, the value's SID for a value), name Lnn_NAME (a text
   node's technical name or a value's key, # for the initial value, as BW's MDX names them) and Lnn_POS (its position
-  among its siblings, BW's order). Level 01 holds DIAGNOSES and REST_H (the not-assigned node, after the hierarchy);
-  under REST_H one placeholder REST_H on Level 02 and one on Level 03, the values under no leaf on Level 04. The
-  placeholders are not hidden: olap4abap puts these values one level below REST_H, so no case looks inside its branch.
+  among its siblings, BW's order). Every value is a leaf (the initial one under NOT_RECORDED > NO_DIAGNOSIS) and BW
+  suppresses the not-assigned node, so the hierarchy has no REST_H.
 
   The dimension ZCLDIAG has no table of its own: the reference gives every hierarchy of a dimension with a table that
   table (RolapHierarchy), so each hierarchy names its own; the flat one is first, so the drill-through's attributes

@@ -132,6 +132,10 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
     METHODS create_tables
       IMPORTING characteristic TYPE rsiobjnm
       RETURNING VALUE(result)  TYPE ty_tables.
+    "! Deletes the not-assigned view, the node and closure tables and the copies of an InfoObject, if it has them:
+    "! the view reads BW's SID table, so BW cannot delete the InfoObject while it exists (the clinic demo's run).
+    METHODS delete_tables
+      IMPORTING characteristic TYPE rsiobjnm.
     "! The current copy of a hierarchy of a characteristic (the basic one, RSHIEDIR-IOBJNM), refilled first if BW's
     "! is newer. Raises ZZXXMLA1_CX_BW_HIERARCHY.
     METHODS current
@@ -438,6 +442,20 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
                                        changed_by    = sy-uname ).
     GET TIME STAMP FIELD row-changed_at.
     MODIFY zzxxmla1_hietab FROM @row.
+    COMMIT WORK.
+  ENDMETHOD.
+
+  METHOD delete_tables.
+    DATA(tables) = registered_tables( characteristic ).
+    IF tables IS INITIAL.
+      RETURN.
+    ENDIF.
+    " the view first, it reads the closure table
+    delete_rest_view( tables ).
+    delete_table( tables-node ).
+    delete_table( tables-closure ).
+    DELETE FROM zzxxmla1_hiedir WHERE iobjnm = @characteristic.
+    DELETE FROM zzxxmla1_hietab WHERE iobjnm = @characteristic.
     COMMIT WORK.
   ENDMETHOD.
 

@@ -175,8 +175,8 @@
         <CubeInfo>
           <Cube>
             <CubeName>ZCLVISIT</CubeName>
-            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T07:10:04</LastDataUpdate>
-            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T07:10:04</LastSchemaUpdate>
+            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T08:50:24</LastDataUpdate>
+            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T08:50:24</LastSchemaUpdate>
           </Cube>
         </CubeInfo>
         <AxesInfo>
@@ -1716,6 +1716,326 @@
                 <DisplayInfo>131072</DisplayInfo>
               </Member>
             </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>NOT_RECORDED</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[1]</UName>
+                <Caption>001</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>NOT_RECORDED</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[2]</UName>
+                <Caption>002</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>NOT_RECORDED</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[3]</UName>
+                <Caption>003</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>NOT_RECORDED</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[4]</UName>
+                <Caption>004</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>NOT_RECORDED</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[5]</UName>
+                <Caption>005</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>NOT_RECORDED</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[6]</UName>
+                <Caption>006</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>NOT_RECORDED</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[7]</UName>
+                <Caption>007</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>NOT_RECORDED</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[8]</UName>
+                <Caption>008</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>NOT_RECORDED</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[9]</UName>
+                <Caption>009</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>NOT_RECORDED</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[10]</UName>
+                <Caption>010</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>NOT_RECORDED</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[11]</UName>
+                <Caption>011</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>NOT_RECORDED</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[12]</UName>
+                <Caption>012</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>NOT_RECORDED</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[13]</UName>
+                <Caption>013</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>NOT_RECORDED</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[14]</UName>
+                <Caption>014</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>NOT_RECORDED</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[15]</UName>
+                <Caption>015</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>NOT_RECORDED</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[16]</UName>
+                <Caption>016</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>NOT_RECORDED</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[17]</UName>
+                <Caption>017</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>NOT_RECORDED</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[18]</UName>
+                <Caption>018</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>NOT_RECORDED</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[19]</UName>
+                <Caption>019</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>NOT_RECORDED</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLDOC]">
+                <UName>[ZCLDOC].[20]</UName>
+                <Caption>020</Caption>
+                <LName>[ZCLDOC].[ZCLDOC]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+            </Tuple>
           </Tuples>
         </Axis>
       </Axes>
@@ -2091,6 +2411,86 @@
         <Cell CellOrdinal="92">
           <Value xsi:type="xsd:double">76</Value>
           <FmtValue>76.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="93">
+          <Value xsi:type="xsd:double">28</Value>
+          <FmtValue>28.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="94">
+          <Value xsi:type="xsd:double">21</Value>
+          <FmtValue>21.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="95">
+          <Value xsi:type="xsd:double">25</Value>
+          <FmtValue>25.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="96">
+          <Value xsi:type="xsd:double">24</Value>
+          <FmtValue>24.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="97">
+          <Value xsi:type="xsd:double">28</Value>
+          <FmtValue>28.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="98">
+          <Value xsi:type="xsd:double">14</Value>
+          <FmtValue>14.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="99">
+          <Value xsi:type="xsd:double">19</Value>
+          <FmtValue>19.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="100">
+          <Value xsi:type="xsd:double">7</Value>
+          <FmtValue>7.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="101">
+          <Value xsi:type="xsd:double">8</Value>
+          <FmtValue>8.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="102">
+          <Value xsi:type="xsd:double">13</Value>
+          <FmtValue>13.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="103">
+          <Value xsi:type="xsd:double">21</Value>
+          <FmtValue>21.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="104">
+          <Value xsi:type="xsd:double">15</Value>
+          <FmtValue>15.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="105">
+          <Value xsi:type="xsd:double">21</Value>
+          <FmtValue>21.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="106">
+          <Value xsi:type="xsd:double">8</Value>
+          <FmtValue>8.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="107">
+          <Value xsi:type="xsd:double">20</Value>
+          <FmtValue>20.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="108">
+          <Value xsi:type="xsd:double">13</Value>
+          <FmtValue>13.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="109">
+          <Value xsi:type="xsd:double">15</Value>
+          <FmtValue>15.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="110">
+          <Value xsi:type="xsd:double">12</Value>
+          <FmtValue>12.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="111">
+          <Value xsi:type="xsd:double">14</Value>
+          <FmtValue>14.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="112">
+          <Value xsi:type="xsd:double">11</Value>
+          <FmtValue>11.000</FmtValue>
         </Cell>
       </CellData>
     </root>

@@ -12,8 +12,10 @@ link leaves, postable nodes) and ZCLSERV_CAT (intervals, overlapping and linked)
 - a node's value is the sum over the distinct values below it (a value reached by two paths counts once);
 - an interval is no member: its values are the leaves, directly under its parent;
 - a postable node is a node whose first child is its own value;
-- the not-assigned node (REST_H) is a root after the hierarchy, its values below it; BW gives them its deepest level;
-- no All member: olap4abap's All member, if it has one, is checked against the provider's total and left out.
+- the not-assigned node (REST_H), unless the hierarchy suppresses it, is a root after the hierarchy, its values below
+  it; BW gives them its deepest level;
+- no All member: olap4abap's All member (MEMBER_TYPE 2), if it has one, is checked against the provider's total and
+  left out.
 
 Per member: level (relative to the first root, not under the not-assigned node; a member's DEPTH where it has one,
 as the members of a parent-child level all have the level's number), number of children, caption (BW's text; with
@@ -25,8 +27,7 @@ compares only the members with a value, in BW's order.
 Reference scenario; catalog ZCLVISIT, reference/schema/ClinicBW.xml, built by scripts/build-bw-reference-db.py) against
 BW's MDX instead, names as captions: so the export is known to be BW's hierarchy before cases are captured from it.
 BW is asked on the aDSO ZCLVISITA, the reference serves the InfoCube ZCLVISIT: both hold the same visits. The
-reference serves them as level hierarchies (Level 01 to Level 04), REST_H with placeholders down to the level above
-its values, so of REST_H's branch only REST_H's value is compared.
+reference serves them as level hierarchies (Level 01 to Level 04); they assign every value and suppress REST_H.
 
     python scripts/bw_hierarchy_test.py
     python scripts/bw_hierarchy_test.py --names --with-facts --url http://localhost:50000/zzxxmla1?sap-client=001
@@ -136,7 +137,7 @@ def post(url, statement):
 def olap4abap_members(url, hierarchy):
     """olap4abap's members of the hierarchy with level, children, caption and values; or the fault."""
     text = post(url, f"SELECT {{{', '.join(MEASURES)}}} ON 0, {{{hierarchy}.Members}} "
-                     f"DIMENSION PROPERTIES DEPTH, CHILDREN_CARDINALITY ON 1 FROM [{CATALOG}]")
+                     f"DIMENSION PROPERTIES DEPTH, CHILDREN_CARDINALITY, MEMBER_TYPE ON 1 FROM [{CATALOG}]")
     fault = re.search(r"<faultstring>(.*?)</faultstring>", text, re.S)
     if fault:
         return None, html.unescape(fault.group(1))
@@ -155,6 +156,7 @@ def olap4abap_members(url, hierarchy):
             "unique": field(member, "UName"), "caption": field(member, "Caption"),
             "level": int(field(member, "DEPTH") or field(member, "LNum") or 0),
             "children": int(field(member, "CHILDREN_CARDINALITY") or 0),
+            "all": field(member, "MEMBER_TYPE") == "2",
             "values": [cells.get(row * len(MEASURES) + column) for column in range(len(MEASURES))]})
     return members, None
 
@@ -165,37 +167,19 @@ def same_values(a, b):
 
 
 def bw_checks(total, key, members, check):
-    """BW's answer itself: the roots and the not-assigned node add up to the total, children counts match."""
+    """BW's answer itself: the roots and the not-assigned node add up to the total, at most one not-assigned node."""
     roots = [m for m in members if m["level"] == 0]
     sums = [sum(m["values"][i] or 0 for m in roots) for i in range(len(MEASURES))]
     check(f"BW {key[1]}: roots and not assigned add up to the total", same_values(sums, total), f"{sums} != {total}")
-    check(f"BW {key[1]}: one not-assigned root", sum(m["kind"] == NOT_ASSIGNED for m in roots) == 1, roots)
-
-
-def without_rest_branch(members, is_rest):
-    """The members without the ones below the not-assigned root (a root, level 0, that is_rest finds)."""
-    kept, under_rest = [], False
-    for member in members:
-        if member["level"] == 0:
-            under_rest = bool(is_rest(member))
-        elif under_rest:
-            continue
-        kept.append(member)
-    return kept
+    check(f"BW {key[1]}: at most one not-assigned root", sum(m["kind"] == NOT_ASSIGNED for m in roots) <= 1, roots)
 
 
 def compare(total, key, expected, actual, args, check):
-    if actual and actual[0]["level"] == 0 and len([m for m in actual if m["level"] == 0]) == 1 \
-            and len([m for m in expected if m["level"] == 0]) > 1:
+    if actual and actual[0]["all"]:
         # olap4abap's All member: the provider's total
         check(f"{key[1]}: All member is the total", same_values(actual[0]["values"], total),
               f"{actual[0]['values']} != {total}")
         actual = [{**m, "level": m["level"] - 1} for m in actual[1:]]
-    if args.reference:
-        # the reference's REST_H has placeholders down to the level above its values, olap4abap's has its values one
-        # level below it: of its branch only REST_H itself is compared (its value)
-        expected = without_rest_branch(expected, lambda m: m["kind"] == NOT_ASSIGNED)
-        actual = without_rest_branch(actual, lambda m: re.fullmatch(r".*\]\.\[REST_H\]", m["unique"]))
     if args.with_facts:
         expected = [m for m in expected if any(v is not None for v in m["values"])]
         actual = [m for m in actual if any(v is not None for v in m["values"])]
@@ -209,7 +193,7 @@ def compare(total, key, expected, actual, args, check):
         problems = []
         if not under_rest and bw["level"] != ours["level"]:
             problems.append(f"level {ours['level']} != {bw['level']}")
-        if not args.with_facts and not (args.reference and under_rest) and bw["children"] != ours["children"]:
+        if not args.with_facts and bw["children"] != ours["children"]:
             problems.append(f"children {ours['children']} != {bw['children']}")
         captions = {bw["caption"]} | ({bw["name"]} if args.names else set())
         if ours["caption"] not in captions:

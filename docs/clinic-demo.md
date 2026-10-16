@@ -123,8 +123,10 @@ joins respecting blanks.
 ## The hierarchy of the diagnoses
 
 For authorizations that combine two characteristics, the diagnosis `ZCLDIAG` has the hierarchy `ZCLDIAG_ICD`, Diagnoses
-by ICD-10 Chapter: All Diagnoses `DIAGNOSES` > chapter > group > diagnosis (69 nodes: 9 chapters, 23 groups, the 36
-diagnoses' codes as leaves). Unlike the physician's, it is plain: neither version nor time dependent (`HIETABFL` only;
+by ICD-10 Chapter: All Diagnoses `DIAGNOSES` > chapter > group > diagnosis (72 nodes: 10 chapters, 24 groups, the 36
+diagnoses' codes and the initial value as leaves). Every value is assigned: the initial one (the 337 visits without a
+diagnosis) is the leaf `#` under `NOT_RECORDED` (Not recorded) > `NO_DIAGNOSIS` (No diagnosis), and the hierarchy
+suppresses the not-assigned node (`NORESTNODES`), so it has no REST_H. Unlike the physician's, it is plain: neither version nor time dependent (`HIETABFL` only;
 version blank, valid to 9999-12-31), so in a combination only the physician's side depends on the key date and the
 version. The text nodes are named by their text in upper case with `_` for blanks and hyphens, cut at 32 characters:
 `RESPIRATORY`, `UPPER_RESPIRATORY_INFECTIONS`, `CHRONIC_LOWER_RESPIRATORY_DISEAS`, `CHECK_UPS`, ... A department
