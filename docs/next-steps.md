@@ -15,6 +15,44 @@ eMondrian's database adds in another order (`docs/test-strategy.md`). The run (t
 two minutes; #85 takes 1 s with the native `Order` (step 8, 105 s before), #46 2.3 s with the native `TopCount` (step
 9); everything else is below 10 s.
 
+## The order from here (2026-10-16, evening)
+
+Where things stand: texts steps 1 to 4, 6 and 7 are done; BW hierarchies steps 7.1 to 7.3 are done (members and
+cells of a BW hierarchy from the copy, served on SAP's test catalog `ZCLHIER`). New today: SSAS Multidimensional
+(`localhost\SSAS_MULT`) holds the clinic with `ZCLDIAG_ICD`, `ZCLPAT_PRG` and `ZCLSERV_CAT` as parent-child
+dimensions related to the facts many-to-many through their closures (`scripts/build-ssas-clinic-md.py`,
+`docs/environment.md`, The clinic in SSAS Multidimensional). `bw_hierarchy_test.py --ssas` passes (every member of
+the three hierarchies BW's, REST_H included), a slicer of two overlapping `ZCLPAT_PRG` nodes counts their shared
+visits once, and Excel shows the subtotals right over HTTP (pump on 8089, proxy backend `ssasmd` on 8088).
+`capture-execute.py --ssas multidimensional` keeps its answers as cases. It is the oracle for Excel's MDX on what
+neither the reference nor BW's MDX can check: shared nodes, links, postable nodes, intervals and REST_H. `ZCLDIAG_ICD`
+stays the reference's (its 71 cases); in SSAS it is the control only, no cases are captured on it there. The
+time-dependent `ZCLDOC_ORG` and `ZCLDOC_SITE` have no copy and are out of scope until the key date.
+
+Checked today in Excel against olap4abap: the setup's catalogs `ZCLVISIT` and `ZCLVISITA` show the flat diagnosis
+only (37 diagnoses with visits, every value and the total BW's); a BW hierarchy is in the test catalog `ZCLHIER` only,
+since accept does not build them yet (step 3 below).
+
+Next, in this order:
+
+1. A test catalog on SAP with the three hierarchies: `ZCLPAT_PRG` and `ZCLSERV_CAT` in `ClinicBW-sap.xml` next to
+   `ZCLDIAG_ICD`, so `bw_hierarchy_test.py --catalog ZCLHIER` runs without editing the schema (open of step 7.3).
+2. Excel's statements on shared nodes, checked by SSAS: a live Excel session against `ssasmd` on `ZCLPAT_PRG` and
+   `ZCLSERV_CAT` (expand linked subtrees, slicers and filters on overlapping programs, drill-through on a duplicate
+   leaf), captured with `--ssas multidimensional` (`execute_ssasmd_*`); a comparison that rewrites each statement into
+   olap4abap's names through `data/foodmart-bw/ssas/members.json` (occurrence `&[POS]` to the path of names), runs it on
+   SAP's `ZCLHIER` and compares the cell values per tuple. Taken from SSAS: values only; levels, parents, children
+   counts and order are olap4abap's and BW's. SSAS's cells are `xsd:decimal` (measures `Currency`, exact), olap4abap's
+   `xsd:double`.
+3. Hierarchies in the schema builder (open 5 below): the proposal and the UI offer the hierarchies a characteristic
+   has in `RSHIEDIR`, accept creates their copies; then `ZCLVISIT` and `ZCLVISITA` have them in Excel. Before the
+   aDSO: a BW hierarchy on an aDSO, whose fact column holds the value, not the SID the closure has.
+4. Smaller: texts step 5 (the check against blank texts); the debt that keeps about 30 hierarchy cases red on SAP
+   (measure captions, member names on `sourceAttribute` levels, `known-issues.md`).
+
+Later, as noted: the key date, then time- and version-dependent hierarchies; the performance risks (below, Paused:
+query planning); query planning step 7.
+
 ## Now: texts and captions
 
 Decided with the user 2026-10-16: the texts are the active work again, ahead of the rest of the BW hierarchies,
@@ -862,6 +900,43 @@ keeps the answers: both test suites give the same answers with planning on and o
    semantics to SQL is settled. Also: the NON EMPTY filter of a query with such a measure from the groups, not by
    the evaluator (`filter_by_evaluator`). Tests: the computed grid measured with `planning_measure.py`, mixed
    statements of `planning_on_and_off`, both suites.
+
+### Performance risks: reporting that is hard to push down (noted 2026-10-16)
+
+Raised by the user 2026-10-16; hierarchies stay first. The engine pushes down a cell that is a stored measure summed
+over keys (native crossjoin, `cross_values`, cells first, native `TopCount`/`Filter`/`Order`); what falls back to
+the evaluator per cell or per tuple in ABAP is the risk. Common Multidimensional reporting that does, most frequent
+in BW and finance first:
+
+1. Calculated measures on large NON EMPTY grids (margin %, variance to plan, price x quantity on a tabular-form
+   table of 4-6 fields): one calculated member switches `fast_cells` and cells first off, and NON EMPTY evaluates
+   the formula for every combination. Step 7 above, then the formula as a SQL expression of the grouped statement.
+2. Time calculations (YTD, rolling 12 months, prior year, growth %): `Sum(PeriodsToDate(...))`,
+   `Sum(LastPeriods(12, ...))` are a set aggregate per cell; to SQL as window functions or range joins.
+   `ParallelPeriod` is one more batch and cheaper.
+3. Distinct counts (customers, patients, documents): not additive, no `roll_up`, a `COUNT(DISTINCT)` per level and
+   subtotal (`GROUPING SETS`); refused today (`check_aggregator`).
+4. Non-cumulative key figures (stock, balances, headcount): the value at a period is the opening balance plus the
+   movements, last value over time, not sum; BW's reference point and markers. A running sum per combination in
+   HANA; refused today.
+5. BW hierarchies with sign reversal and formula nodes (P&L, balance sheet): the closure join sums; a sign per node
+   is a signed closure (sign x amount through the closure, in HANA), a formula node a calculation. To design with
+   the BW hierarchies.
+6. Top-N per group (`Generate(..., TopCount(...))`, Excel's Top 10 with a row field) and `Rank()` per tuple: the
+   native `TopCount` runs once per group; `ROW_NUMBER() OVER (PARTITION BY ...)` in one statement.
+7. Value filters and sorts on calculated measures (margin < 10 %, sort by variance): the native `Filter` and `Order`
+   take stored measures only; the expression compilation of 1 covers them.
+8. Ratios to parent or total: the parent's cells come in the same batch, two grouped reads and a division per cell
+   in ABAP; fine for hundreds of rows, slow for 100,000.
+9. Excel: Expand Entire Field on a large level, "Show items with no data" (no NON EMPTY: the whole crossjoin, up to
+   the result limit), and every click resending the whole query with no cell cache across requests (the Discover
+   cache only).
+
+Next when this resumes: measure before optimising, with about ten reports shaped like finance reporting rather than
+the reference's tests (a margin-% grid, YTD against prior year, top 5 per group, a distinct count, a value filter
+on a ratio, a wide tabular-form list) on `ZXMLWIDE` and the clinic, timed with the trace (`planning_measure.py`) and
+the planner's computed nodes listed. Expected most gain for the effort: 1, 2 and 7 (arithmetic and time windows
+compiled to SQL); 4 and 5 are the large BW-specific pieces to scope early.
 
 ## Paused: fixed selections
 

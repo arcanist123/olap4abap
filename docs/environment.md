@@ -159,9 +159,76 @@ Keep no Microsoft schema files or sample texts in the repository, only our data 
 
 Over HTTP it is IIS's `msmdpump.dll`, which `scripts/ssas-http-setup.ps1` sets up once in an elevated PowerShell
 (its own site `OLAP` on `http://127.0.0.1:8087/msmdpump.dll`, pool `OLAP` with anonymous access under the pool's identity, `IIS APPPOOL\OLAP` an administrator
-of the instance; a development machine only). `scripts/xmla-proxy.py` then logs it as backend `ssas` on
+of the instance; a development machine only). The SQL Server 2025 pump answers plain HTTP only with
+`<RequireSecureChannel>0</RequireSecureChannel>` in its `msmdpump.ini`, which the script sets (the site listens on
+127.0.0.1 only). Microsoft documents the setting for test environments, there with the value `false`
+([Configure HTTP Access to Analysis Services on IIS 8.0](https://learn.microsoft.com/en-us/analysis-services/instances/configure-http-access-to-analysis-services-on-iis-8-0?view=sql-analysis-services-2025),
+step 6); `0` works as well. `scripts/xmla-proxy.py` then logs it as backend `ssas` on
 `http://localhost:8086/`. MSOLAP talks to SSAS in binary, compressed XML unless the connection string says
 `Protocol Format=XML;Transport Compression=None`; the proxy shows such exchanges as "binary".
+
+### The clinic in SSAS
+
+`python scripts/build-ssas-clinic.py` loads the clinic InfoCube `ZCLVISIT` into SSAS as database `ZCLHIER`, with
+`ZCLDIAG_ICD` as a level hierarchy, from the export of `build-bw-reference-db.py` (run that first; its
+`--no-export` reuses an export). The rows go into the SQL Server database `olap4abap_ssas` of the same instance
+(`MSSQL$SSAS_TAB`, dropped and created again; SSAS's service account `NT Service\MSOLAP$SSAS_TAB` reads it): the
+cube's BW tables, `ZZXXMLA1_HL_ZCLDIAG_ICD` (the reference's `hierarchy_levels`) and the characteristics' views
+under their placeholder names, created from HANA's SQL as it is (T-SQL runs it with `QUOTED_IDENTIFIER` on), so SSAS
+reads SAP's views as the reference does. The Tabular model (compatibility level 1600) is derived from
+`reference/schema/ClinicBW.xml` and deployed with a TMSL `createOrReplace` and a full refresh (`Invoke-ASCmd`; the
+SQL and TMSL it runs are kept in the git-ignored `data/foodmart-bw/ssas/`): a table per dimension, the level of a
+flat hierarchy a column named as the level (from its `nameColumn`, sorted by the key attribute's `OrderByColumn` or
+the SID), next to it the key attribute's `NameColumn` as the hierarchy `<level> Text` (the text as a hierarchy of
+its own, to watch Excel with repeated texts: `ZCLPAT`, `ZCLROOM`, `ZCLFISCPR`), each display attribute and its text
+a hierarchy too (captioned as the level's member properties, `Sex`, `Sex (Text)`; the attributes in the display folder
+`Attributes`, every text in `Texts`), `ZCLDIAG_ICD` a user hierarchy with the levels `Level 01` to `Level 04` (sorted by `Lnn_POS`), the fact
+table the hidden table `ZCLVISIT` related by its `SID_` columns, a `SUM` measure per measure, the captions an en-US
+translation. Tabular cannot model member captions (a member's caption is its name), member properties,
+`allMemberName` (the All member is `All`), the drill-through action or the cube's name (always `Model`); its names
+are SSAS's (`[ZCLDIAG].[ZCLDIAG_ICD].[Level 03].&[INFLUENZA]`). Checked: SSAS gives the reference's values and order
+for `execute_hier_children` and `execute_hier_descendants_distance`.
+
+### The clinic in SSAS Multidimensional
+
+The second instance `localhost\SSAS_MULT` (Multidimensional mode, same SQL Server 2025 Developer edition; its
+administrators are set per Windows user, a local administrator's elevated session can add one) holds the clinic with
+its BW hierarchies, which Tabular cannot model: `python scripts/build-ssas-clinic-md.py` (`--no-load` keeps the SQL
+Server database) loads the database `olap4abap_ssas` as `build-ssas-clinic.py` does and adds per hierarchy of the
+export (`build-bw-reference-db.py` exports `ZCLPAT_PRG` and `ZCLSERV_CAT` from their copies too; the time-dependent
+`ZCLDOC_ORG` and `ZCLDOC_SITE` have no copy and are out of scope) `H_<h>` (a row per occurrence of the copy's node
+table, keyed by `POS`, `PARENT_POS` the enclosing occurrence, REST_H and its values after the roots where the
+hierarchy shows it), `HV_<h>` (named and captioned as olap4abap names them: a leaf as the characteristic's member, a
+node by its `NODE_NAME`) and the bridge `B_<h>` (per occurrence the distinct SIDs of its subtree, the closure). The
+model is ASSL (`Create`, then `ProcessFull`, with `Invoke-ASCmd`), database and cube `ZCLHIER`: a dimension per
+characteristic (key the SID, named by the level's `nameColumn`, captioned by the text through a 1033 translation with
+a `CaptionColumn`, the display attributes member properties), a parent-child dimension per BW hierarchy
+(`[ZCLPAT_PRG].[ZCLPAT_PRG]`, levels `Level 01` ..., `NonLeafDataHidden`), the measures `Sum` of `Currency` (exact;
+`Double` sums differ in the last digits) in the measure group `Visits`, related to each hierarchy dimension
+many-to-many through its bridge's measure group, and the default drill-through action. So a fact counts once per
+member however many paths lead to it: link nodes, duplicate leaves, overlapping intervals and overlapping members in
+one slicer. `data/foodmart-bw/ssas/members.json` maps each occurrence's SSAS unique name (`&[POS]`) to olap4abap's
+(the path of names). Only cell values are taken from this model; the shape of a BW hierarchy is olap4abap's and BW's.
+`python scripts/bw_hierarchy_test.py --ssas` checks it against BW's MDX: all members of the three hierarchies have
+BW's level, children, caption and values in BW's order (2026-10-16); a slicer of two overlapping `ZCLPAT_PRG` nodes
+gives the sum over the union of their values. Over HTTP it is a second pump site next to the first, set up by the
+same script with its parameters (`-Instance 'localhost\SSAS_MULT' -Service 'MSOLAP$SSAS_MULT' -Target
+'C:\inetpub\olap_mult' -Site 'OLAP_MULT' -Port 8089 -Pool 'OLAP_MULT'`), the proxy's backend `ssasmd` on
+`http://localhost:8088/`.
+
+Answers of SSAS are kept as test cases with `--ssas` of `capture-case.py` and `capture-execute.py` (catalog `ZCLHIER`
+unless `-p Catalog=` says otherwise; the case gets `ssas.txt`, and `recapture-cases.py` asks SSAS again).
+`--ssas multidimensional` captures from the Multidimensional model (its pump on 8089); `ssas.txt` then names that
+instance and `recapture-cases.py` asks it there (`execute_ssasmd_*`, the first one Excel's drill-down of
+`ZCLDIAG_ICD`).
+`scripts/ssas_texts.py` cleans every such answer before it is written, as the license requires (below): it removes
+the inline XSD and comments, empties fault and error texts (`faultstring`, `Description`; the codes stay) and the
+description columns of `DISCOVER_PROPERTIES`, `DISCOVER_ENUMERATORS`, `DISCOVER_SCHEMA_ROWSETS` and
+`MDSCHEMA_FUNCTIONS`, writes olap4abap's provider name and the version it reports where SSAS names itself, `localhost`
+and `user` for this machine's server, instance and Windows users, a fixed session id and timestamp for the server's
+times; it fails when a text it knows of is left (a new one needs a rule there) and refuses `DISCOVER_KEYWORDS`, whose
+rows are SSAS's keyword list. `xmla_test.py` leaves these cases out unless they are named: olap4abap does not write
+SSAS's names yet (`next-steps.md`, Later: SSAS naming).
 
 ### SSAS license
 
@@ -177,8 +244,9 @@ license terms (the PDF lies next to the installation; it is not in the repositor
 - No benchmarks (section 5): the results of a benchmark test of SSAS are not disclosed without Microsoft's written
   approval, and the public repository is disclosure. No SSAS runtimes or speed comparisons with olap4abap in commits,
   docs, issues or PRs; captured SSAS answers carry no timings.
-- No reverse engineering (section 6): SSAS, MSOLAP and ADOMD.NET are not decompiled or disassembled, and nothing is
-  ported from them. What olap4abap takes from SSAS is its observed XMLA behaviour against our own models; the protocol
+- No reverse engineering (section 6): SSAS, MSOLAP and ADOMD.NET are not decompiled or disassembled, their binaries
+  (`msmdpump.dll` too) are not searched for strings or settings, and nothing is ported from them. A configuration
+  setting comes from Microsoft's documentation or from the server's observed behaviour. What olap4abap takes from SSAS is its observed XMLA behaviour against our own models; the protocol
   is Microsoft's published specification (MS-SSAS, MS-SSAS-T, under the Open Specifications Promise). Binary XML is
   read from that specification, or avoided with `Protocol Format=XML`.
 - Nothing of the software published (section 6): no texts SSAS ships, i.e. no inline XSD of its rowsets, no

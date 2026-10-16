@@ -5,6 +5,9 @@
 # Run once in an elevated Windows PowerShell:
 #     powershell -ExecutionPolicy Bypass -File scripts\ssas-http-setup.ps1
 #     powershell -ExecutionPolicy Bypass -File scripts\ssas-http-setup.ps1 -Instance 'localhost\SSAS_TAB'
+# and for the Multidimensional instance a second site next to it (the proxy's backend "ssasmd", http://localhost:8088/):
+#     powershell -ExecutionPolicy Bypass -File scripts\ssas-http-setup.ps1 -Instance 'localhost\SSAS_MULT' `
+#         -Service 'MSOLAP$SSAS_MULT' -Target 'C:\inetpub\olap_mult' -Site 'OLAP_MULT' -Port 8089 -Pool 'OLAP_MULT'
 #
 # It enables IIS's ISAPI extensions, copies the instance's isapi folder to C:\inetpub\olap, points msmdpump.ini at the
 # instance, creates the application pool OLAP and the site OLAP (port 8087) with anonymous access under the pool's
@@ -55,7 +58,7 @@ Copy-Item (Join-Path $isapi '*') $Target -Recurse -Force
 $ini = Join-Path $Target 'msmdpump.ini'
 $text = Get-Content $ini -Raw
 $text = $text -replace '<ServerName>[^<]*</ServerName>', "<ServerName>$Instance</ServerName>"
-# the 2025 pump refuses http ("must use secure channels") unless told otherwise; the site listens on 127.0.0.1 only
+# the 2025 pump refuses plain http unless RequireSecureChannel is 0; the site listens on 127.0.0.1 only
 $text = $text -replace '\s*<RequireSecureChannel>[^<]*</RequireSecureChannel>', ''
 $text = $text -replace '</ConfigurationSettings>', "`t<RequireSecureChannel>0</RequireSecureChannel>`r`n</ConfigurationSettings>"
 Set-Content $ini $text -Encoding ASCII

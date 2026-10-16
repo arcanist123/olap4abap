@@ -4,7 +4,9 @@
 Posts reference/<case>/request.xml as it is and replaces response.xml (status.txt if the case has one; rows.txt, the
 number of rows, for a count-only case). Cases whose request names something the schema no longer has must be edited
 first. A case with equivalent.txt is answered for the equivalent statement (capture-execute.py --answer-of). Prints
-the cases whose answer changed, so that the change can be reviewed with git diff.
+the cases whose answer changed, so that the change can be reviewed with git diff. A case with ssas.txt was captured
+from the local SSAS and is asked there again (the instance its marker names), its answer cleaned by
+scripts/ssas_texts.py.
 
     python scripts/recapture-cases.py              # all cases
     python scripts/recapture-cases.py members_ execute_store_children   # cases whose names start with these
@@ -16,6 +18,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from xml.sax.saxutils import escape
+
+import ssas_texts
 
 ROOT = Path(__file__).resolve().parent.parent
 SOAP_ACTION = {"Discover": '"urn:schemas-microsoft-com:xml-analysis:Discover"',
@@ -49,7 +53,11 @@ def main():
             equivalent = escape((folder / "equivalent.txt").read_text(encoding="utf-8").strip())
             body = re.sub(r"<Statement>.*?</Statement>", lambda m: f"<Statement>{equivalent}</Statement>", body,
                           flags=re.S)
-        status, answer = post(args.url, body)
+        ssas = (folder / "ssas.txt").exists()
+        status, answer = post(ssas_texts.url_of(folder) if ssas else args.url, body)
+        if ssas:
+            request_type = re.search(r"<RequestType>([^<]*)</RequestType>", body)
+            answer = ssas_texts.as_captured(answer, request_type.group(1) if request_type else None)
         if (folder / "rows.txt").exists():
             target, text = folder / "rows.txt", f"{len(re.findall(r'<row>', answer))}\n"
         else:

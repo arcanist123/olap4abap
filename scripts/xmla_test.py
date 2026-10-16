@@ -132,6 +132,10 @@ def main():
                    if (p.parent / "response.xml").exists() or (p.parent / "rows.txt").exists())
     if args.cases:
         cases = [c for c in cases if c.name in args.cases]
+    else:
+        # captured from SSAS (ssas.txt): its names are SSAS's, which olap4abap does not write yet
+        # (docs/next-steps.md, Later: SSAS naming); run one by naming it
+        cases = [c for c in cases if not (c / "ssas.txt").exists()]
     if not cases:
         sys.exit("no cases found")
 

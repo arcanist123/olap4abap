@@ -7,7 +7,7 @@ URL and the answer goes back unchanged. Every exchange is printed as one line (m
 MDX statement, status, time, size, rows/cells or the fault) and saved in full under logs/xmla-proxy/<start time>/ as
 <n>-<backend>.request.txt and <n>-<backend>.response.txt (headers, a blank line, the body).
 
-    python scripts/xmla-proxy.py                  # all five backends below
+    python scripts/xmla-proxy.py                  # all six backends below
     python scripts/xmla-proxy.py --mondrian-port 9081 --sap-url http://vhcala4hci:50000/zzxxmla1?sap-client=001
     python scripts/xmla-proxy.py --backend other=8085=http://localhost:8095/emondrian/xmla   # one more server
 
@@ -19,6 +19,8 @@ By default:
     http://localhost:8086/  ssas      SSAS (Tabular, instance SSAS_TAB) through IIS's msmdpump.dll (8087), which
                                       scripts/ssas-http-setup.ps1 sets up once (elevated); always on 127.0.0.1,
                                       whatever --bind says (docs/environment.md, SSAS license)
+    http://localhost:8088/  ssasmd    SSAS (Multidimensional, instance SSAS_MULT) through its own msmdpump.dll site
+                                      (8089), set up by the same script with its parameters; 127.0.0.1 too
 A backend that is not running answers 502 Bad Gateway.
 
 --auth-probe PORT adds a port that forwards nothing: it answers every request with 401 and the --challenge headers
@@ -314,6 +316,8 @@ def main():
     parser.add_argument("--release-url", default="http://localhost:8090/emondrian/xmla")
     parser.add_argument("--ssas-port", type=int, default=8086)
     parser.add_argument("--ssas-url", default="http://127.0.0.1:8087/msmdpump.dll")
+    parser.add_argument("--ssasmd-port", type=int, default=8088)
+    parser.add_argument("--ssasmd-url", default="http://127.0.0.1:8089/msmdpump.dll")
     parser.add_argument("--bind", default="127.0.0.1", help="address to listen on (0.0.0.0 for other machines)")
     parser.add_argument("--backend", action="append", default=[], metavar="NAME=PORT=URL",
                         help="one more backend, e.g. other=8085=http://localhost:8095/emondrian/xmla")
@@ -343,7 +347,7 @@ def main():
     servers = []
     backends = [("mondrian", args.mondrian_port, args.mondrian_url), ("sap", args.sap_port, args.sap_url),
                 ("git", args.git_port, args.git_url), ("release", args.release_port, args.release_url),
-                ("ssas", args.ssas_port, args.ssas_url)]
+                ("ssas", args.ssas_port, args.ssas_url), ("ssasmd", args.ssasmd_port, args.ssasmd_url)]
     for extra in args.backend:
         name, port, target = extra.split("=", 2)
         backends.append((name, int(port), target))
@@ -355,7 +359,7 @@ def main():
     for backend, port, target, handler in handlers:
         # SSAS Developer edition is licensed to this machine's development and tests, not to be served to others
         # (its license terms, section 6): its port listens on this machine only, whatever --bind says
-        bind = "127.0.0.1" if backend == "ssas" else args.bind
+        bind = "127.0.0.1" if backend in ("ssas", "ssasmd") else args.bind
         server = http.server.ThreadingHTTPServer((bind, port), handler)
         if tls:
             # the handshake runs in the request's thread, so a client that stalls in it blocks no other client

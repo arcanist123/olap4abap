@@ -29,11 +29,17 @@ BW's MDX instead, names as captions: so the export is known to be BW's hierarchy
 BW is asked on the aDSO ZCLVISITA, the reference serves the InfoCube ZCLVISIT: both hold the same visits. The
 reference serves them as level hierarchies (Level 01 to Level 04); they assign every value and suppress REST_H.
 
+--ssas checks the clinic's model in SSAS Multidimensional (database and cube ZCLHIER on localhost\\SSAS_MULT, built by
+scripts/build-ssas-clinic-md.py: a parent-child dimension per hierarchy, related to the facts many-to-many through
+its closure) against BW's MDX, names as captions, before answers of it are trusted; the statement goes to SSAS with
+Invoke-ASCmd (Windows authentication), the hierarchies are named as SSAS names them ([ZCLPAT_PRG].[ZCLPAT_PRG]).
+
     python scripts/bw_hierarchy_test.py
     python scripts/bw_hierarchy_test.py --names --with-facts --url http://localhost:50000/zzxxmla1?sap-client=001
     python scripts/bw_hierarchy_test.py --bw-only           # BW's answer and its own checks
     python scripts/bw_hierarchy_test.py --reference         # the reference server's ZCLDIAG_ICD
     python scripts/bw_hierarchy_test.py --catalog ZCLHIER   # another catalog of olap4abap (its cube of that name)
+    python scripts/bw_hierarchy_test.py --ssas              # the SSAS Multidimensional model
 """
 import argparse
 import html
@@ -58,6 +64,9 @@ NOT_ASSIGNED = "1HIER_REST"
 REFERENCE_URL = "http://localhost:8080/emondrian/xmla"
 REFERENCE_CATALOG = "ZCLHIER"
 REFERENCE_HIERARCHIES = [("ZCLDIAG", "ZCLDIAG_ICD")]
+# --ssas: the SSAS Multidimensional instance and its database and cube
+SSAS_INSTANCE = r"localhost\SSAS_MULT"
+SSAS_CATALOG = "ZCLHIER"
 
 EXECUTE = """<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/"><SOAP-ENV:Body>
 <Execute xmlns="urn:schemas-microsoft-com:xml-analysis"><Command><Statement>{statement}</Statement></Command>
@@ -123,6 +132,8 @@ def bw_members():
 
 
 def post(url, statement):
+    if url == "ssas":
+        return ssas_execute(statement)
     import urllib.error
     import urllib.request
     body = EXECUTE.format(statement=html.escape(statement, quote=False), catalog=CATALOG)
@@ -135,10 +146,25 @@ def post(url, statement):
         return error.read().decode("utf-8", "replace")
 
 
+def ssas_execute(statement):
+    """The answer of SSAS Multidimensional to a statement (Invoke-ASCmd, the mddataset of an Execute)."""
+    script = (f"Import-Module SqlServer; Invoke-ASCmd -Server '{SSAS_INSTANCE}' -Database '{SSAS_CATALOG}' "
+              "-Query $input | Out-String -Width 1000000")
+    result = subprocess.run(["powershell", "-NoProfile", "-Command", script], input=statement, capture_output=True,
+                            text=True, encoding="utf-8")
+    error = re.search(r'<Error [^>]*Description="([^"]*)"', result.stdout)
+    if result.returncode or error:
+        detail = html.unescape(error.group(1)) if error else result.stdout + result.stderr
+        return f"<faultstring>{html.escape(detail)}</faultstring>"
+    return result.stdout
+
+
 def olap4abap_members(url, hierarchy):
     """olap4abap's members of the hierarchy with level, children, caption and values; or the fault."""
+    # SSAS has no DEPTH: its level number LNum is the depth of a parent-child member
+    depth = "" if url == "ssas" else "DEPTH, "
     text = post(url, f"SELECT {{{', '.join(MEASURES)}}} ON 0, {{{hierarchy}.Members}} "
-                     f"DIMENSION PROPERTIES DEPTH, CHILDREN_CARDINALITY, MEMBER_TYPE ON 1 FROM [{CATALOG}]")
+                     f"DIMENSION PROPERTIES {depth}CHILDREN_CARDINALITY, MEMBER_TYPE ON 1 FROM [{CATALOG}]")
     fault = re.search(r"<faultstring>(.*?)</faultstring>", text, re.S)
     if fault:
         return None, html.unescape(fault.group(1))
@@ -224,6 +250,8 @@ def main():
     parser.add_argument("--bw-only", action="store_true", help="only BW's answer and its own checks")
     parser.add_argument("--reference", action="store_true",
                         help="check the reference server's hierarchies (catalog ZCLHIER) against BW's")
+    parser.add_argument("--ssas", action="store_true",
+                        help="check the SSAS Multidimensional model (database ZCLHIER) against BW's")
     parser.add_argument("--show", type=int, default=10, help="differences shown per hierarchy")
     parser.add_argument("--catalog", help=f"olap4abap's catalog and cube (default {CATALOG})")
     args = parser.parse_args()
@@ -234,6 +262,11 @@ def main():
         CATALOG = REFERENCE_CATALOG
         hierarchies_checked = {key: HIERARCHIES[key] for key in REFERENCE_HIERARCHIES}
         args.names = True
+    if args.ssas:
+        CATALOG = SSAS_CATALOG
+        hierarchies_checked = {key: f"[{key[1]}].[{key[1]}]" for key in HIERARCHIES}
+        args.names = True
+        args.url = "ssas"
     args.url = args.url or (REFERENCE_URL if args.reference else "http://localhost:50000/zzxxmla1?sap-client=001")
     failures = []
 

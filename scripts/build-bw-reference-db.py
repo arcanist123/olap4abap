@@ -71,6 +71,10 @@ CUBES = {
 # hierarchies in which every node occurs once, every value is a leaf and the not-assigned node is suppressed
 # (docs/next-steps.md, Reference scenario)
 HIERARCHIES = {"ZCLDIAG_ICD": "ZCLDIAG"}
+# the other BW hierarchies of the clinic, exported for SSAS (scripts/build-ssas-clinic-md.py) only, not built into the
+# reference: link nodes, duplicate leaves and postable nodes (ZCLPAT_PRG), intervals (ZCLSERV_CAT) and the time- and
+# version-dependent ones of the physician, which the copy refuses (skipped with a note while they have no copy)
+SSAS_HIERARCHIES = {"ZCLPAT_PRG": "ZCLPAT", "ZCLSERV_CAT": "ZCLSERV", "ZCLDOC_ORG": "ZCLDOC", "ZCLDOC_SITE": "ZCLDOC"}
 CR, NL = "\r", "\n"
 PLACEHOLDER = "ZZXXMLA1_C_"  # + characteristic: the reference schema's name of its view (ZZXXMLA1_CL_BW_VIEW_GEN)
 LEVELS = "ZZXXMLA1_HL_"  # + hierarchy: the flattened table of a hierarchy
@@ -128,6 +132,11 @@ def export():
     (EXPORT / "tables.json").write_text(json.dumps(tables, indent=1), encoding="utf-8")
     for hierarchy, characteristic in HIERARCHIES.items():
         export_hierarchy(hierarchy, characteristic)
+    for hierarchy, characteristic in SSAS_HIERARCHIES.items():
+        try:
+            export_hierarchy(hierarchy, characteristic)
+        except AssertionError as error:
+            print(f"not exported: {error}")
 
 
 def export_hierarchy(hierarchy, characteristic):
@@ -135,7 +144,7 @@ def export_hierarchy(hierarchy, characteristic):
     HIESID and SVER."""
     registry = sapcli(f"SELECT node_table FROM zzxxmla1_hietab WHERE iobjnm = '{characteristic}'", 10)
     assert len(registry) == 1, f"{characteristic} has no copy tables: run program ZZXXMLA1_HIERARCHY_COPY"
-    copies = sapcli("SELECT hieid, hiesid, sver, timestmp, root_sid, norestnodes FROM zzxxmla1_hiedir "
+    copies = sapcli("SELECT hieid, hiesid, sver, timestmp, root_sid, rest_top_sid, norestnodes FROM zzxxmla1_hiedir "
                     f"WHERE iobjnm = '{characteristic}' AND hienm = '{hierarchy}'", 1000)
     assert copies, f"{hierarchy} has no copy: run program ZZXXMLA1_HIERARCHY_COPY"
     # BW's current version, as ZZXXMLA1_CL_BW_HIERARCHY_COPY finds it
@@ -146,10 +155,10 @@ def export_hierarchy(hierarchy, characteristic):
     copy = [c for c in copies if (number(c["HIESID"]), c["SVER"], number(c["TIMESTMP"])) == key]
     assert copy, f"{hierarchy}: no copy of BW's current version {key}: run program ZZXXMLA1_HIERARCHY_COPY"
     copy = copy[0]
-    assert copy["NORESTNODES"].strip(), f"{hierarchy} shows the not-assigned node: not a reference case"
     hiesid, sver = key[0], key[1]
     data = dict(hierarchy=hierarchy, characteristic=characteristic, hiesid=hiesid, sver=sver, timestmp=key[2],
-                root_sid=number(copy["ROOT_SID"]))
+                root_sid=number(copy["ROOT_SID"]), rest_top_sid=number(copy["REST_TOP_SID"]),
+                rest_shown=not copy["NORESTNODES"].strip())
     for part, table in (("nodes", registry[0]["NODE_TABLE"]),):
         fields = ddic_fields(sapcli(DD03L + f"tabname = '{table}' ORDER BY position ASCENDING", 1000))
         assert fields, table
@@ -259,6 +268,7 @@ def hierarchy_levels(data):
     position among its siblings). Fails unless the tree is balanced with every value of the characteristic a leaf, so that it
     is a level hierarchy."""
     h, c = data["hierarchy"], data["characteristic"]
+    assert not data.get("rest_shown"), f"{h} shows the not-assigned node: not a reference case"
     root = int(data["root_sid"])
     fields = [f["name"] for f in data["nodes"]["fields"]]
     sid_table = json.loads(table_file(f"/BIC/S{c}").read_text(encoding="utf-8"))
