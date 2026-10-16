@@ -748,9 +748,10 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       RETURNING VALUE(result) TYPE ty_t_tuple
       RAISING   zzxxmla1_cx_xmla.
     "! Hierarchize (Sorter.hierarchizeTupleList, FunUtil.compareHierarchically): an ancestor before its descendants,
-    "! siblings by Sorter.compareSiblingMembers; tuples by their members in turn. A stable sort.
+    "! after them with post, siblings by Sorter.compareSiblingMembers; tuples by their members in turn. A stable sort.
     METHODS hierarchize
       IMPORTING tuples        TYPE ty_t_tuple
+                post          TYPE abap_bool DEFAULT abap_false
       RETURNING VALUE(result) TYPE ty_t_tuple.
     "! The key of a member for hierarchize: a stored member's order key (the keys from the root, each as 0 and its
     "! key), a calculated one the key of its parent, then 1, its order key and its name (after its stored siblings and
@@ -4866,10 +4867,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       WHEN `HIERARCHIZE|Function|8`.
         result = hierarchize( evaluate_set( evaluator = evaluator node = node->args[ 1 ] ) ).
       WHEN `HIERARCHIZE|Function|8,11`.
-        IF node->args[ 2 ]->value <> `PRE`.
-          not_implemented( node ).
-        ENDIF.
-        result = hierarchize( evaluate_set( evaluator = evaluator node = node->args[ 1 ] ) ).
+        result = hierarchize( tuples = evaluate_set( evaluator = evaluator node = node->args[ 1 ] )
+                              post   = xsdbool( node->args[ 2 ]->value = `POST` ) ).
       WHEN `DRILLDOWNLEVELTOP|Function|8,7` OR `DRILLDOWNLEVELTOP|Function|8,7,4`
         OR `DRILLDOWNLEVELTOP|Function|8,7,4,7` OR `DRILLDOWNLEVELTOP|Function|8,7,17,7`.
         result = drill_down_level_top( evaluator = evaluator node = node ).
@@ -5574,11 +5573,13 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         tuple TYPE ty_tuple,
       END OF ty_keyed.
     DATA keyed TYPE STANDARD TABLE OF ty_keyed WITH EMPTY KEY.
+    " post order: each member's key ends with a character above every other, so an ancestor sorts after its descendants
+    DATA(last) = COND string( WHEN post = abap_true THEN cl_abap_conv_in_ce=>uccp( 'FFFF' ) ).
     LOOP AT tuples INTO DATA(tuple).
       " a separator after each member: an ancestor's key is a prefix of its descendants' and sorts first
       DATA(key) = VALUE string( ).
       LOOP AT tuple INTO DATA(member).
-        key = key && hierarchize_key( member ) && zzxxmla1_cl_model=>c_separator.
+        key = key && hierarchize_key( member ) && last && zzxxmla1_cl_model=>c_separator.
       ENDLOOP.
       APPEND VALUE #( key = key tuple = tuple ) TO keyed.
     ENDLOOP.
@@ -8839,8 +8840,11 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         " Member.MemberType.ordinal: UNKNOWN, REGULAR, ALL, MEASURE, FORMULA, NULL
         result = VALUE #( kind = zzxxmla1_cl_mdx_evaluator=>c_value-integer number = type ).
       WHEN `CHILDREN_CARDINALITY`.
+        " a visual total has the children of the member it stands for (VisualTotalMember.getPropertyValue)
+        DATA(calc) = visual_total_calc( member ).
         result = VALUE #( kind = zzxxmla1_cl_mdx_evaluator=>c_value-integer
-                          number = schema_reader->get_children_count( member ) ).
+                          number = schema_reader->get_children_count( COND #( WHEN calc IS BOUND THEN calc->member
+                                                                              ELSE member ) ) ).
       WHEN `PARENT_LEVEL`.
         result = VALUE #( kind = zzxxmla1_cl_mdx_evaluator=>c_value-integer
                           number = COND #( WHEN parent IS NOT INITIAL THEN depth_of( parent ) ) ).

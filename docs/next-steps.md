@@ -712,6 +712,12 @@ Done (2026-10-15): the reference serves `ZCLDIAG_ICD`.
         value with `--names` and has `--catalog`). Open: a test catalog on SAP with the three hierarchies, so the
         BW check runs without editing the schema; the measure caption (30 cases); a BW hierarchy on an aDSO, whose
         fact column holds the value, not the SID the closure has; Excel against olap4abap.
+        Done (2026-10-16): `Hierarchize(..., POST)` (`hierarchize` with `post`: each member's key ends with
+        U+FFFF, so an ancestor sorts after its descendants), and a visual total's `CHILDREN_CARDINALITY` is the
+        one of the member it stands for (`VisualTotalMember.getPropertyValue`; it was 0). Checked: `xmla_test.py`
+        371 of 372 (`execute_hier_hierarchize_post`, `execute_hier_visualtotals` and `_pattern` pass;
+        `execute_hier_drillthrough_subselect` fails on the blank texts of the views until the reference's copies
+        are rebuilt, texts step 7), `compare-applicable.py` 394 of 395 as before.
 - Simplified (2026-10-16, with the user): the reference cannot be the oracle of REST_H (it needed placeholders and the
   cases kept out of its branch), so it no longer pretends to be. `ZCLDIAG_ICD` assigns every value explicitly, the
   initial one (337 visits) as the leaf `#` under the chapter `NOT_RECORDED` (Not recorded) and the group
