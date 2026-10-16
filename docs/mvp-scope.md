@@ -52,7 +52,8 @@ Decisions taken by the project owner on 2026-10-02, with reasons.
   source `ZZXXMLA1_C` + the same digits (decided 2026-10-06: a namespace's slashes are not allowed in it). **NUMC columns are delivered as BW holds them**, each followed
   by its number `COLUMN_INT` (decided 2026-10-13, replacing "all NUMC columns as numbers" of 2026-10-04): BW's value
   (`0042`) is the default, a number as the member's key or name is a choice of the schema, which names the `_INT`
-  column (the schema builder's "As numbers" per dimension). The reference's schema format names columns only, no
+  column (the schema builder's "As numbers" per dimension; decided 2026-10-16 that it goes, NUMC being a string of
+  fixed length, and the `_INT` columns stay for FoodMart's schemas: `next-steps.md`, Now: texts and captions). The reference's schema format names columns only, no
   expressions, and a view is shared by every schema of its characteristic, so the view has both. FoodMart's schemas
   name the numbers (`1997`, Store Sqft), the schema builder proposes BW's values. The eMondrian reference database holds copies of the BW tables and the same views, with
   HANA's view SQL (HSQLDB 2.3.2 accepts it and `/` in quoted names; checked 2026-10-04), so the data is identical.
@@ -186,7 +187,7 @@ Decisions taken by the project owner on 2026-10-02, with reasons.
 ## Out of scope (MVP)
 
 - **BW external hierarchies that are time or version dependent.** Time-independent ones are in scope since
-  2026-10-15 (decided with the user; `next-steps.md`, Now: time-independent BW hierarchies), as Mondrian
+  2026-10-15 (decided with the user; `next-steps.md`, Then: time-independent BW hierarchies), as Mondrian
   **parent-child hierarchies** over a materialized closure, also with nodes under several parents. Sign reversal of
   hierarchy nodes is out of scope.
 - **Key-date logic** (see `mondrian-hierarchies-and-time-dependency.md` for how it could be added later: a key-date

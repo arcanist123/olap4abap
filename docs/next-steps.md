@@ -15,11 +15,80 @@ eMondrian's database adds in another order (`docs/test-strategy.md`). The run (t
 two minutes; #85 takes 1 s with the native `Order` (step 8, 105 s before), #46 2.3 s with the native `TopCount` (step
 9); everything else is below 10 s.
 
-## Now: time-independent BW hierarchies
+## Now: texts and captions
 
-Decided with the user 2026-10-15: the next big piece of work is BW's external hierarchies (`/BI0/H<char>`,
-`/BIC/H<char>`, directory `RSHIEDIR`) that are neither time nor version dependent, ahead of planning step 7 and the
-texts (both paused below). Users report on BW hierarchies, and none of them can be shown today. A plain hierarchy
+Decided with the user 2026-10-16: the texts are the active work again, ahead of the rest of the BW hierarchies,
+which depend on them (a leaf's name and caption are the characteristic's). Paused 2026-10-15 because a report showed
+a characteristic as BW does, key and text side by side; now the text is the member's caption, the key its name.
+
+The rules (decided 2026-10-16):
+
+- **Names are keys, the same in every hierarchy.** A flat dimension is a hierarchy with one root: its members and a
+  BW hierarchy's leaves follow the same rules, no special case for either. SSAS's convention for a key without value
+  (`NullProcessing` `ZeroOrBlank`: `''` for a string, `0` for a number) applies to BW's initial value (SID 0, BW's
+  "not assigned"): it is named `''` for every key type, CHAR, NUMC, DATS and TIMS alike (`[ZCLDIAG].[]`); its key
+  (`MEMBER_KEY`) stays BW's value (`0000`). NUMC is a string of fixed length (SSAS `WChar`), not a number.
+- **A compounded characteristic is named by the concatenation of its key fields**, compounding first, each at its full
+  length, as BW concatenates them: CHAR parts padded with blanks, NUMC parts with zeros (as BW stores them), no
+  separator (`K42024001`). Strings stay uniform: a name keeps its trailing blanks where its last parts are initial
+  (`1000` and a blank cost centre is `1000` followed by ten blanks). Fully initial (SID 0) it is `''`, as above.
+- **The caption of a characteristic with texts is its text field** as configured (short, medium or long), a value
+  without text `''`, the initial value too. Blank captions are the modeller's to fix, not the engine's (step 4).
+- **The caption of a characteristic without texts is its key**, `#` for the initial value; a compounded one is
+  captioned as `COMPOUND_KEY` names it today, the parts separated by `/` and `#` for an initial part (`K4/2024001`,
+  `#/#`).
+- **`Caption` means the caption column** wherever the engine compares it: `.Caption`, Excel's label filters (the
+  subcube's `label_predicate`) and the native label filter (`get_level_members_where`), as SSAS does. The reference's
+  patched subcube filter compares the level's column there (`scripts/patches/subcube-filter-member-caption.patch`), so
+  these answers have no oracle where caption and name differ.
+- **The texts are no member properties any more**, nowhere: the `Text` property, the attributes' text properties and
+  the drill-through's `(Text)` columns go (to be revisited on user feedback). The key stays a member property `Key`
+  on every dimension, an aDSO's too.
+- **NUMC as numbers leaves the schema builder:** "As numbers" and `intColumns` of the API go; the views keep their
+  `COLUMN_INT` columns for FoodMart's schemas, which name numbers as the reference's tests do (`mvp-scope.md`, NUMC
+  decision). Restored if a user needs it.
+
+The steps:
+
+1. `captionColumn` in the engine. A level's key column joins and groups, its `nameColumn` names the member (unique
+   name, MDX lookup), its `captionColumn` is only shown (`MEMBER_CAPTION`); so a text caption joins nothing, and
+   texts that are not unique do not clash. Today `ZZXXMLA1_CL_SCHEMA` refuses `captionColumn` (and `caption`
+   expressions) and a member's caption is its name. To do:
+   - read the caption column with the members (one more column of the same view in every member read of
+     `ZZXXMLA1_CL_MODEL=>read_members`, the native reads and `cells_first` included);
+   - keep every MDX lookup on the name: the schema reader compares captions in places
+     (`ZZXXMLA1_CL_MDX_SCHEMA_READER`, child lookup), which is the same only while caption = name;
+   - make `Caption` mean the caption column where the engine filters on it (above);
+   - check against eMondrian with a FoodMart level given a `captionColumn` (a test catalog, like `ZFMDRILL`).
+2. The views (`ZZXXMLA1_CL_BW_VIEW_GEN`), so that changing a caption needs no new view:
+   - every text BW has, short, medium and long (`TXTSH`, `TXTMD`, `TXTLG` of the text table, as far as the
+     characteristic has them), each its own column, `coalesce( text, '' )` instead of `coalesce( text, key )` (as
+     data, so the reference shows the same: it falls back to the name for a NULL caption), for the characteristic
+     and for every attribute with texts;
+   - a name column with `''` for SID 0 where the key is not CHAR (CHAR's initial value is `''` already);
+   - `COMPOUND_KEY` the concatenation above (CDS `concat` drops trailing blanks: `rpad` each CHAR part; check on
+     7.50 and that HANA, ADBC and the XMLA answer keep the blanks), its present form a caption column of its own;
+   - a key caption column for characteristics without texts (the key, `#` for SID 0).
+3. The proposal (`ZZXXMLA1_CL_SCHEMA_PROPOSAL`) and the schema builder: each characteristic's level gets its text as
+   `captionColumn`, the medium text, else the long, else the short one, the key caption column if it has none; the
+   name stays the key and `Key` is a member property; no text properties, no `(Text)` drill-through columns. The
+   schema editor switches a dimension's caption between the key and each text field the view has. "As numbers"
+   goes.
+4. A schema check against blank texts: the schema API's `check` (and accept) reports, per dimension, the members whose
+   caption is blank (a count and examples), so the modeller sees them; open whether it warns or refuses.
+5. BW hierarchies: a leaf is named and captioned as the characteristic's member (`levels_sql`, `c_initial_name` `#`
+   goes: SID 0 is `''`); text nodes keep their technical name, their captions (RSTHIENODE's texts) come later. The
+   reference's `ZCLDIAG_ICD` names its initial leaf `#` (`build-bw-reference-db.py`): rebuilt, and the cases that name
+   it (`execute_hier_slicer_initial`, ...) rewritten and recaptured.
+6. The reference database's copies of the views rebuilt, the clinic cases recaptured, the docs (`bw-schema-design-guide.md`
+   3.4 and 3.7, `schema-generator.md`) brought to what is built; `known-issues.md`'s entry on `#` goes.
+
+## Then: time-independent BW hierarchies
+
+Waits for the texts (above, decided 2026-10-16): steps 7.1 to 7.3 are done, the rest follows their names and
+captions. Decided with the user 2026-10-15: the next big piece of work is BW's external hierarchies (`/BI0/H<char>`,
+`/BIC/H<char>`, directory `RSHIEDIR`) that are neither time nor version dependent, ahead of planning step 7 (paused
+below). Users report on BW hierarchies, and none of them can be shown today. A plain hierarchy
 needs no key date, so this does not wait for one. Afterwards the key date (time-dependent attributes, texts and
 navigation attributes read on a date instead of 9999-12-31; open: how a client, Excel above all, sends it), then time-
 and version-dependent hierarchies on both (the clinic demo's `ZCLDOC_ORG`, `ZCLDOC_SITE`).
@@ -302,7 +371,7 @@ Open:
    only (as a level hierarchy, the reference scenario below); for shared nodes, BW's own MDX
    (`ZZXXMLA1_BW_AUTH_PROBE`).
 3. Names and captions of nodes: a text node's name is its technical name, a leaf's the characteristic's key; the
-   engine shows a member's name as its caption (`captionColumn` is paused with the texts).
+   engine shows a member's name as its caption until the texts give it a caption column (`Now: texts and captions`).
 4. The engine: members of a parent-child level and the closure in the fact reads; the planner marks such members
    computed at first, so the evaluator answers them, native and grouped reads later.
 5. The proposal and the UI: offer the hierarchies a characteristic has in `RSHIEDIR` (no not-assigned switch: the
@@ -1021,43 +1090,6 @@ Design in `schema-generator.md`. Order:
    Open: an accept through the UI checked by hand (the API's accept was); calculated members of the schema (check
    and accept refuse them, a query of their cube fails) and aggregators other than `sum`/`count` (a query that reads
    such a measure fails; a BW key figure with MIN or MAX is proposed so) are not implemented.
-## Paused: texts
-
-Paused 2026-10-15 (decided with the user): the texts are useful as they are, and a report shows a characteristic as
-BW does, its key and its text side by side; whether users want the text as the caption instead is not clear. The
-steps wait, as planned:
-
-1. Not started (asked 2026-10-15): `captionColumn` in the engine. A level's key column joins and groups, its
-   `nameColumn` names the member (unique name, MDX lookup), its `captionColumn` is only shown (`MEMBER_CAPTION`); so a
-   text caption joins nothing, and texts that are not unique do not clash. Today `ZZXXMLA1_CL_SCHEMA` refuses
-   `captionColumn` (and `caption` expressions) and a member's caption is its name. To do:
-   - read the caption column with the members (one more column of the same view in every member read of
-     `ZZXXMLA1_CL_MODEL=>read_members`, the native reads and `cells_first` included);
-   - keep every MDX lookup on the name: the schema reader compares captions in places
-     (`ZZXXMLA1_CL_MDX_SCHEMA_READER`, child lookup), which is the same only while caption = name;
-   - make `Caption` mean the caption column where the engine filters on it: the subcube's label predicates
-     (`label_predicate`, Excel's label filters) and the native label filter (`get_level_members_where`), `.Caption`;
-   - check against eMondrian with a FoodMart level given a `captionColumn` (a test catalog, like `ZFMDRILL`).
-2. Then: `captionColumn` in the proposals. The proposal (`ZZXXMLA1_CL_SCHEMA_PROPOSAL`) gives each characteristic's
-   level the text column as `captionColumn` (Excel shows "Dr. Amelia Hart" instead of `001`), the name stays the key
-   and the key stays available as a property; a characteristic without text keeps the key as caption. The schema
-   editor switches a dimension's caption between key and text (BW's key/text display). Open: a "key - text" column of
-   the view as a third choice.
-3. Then: configurable texts. Today the views carry one text per characteristic (and
-   per attribute with texts), `coalesce( text, key )` of whichever text BW's text table has (`schema-generator.md`,
-   Implementation). Instead:
-   - `ZZXXMLA1_CL_BW_VIEW_GEN` puts every text BW has into the dimension view: short, medium and long (`TXTSH`,
-     `TXTMD`, `TXTLG` of the text table, as far as the characteristic has them), each its own column, for the
-     characteristic and for every attribute with texts.
-   - The proposal's default text (the `Text` property, the drill-through `... (Text)` column) is the medium text; if
-     the characteristic has none, the long one; if it has none either, the short one; it is also the caption column
-     where step 2 shows the text.
-   - The schema editor lists a dimension's text fields with a checkbox each, enabled or disabled: an enabled text is
-     in the schema (a member property), a disabled one is left out of it; the view keeps all of them, so switching one
-     on needs no new view. Open: the property names when several are enabled (`Text` for the default one and
-     `Short Text`, `Long Text` for the others, or one name per length), and whether the switches are an annotation,
-     like `olap4abap.membersWithFacts`, or only the schema's properties as the UI edits them.
-
 ## Done: compounded characteristics
 
 Built 2026-10-12; the model is in `bw-schema-design-guide.md`, section 3.7. A compounded characteristic (`0FISCPER`

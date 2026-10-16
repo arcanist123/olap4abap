@@ -10,11 +10,11 @@ it is fixed. Read this before comparing answers with the reference or with BW.
   `[ZCLDOC].[0]` (the key, `SID`) where olap4abap names `[ZCLDOC].[000]` (the `NameColumn`), on the same schema
   (`ClinicBW.xml` and SAP's `ZCLVISIT`, compared 2026-10-16). Every schema the proposal makes has such levels.
   Example: `SELECT {[Measures].[ZCLVISNO]} ON 0, Head([ZCLDOC].[ZCLDOC].Members, 3) ON 1 FROM [ZCLVISIT]`.
-- **The initial value is not named `#` in flat dimensions.** BW's MDX and olap4abap's BW hierarchies
-  (`ZZXXMLA1_CL_BW_HIERARCHY_COPY=>levels_sql`, `c_initial_name`) name a characteristic's initial value (SID 0) `#`;
-  the flat hierarchies on the characteristics' views name it by the view's value, the empty key for a CHAR
-  characteristic (`[ZCLDIAG].[]`), so the same value has two names in one cube, and the empty one cannot be looked
-  up by `[#]`. Fix: name it `#` in the model's member reads of the views too.
+- **The initial value has two names in one cube.** olap4abap's BW hierarchies
+  (`ZZXXMLA1_CL_BW_HIERARCHY_COPY=>levels_sql`, `c_initial_name`) name a characteristic's initial value (SID 0) `#`,
+  as BW's MDX does; the flat hierarchies on the characteristics' views name it by the view's value, `''` for a CHAR
+  characteristic (`[ZCLDIAG].[]`), BW's value for the others (`0000`). Decided 2026-10-16: `''` everywhere, every key
+  type, with `#` as the caption of a characteristic without texts (`next-steps.md`, Now: texts and captions).
 - **A measure's `caption` is not its caption in an Execute answer.** `ZCLVISNO` has `caption="Visits"`; the
   reference's axis shows `Visits`, olap4abap's `ZCLVISNO` (the schema reader reads the caption,
   `ZZXXMLA1_CL_SCHEMA`). Same example.

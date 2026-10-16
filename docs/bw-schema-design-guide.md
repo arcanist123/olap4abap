@@ -149,9 +149,10 @@ only declared properties: the member key is not offered, which is why the text a
   members refer to keys that never change. Named by text, they break with every text maintenance, and two members with
   the same text under one parent collide.
 - **Texts are properties** (`Text`, the EN medium text), shown next to the key on request.
-- **Texts later, if the business wants them:** the caption shown for a member is its name, so showing texts means
-  naming members by the text column (`NameColumn` = `TXTMD`), at the price of unique names that change with the text.
-  The SID key, joins and numbers stay the same. Decide per characteristic.
+- **Texts become captions** (decided 2026-10-16, being built: `next-steps.md`, Now: texts and captions): a member is
+  named by its key and captioned by its text (`captionColumn`), the key a property `Key`, no text properties; the
+  initial value is named `''` for every key type and, without texts, captioned `#`; a compounded characteristic is
+  named by its key fields concatenated at full length. Until then the caption shown for a member is its name.
 
 ### 3.5 What BW does not have, and when to add it
 

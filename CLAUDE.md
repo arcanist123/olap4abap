@@ -350,7 +350,7 @@ Read before designing anything:
   `ZXMLWIDE` and aDSO `ZXMLWIDEA` with 100 characteristics `ZXMLAD00`-`ZXMLAD99` of 1,000 members each (`ZXMLAD00`
   100,000), one key figure
   and 1,000,000 made-up records (another number on request), without schema or catalog; the reference has no copy of it.
-- BW hierarchies (in progress, `docs/next-steps.md`, Now: time-independent BW hierarchies): part one, the copies, is
+- BW hierarchies (in progress, waiting for the texts, `docs/next-steps.md`, Then: time-independent BW hierarchies; the texts and captions are the active work, Now: texts and captions): part one, the copies, is
   done. `ZZXXMLA1_CL_BW_HIERARCHY_COPY` keeps per InfoObject a node table and a closure table (generated DDIC tables
   in `$TMP`, `ZZXXMLA1H`/`ZZXXMLA1C` and 7 digits, registered in `ZZXXMLA1_HIETAB`, made by `create_tables`) holding
   all its hierarchies, keyed by BW's `HIESID` and `SVER` (directory `ZZXXMLA1_HIEDIR`, a row per copy): the
