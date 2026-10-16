@@ -446,10 +446,25 @@ Done (2026-10-15): the reference serves `ZCLDIAG_ICD`.
      `DrilldownMember` with `LNum` the depth.
   3. Done (2026-10-16): `bw_hierarchy_test.py --reference` passes (70 members, the All member the total): it leaves
      out what is below REST_H on both sides and its children count, so only REST_H's value is compared there.
-  4. Recapture the 68 cases (`recapture-cases.py`); their values stay, `LNum`, `Level`, `.Ordinal`, `PrevMember` and
-     `MDSCHEMA_LEVELS` change. Cases that list a whole level are rewritten from DIAGNOSES. The cells are recomputed
-     from the exported facts again.
-  5. Check whether the 8 subselect and drill-through cases pass without `parent-child-closure.patch`; drop it if so.
+  4. Done (2026-10-16), but for three Excel cases: 64 of the 67 cases recaptured. 41 changed only in their levels
+     (`LNum`, `LName`, `PARENT_LEVEL`, `MDSCHEMA_LEVELS`; `Level.Ordinal` is the depth). 16 requests were rewritten
+     because they named the old level `[ZCLDIAG]` or looked inside REST_H's branch:
+     - `Level 01` to `Level 04` take the old level's place.
+     - `[REST_H].[#]` is left out.
+     - `[ZCLDIAG.ZCLDIAG_ICD].Members` became `Except(... .Members, Descendants([REST_H], 1, SELF_AND_AFTER))`, and
+       a level's members are taken `Except` REST_H's members on that level, so the request means the same on
+       olap4abap, where REST_H's values are one level below it.
+     - `members_hier_all` is DIAGNOSES with its descendants (`TREE_OP` 24); `members_hier_level` is `Level 01`.
+     `members_hier_children_rest` is dropped. Every cell of a member answered before and now is the same as before
+     (values checked when they were captured).
+     Changed by the model, not by the rewrite:
+     - VisualTotals members have their real `DEPTH` (the parent-child form gave 1).
+     - `members_hier_descendants` (`TREE_OP` 16) gives the whole subtree.
+     - The Discover tree operators come in the reference's order.
+     Left for the Excel session: `execute_hier_excel_search` and `_slicer_count` (they name the old level) and
+     `_item_path_rest` (inside REST_H's branch); Excel's own statements replace them. Against the reference
+     `xmla_test.py` passes 337 of 344 cases: those three and the `session_*` cases, which fail there by design.
+  5. Done: the reference does not need `parent-child-closure.patch` any more (the user, 2026-10-16).
   6. Repeat the live Excel session against the reference (rows, expand a member, expand entire field, crossjoin,
      the tree filter, Keep Only Selected Items, search, Filters area, slicer, label and value filters, double-click)
      and capture the statements it sends as cases.

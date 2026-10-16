@@ -175,8 +175,8 @@
         <CubeInfo>
           <Cube>
             <CubeName>ZCLVISIT</CubeName>
-            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-15T21:29:14</LastDataUpdate>
-            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-15T21:29:14</LastSchemaUpdate>
+            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T07:10:04</LastDataUpdate>
+            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T07:10:04</LastSchemaUpdate>
           </Cube>
         </CubeInfo>
         <AxesInfo>
@@ -237,8 +237,8 @@
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[UPPER_RESPIRATORY_INFECTIONS]</UName>
                 <Caption>UPPER_RESPIRATORY_INFECTIONS</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[ZCLDIAG]</LName>
-                <LNum>1</LNum>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
                 <DisplayInfo>3</DisplayInfo>
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY]</PARENT_UNIQUE_NAME>
                 <DEPTH>3</DEPTH>
@@ -249,7 +249,7 @@
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</UName>
                 <Caption>DIAGNOSES</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[ZCLDIAG]</LName>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 01]</LName>
                 <LNum>1</LNum>
                 <DisplayInfo>9</DisplayInfo>
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</PARENT_UNIQUE_NAME>
@@ -270,37 +270,26 @@
             </Tuple>
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
-                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[UPPER_RESPIRATORY_INFECTIONS].[J06]</UName>
-                <Caption>J06</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[ZCLDIAG]</LName>
-                <LNum>1</LNum>
-                <DisplayInfo>0</DisplayInfo>
-                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[UPPER_RESPIRATORY_INFECTIONS]</PARENT_UNIQUE_NAME>
-                <DEPTH>4</DEPTH>
-                <CHILDREN_CARDINALITY>0</CHILDREN_CARDINALITY>
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY]</UName>
+                <Caption>RESPIRATORY</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>4</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+                <DEPTH>2</DEPTH>
+                <CHILDREN_CARDINALITY>4</CHILDREN_CARDINALITY>
               </Member>
             </Tuple>
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
-                <UName>[ZCLDIAG.ZCLDIAG_ICD].[REST_H]</UName>
-                <Caption>REST_H</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[ZCLDIAG]</LName>
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</UName>
+                <Caption>DIAGNOSES</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 01]</LName>
                 <LNum>1</LNum>
-                <DisplayInfo>1</DisplayInfo>
+                <DisplayInfo>9</DisplayInfo>
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</PARENT_UNIQUE_NAME>
                 <DEPTH>1</DEPTH>
-                <CHILDREN_CARDINALITY>1</CHILDREN_CARDINALITY>
-              </Member>
-            </Tuple>
-            <Tuple>
-              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
-                <UName>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</UName>
-                <Caption>All Diagnoses by ICD-10 Chapter</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[(All)]</LName>
-                <LNum>0</LNum>
-                <DisplayInfo>2</DisplayInfo>
-                <DEPTH>0</DEPTH>
-                <CHILDREN_CARDINALITY>2</CHILDREN_CARDINALITY>
+                <CHILDREN_CARDINALITY>9</CHILDREN_CARDINALITY>
               </Member>
             </Tuple>
           </Tuples>
@@ -332,28 +321,20 @@
           <FmtValue>6,097,617.200</FmtValue>
         </Cell>
         <Cell CellOrdinal="6">
-          <Value xsi:type="xsd:double">2400</Value>
-          <FmtValue>2,400.000</FmtValue>
+          <Value xsi:type="xsd:double">9900</Value>
+          <FmtValue>9,900.000</FmtValue>
         </Cell>
         <Cell CellOrdinal="7">
-          <Value xsi:type="xsd:double">266151.5</Value>
-          <FmtValue>266,151.500</FmtValue>
+          <Value xsi:type="xsd:double">1518463.5</Value>
+          <FmtValue>1,518,463.500</FmtValue>
         </Cell>
         <Cell CellOrdinal="8">
-          <Value xsi:type="xsd:double">337</Value>
-          <FmtValue>337.000</FmtValue>
+          <Value xsi:type="xsd:double">33619</Value>
+          <FmtValue>33,619.000</FmtValue>
         </Cell>
         <Cell CellOrdinal="9">
-          <Value xsi:type="xsd:double">51073</Value>
-          <FmtValue>51,073.000</FmtValue>
-        </Cell>
-        <Cell CellOrdinal="10">
-          <Value xsi:type="xsd:double">33956</Value>
-          <FmtValue>33,956.000</FmtValue>
-        </Cell>
-        <Cell CellOrdinal="11">
-          <Value xsi:type="xsd:double">6097617.2</Value>
-          <FmtValue>6,097,617.200</FmtValue>
+          <Value xsi:type="xsd:double">6046544.2</Value>
+          <FmtValue>6,046,544.200</FmtValue>
         </Cell>
       </CellData>
     </root>

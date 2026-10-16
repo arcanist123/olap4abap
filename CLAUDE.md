@@ -362,8 +362,9 @@ Read before designing anything:
   The reference serves `ZCLDIAG_ICD` as a balanced level hierarchy (`Level 01`-`Level 04` on the flattened table
   `ZZXXMLA1_HL_ZCLDIAG_ICD`, placeholders under REST_H; catalog `ZCLVISIT`, `reference/schema/ClinicBW.xml`, built by
   `build-bw-reference-db.py` from an export of the InfoCube and the copy, checked against BW by
-  `bw_hierarchy_test.py --reference`); its 68 cases (`execute_hier_*`, `members_hier_*`, `mdschema_*_hier`), still
-  captured from the parent-child form and to be recaptured, are what the engine work has to pass
+  `bw_hierarchy_test.py --reference`); its 67 cases (`execute_hier_*`, `members_hier_*`, `mdschema_*_hier`;
+  none inside REST_H's branch; three Excel ones still to be replaced by the live session) are what the engine work has
+  to pass
   (`docs/next-steps.md`, Reference scenario). Decided 2026-10-16 after Excel failed on the parent-child form: the
   reference is the oracle for everything but parent-child hierarchies and is patched only to fix wrong answers, not
   to change its model; olap4abap puts each member of a BW hierarchy on the level of its depth, as SSAS does (Excel

@@ -175,8 +175,8 @@
         <CubeInfo>
           <Cube>
             <CubeName>ZCLVISIT</CubeName>
-            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-15T21:29:14</LastDataUpdate>
-            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-15T21:29:14</LastSchemaUpdate>
+            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T07:10:04</LastDataUpdate>
+            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T07:10:04</LastSchemaUpdate>
           </Cube>
         </CubeInfo>
         <AxesInfo>
@@ -235,22 +235,10 @@
           <Tuples>
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
-                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY]</UName>
-                <Caption>RESPIRATORY</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[ZCLDIAG]</LName>
-                <LNum>1</LNum>
-                <DisplayInfo>65540</DisplayInfo>
-                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
-                <DEPTH>2</DEPTH>
-                <CHILDREN_CARDINALITY>4</CHILDREN_CARDINALITY>
-              </Member>
-            </Tuple>
-            <Tuple>
-              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[UPPER_RESPIRATORY_INFECTIONS]</UName>
                 <Caption>UPPER_RESPIRATORY_INFECTIONS</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[ZCLDIAG]</LName>
-                <LNum>1</LNum>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
                 <DisplayInfo>65539</DisplayInfo>
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY]</PARENT_UNIQUE_NAME>
                 <DEPTH>3</DEPTH>
@@ -261,8 +249,8 @@
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[UPPER_RESPIRATORY_INFECTIONS].[J06]</UName>
                 <Caption>J06</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[ZCLDIAG]</LName>
-                <LNum>1</LNum>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
+                <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[UPPER_RESPIRATORY_INFECTIONS]</PARENT_UNIQUE_NAME>
                 <DEPTH>4</DEPTH>
@@ -273,8 +261,8 @@
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[UPPER_RESPIRATORY_INFECTIONS].[J02]</UName>
                 <Caption>J02</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[ZCLDIAG]</LName>
-                <LNum>1</LNum>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
+                <LNum>4</LNum>
                 <DisplayInfo>131072</DisplayInfo>
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[UPPER_RESPIRATORY_INFECTIONS]</PARENT_UNIQUE_NAME>
                 <DEPTH>4</DEPTH>
@@ -285,8 +273,8 @@
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[UPPER_RESPIRATORY_INFECTIONS].[J01]</UName>
                 <Caption>J01</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[ZCLDIAG]</LName>
-                <LNum>1</LNum>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
+                <LNum>4</LNum>
                 <DisplayInfo>131072</DisplayInfo>
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[UPPER_RESPIRATORY_INFECTIONS]</PARENT_UNIQUE_NAME>
                 <DEPTH>4</DEPTH>
@@ -297,8 +285,8 @@
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[INFLUENZA]</UName>
                 <Caption>INFLUENZA</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[ZCLDIAG]</LName>
-                <LNum>1</LNum>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
                 <DisplayInfo>65537</DisplayInfo>
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY]</PARENT_UNIQUE_NAME>
                 <DEPTH>3</DEPTH>
@@ -309,8 +297,8 @@
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[INFLUENZA].[J11]</UName>
                 <Caption>J11</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[ZCLDIAG]</LName>
-                <LNum>1</LNum>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
+                <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[INFLUENZA]</PARENT_UNIQUE_NAME>
                 <DEPTH>4</DEPTH>
@@ -321,8 +309,8 @@
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[LOWER_RESPIRATORY_DISEASES]</UName>
                 <Caption>LOWER_RESPIRATORY_DISEASES</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[ZCLDIAG]</LName>
-                <LNum>1</LNum>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
                 <DisplayInfo>65538</DisplayInfo>
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY]</PARENT_UNIQUE_NAME>
                 <DEPTH>3</DEPTH>
@@ -333,8 +321,8 @@
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[LOWER_RESPIRATORY_DISEASES].[J20]</UName>
                 <Caption>J20</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[ZCLDIAG]</LName>
-                <LNum>1</LNum>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
+                <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[LOWER_RESPIRATORY_DISEASES]</PARENT_UNIQUE_NAME>
                 <DEPTH>4</DEPTH>
@@ -345,8 +333,8 @@
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[LOWER_RESPIRATORY_DISEASES].[J18]</UName>
                 <Caption>J18</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[ZCLDIAG]</LName>
-                <LNum>1</LNum>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
+                <LNum>4</LNum>
                 <DisplayInfo>131072</DisplayInfo>
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[LOWER_RESPIRATORY_DISEASES]</PARENT_UNIQUE_NAME>
                 <DEPTH>4</DEPTH>
@@ -357,8 +345,8 @@
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[CHRONIC_LOWER_RESPIRATORY_DISEAS]</UName>
                 <Caption>CHRONIC_LOWER_RESPIRATORY_DISEAS</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[ZCLDIAG]</LName>
-                <LNum>1</LNum>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
                 <DisplayInfo>65538</DisplayInfo>
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY]</PARENT_UNIQUE_NAME>
                 <DEPTH>3</DEPTH>
@@ -369,8 +357,8 @@
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[CHRONIC_LOWER_RESPIRATORY_DISEAS].[J45]</UName>
                 <Caption>J45</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[ZCLDIAG]</LName>
-                <LNum>1</LNum>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
+                <LNum>4</LNum>
                 <DisplayInfo>0</DisplayInfo>
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[CHRONIC_LOWER_RESPIRATORY_DISEAS]</PARENT_UNIQUE_NAME>
                 <DEPTH>4</DEPTH>
@@ -381,8 +369,8 @@
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[CHRONIC_LOWER_RESPIRATORY_DISEAS].[J44]</UName>
                 <Caption>J44</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[ZCLDIAG]</LName>
-                <LNum>1</LNum>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 04]</LName>
+                <LNum>4</LNum>
                 <DisplayInfo>131072</DisplayInfo>
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[CHRONIC_LOWER_RESPIRATORY_DISEAS]</PARENT_UNIQUE_NAME>
                 <DEPTH>4</DEPTH>
@@ -394,44 +382,44 @@
       </Axes>
       <CellData>
         <Cell CellOrdinal="0">
-          <Value xsi:type="xsd:double">9900</Value>
-          <FmtValue>9,900.000</FmtValue>
-        </Cell>
-        <Cell CellOrdinal="1">
-          <Value xsi:type="xsd:double">1518463.5</Value>
-          <FmtValue>1,518,463.500</FmtValue>
-        </Cell>
-        <Cell CellOrdinal="2">
           <Value xsi:type="xsd:double">4425</Value>
           <FmtValue>4,425.000</FmtValue>
         </Cell>
-        <Cell CellOrdinal="3">
+        <Cell CellOrdinal="1">
           <Value xsi:type="xsd:double">489932.3</Value>
           <FmtValue>489,932.300</FmtValue>
         </Cell>
-        <Cell CellOrdinal="4">
+        <Cell CellOrdinal="2">
           <Value xsi:type="xsd:double">2400</Value>
           <FmtValue>2,400.000</FmtValue>
         </Cell>
-        <Cell CellOrdinal="5">
+        <Cell CellOrdinal="3">
           <Value xsi:type="xsd:double">266151.5</Value>
           <FmtValue>266,151.500</FmtValue>
         </Cell>
-        <Cell CellOrdinal="6">
+        <Cell CellOrdinal="4">
           <Value xsi:type="xsd:double">1331</Value>
           <FmtValue>1,331.000</FmtValue>
         </Cell>
-        <Cell CellOrdinal="7">
+        <Cell CellOrdinal="5">
           <Value xsi:type="xsd:double">146861</Value>
           <FmtValue>146,861.000</FmtValue>
         </Cell>
-        <Cell CellOrdinal="8">
+        <Cell CellOrdinal="6">
           <Value xsi:type="xsd:double">694</Value>
           <FmtValue>694.000</FmtValue>
         </Cell>
-        <Cell CellOrdinal="9">
+        <Cell CellOrdinal="7">
           <Value xsi:type="xsd:double">76919.8</Value>
           <FmtValue>76,919.800</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="8">
+          <Value xsi:type="xsd:double">842</Value>
+          <FmtValue>842.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="9">
+          <Value xsi:type="xsd:double">93535.4</Value>
+          <FmtValue>93,535.400</FmtValue>
         </Cell>
         <Cell CellOrdinal="10">
           <Value xsi:type="xsd:double">842</Value>
@@ -442,58 +430,50 @@
           <FmtValue>93,535.400</FmtValue>
         </Cell>
         <Cell CellOrdinal="12">
-          <Value xsi:type="xsd:double">842</Value>
-          <FmtValue>842.000</FmtValue>
-        </Cell>
-        <Cell CellOrdinal="13">
-          <Value xsi:type="xsd:double">93535.4</Value>
-          <FmtValue>93,535.400</FmtValue>
-        </Cell>
-        <Cell CellOrdinal="14">
           <Value xsi:type="xsd:double">2415</Value>
           <FmtValue>2,415.000</FmtValue>
         </Cell>
-        <Cell CellOrdinal="15">
+        <Cell CellOrdinal="13">
           <Value xsi:type="xsd:double">522760.9</Value>
           <FmtValue>522,760.900</FmtValue>
         </Cell>
-        <Cell CellOrdinal="16">
+        <Cell CellOrdinal="14">
           <Value xsi:type="xsd:double">1369</Value>
           <FmtValue>1,369.000</FmtValue>
         </Cell>
-        <Cell CellOrdinal="17">
+        <Cell CellOrdinal="15">
           <Value xsi:type="xsd:double">152683.6</Value>
           <FmtValue>152,683.600</FmtValue>
         </Cell>
-        <Cell CellOrdinal="18">
+        <Cell CellOrdinal="16">
           <Value xsi:type="xsd:double">1046</Value>
           <FmtValue>1,046.000</FmtValue>
         </Cell>
-        <Cell CellOrdinal="19">
+        <Cell CellOrdinal="17">
           <Value xsi:type="xsd:double">370077.3</Value>
           <FmtValue>370,077.300</FmtValue>
         </Cell>
-        <Cell CellOrdinal="20">
+        <Cell CellOrdinal="18">
           <Value xsi:type="xsd:double">2218</Value>
           <FmtValue>2,218.000</FmtValue>
         </Cell>
-        <Cell CellOrdinal="21">
+        <Cell CellOrdinal="19">
           <Value xsi:type="xsd:double">412234.9</Value>
           <FmtValue>412,234.900</FmtValue>
         </Cell>
-        <Cell CellOrdinal="22">
+        <Cell CellOrdinal="20">
           <Value xsi:type="xsd:double">1383</Value>
           <FmtValue>1,383.000</FmtValue>
         </Cell>
-        <Cell CellOrdinal="23">
+        <Cell CellOrdinal="21">
           <Value xsi:type="xsd:double">319616.7</Value>
           <FmtValue>319,616.700</FmtValue>
         </Cell>
-        <Cell CellOrdinal="24">
+        <Cell CellOrdinal="22">
           <Value xsi:type="xsd:double">835</Value>
           <FmtValue>835.000</FmtValue>
         </Cell>
-        <Cell CellOrdinal="25">
+        <Cell CellOrdinal="23">
           <Value xsi:type="xsd:double">92618.2</Value>
           <FmtValue>92,618.200</FmtValue>
         </Cell>

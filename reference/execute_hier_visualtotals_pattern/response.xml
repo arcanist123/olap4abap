@@ -175,8 +175,8 @@
         <CubeInfo>
           <Cube>
             <CubeName>ZCLVISIT</CubeName>
-            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-15T21:29:14</LastDataUpdate>
-            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-15T21:29:14</LastSchemaUpdate>
+            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T07:10:04</LastDataUpdate>
+            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T07:10:04</LastSchemaUpdate>
           </Cube>
         </CubeInfo>
         <AxesInfo>
@@ -237,7 +237,7 @@
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</UName>
                 <Caption>DIAGNOSES (visual)</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[ZCLDIAG]</LName>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 01]</LName>
                 <LNum>1</LNum>
                 <DisplayInfo>65545</DisplayInfo>
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</PARENT_UNIQUE_NAME>
@@ -249,8 +249,8 @@
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY]</UName>
                 <Caption>RESPIRATORY</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[ZCLDIAG]</LName>
-                <LNum>1</LNum>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
                 <DisplayInfo>4</DisplayInfo>
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
                 <DEPTH>2</DEPTH>
@@ -261,11 +261,11 @@
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY]</UName>
                 <Caption>CIRCULATORY (visual)</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[ZCLDIAG]</LName>
-                <LNum>1</LNum>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
                 <DisplayInfo>196611</DisplayInfo>
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
-                <DEPTH>1</DEPTH>
+                <DEPTH>2</DEPTH>
                 <CHILDREN_CARDINALITY>3</CHILDREN_CARDINALITY>
               </Member>
             </Tuple>
@@ -273,8 +273,8 @@
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY].[HYPERTENSIVE_DISEASES]</UName>
                 <Caption>HYPERTENSIVE_DISEASES</Caption>
-                <LName>[ZCLDIAG.ZCLDIAG_ICD].[ZCLDIAG]</LName>
-                <LNum>1</LNum>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
                 <DisplayInfo>1</DisplayInfo>
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY]</PARENT_UNIQUE_NAME>
                 <DEPTH>3</DEPTH>

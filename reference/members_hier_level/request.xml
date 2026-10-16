@@ -2,6 +2,6 @@
 <SOAP-ENV:Body>
 <Discover xmlns="urn:schemas-microsoft-com:xml-analysis" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
 <RequestType>MDSCHEMA_MEMBERS</RequestType>
-<Restrictions><RestrictionList><CATALOG_NAME>ZCLVISIT</CATALOG_NAME><CUBE_NAME>ZCLVISIT</CUBE_NAME><HIERARCHY_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD]</HIERARCHY_UNIQUE_NAME><LEVEL_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[ZCLDIAG]</LEVEL_UNIQUE_NAME></RestrictionList></Restrictions>
+<Restrictions><RestrictionList><CATALOG_NAME>ZCLVISIT</CATALOG_NAME><CUBE_NAME>ZCLVISIT</CUBE_NAME><HIERARCHY_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD]</HIERARCHY_UNIQUE_NAME><LEVEL_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[Level 01]</LEVEL_UNIQUE_NAME></RestrictionList></Restrictions>
 <Properties><PropertyList><DataSourceInfo>ABAP BW</DataSourceInfo><Catalog>ZFOODMART</Catalog><Content>Data</Content><Catalog>ZCLVISIT</Catalog></PropertyList></Properties>
 </Discover></SOAP-ENV:Body></SOAP-ENV:Envelope>
