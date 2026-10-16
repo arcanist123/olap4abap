@@ -68,7 +68,8 @@ CLASS ltc_schema_fix IMPLEMENTATION.
       `</DimensionAttribute>` &&
       `<DimensionAttribute name="ZCLFISCVR Key" attributeHierarchyEnabled="false">` &&
       `<KeyColumn dataType="String" columnName="ZCLFISCVR"/></DimensionAttribute>` &&
-      `<Hierarchy hasAll="true"><Level name="ZCLFISCVR" sourceAttribute="ZCLFISCVR SID"/></Hierarchy>` &&
+      `<Hierarchy hasAll="true"><Level name="ZCLFISCVR" sourceAttribute="ZCLFISCVR SID" nameColumn="ZCLFISCVR"/>` &&
+      `</Hierarchy>` &&
       `</Dimension>` &&
       `<Dimension name="ZCLFISCPR" caption="Fiscal Period" table="ZZXXMLA1V0000002">` &&
       `<DimensionAttribute name="ZCLFISCPR SID" usage="Key" attributeHierarchyEnabled="false">` &&
@@ -76,7 +77,8 @@ CLASS ltc_schema_fix IMPLEMENTATION.
       `<NameColumn dataType="String" columnName="COMPOUND_KEY"/></DimensionAttribute>` &&
       `<DimensionAttribute name="ZCLFISCPR Key" attributeHierarchyEnabled="false">` &&
       `<KeyColumn dataType="String" columnName="ZCLFISCPR"/></DimensionAttribute>` &&
-      `<Hierarchy name="Periods" hasAll="true"><Level name="Period" sourceAttribute="ZCLFISCPR SID"/></Hierarchy>` &&
+      `<Hierarchy name="Periods" hasAll="true">` &&
+      `<Level name="Period" sourceAttribute="ZCLFISCPR SID" nameColumn="COMPOUND_KEY"/></Hierarchy>` &&
       `</Dimension>` &&
       `<Cube name="ZCLVISIT" caption="Clinic Visits">` &&
       `<Table name="/BIC/FZCLVISIT"/>` &&
@@ -164,6 +166,7 @@ CLASS ltc_schema_fix IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = key-name_column->data_type exp = `String` ).
     cl_abap_unit_assert=>assert_not_bound( key-order_by_column ).
     cl_abap_unit_assert=>assert_equals( act = period-hierarchies[ 1 ]-name exp = `Periods` ).
+    cl_abap_unit_assert=>assert_equals( act = period-hierarchies[ 1 ]-levels[ 1 ]-name_column exp = `ZCLFISCPR` ).
     cl_abap_unit_assert=>assert_equals(
       act = result-tables
       exp = VALUE zzxxmla1_cl_schema_fix=>ty_t_replaced( ( from = `/BIC/FZCLVISIT` to = `ZZXXMLA1_F_ZCLVISIT` )

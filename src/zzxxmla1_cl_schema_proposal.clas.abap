@@ -189,6 +189,8 @@ CLASS zzxxmla1_cl_schema_proposal DEFINITION
                 iobjnm          TYPE string OPTIONAL.
     "! Writes a flat Hierarchy: All and one level, the level's text as property Text; in a time dimension the level
     "! has the level type of its attribute's characteristic (iobjnm, column).
+    "! @parameter name_column | the level's nameColumn, the column that names the members; initial: the attribute's
+    "! KeyColumn names them (RolapLevel: its NameColumn only captions them)
     METHODS open_hierarchy
       IMPORTING name           TYPE string OPTIONAL
                 caption        TYPE string
@@ -196,7 +198,8 @@ CLASS zzxxmla1_cl_schema_proposal DEFINITION
                 attribute      TYPE string
                 text_attribute TYPE string OPTIONAL
                 iobjnm         TYPE string OPTIONAL
-                column         TYPE zzxxmla1_cl_bw_provider=>ty_column OPTIONAL.
+                column         TYPE zzxxmla1_cl_bw_provider=>ty_column OPTIONAL
+                name_column    TYPE string OPTIONAL.
     METHODS close_hierarchy.
     "! Writes a member property.
     METHODS property
@@ -359,13 +362,17 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
 
-    " the characteristic: flat, the other attributes as properties
+    " the characteristic: flat, the other attributes as properties; keyed by the SID, named by the BW key (the key
+    " attribute's NameColumn only captions it)
     open_hierarchy( caption        = characteristic-text
                     level          = result
                     attribute      = key
                     text_attribute = text
                     iobjnm         = characteristic-iobjnm
-                    column         = characteristic-key_column ).
+                    column         = characteristic-key_column
+                    name_column    = COND #( WHEN by_sid = abap_true AND compounded = abap_true
+                                               THEN characteristic-name_column-name
+                                             WHEN by_sid = abap_true THEN characteristic-key_column-name ) ).
     IF compounded = abap_true.
       property( name = `Key` caption = |{ characteristic-text } (Key)| attribute = value ).
     ENDIF.
@@ -423,6 +430,7 @@ CLASS zzxxmla1_cl_schema_proposal IMPLEMENTATION.
                                                ( name = `caption` value = caption )
                                                ( name = `uniqueMembers` value = `true` )
                                                ( name = `sourceAttribute` value = attribute )
+                                               ( name = `nameColumn` value = name_column )
                                                ( name  = `levelType`
                                                  value = time_level_type_of( iobjnm = iobjnm column = column ) ) ) ).
     IF text_attribute IS NOT INITIAL.

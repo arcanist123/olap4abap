@@ -116,7 +116,8 @@ The schema names the BW tables themselves (`/BIC/FZFMSALES`, `/BIC/S<char>`, `/B
 eMondrian and our engine. Its database (the HSQLDB jar) therefore holds copies of those 11 tables with BW's contents,
 and the generated characteristic views with the SQL HANA has for them, named by their placeholders
 (`ZZXXMLA1_C_ZFMSTORE`, the schema's names; SAP's `ZZXXMLA1V...` is found in table `ZZXXMLA1_VIEW`). The catalog `ZFMDRILL` (`reference/schema/FoodmartBWDrill.xml`, drill-through
-actions) needs no tables of its own: its cube is on ZFMSALES's. On SAP it is a catalog of `/WEB-INF/datasources.xml` next
+actions) needs no tables of its own: its cube is on ZFMSALES's; nor does `ZFMCAPT` (`reference/schema/FoodmartBWCaption.xml`,
+captions that differ from names). On SAP it is a catalog of `/WEB-INF/datasources.xml` next
 to the ones the schema builder added there. So is the clinic's test catalog `ZCLHIER`, from
 `reference/schema/ClinicBW-sap.xml` (the reference's `ClinicBW.xml` with the BW hierarchy in olap4abap's form). Only views over copied tables are taken; SAP has views of other providers too:
 

@@ -3,7 +3,8 @@
 
 Posts reference/<case>/request.xml as it is and replaces response.xml (status.txt if the case has one; rows.txt, the
 number of rows, for a count-only case). Cases whose request names something the schema no longer has must be edited
-first. Prints the cases whose answer changed, so that the change can be reviewed with git diff.
+first. A case with equivalent.txt is answered for the equivalent statement (capture-execute.py --answer-of). Prints
+the cases whose answer changed, so that the change can be reviewed with git diff.
 
     python scripts/recapture-cases.py              # all cases
     python scripts/recapture-cases.py members_ execute_store_children   # cases whose names start with these
@@ -14,6 +15,7 @@ import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
+from xml.sax.saxutils import escape
 
 ROOT = Path(__file__).resolve().parent.parent
 SOAP_ACTION = {"Discover": '"urn:schemas-microsoft-com:xml-analysis:Discover"',
@@ -41,7 +43,13 @@ def main():
     for folder in sorted(p for p in (ROOT / "reference").iterdir() if (p / "request.xml").exists()):
         if args.prefixes and not any(folder.name.startswith(p) for p in args.prefixes):
             continue
-        status, answer = post(args.url, (folder / "request.xml").read_text(encoding="utf-8"))
+        body = (folder / "request.xml").read_text(encoding="utf-8")
+        if (folder / "equivalent.txt").exists():
+            # the expected answer is the reference's answer of an equivalent statement (capture-execute.py --answer-of)
+            equivalent = escape((folder / "equivalent.txt").read_text(encoding="utf-8").strip())
+            body = re.sub(r"<Statement>.*?</Statement>", lambda m: f"<Statement>{equivalent}</Statement>", body,
+                          flags=re.S)
+        status, answer = post(args.url, body)
         if (folder / "rows.txt").exists():
             target, text = folder / "rows.txt", f"{len(re.findall(r'<row>', answer))}\n"
         else:

@@ -27,6 +27,7 @@ INTERFACE zzxxmla1_if_mdx_schema_reader
       key_level     TYPE i,        " the level in the model (1 the first below the All level), 0: the All member
       path          TYPE string,   " the keys of the model levels down to key_level (ZZXXMLA1_CL_MODEL)
       unique_name   TYPE string,
+      name          TYPE string,   " the name its unique name ends with (Member.getName)
       caption       TYPE string,
       level         TYPE i,        " id of the level
       level_name    TYPE string,   " unique name of the level

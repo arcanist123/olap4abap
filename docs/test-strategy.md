@@ -513,6 +513,17 @@ non-trivial calculated member fails in eMondrian with a Java NullPointerExceptio
 `Cannot do DrillThrough operation on the cell` with the same fault code. Not ported: virtual cubes, `Format` property
 values other than the exact `Tabular`.
 
+Captions (`execute_caption_*`, `mdschema_members_caption_*`, `mdschema_measures_caption`, `dbschema_columns_caption`;
+catalog `ZFMCAPT`, `reference/schema/FoodmartBWCaption.xml`, a cube on ZFMSALES's facts whose members' captions differ
+from their names): a `sourceAttribute` level named by its own `nameColumn` (the store's BW key) and captioned by the
+attribute's `NameColumn` (the store's name), the attribute's hierarchy (named by the SID), a level with `column`,
+`nameColumn` and `captionColumn` and one with `captionColumn` only, and a measure's caption. They show that names and
+captions go to their own places (axes, `MDSCHEMA_MEMBERS`, `.Name`, `.Caption`, `Order` by caption, `Filter` on it)
+and that a member is looked up by its name only (`execute_caption_lookup_by_caption*` are the reference's faults). The
+subselect label filters on `Name` and `Caption` (`execute_caption_subcube_*`) are hand-made: the reference compares
+the level's key column there (`known-issues.md`, deliberate deviations), so `capture-execute.py --answer-of` takes the
+answer of an equivalent member set, kept in the case's `equivalent.txt` (`recapture-cases.py` asks that one).
+
 Drill-through actions (`execute_drillthrough_action*`, catalog `ZFMDRILL`, `reference/schema/FoodmartBWDrill.xml`: a
 cube on ZFMSALES's facts with a non-default action and a default one): without `RETURN` the default action's columns
 are the return list, a level, a dimension (its first level), a `sourceAttribute` column (Media Type without attribute

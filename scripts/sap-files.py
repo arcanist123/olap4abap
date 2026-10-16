@@ -35,6 +35,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 DEPLOY = [
     ("reference/schema/FoodmartBW.xml", "/WEB-INF/schema/FoodmartBW.xml"),
     ("reference/schema/FoodmartBWDrill.xml", "/WEB-INF/schema/FoodmartBWDrill.xml"),
+    ("reference/schema/FoodmartBWCaption.xml", "/WEB-INF/schema/FoodmartBWCaption.xml"),
     ("reference/schema/ClinicBW-sap.xml", "/WEB-INF/schema/ClinicBW.xml"),
 ]
 # the data sources file `deploy` merges its catalogs from

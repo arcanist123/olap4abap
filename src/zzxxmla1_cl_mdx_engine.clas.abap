@@ -2793,9 +2793,13 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     CASE to_upper( property ).
       WHEN `KEY` OR `MEMBER_KEY`.
         result-column = level-key_column.
-      WHEN `NAME` OR `CAPTION` OR `MEMBER_NAME` OR `MEMBER_CAPTION`.
-        " a level has no caption column: the caption is the name, the key without a name column
+      WHEN `NAME` OR `MEMBER_NAME`.
         result-column = level-name_column.
+        result-force_string = abap_true.
+      WHEN `CAPTION` OR `MEMBER_CAPTION`.
+        " a level without a caption column is captioned by its name
+        result-column = COND #( WHEN level-caption_column IS NOT INITIAL THEN level-caption_column
+                                ELSE level-name_column ).
         result-force_string = abap_true.
       WHEN OTHERS.
         CLEAR result.
@@ -2966,7 +2970,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       WHEN OTHERS.
         IF name = `MEMBER_KEY` AND measure = abap_true.
           " a measure's key is its name
-          value = member-caption.
+          value = member-name.
           RETURN.
         ENDIF.
         TRY.
@@ -5592,7 +5596,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     DATA(parent) = schema_reader->get_parent_member( member ).
     result = COND string( WHEN parent IS NOT INITIAL THEN hierarchize_key( parent ) )
              && zzxxmla1_cl_model=>c_separator && `1` && member-order_key && zzxxmla1_cl_model=>c_separator
-             && member-caption.
+             && member-name.
   ENDMETHOD.
 
   METHOD non_empty_list.
@@ -6862,8 +6866,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       RETURN.
     ENDIF.
     " RolapMemberBase.compareTo: by key; calculated members by name
-    DATA(text1) = COND string( WHEN member1-calculated = abap_true THEN member1-caption ELSE member1-key ).
-    DATA(text2) = COND string( WHEN member2-calculated = abap_true THEN member2-caption ELSE member2-key ).
+    DATA(text1) = COND string( WHEN member1-calculated = abap_true THEN member1-name ELSE member1-key ).
+    DATA(text2) = COND string( WHEN member2-calculated = abap_true THEN member2-name ELSE member2-key ).
     result = COND #( WHEN text1 < text2 THEN -1 WHEN text1 > text2 THEN 1 ).
   ENDMETHOD.
 
@@ -7037,7 +7041,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       member = first[ position ].
       DATA(hierarchy) = schema_reader->get_hierarchy( member-hier_id ).
       DATA(placeholder) = VALUE ty_member( hierarchy = member-hierarchy hier_id = member-hier_id
-                                           unique_name = |{ hierarchy-unique_name }.[#null]| caption = `#null`
+                                           unique_name = |{ hierarchy-unique_name }.[#null]|
+                                           name = `#null` caption = `#null`
                                            level = hierarchy-levels[ 1 ] calculated = abap_true
                                            solve_order = -99999 ).
       schema_reader->add_calculated_member( placeholder ).
@@ -7472,7 +7477,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       LOOP AT tuples INTO DATA(tuple).
         DATA(match) = abap_true.
         LOOP AT names INTO DATA(name).
-          IF tuple[ sy-tabix ]-caption <> name.
+          IF name_of( tuple[ sy-tabix ] ) <> name.
             match = abap_false.
             EXIT.
           ENDIF.
@@ -7637,7 +7642,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     DATA(level) = schema_reader->get_level( definition-levels[ 1 ] ).
     " a level like the All level (depth 0), the name #null (RolapUtil.mdxNullLiteral)
     result = VALUE #( hierarchy = definition-unique_name hier_id = hierarchy unique_name = |{ definition-unique_name }.[#null]|
-                      caption = `#null` level = level-id level_name = level-unique_name is_null = abap_true ).
+                      name = `#null` caption = `#null` level = level-id level_name = level-unique_name
+                      is_null = abap_true ).
   ENDMETHOD.
 
   METHOD without_null_tuples.
@@ -8589,7 +8595,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         ELSE schema_reader->get_member_children( current ) ).
       DATA(exact) = VALUE ty_member( ).
       LOOP AT candidates INTO DATA(candidate).
-        IF to_upper( candidate-caption ) = to_upper( segment-name ).
+        IF to_upper( candidate-name ) = to_upper( segment-name ).
           exact = candidate.
           EXIT.
         ENDIF.
@@ -8803,7 +8809,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
 
   METHOD name_of.
     DATA(calc) = visual_total_calc( member ).
-    result = COND #( WHEN calc IS BOUND THEN name_of( calc->member ) ELSE member-caption ).
+    result = COND #( WHEN calc IS BOUND THEN name_of( calc->member ) ELSE member-name ).
   ENDMETHOD.
 
   METHOD member_property.
@@ -8917,8 +8923,9 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     " the child level; none below the last level
     IF member-is_null = abap_false AND level-depth + 1 < lines( levels ).
       DATA(child_level) = levels[ level-depth + 2 ].
+      DATA(child_name) = name.
       LOOP AT query_calculated_members( member-hier_id ) INTO DATA(child)
-           WHERE level = child_level AND parent_unique = member-unique_name AND caption = name.
+           WHERE level = child_level AND parent_unique = member-unique_name AND name = child_name.
         result = child.
         RETURN.
       ENDLOOP.

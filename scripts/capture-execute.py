@@ -6,6 +6,15 @@
 Writes request.xml and response.xml (see docs/test-strategy.md). The properties DataSourceInfo (ABAP BW), Catalog
 (ZFOODMART), Format (Multidimensional), AxisFormat (TupleFormat) and Content (SchemaData) are sent; override or add
 with -p NAME=VALUE. The statement can also be given as @index of tests/mdx/applicable.json (e.g. @9).
+
+Where olap4abap answers differently from the reference on purpose (docs/known-issues.md, deliberate deviations),
+--answer-of takes the expected answer from an equivalent statement the reference answers as olap4abap should:
+request.xml holds the statement, response.xml the reference's answer of the equivalent one and equivalent.txt the
+equivalent statement, so that the case can be captured again.
+
+    python scripts/capture-execute.py execute_caption_subcube_name -p Catalog=ZFMCAPT \
+        'SELECT FROM (SELECT Filter([Promotions].[Promotion].Members, [Promotions].CurrentMember.Name = "0000000001") ON 0 FROM [ZFMSALESCP])' \
+        --answer-of 'SELECT FROM (SELECT {[Promotions].[0000000001]} ON 0 FROM [ZFMSALESCP])'
 """
 import argparse
 import json
@@ -34,6 +43,7 @@ def main():
     parser.add_argument("statement")
     parser.add_argument("-p", "--property", action="append", default=[], metavar="NAME=VALUE")
     parser.add_argument("--url", default="http://localhost:8080/emondrian/xmla")
+    parser.add_argument("--answer-of", metavar="STATEMENT", help="the equivalent statement the reference answers")
     args = parser.parse_args()
 
     statement = args.statement
@@ -43,8 +53,9 @@ def main():
                   "AxisFormat": "TupleFormat", "Content": "SchemaData"}
     properties.update(p.split("=", 1) for p in args.property)
     body = request_xml(statement, properties)
+    asked = request_xml(args.answer_of, properties) if args.answer_of else body
 
-    request = urllib.request.Request(args.url, data=body.encode("utf-8"), method="POST", headers={
+    request = urllib.request.Request(args.url, data=asked.encode("utf-8"), method="POST", headers={
         "Content-Type": "text/xml; charset=utf-8", "SOAPAction": '"urn:schemas-microsoft-com:xml-analysis:Execute"'})
     with urllib.request.urlopen(request, timeout=600) as response:
         answer = response.read().decode("utf-8")
@@ -53,6 +64,8 @@ def main():
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "request.xml").write_text(body, encoding="utf-8", newline="\n")
     (folder / "response.xml").write_text(answer, encoding="utf-8", newline="\n")
+    if args.answer_of:
+        (folder / "equivalent.txt").write_text(args.answer_of + "\n", encoding="utf-8", newline="\n")
     print(f"{args.name}: {len(answer)} bytes, {len(re.findall(r'<Cell ', answer))} cells")
 
 

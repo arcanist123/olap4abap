@@ -24,8 +24,11 @@ CLASS ltc_schema DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT
     "! member properties of a level: the column and type of a sourceAttribute or their own; formatters and date types
     "! are refused
     METHODS properties FOR TESTING RAISING cx_static_check.
-    "! an attribute keyed by the SID and named by the value (NameColumn): its hierarchy and a level over it
+    "! an attribute keyed by the SID and captioned by the value (NameColumn): its hierarchy and a level over it are
+    "! named by the SID, a level with a nameColumn of its own by that column
     METHODS name_column FOR TESTING RAISING cx_static_check.
+    "! a level's captionColumn; a caption of the column that names the member is none
+    METHODS caption_column FOR TESTING RAISING cx_static_check.
     "! the members' order: an attribute's OrderByColumn (on its hierarchy and on a level over it), a level's
     "! ordinalColumn, orderBy="Name"; none where it is the key
     METHODS ordinal_column FOR TESTING RAISING cx_static_check.
@@ -61,6 +64,8 @@ CLASS ltc_schema IMPLEMENTATION.
       `    <DimensionAttribute name="Country"><KeyColumn dataType="String" columnName="CNTRY"/></DimensionAttribute>` &&
       `    <Hierarchy name="Stores" hasAll="true"><Level name="Country" sourceAttribute="Country"/>` &&
       `      <Level name="Store" sourceAttribute="Store"/></Hierarchy>` &&
+      `    <Hierarchy name="Named" hasAll="true"><Level name="Store" sourceAttribute="Store" nameColumn="STORE"/>` &&
+      `      </Hierarchy>` &&
       `  </Dimension>` &&
       `  <Cube name="Sales"><Table name="/BIC/FSALES"/>` &&
       `    <DimensionUsage name="Store" source="Store" foreignKey="SID_STORE"/>` &&
@@ -71,10 +76,41 @@ CLASS ltc_schema IMPLEMENTATION.
     DATA(levels) = schema->levels( cube = `Sales` dim = `Store` hier = `Stores` ).
     DATA(level) = levels[ 2 ].
     cl_abap_unit_assert=>assert_equals( act = level-key_column exp = `SID` ).
-    cl_abap_unit_assert=>assert_equals( act = level-name_column exp = `STORE` ).
+    cl_abap_unit_assert=>assert_equals( act = level-name_column exp = `SID` ).
+    cl_abap_unit_assert=>assert_equals( act = level-caption_column exp = `STORE` ).
+    DATA(named) = schema->levels( cube = `Sales` dim = `Store` hier = `Named` ).
+    cl_abap_unit_assert=>assert_equals( act = named[ 1 ]-name_column exp = `STORE` ).
+    cl_abap_unit_assert=>assert_initial( named[ 1 ]-caption_column ).
     DATA(attribute) = schema->levels( cube = `Sales` dim = `Store` hier = `Store` ).
     cl_abap_unit_assert=>assert_equals( act = lines( attribute ) exp = 1 ).
-    cl_abap_unit_assert=>assert_equals( act = attribute[ 1 ]-name_column exp = `STORE` ).
+    cl_abap_unit_assert=>assert_equals( act = attribute[ 1 ]-name_column exp = `SID` ).
+    cl_abap_unit_assert=>assert_equals( act = attribute[ 1 ]-caption_column exp = `STORE` ).
+  ENDMETHOD.
+
+  METHOD caption_column.
+    DATA(schema) = read(
+      `<Schema name="S">` &&
+      `  <Dimension name="Promotion" table="V_PROMO">` &&
+      `    <DimensionAttribute name="SID" usage="Key" attributeHierarchyEnabled="false">` &&
+      `      <KeyColumn dataType="Integer" columnName="SID"/></DimensionAttribute>` &&
+      `    <Hierarchy hasAll="true"><Level name="Promotion" column="SID" type="Integer" nameColumn="PROMO"` &&
+      `      captionColumn="PROMO_TXT"/></Hierarchy>` &&
+      `    <Hierarchy name="Id" hasAll="true"><Level name="Id" column="SID" captionColumn="PROMO_TXT"/></Hierarchy>` &&
+      `    <Hierarchy name="Same" hasAll="true"><Level name="Same" column="SID" nameColumn="PROMO"` &&
+      `      captionColumn="PROMO"/></Hierarchy>` &&
+      `  </Dimension>` &&
+      `  <Cube name="Sales"><Table name="/BIC/FSALES"/>` &&
+      `    <DimensionUsage name="Promotion" source="Promotion" foreignKey="SID_PROMO"/>` &&
+      `    <Measure name="Units" column="UNITS" aggregator="sum"/></Cube>` &&
+      `</Schema>` ).
+    DATA(levels) = schema->levels( cube = `Sales` dim = `Promotion` hier = `Promotion` ).
+    cl_abap_unit_assert=>assert_equals( act = levels[ 1 ]-name_column exp = `PROMO` ).
+    cl_abap_unit_assert=>assert_equals( act = levels[ 1 ]-caption_column exp = `PROMO_TXT` ).
+    levels = schema->levels( cube = `Sales` dim = `Promotion` hier = `Id` ).
+    cl_abap_unit_assert=>assert_equals( act = levels[ 1 ]-name_column exp = `SID` ).
+    cl_abap_unit_assert=>assert_equals( act = levels[ 1 ]-caption_column exp = `PROMO_TXT` ).
+    levels = schema->levels( cube = `Sales` dim = `Promotion` hier = `Same` ).
+    cl_abap_unit_assert=>assert_initial( levels[ 1 ]-caption_column ).
   ENDMETHOD.
 
   METHOD ordinal_column.
@@ -248,8 +284,18 @@ CLASS ltc_schema IMPLEMENTATION.
       CATCH zzxxmla1_cx_xmla INTO DATA(fault).
         cl_abap_unit_assert=>assert_equals( act = fault->description
                                             exp = |olap4abap Error:Hierarchy 'D' of dimension 'D', level 'L': only a key | &&
-                                                  |column, a name column and an ordinal column of the dimension's table | &&
-                                                  |are supported| ).
+                                                  |column, a name column, a caption column and an ordinal column of the | &&
+                                                  |dimension's table are supported| ).
+    ENDTRY.
+    TRY.
+        read( |<Schema name="S">{ dimension }<Hierarchy name="H" hasAll="true">| &&
+              |<Level name="L" sourceAttribute="K" captionColumn="TXT"/></Hierarchy></Dimension>{ cube }</Schema>| ).
+        cl_abap_unit_assert=>fail( `no fault` ).
+      CATCH zzxxmla1_cx_xmla INTO fault.
+        cl_abap_unit_assert=>assert_equals( act = fault->description
+                                            exp = |olap4abap Error:Hierarchy 'H' of dimension 'D', level 'L': a level | &&
+                                                  |with a sourceAttribute is captioned by the attribute's NameColumn, not | &&
+                                                  |by a captionColumn| ).
     ENDTRY.
     TRY.
         read( |<Schema name="S">{ dimension }<Hierarchy hasAll="true"><Level name="L" sourceAttribute="X"/>| &&

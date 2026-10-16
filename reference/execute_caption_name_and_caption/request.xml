@@ -1,0 +1,6 @@
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<SOAP-ENV:Body>
+<Execute xmlns="urn:schemas-microsoft-com:xml-analysis" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<Command><Statement>WITH MEMBER [Measures].[Name] AS [Store].CurrentMember.Name MEMBER [Measures].[Caption] AS [Store].CurrentMember.Caption MEMBER [Measures].[Promotion] AS [Promotions].CurrentMember.Caption SELECT {[Measures].[Name], [Measures].[Caption], [Measures].[Promotion]} ON 0, Head([Store].[Store Name].Members, 3) ON 1 FROM [ZFMSALESCP] WHERE [Promotions].[0000000001]</Statement></Command>
+<Properties><PropertyList><DataSourceInfo>ABAP BW</DataSourceInfo><Catalog>ZFMCAPT</Catalog><Format>Multidimensional</Format><AxisFormat>TupleFormat</AxisFormat><Content>SchemaData</Content></PropertyList></Properties>
+</Execute></SOAP-ENV:Body></SOAP-ENV:Envelope>

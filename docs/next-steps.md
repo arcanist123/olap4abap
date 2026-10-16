@@ -55,16 +55,33 @@ The rules (decided 2026-10-16):
 
 The steps:
 
-1. `captionColumn` in the engine. A level's key column joins and groups, its `nameColumn` names the member (unique
-   name, MDX lookup), its `captionColumn` is only shown (`MEMBER_CAPTION`); so a text caption joins nothing, and
-   texts that are not unique do not clash. Today `ZZXXMLA1_CL_SCHEMA` refuses `captionColumn` (and `caption`
-   expressions) and a member's caption is its name. To do:
-   - read the caption column with the members (one more column of the same view in every member read of
-     `ZZXXMLA1_CL_MODEL=>read_members`, the native reads and `cells_first` included);
-   - keep every MDX lookup on the name: the schema reader compares captions in places
-     (`ZZXXMLA1_CL_MDX_SCHEMA_READER`, child lookup), which is the same only while caption = name;
-   - make `Caption` mean the caption column where the engine filters on it (above);
-   - check against eMondrian with a FoodMart level given a `captionColumn` (a test catalog, like `ZFMDRILL`).
+1. Done (2026-10-16): captions in the engine, by the reference's rule (`RolapLevel.createFromXml`, `RolapDimension`,
+   checked on the test catalog `ZFMCAPT`, `reference/schema/FoodmartBWCaption.xml`): a level with `sourceAttribute` is
+   keyed by the attribute's `KeyColumn`, named by the level's own `nameColumn` (else by the key) and captioned by the
+   attribute's `NameColumn`; an attribute's hierarchy is named by its key and captioned by its `NameColumn`; a level
+   with `column` is named by its `nameColumn` and captioned by its `captionColumn`. A caption of the column that names
+   the member is none. `ZZXXMLA1_CL_SCHEMA` gives a level its `caption_column` (a `captionColumn` on a level with
+   `sourceAttribute`, which the reference ignores, is refused); `ZZXXMLA1_CL_MODEL=>members_of_rows` reads it after
+   the name in every member read (the native reads and `cells_first` read members through it too); the engine's
+   member has a `name` beside its `caption`: lookups, `.Name`, `Item` by name, calculated children and the
+   hierarchize order of calculated members use the name, `.Caption`, `MEMBER_CAPTION` (axes, `MDSCHEMA_MEMBERS`) the
+   caption, and `property_reference` gives `Caption` the caption column, so the subcube's label conditions and the
+   native label filter compare it (`Name` the name column; the reference compares the key column there, the cases
+   `execute_caption_subcube_*` take their answers from equivalent member sets, `capture-execute.py --answer-of`). A
+   measure's `caption` is its caption (known issue fixed: `Visits`, not `ZCLVISNO`). `DBSCHEMA_COLUMNS` has no
+   `$caption` (the reference's neither).
+   Known issue 1 (members of `sourceAttribute` levels named by the attribute's `NameColumn`) is gone with it: the
+   proposal writes the key attribute's `NameColumn` as the level's `nameColumn` too, so a member is named by its BW
+   key on the reference and on SAP alike (the key attribute's `NameColumn` is the same column, so no caption yet);
+   `ZZXXMLA1_CL_SCHEMA_FIX` rewrites a level's `nameColumn` with the attribute's, the schema builder gives a level it
+   adds over an attribute the attribute's `NameColumn` as `nameColumn` and "As numbers" switches it; `ClinicBW.xml`,
+   `ClinicBW-sap.xml` and SAP's accepted `ZCLVISIT`, `ZCLVISITA` and `ZXMLWIDE` got the `nameColumn`s, and the clinic
+   cases were recaptured (58 answers: names by key, not SID; `execute_hier_drillthrough_subselect` names
+   `[ZCLVTYPE].[Emergency]`).
+   Checked: `xmla_test.py` 369 of 372 (the 26 caption cases new; of the clinic cases only
+   `execute_hier_hierarchize_post` and `execute_hier_visualtotals`, `_pattern` fail, `known-issues.md`),
+   `compare-applicable.py` 394 of 395 as before, `schema_api_test.py`, `fixed_selection_test.py`, `clinic_test.py`
+   and `schema_ui_test.py` pass, the unit tests of `ZZXXMLA1_CL_SCHEMA`, `_MODEL` and `_SCHEMA_FIX` pass.
 2. The views (`ZZXXMLA1_CL_BW_VIEW_GEN`), so that changing a caption needs no new view:
    - every text BW has, short, medium and long (`TXTSH`, `TXTMD`, `TXTLG` of the text table, as far as the
      characteristic has them), each its own column, `coalesce( text, '' )` instead of `coalesce( text, key )` (as
@@ -74,9 +91,12 @@ The steps:
    - `COMPOUND_KEY` the name above (an initial part empty, SID 0 `''`), its present form (`#` for an initial part)
      a caption column of its own;
    - a key caption column for characteristics without texts (the key, `#` for SID 0).
-3. The proposal (`ZZXXMLA1_CL_SCHEMA_PROPOSAL`) and the schema builder: each characteristic's level gets its text as
-   `captionColumn`, the medium text, else the long, else the short one, the key caption column if it has none; the
-   name stays the key and `Key` is a member property; no `Text` property and no `(Text)` drill-through column of the
+3. The proposal (`ZZXXMLA1_CL_SCHEMA_PROPOSAL`) and the schema builder: each characteristic's key attribute gets its
+   text as `NameColumn` (the caption of a level with `sourceAttribute`, step 1; not a `captionColumn`, which the
+   reference ignores there), the medium text, else the long, else the short one, the key caption column if it has
+   none; the level's `nameColumn` stays the key (written since step 1), and so does a BW hierarchy's leaf name, which
+   `ZZXXMLA1_CL_SCHEMA` takes from the key attribute's `NameColumn` today (`bw_value_name`: take the level's
+   `nameColumn` instead); the name stays the key and `Key` is a member property; no `Text` property and no `(Text)` drill-through column of the
    characteristic itself, while each display attribute keeps its key and its text as properties (and its drill-through
    columns). The schema editor switches a dimension's caption between the key and each text field the view has.
    "As numbers" goes.

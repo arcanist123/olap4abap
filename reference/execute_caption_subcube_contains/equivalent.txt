@@ -1,0 +1,1 @@
+SELECT {[Measures].[Unit Sales]} ON 0, [Store].[Store Country].Members ON 1 FROM (SELECT {[Store].[Canada].[0000000020], [Store].[Mexico].[0000000021], [Store].[USA].[0000000002], [Store].[USA].[0000000022], [Store].[USA].[0000000023], [Store].[USA].[0000000024]} ON 0 FROM [ZFMSALESCP])

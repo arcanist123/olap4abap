@@ -15,6 +15,8 @@ CLASS ltc_model DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
     METHODS members_of_rows FOR TESTING.
     "! a level with a name column of its own: keyed by one column, named by the other
     METHODS name_column FOR TESTING.
+    "! a caption column: its value after the name, before the properties; without one the caption is the name
+    METHODS caption_column FOR TESTING.
     "! the empty member (blank keys) is a member like any other, also on the first row
     METHODS empty_member FOR TESTING.
     "! the values of a level's properties follow its key and name; a member takes the ones of its first row
@@ -61,25 +63,26 @@ CLASS ltc_model IMPLEMENTATION.
     DATA(portland) = |{ usa }{ tab }0Portland|.
     DATA(seattle) = |{ usa }{ tab }0Seattle|.
     cl_abap_unit_assert=>assert_equals( act = members exp = VALUE zzxxmla1_cl_model=>ty_t_member(
-      ( level_no = 1 key = `Canada` name = `Canada` path = `Canada` unique_name = `[Store].[Canada]` children = 1
-        order_key = canada )
-      ( level_no = 2 key = `Vancouver` name = `Vancouver` path = |Canada{ tab }Vancouver|
+      ( level_no = 1 key = `Canada` name = `Canada` caption = `Canada` path = `Canada` unique_name = `[Store].[Canada]`
+        children = 1 order_key = canada )
+      ( level_no = 2 key = `Vancouver` name = `Vancouver` caption = `Vancouver` path = |Canada{ tab }Vancouver|
         unique_name = `[Store].[Canada].[Vancouver]` parent = `[Store].[Canada]` children = 1 order_key = vancouver )
-      ( level_no = 3 key = `19` name = `19` path = |Canada{ tab }Vancouver{ tab }19|
+      ( level_no = 3 key = `19` name = `19` caption = `19` path = |Canada{ tab }Vancouver{ tab }19|
         unique_name = `[Store].[Canada].[Vancouver].[19]` parent = `[Store].[Canada].[Vancouver]`
         order_key = |{ vancouver }{ tab }0P0219| )
-      ( level_no = 1 key = `USA` name = `USA` path = `USA` unique_name = `[Store].[USA]` children = 2 order_key = usa )
-      ( level_no = 2 key = `Portland` name = `Portland` path = |USA{ tab }Portland|
+      ( level_no = 1 key = `USA` name = `USA` caption = `USA` path = `USA` unique_name = `[Store].[USA]` children = 2
+        order_key = usa )
+      ( level_no = 2 key = `Portland` name = `Portland` caption = `Portland` path = |USA{ tab }Portland|
         unique_name = `[Store].[USA].[Portland]` parent = `[Store].[USA]` children = 1 order_key = portland )
-      ( level_no = 3 key = `11` name = `11` path = |USA{ tab }Portland{ tab }11|
+      ( level_no = 3 key = `11` name = `11` caption = `11` path = |USA{ tab }Portland{ tab }11|
         unique_name = `[Store].[USA].[Portland].[11]` parent = `[Store].[USA].[Portland]`
         order_key = |{ portland }{ tab }0P0211| )
-      ( level_no = 2 key = `Seattle` name = `Seattle` path = |USA{ tab }Seattle|
+      ( level_no = 2 key = `Seattle` name = `Seattle` caption = `Seattle` path = |USA{ tab }Seattle|
         unique_name = `[Store].[USA].[Seattle]` parent = `[Store].[USA]` children = 2 order_key = seattle )
-      ( level_no = 3 key = `15` name = `15` path = |USA{ tab }Seattle{ tab }15|
+      ( level_no = 3 key = `15` name = `15` caption = `15` path = |USA{ tab }Seattle{ tab }15|
         unique_name = `[Store].[USA].[Seattle].[15]` parent = `[Store].[USA].[Seattle]`
         order_key = |{ seattle }{ tab }0P0215| )
-      ( level_no = 3 key = `16` name = `16` path = |USA{ tab }Seattle{ tab }16|
+      ( level_no = 3 key = `16` name = `16` caption = `16` path = |USA{ tab }Seattle{ tab }16|
         unique_name = `[Store].[USA].[Seattle].[16]` parent = `[Store].[USA].[Seattle]`
         order_key = |{ seattle }{ tab }0P0216| ) ) ).
   ENDMETHOD.
@@ -120,6 +123,21 @@ CLASS ltc_model IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = members[ 3 ]-key exp = `15` ).
     cl_abap_unit_assert=>assert_equals( act = members[ 3 ]-name exp = `Store [15]` ).
     cl_abap_unit_assert=>assert_equals( act = members[ 3 ]-unique_name exp = `[Store].[USA].[Seattle].[Store [15]]]` ).
+  ENDMETHOD.
+
+  METHOD caption_column.
+    DATA(store) = hierarchy( `NAME` ).
+    store-levels[ 3 ]-caption_column = `TXT`.
+    store-levels[ 3 ]-properties = VALUE #( ( name = `Store Type` column = `TYPE` data_type = `String` ) ).
+    DATA(members) = zzxxmla1_cl_model=>members_of_rows(
+      hierarchy = store
+      rows      = VALUE #( ( VALUE #( ( `USA` ) ( `Seattle` ) ( `15` ) ( `0015` ) ( `Store 15` ) ( `Supermarket` ) ) ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = lines( members ) exp = 3 ).
+    cl_abap_unit_assert=>assert_equals( act = members[ 3 ]-name exp = `0015` ).
+    cl_abap_unit_assert=>assert_equals( act = members[ 3 ]-caption exp = `Store 15` ).
+    cl_abap_unit_assert=>assert_equals( act = members[ 3 ]-unique_name exp = `[Store].[USA].[Seattle].[0015]` ).
+    cl_abap_unit_assert=>assert_equals( act = members[ 3 ]-properties exp = VALUE string_table( ( `Supermarket` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = members[ 2 ]-caption exp = `Seattle` ).
   ENDMETHOD.
 
   METHOD empty_member.

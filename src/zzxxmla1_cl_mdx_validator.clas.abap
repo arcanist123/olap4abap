@@ -1702,7 +1702,8 @@ CLASS zzxxmla1_cl_mdx_validator IMPLEMENTATION.
         THEN |{ hierarchy_info-unique_name }.{ zzxxmla1_cl_mdx_node=>quote_identifier( level_info-name ) }.{ quoted }|
       ELSE |{ hierarchy_info-unique_name }.{ quoted }| ).
     result = VALUE #( hierarchy = hierarchy_info-unique_name hier_id = hierarchy unique_name = unique_name
-                      caption = name level = level level_name = level_info-unique_name level_number = level_info-depth
+                      name = name caption = name
+                      level = level level_name = level_info-unique_name level_number = level_info-depth
                       parent_unique = parent_member-unique_name calculated = abap_true
                       solve_order = solve_order_of( formula ) ).
   ENDMETHOD.

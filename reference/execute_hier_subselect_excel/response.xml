@@ -175,8 +175,8 @@
         <CubeInfo>
           <Cube>
             <CubeName>ZCLHIER</CubeName>
-            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T08:50:24</LastDataUpdate>
-            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T08:50:24</LastSchemaUpdate>
+            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T12:10:47</LastDataUpdate>
+            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T12:10:47</LastSchemaUpdate>
           </Cube>
         </CubeInfo>
         <AxesInfo>
@@ -240,7 +240,7 @@
                 <DisplayInfo>1</DisplayInfo>
               </Member>
               <Member Hierarchy="[ZCLVTYPE]">
-                <UName>[ZCLVTYPE].[0]</UName>
+                <UName>[ZCLVTYPE].[]</UName>
                 <Caption/>
                 <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
                 <LNum>1</LNum>
@@ -257,7 +257,7 @@
                 <DisplayInfo>1</DisplayInfo>
               </Member>
               <Member Hierarchy="[ZCLVTYPE]">
-                <UName>[ZCLVTYPE].[3]</UName>
+                <UName>[ZCLVTYPE].[Follow-up]</UName>
                 <Caption>Follow-up</Caption>
                 <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
                 <LNum>1</LNum>
@@ -274,7 +274,7 @@
                 <DisplayInfo>1</DisplayInfo>
               </Member>
               <Member Hierarchy="[ZCLVTYPE]">
-                <UName>[ZCLVTYPE].[4]</UName>
+                <UName>[ZCLVTYPE].[Outpatient]</UName>
                 <Caption>Outpatient</Caption>
                 <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
                 <LNum>1</LNum>
@@ -291,7 +291,7 @@
                 <DisplayInfo>65537</DisplayInfo>
               </Member>
               <Member Hierarchy="[ZCLVTYPE]">
-                <UName>[ZCLVTYPE].[5]</UName>
+                <UName>[ZCLVTYPE].[Telehealth]</UName>
                 <Caption>Telehealth</Caption>
                 <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
                 <LNum>1</LNum>
@@ -326,7 +326,7 @@
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</PARENT_UNIQUE_NAME>
               </Member>
               <Member Hierarchy="[ZCLVTYPE]">
-                <UName>[ZCLVTYPE].[0]</UName>
+                <UName>[ZCLVTYPE].[]</UName>
                 <Caption/>
                 <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
                 <LNum>1</LNum>
@@ -344,7 +344,7 @@
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</PARENT_UNIQUE_NAME>
               </Member>
               <Member Hierarchy="[ZCLVTYPE]">
-                <UName>[ZCLVTYPE].[3]</UName>
+                <UName>[ZCLVTYPE].[Follow-up]</UName>
                 <Caption>Follow-up</Caption>
                 <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
                 <LNum>1</LNum>
@@ -362,7 +362,7 @@
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</PARENT_UNIQUE_NAME>
               </Member>
               <Member Hierarchy="[ZCLVTYPE]">
-                <UName>[ZCLVTYPE].[4]</UName>
+                <UName>[ZCLVTYPE].[Outpatient]</UName>
                 <Caption>Outpatient</Caption>
                 <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
                 <LNum>1</LNum>
@@ -380,7 +380,7 @@
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</PARENT_UNIQUE_NAME>
               </Member>
               <Member Hierarchy="[ZCLVTYPE]">
-                <UName>[ZCLVTYPE].[5]</UName>
+                <UName>[ZCLVTYPE].[Telehealth]</UName>
                 <Caption>Telehealth</Caption>
                 <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
                 <LNum>1</LNum>
@@ -415,7 +415,7 @@
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
               </Member>
               <Member Hierarchy="[ZCLVTYPE]">
-                <UName>[ZCLVTYPE].[0]</UName>
+                <UName>[ZCLVTYPE].[]</UName>
                 <Caption/>
                 <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
                 <LNum>1</LNum>
@@ -433,7 +433,7 @@
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
               </Member>
               <Member Hierarchy="[ZCLVTYPE]">
-                <UName>[ZCLVTYPE].[3]</UName>
+                <UName>[ZCLVTYPE].[Follow-up]</UName>
                 <Caption>Follow-up</Caption>
                 <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
                 <LNum>1</LNum>
@@ -451,7 +451,7 @@
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
               </Member>
               <Member Hierarchy="[ZCLVTYPE]">
-                <UName>[ZCLVTYPE].[4]</UName>
+                <UName>[ZCLVTYPE].[Outpatient]</UName>
                 <Caption>Outpatient</Caption>
                 <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
                 <LNum>1</LNum>
@@ -469,7 +469,7 @@
                 <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
               </Member>
               <Member Hierarchy="[ZCLVTYPE]">
-                <UName>[ZCLVTYPE].[5]</UName>
+                <UName>[ZCLVTYPE].[Telehealth]</UName>
                 <Caption>Telehealth</Caption>
                 <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
                 <LNum>1</LNum>

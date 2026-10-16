@@ -1,0 +1,63 @@
+<?xml version="1.0"?>
+<!--
+  Catalog ZFMCAPT: a cube on the facts of ZFMSALES (reference/schema/FoodmartBW.xml) whose members have captions that
+  differ from their names, for captionColumn and the attributes' NameColumn (execute_caption_*, mdschema_members_caption_*;
+  docs/next-steps.md, Now: texts and captions, step 1). The reference's rule (RolapLevel.createFromXml,
+  RolapDimension): a level with sourceAttribute is keyed by the attribute's KeyColumn, named by the level's own
+  nameColumn (else by the key) and captioned by the attribute's NameColumn; an attribute hierarchy is keyed and named
+  by its KeyColumn and captioned by its NameColumn; a level with column is named by its nameColumn and captioned by
+  its captionColumn.
+  - Store: Store Name is keyed by the SID, named by the store's BW key ZFMSTORE and captioned by its name ZFMSNAME;
+    the key attribute's hierarchy [Store.Store Id] is named by the SID and captioned by ZFMSNAME.
+  - Promotions: a level with column, nameColumn (the BW key) and captionColumn (the promotion's name); the hierarchy
+    Promotion Id a level with column (the SID) and captionColumn only.
+  - Product: Product Name names its own nameColumn; the attribute has no NameColumn, so the caption is the name. The
+    reference ignores a captionColumn on a level with sourceAttribute; olap4abap refuses it (docs/known-issues.md).
+  The tables are placeholders of the characteristics' views, as in FoodmartBW.xml.
+-->
+<Schema name="ZFMCAPT">
+  <Dimension name="Store" table="ZZXXMLA1_C_ZFMSTORE">
+    <DimensionAttribute name="Store Id" usage="Key">
+      <KeyColumn dataType="Integer" columnName="SID"/>
+      <NameColumn dataType="String" columnName="ZFMSNAME"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="Country"><KeyColumn dataType="String" columnName="ZFMCNTRY"/></DimensionAttribute>
+    <Hierarchy hasAll="true">
+      <Level name="Store Country" uniqueMembers="true" sourceAttribute="Country"/>
+      <Level name="Store Name" uniqueMembers="true" sourceAttribute="Store Id" nameColumn="ZFMSTORE"/>
+    </Hierarchy>
+  </Dimension>
+
+  <Dimension name="Promotions" table="ZZXXMLA1_C_ZFMPROMO">
+    <DimensionAttribute name="Promotion SID" usage="Key" attributeHierarchyEnabled="false">
+      <KeyColumn dataType="Integer" columnName="SID"/>
+    </DimensionAttribute>
+    <Hierarchy hasAll="true" allMemberName="All Promotions">
+      <Level name="Promotion" column="SID" type="Integer" nameColumn="ZFMPROMO" captionColumn="ZFMPRNAM"
+          uniqueMembers="true"/>
+    </Hierarchy>
+    <Hierarchy name="Promotion Id" hasAll="true">
+      <Level name="Promotion Id" column="SID" type="Integer" captionColumn="ZFMPRNAM" uniqueMembers="true"/>
+    </Hierarchy>
+  </Dimension>
+
+  <Dimension name="Product" table="ZZXXMLA1_C_ZFMPROD">
+    <DimensionAttribute name="Product Id" usage="Key" attributeHierarchyEnabled="false">
+      <KeyColumn dataType="Integer" columnName="SID"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="Product Family"><KeyColumn dataType="String" columnName="ZFMFAMILY"/></DimensionAttribute>
+    <Hierarchy hasAll="true">
+      <Level name="Product Family" uniqueMembers="true" sourceAttribute="Product Family"/>
+      <Level name="Product Name" uniqueMembers="true" sourceAttribute="Product Id" nameColumn="ZFMPROD"/>
+    </Hierarchy>
+  </Dimension>
+
+  <Cube name="ZFMSALESCP" caption="FoodMart Sales with captions" defaultMeasure="Unit Sales">
+    <Table name="/BIC/FZFMSALES"/>
+    <DimensionUsage name="Store" source="Store" foreignKey="SID_ZFMSTORE"/>
+    <DimensionUsage name="Promotions" source="Promotions" foreignKey="SID_ZFMPROMO"/>
+    <DimensionUsage name="Product" source="Product" foreignKey="SID_ZFMPROD"/>
+    <Measure name="Unit Sales" column="/BIC/ZFMUNITS" aggregator="sum" caption="Units sold"/>
+    <Measure name="Store Sales" column="/BIC/ZFMSSALES" aggregator="sum"/>
+  </Cube>
+</Schema>

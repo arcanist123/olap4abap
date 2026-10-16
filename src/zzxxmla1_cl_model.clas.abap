@@ -50,6 +50,7 @@ CLASS zzxxmla1_cl_model DEFINITION
     TYPES:
       BEGIN OF ty_measure,
         name        TYPE string,
+        caption     TYPE string,
         fact_column TYPE string,
         aggregator  TYPE string,
         format      TYPE string,
@@ -61,6 +62,7 @@ CLASS zzxxmla1_cl_model DEFINITION
         level_no    TYPE i,        " the level, from 1
         key         TYPE string,   " value of the level's key column
         name        TYPE string,
+        caption     TYPE string,   " the value of the level's caption column; the name if it has none
         path        TYPE string,   " the keys of the levels 1 to level_no, separated by c_separator
         unique_name TYPE string,   " the hierarchy's unique name, then the names from the first level
         parent      TYPE string,   " unique name of the parent; empty on the first level
@@ -203,9 +205,10 @@ CLASS zzxxmla1_cl_model DEFINITION
                 level_no      TYPE i
                 paths         TYPE string_table
       RETURNING VALUE(result) TYPE ty_t_child_count.
-    "! The members of a level built from rows of the level columns: each row holds per level the key, followed by
-    "! the name if the level has a name column of its own, then the values of the level's properties; the rows are in
-    "! hierarchy order. A member's properties are the ones of its first row.
+    "! The members of a level built from rows of the level columns: each row holds per level the key, its ordinal if
+    "! it has an ordinal column other than the name column, the name if it has a name column of its own, the caption
+    "! if it has a caption column, then the values of the level's properties; the rows are in hierarchy order. A
+    "! member's properties are the ones of its first row.
     CLASS-METHODS members_of_rows
       IMPORTING hierarchy     TYPE ty_hierarchy
                 rows          TYPE zzxxmla1_cl_sql=>ty_t_row
@@ -257,8 +260,8 @@ CLASS zzxxmla1_cl_model DEFINITION
     CLASS-METHODS bw_levels
       IMPORTING hierarchy     TYPE ty_hierarchy
       RETURNING VALUE(result) TYPE string.
-    "! The columns of the levels: per level its key, its name if it has a name column of its own, the columns of its
-    "! member properties; and the key columns to order by.
+    "! The columns of the levels: per level its key, its name if it has a name column of its own, its caption if it
+    "! has a caption column, the columns of its member properties; and the key columns to order by.
     CLASS-METHODS level_columns
       IMPORTING hierarchy TYPE ty_hierarchy
       EXPORTING columns   TYPE string_table
@@ -382,10 +385,10 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
 
   METHOD measures.
     LOOP AT zzxxmla1_cl_schema=>get( )->measures( cube ) INTO DATA(measure).
-      APPEND VALUE #( name = measure-meas_name fact_column = measure-fact_column aggregator = measure-aggregator
-                      format = measure-format_string ) TO result.
+      APPEND VALUE #( name = measure-meas_name caption = measure-caption fact_column = measure-fact_column
+                      aggregator = measure-aggregator format = measure-format_string ) TO result.
     ENDLOOP.
-    APPEND VALUE #( name = `Fact Count` aggregator = `count` ) TO result.
+    APPEND VALUE #( name = `Fact Count` caption = `Fact Count` aggregator = `count` ) TO result.
   ENDMETHOD.
 
   METHOD members.
@@ -413,6 +416,9 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
       APPEND zzxxmla1_cl_sql=>quote( level-key_column ) TO order_by.
       IF level-name_column <> level-key_column.
         APPEND zzxxmla1_cl_sql=>quote( level-name_column ) TO columns.
+      ENDIF.
+      IF level-caption_column IS NOT INITIAL.
+        APPEND zzxxmla1_cl_sql=>quote( level-caption_column ) TO columns.
       ENDIF.
       LOOP AT level-properties INTO DATA(property).
         APPEND zzxxmla1_cl_sql=>quote( property-column ) TO columns.
@@ -641,6 +647,11 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
           column = column + 1.
           name = row[ column ].
         ENDIF.
+        DATA(caption) = name.
+        IF level-caption_column IS NOT INITIAL.
+          column = column + 1.
+          caption = row[ column ].
+        ENDIF.
         " the order key of a level with an ordinal column: the ordinal's, then the key's (RolapMemberBase.compareTo)
         IF level-ordinal_column IS NOT INITIAL.
           IF level-ordinal_column = level-name_column.
@@ -663,7 +674,7 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
         " a new member when the keys down to this level differ from the previous row's
         IF first_row = abap_true OR path <> last_paths[ level_no ].
           last_paths[ level_no ] = path.
-          APPEND VALUE #( level_no = level_no key = key name = name path = path unique_name = unique_name
+          APPEND VALUE #( level_no = level_no key = key name = name caption = caption path = path unique_name = unique_name
                           parent = parent order_key = order properties = properties ) TO result.
           IF parent IS NOT INITIAL.
             ASSIGN counts[ parent = parent ] TO FIELD-SYMBOL(<count>).

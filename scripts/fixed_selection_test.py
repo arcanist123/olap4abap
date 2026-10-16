@@ -156,14 +156,15 @@ def main():
             captions, _, error = run(test, f"SELECT [Measures].[ZCLVISNO] ON 0, "
                                            f"[ZCLFISCVR].[ZCLFISCVR].Members ON 1 FROM {test}")
             check(f"{test}: the variant has one member, K4", error is None and captions == ["K4"], error or captions)
-            # un-fixing the accepted schema: the plain proposal's tables, the period compounded again
+            # un-fixing the accepted schema: the plain proposal's tables, the period compounded again (COMPOUND_KEY
+            # its key attribute's OrderByColumn and NameColumn and its level's nameColumn)
             status, unfixed = api(args.url, args.client, "POST", "fix", {}, accepted["xml"])
             plain_tables = set(re.findall(r'(?:<Table name|table)="([^"]+)"', plain))
             back = set(re.findall(r'(?:<Table name|table)="([^"]+)"', unfixed.get("xml", "")))
             period = re.search(r'<Dimension [^>]*name="ZCLFISCPR".*?</Dimension>', unfixed.get("xml", ""), re.S)
             check(f"{test}: un-fixed, the plain tables and the period compounded again",
                   status == 200 and back == plain_tables and "olap4abap.filter" not in unfixed["xml"]
-                  and period is not None and period.group(0).count("COMPOUND_KEY") == 2,
+                  and period is not None and period.group(0).count("COMPOUND_KEY") == 3,
                   unfixed if status != 200 else {"back": back, "plain": plain_tables})
         finally:
             status, removed = api(args.url, args.client, "POST", "remove", {"catalog": test})

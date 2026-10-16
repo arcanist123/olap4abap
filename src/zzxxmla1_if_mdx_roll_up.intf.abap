@@ -26,6 +26,7 @@ INTERFACE zzxxmla1_if_mdx_roll_up
       key_level     TYPE i,
       path          TYPE string,
       unique_name   TYPE string,
+      name          TYPE string,   " the name its unique name ends with (Member.getName)
       caption       TYPE string,
       level         TYPE i,
       level_name    TYPE string,

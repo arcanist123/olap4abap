@@ -40,6 +40,7 @@ CLASS zzxxmla1_cl_mdx_schema_reader DEFINITION
         key_level     TYPE i,        " the level in the model (1 the first below the All level), 0: the All member
         path          TYPE string,   " the keys of the model levels down to key_level (ZZXXMLA1_CL_MODEL)
         unique_name   TYPE string,
+        name          TYPE string,   " the name its unique name ends with (Member.getName)
         caption       TYPE string,
         level         TYPE i,        " id of the level
         level_name    TYPE string,   " unique name of the level
@@ -589,7 +590,8 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
     result = VALUE #( hierarchy = `[Measures]` hier_id = c_measures measure_index = index
                       order_key = |{ zzxxmla1_cl_model=>c_separator }0{ index WIDTH = 10 ALIGN = RIGHT PAD = `0` }|
                       unique_name = |[Measures].{ zzxxmla1_cl_mdx_node=>quote_identifier( measures[ index ]-name ) }|
-                      caption = measures[ index ]-name level = level-id level_name = level-unique_name level_number = 0 ).
+                      name = measures[ index ]-name caption = measures[ index ]-caption
+                      level = level-id level_name = level-unique_name level_number = 0 ).
   ENDMETHOD.
 
   METHOD read.
@@ -634,7 +636,8 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
                       member = VALUE #( hierarchy = model-unique_name hier_id = hierarchy
                                         order_key = model_member-order_key key = model_member-key
                                         key_level = model_member-level_no path = model_member-path
-                                        unique_name = model_member-unique_name caption = model_member-name
+                                        unique_name = model_member-unique_name name = model_member-name
+                                        caption = model_member-caption
                                         level = level-id level_name = level-unique_name level_number = level-depth
                                         parent_unique = COND #( WHEN model_member-parent IS NOT INITIAL
                                                                 THEN model_member-parent ELSE all_unique ) ) )
@@ -693,7 +696,7 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
            WITH TABLE KEY hier_id = parent-hier_id key_level = parent-key_level path = parent-path.
       IF sy-subrc = 0.
         LOOP AT <children>-members INTO DATA(child).
-          IF equal_name( name1 = child-caption name2 = name ) = abap_true.
+          IF equal_name( name1 = child-name name2 = name ) = abap_true.
             result = child.
             RETURN.
           ENDIF.
@@ -860,7 +863,8 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
     DATA(all_level) = levels[ hierarchies[ hierarchy + 1 ]-levels[ 1 ] ].
     result = VALUE #( hierarchy = model-unique_name hier_id = hierarchy
                       unique_name = |{ model-unique_name }.{ zzxxmla1_cl_model=>quote_name( model-all_member_name ) }|
-                      caption = model-all_member_name level = all_level-id level_name = all_level-unique_name
+                      name = model-all_member_name caption = model-all_member_name
+                      level = all_level-id level_name = all_level-unique_name
                       level_number = 0 ).
   ENDMETHOD.
 
@@ -1153,7 +1157,7 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
     DATA(names) = segments.
     DATA(current) = member.
     WHILE current-parent_unique IS NOT INITIAL.
-      IF names IS INITIAL OR segment_matches( segment = names[ lines( names ) ] name = current-caption ) = abap_false.
+      IF names IS INITIAL OR segment_matches( segment = names[ lines( names ) ] name = current-name ) = abap_false.
         RETURN.
       ENDIF.
       current = get_parent_member( current ).
@@ -1162,7 +1166,7 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
     IF names IS INITIAL.
       RETURN.
     ENDIF.
-    IF segment_matches( segment = names[ lines( names ) ] name = current-caption ) = abap_true.
+    IF segment_matches( segment = names[ lines( names ) ] name = current-name ) = abap_true.
       DELETE names INDEX lines( names ).
       result = equal_name( name1 = current-hierarchy name2 = implode( names ) ).
     ELSEIF current-level_number = 0 AND current-hier_id <> c_measures AND current-calculated = abap_false.
@@ -1243,7 +1247,7 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
       RETURN.
     ENDIF.
     LOOP AT get_calculated_members( element-hierarchy ) INTO DATA(named) WHERE level = level.
-      IF equal_name( name1 = named-caption name2 = segment-name ) = abap_true.
+      IF equal_name( name1 = named-name name2 = segment-name ) = abap_true.
         result = VALUE #( kind = c_element-member id = named-level member = named ).
         RETURN.
       ENDIF.
@@ -1314,7 +1318,7 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
   METHOD lookup_hierarchy_root_member.
     IF hierarchy = c_measures.
       LOOP AT get_hierarchy_members( hierarchy ) INTO DATA(measure).
-        IF equal_name( name1 = measure-caption name2 = name ) = abap_true.
+        IF equal_name( name1 = measure-name name2 = name ) = abap_true.
           result = VALUE #( kind = c_element-member id = measure-level member = measure ).
           RETURN.
         ENDIF.
@@ -1329,7 +1333,7 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
       ENDIF.
       RETURN.
     ENDIF.
-    IF equal_name( name1 = all-caption name2 = name ) = abap_true.
+    IF equal_name( name1 = all-name name2 = name ) = abap_true.
       result = VALUE #( kind = c_element-member id = all-level member = all ).
       RETURN.
     ENDIF.

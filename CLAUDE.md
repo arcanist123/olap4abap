@@ -228,6 +228,14 @@ Read before designing anything:
   `OpeningPeriod`/`ClosingPeriod`, `Ytd`/`Qtd`/`Mtd`/`Wtd` and `Subset`. An infinite recursion of calculated members is
   found as `RolapEvaluator.checkRecursion` finds it (the evaluator's command stack has Mondrian's shape and widths), with
   Mondrian's context stack in the message.
+  Members have a name and a caption, by the reference's rule (`RolapLevel.createFromXml`; test catalog `ZFMCAPT`,
+  `reference/schema/FoodmartBWCaption.xml`): a `sourceAttribute` level is named by its own `nameColumn` (else the
+  attribute's key) and captioned by the attribute's `NameColumn`, an attribute's hierarchy named by the key and
+  captioned by its `NameColumn`, a `column` level captioned by its `captionColumn` (refused on a `sourceAttribute`
+  level, which the reference ignores); the model reads the caption column with the members (`members_of_rows`),
+  lookups, `.Name` and the unique names use the name, `.Caption`, `MEMBER_CAPTION` and the label conditions (subcube,
+  native label filter) the caption; a measure's `caption` is its caption. The proposal writes the key attribute's
+  `NameColumn` as the level's `nameColumn` too, so members are named by their BW key.
   Member properties of levels (the schema's `<Property>`, FoodMart's on Store Name and the customer Name level) are read
   with the members; they are listed in `MDSCHEMA_PROPERTIES` (PROPERTY_TYPE 1) and `DBSCHEMA_COLUMNS`, typed and
   evaluated by `.Properties`, written for `DIMENSION PROPERTIES [Store].[Store Name].[Store Sqft]` (olap4j's

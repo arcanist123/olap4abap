@@ -336,6 +336,12 @@ CLASS zzxxmla1_cl_schema_fix IMPLEMENTATION.
           CLEAR <attribute>-order_by_column.
         ENDIF.
       ENDLOOP.
+      " the levels named by it (nameColumn: the attribute's NameColumn only captions them)
+      LOOP AT dimension-hierarchies ASSIGNING FIELD-SYMBOL(<hierarchy>).
+        LOOP AT <hierarchy>-levels ASSIGNING FIELD-SYMBOL(<level>) WHERE name_column = old-name_column-name.
+          <level>-name_column = new-key_column-name.
+        ENDLOOP.
+      ENDLOOP.
     ELSEIF old-name_column IS INITIAL AND new-name_column IS NOT INITIAL.
       " compounded again: its key attribute named and ordered by COMPOUND_KEY, unless the user named it otherwise
       LOOP AT dimension-attributes ASSIGNING <attribute> WHERE usage = `Key`.
@@ -350,6 +356,16 @@ CLASS zzxxmla1_cl_schema_fix IMPLEMENTATION.
           <attribute>-order_by_column = NEW #( data_type   = zzxxmla1_cl_schema_proposal=>data_type( new-name_column )
                                                column_name = new-name_column-name ).
         ENDIF.
+        " and the levels over it named by COMPOUND_KEY likewise
+        DATA(key_attribute) = <attribute>-name.
+        LOOP AT dimension-hierarchies ASSIGNING <hierarchy>.
+          LOOP AT <hierarchy>-levels ASSIGNING <level> WHERE source_attribute = key_attribute.
+            IF <level>-name_column IS INITIAL OR <level>-name_column = old-key_column-name
+                OR ( old-key_int_column IS NOT INITIAL AND <level>-name_column = old-key_int_column-name ).
+              <level>-name_column = new-name_column-name.
+            ENDIF.
+          ENDLOOP.
+        ENDLOOP.
       ENDLOOP.
     ENDIF.
   ENDMETHOD.

@@ -252,6 +252,11 @@ function setNumbers(dim, on, numbers) {
     el.setAttribute('columnName', other.column);
     el.setAttribute('dataType', other.dataType);
   }
+  // a level's nameColumn names its members (the attribute's NameColumn only captions them)
+  for (const level of hierarchiesOf(dim).flatMap((h) => kids(h, 'Level'))) {
+    const other = numbers.get(`${attr(dim, 'table')}|${attr(level, 'nameColumn')}`);
+    if (other && other.number === on) level.setAttribute('nameColumn', other.column);
+  }
 }
 
 function setTimeDimension(dim, on, suggestions) {
@@ -1009,6 +1014,16 @@ function DimensionPane({ doc, edit, dim, sel, select, suggestions, numbers, char
   </div>`;
 }
 
+// A level over an attribute is named by its key unless it names a column (the reference's RolapLevel: the
+// attribute's NameColumn only captions it): one over an attribute with a NameColumn is named by that column, as the
+// proposal's levels are.
+function setLevelSource(level, attribute) {
+  level.setAttribute('sourceAttribute', attr(attribute, 'name'));
+  const nameColumn = attr(kids(attribute, 'NameColumn')[0], 'columnName');
+  if (nameColumn) level.setAttribute('nameColumn', nameColumn);
+  else level.removeAttribute('nameColumn');
+}
+
 function HierarchyEditor({ doc, edit, dim, h, others }) {
   const [open, setOpen] = useState({});
   const time = isTime(dim);
@@ -1025,12 +1040,14 @@ function HierarchyEditor({ doc, edit, dim, h, others }) {
     const a = attributes.find((x) => attr(x, 'name') === source);
     let levelName = source;
     for (let n = 2; levelNames.includes(levelName); n++) levelName = `${source} ${n}`;
-    h.appendChild(create(doc, 'Level', {
+    const level = create(doc, 'Level', {
       name: levelName,
       uniqueMembers: levels.length === 0 ? 'true' : 'false',
       sourceAttribute: source,
       levelType: time ? attr(a, 'levelType') || 'TimeUndefined' : '',
-    }));
+    });
+    if (a) setLevelSource(level, a);
+    h.appendChild(level);
   });
 
   return html`<div class="hier">
@@ -1060,7 +1077,10 @@ function HierarchyEditor({ doc, edit, dim, h, others }) {
             <td class="num muted">${i + 1}</td>
             <td><${TextField} value=${attr(l, 'name')} validate=${unique('A level', levelNames.filter((n) => n !== attr(l, 'name')))}
               onCommit=${(v) => edit(() => l.setAttribute('name', v))} /></td>
-            <td><${Select} value=${attr(l, 'sourceAttribute')} options=${attrNames} onChange=${(v) => edit(() => l.setAttribute('sourceAttribute', v))} /></td>
+            <td><${Select} value=${attr(l, 'sourceAttribute')} options=${attrNames} onChange=${(v) => edit(() => {
+              const a = attributes.find((x) => attr(x, 'name') === v);
+              if (a) setLevelSource(l, a); else l.setAttribute('sourceAttribute', v);
+            })} /></td>
             ${time && html`<td><${Select} value=${attr(l, 'levelType')} options=${TIME_TYPES} onChange=${(v) => edit(() => l.setAttribute('levelType', v))} /></td>`}
             <td><input type="checkbox" checked=${isTrue(l, 'uniqueMembers', false)} aria-label="Unique members"
               onChange=${(e) => edit(() => l.setAttribute('uniqueMembers', String(e.target.checked)))} /></td>

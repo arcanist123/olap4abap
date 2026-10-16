@@ -107,6 +107,7 @@ CLASS zzxxmla1_cl_xmla_handler DEFINITION
         level        TYPE string,
         number       TYPE i,
         name         TYPE string,
+        caption      TYPE string,
         unique       TYPE string,
         type         TYPE i,
         cardinality  TYPE i,
@@ -1148,7 +1149,7 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
     LOOP AT members INTO DATA(member).
       DATA(depth) = member-level_number.
       APPEND VALUE #( dimension = dimension hierarchy = definition-unique_name level = member-level_name
-                      number = depth name = member-caption unique = member-unique_name
+                      number = depth name = member-name caption = member-caption unique = member-unique_name
                       type = COND #( WHEN member-key_level = 0 THEN 2 ELSE 1 )
                       cardinality = reader->get_children_count( member ) parent = member-parent_unique
                       parent_level = COND #( WHEN depth > 0 THEN depth - 1 )
@@ -1208,7 +1209,8 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
     DATA(measures) = schema->measures( cube ).
     LOOP AT measures INTO DATA(measure).
       APPEND VALUE #( dimension = `[Measures]` hierarchy = `[Measures]` level = `[Measures].[MeasuresLevel]` number = 0
-                      name = measure-meas_name unique = |[Measures].[{ measure-meas_name }]| type = 3 )
+                      name = measure-meas_name caption = measure-caption unique = |[Measures].[{ measure-meas_name }]|
+                      type = 3 )
              TO result.
     ENDLOOP.
   ENDMETHOD.
@@ -1355,7 +1357,7 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
           ( name = `MEMBER_NAME`           value = member-name )
           ( name = `MEMBER_UNIQUE_NAME`    value = member-unique )
           ( name = `MEMBER_TYPE`           value = |{ member-type }| )
-          ( name = `MEMBER_CAPTION`        value = member-name )
+          ( name = `MEMBER_CAPTION`        value = member-caption )
           ( name = `CHILDREN_CARDINALITY`  value = |{ member-cardinality }| )
           ( name = `PARENT_LEVEL`          value = |{ member-parent_level }| ) ).
         IF member-parent IS NOT INITIAL.

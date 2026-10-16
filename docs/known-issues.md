@@ -6,18 +6,14 @@ it is fixed. Read this before comparing answers with the reference or with BW.
 
 ## Debt
 
-- **Members of a level with `sourceAttribute` are named by their name, not their key.** The reference names
-  `[ZCLDOC].[0]` (the key, `SID`) where olap4abap names `[ZCLDOC].[000]` (the `NameColumn`), on the same schema
-  (`ClinicBW.xml` and SAP's `ZCLVISIT`, compared 2026-10-16). Every schema the proposal makes has such levels.
-  Example: `SELECT {[Measures].[ZCLVISNO]} ON 0, Head([ZCLDOC].[ZCLDOC].Members, 3) ON 1 FROM [ZCLVISIT]`.
 - **The initial value has two names in one cube.** olap4abap's BW hierarchies
   (`ZZXXMLA1_CL_BW_HIERARCHY_COPY=>levels_sql`, `c_initial_name`) name a characteristic's initial value (SID 0) `#`,
   as BW's MDX does; the flat hierarchies on the characteristics' views name it by the view's value, `''` for a CHAR
   characteristic (`[ZCLDIAG].[]`), BW's value for the others (`0000`). Decided 2026-10-16: `''` everywhere, every key
   type, with `#` as the caption of a characteristic without texts (`next-steps.md`, Now: texts and captions).
-- **A measure's `caption` is not its caption in an Execute answer.** `ZCLVISNO` has `caption="Visits"`; the
-  reference's axis shows `Visits`, olap4abap's `ZCLVISNO` (the schema reader reads the caption,
-  `ZZXXMLA1_CL_SCHEMA`). Same example.
+- **A visual total of a BW hierarchy's member has no children.** `VisualTotals` on `ZCLDIAG_ICD`
+  (`execute_hier_visualtotals`, `_pattern`): the reference's `CHILDREN_CARDINALITY` of `[DIAGNOSES]` is 4,
+  olap4abap's 0. Found 2026-10-16 once the names of the clinic cases matched.
 - **The Discover cache does not see BW loads.** It is cleared by a change of a server file and the time master data
   fill, not when BW activates master data or loads a request: a Discover answer can be up to 12 hours old
   (`mvp-scope.md`, Discover cache decision; `next-steps.md`, Later).
@@ -64,6 +60,12 @@ olap4abap answers differently on purpose; a comparison has to allow for these.
 - `CREATE SESSION CUBE`, `CREATE SUBCUBE`, `ALTER CUBE`, `DROP CUBE` (Excel's grouping of members) are answered with
   a fault "... statements are not supported" before parsing; the reference gives a syntax error
   (`ZZXXMLA1_CL_XMLA_HANDLER=>unsupported_statement`).
+- A level with `sourceAttribute` and a `captionColumn` of its own is refused: the reference ignores the
+  `captionColumn` there and captions by the attribute's `NameColumn` (`RolapLevel.createFromXml`).
+- A label condition of a subselect (`Filter` on `Name` or `Caption`, Excel's label filters) compares the level's
+  name or caption column, as SSAS does; the reference compares its key column, so on a level keyed by the SID its
+  answer is empty, everything or a cast error. Those cases take their answer from an equivalent member set
+  (`execute_caption_subcube_*`, `capture-execute.py --answer-of`).
 - A subselect `Filter` whose condition is a constant true (`1 = 1`) does not restrict the subcube; the reference fails
   with a NullPointerException (`LiteralStarPredicate` has no column).
 - The native crossjoin has no bound on an enumeration (the reference's `MaxConstraints` 1,000,
