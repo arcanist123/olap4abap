@@ -148,6 +148,48 @@ SQL, listed in `tables.json` of the export; LANG and DATS are VARCHAR too, and a
 with `python scripts/bw_hierarchy_test.py --reference` and capture the changed answers again
 (`python scripts/recapture-cases.py execute_hier_ members_hier_ mdschema_hierarchies_hier mdschema_levels_hier`).
 
+## SSAS (Tabular) as reference server
+
+A local SQL Server 2025 Analysis Services instance in Tabular mode (`localhost\SSAS_TAB`, version 17.0,
+Developer edition) is the oracle for hierarchies and Excel's behaviour where the reference cannot be
+(`next-steps.md`, Reference scenario). Its TCP port changes with every service restart: name the instance, SQL Browser
+resolves it. PowerShell reaches it with the `SqlServer` module (`Install-Module SqlServer -Scope CurrentUser
+-AllowClobber`; `Invoke-ASCmd -Server 'localhost\SSAS_TAB' -Query ...`, AMO's `Microsoft.AnalysisServices.Server`).
+Keep no Microsoft schema files or sample texts in the repository, only our data and captured answers.
+
+Over HTTP it is IIS's `msmdpump.dll`, which `scripts/ssas-http-setup.ps1` sets up once in an elevated PowerShell
+(its own site `OLAP` on `http://127.0.0.1:8087/msmdpump.dll`, pool `OLAP` with anonymous access under the pool's identity, `IIS APPPOOL\OLAP` an administrator
+of the instance; a development machine only). `scripts/xmla-proxy.py` then logs it as backend `ssas` on
+`http://localhost:8086/`. MSOLAP talks to SSAS in binary, compressed XML unless the connection string says
+`Protocol Format=XML;Transport Compression=None`; the proxy shows such exchanges as "binary".
+
+### SSAS license
+
+The instance is SQL Server 2025 Developer edition, under Microsoft's "SQL Server 2025 Developer, Express, Evaluation"
+license terms (the PDF lies next to the installation; it is not in the repository, `.gitignore`). What they mean here:
+
+- Use (section 1.a.i): on our machines, to design, develop, test and demonstrate olap4abap; never in production.
+- No distribution (sections 2.a, 6): Developer edition has no distributable code. No Microsoft file goes into the
+  repository: not `msmdpump.dll` or `msmdpump.ini` (the setup script copies them on the machine), not AMO, ADOMD.NET,
+  MSOLAP or the `SqlServer` module, not the license PDF.
+- No hosting (section 6): the instance serves this machine only. The pump's site listens on 127.0.0.1, and
+  `xmla-proxy.py` keeps its `ssas` port on 127.0.0.1 whatever `--bind` says.
+- No benchmarks (section 5): the results of a benchmark test of SSAS are not disclosed without Microsoft's written
+  approval, and the public repository is disclosure. No SSAS runtimes or speed comparisons with olap4abap in commits,
+  docs, issues or PRs; captured SSAS answers carry no timings.
+- No reverse engineering (section 6): SSAS, MSOLAP and ADOMD.NET are not decompiled or disassembled, and nothing is
+  ported from them. What olap4abap takes from SSAS is its observed XMLA behaviour against our own models; the protocol
+  is Microsoft's published specification (MS-SSAS, MS-SSAS-T, under the Open Specifications Promise). Binary XML is
+  read from that specification, or avoided with `Protocol Format=XML`.
+- Nothing of the software published (section 6): no texts SSAS ships, i.e. no inline XSD of its rowsets, no
+  `MDSCHEMA_FUNCTIONS` descriptions, no description texts of `DISCOVER_PROPERTIES`, `DISCOVER_KEYWORDS`,
+  `DISCOVER_ENUMERATORS` or `DISCOVER_SCHEMA_ROWSETS`, no error texts (a fault's code and that it happened stay).
+  Captured answers keep only our data and the protocol's structure; SSAS's name for itself (provider name and
+  version, fault source), the server and instance names, Windows users, session ids and update timestamps are
+  replaced.
+- Documentation (section 9): Microsoft's documentation is for internal reference; docs link to it, they do not copy it.
+- Data (section 3): SSAS may send usage data to Microsoft; it holds only synthetic or public data (clinic, FoodMart).
+
 ## FoodMart data for the BW cube
 
 `python scripts/export-foodmart-csv.py` reads `eMondrian/.../hsqldb-foodmart.jar` (fetched by `setup-reference.sh`) and

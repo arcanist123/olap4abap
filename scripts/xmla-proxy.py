@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""A logging proxy between an XMLA client (Excel) and the XMLA servers: the eMondrian containers and the SAP
-implementation.
+"""A logging proxy between an XMLA client (Excel) and the XMLA servers: the eMondrian containers, the SAP
+implementation and the local SSAS instance.
 
 Each backend gets its own local port; whatever arrives there (any method, any path) is forwarded to that backend's
 URL and the answer goes back unchanged. Every exchange is printed as one line (method, SOAP action, request type or
 MDX statement, status, time, size, rows/cells or the fault) and saved in full under logs/xmla-proxy/<start time>/ as
 <n>-<backend>.request.txt and <n>-<backend>.response.txt (headers, a blank line, the body).
 
-    python scripts/xmla-proxy.py                  # all four backends below
+    python scripts/xmla-proxy.py                  # all five backends below
     python scripts/xmla-proxy.py --mondrian-port 9081 --sap-url http://vhcala4hci:50000/zzxxmla1?sap-client=001
     python scripts/xmla-proxy.py --backend other=8085=http://localhost:8095/emondrian/xmla   # one more server
 
@@ -16,6 +16,9 @@ By default:
     http://localhost:8082/  sap       the SAP implementation
     http://localhost:8083/  git       container emondrian-git (8091): the same build, catalog FoodMart (the sample)
     http://localhost:8084/  release   container emondrian-release (8090): the released eMondrian
+    http://localhost:8086/  ssas      SSAS (Tabular, instance SSAS_TAB) through IIS's msmdpump.dll (8087), which
+                                      scripts/ssas-http-setup.ps1 sets up once (elevated); always on 127.0.0.1,
+                                      whatever --bind says (docs/environment.md, SSAS license)
 A backend that is not running answers 502 Bad Gateway.
 
 --auth-probe PORT adds a port that forwards nothing: it answers every request with 401 and the --challenge headers
@@ -26,6 +29,9 @@ claims). It shows whether Excel can be sent to Entra ID by a custom XMLA endpoin
     python scripts/xmla-proxy.py --sap-url "https://localhost:50001/zzxxmla1?sap-client=001" --insecure
 
 In Excel: Data > Get Data > From Database > From Analysis Services, server http://localhost:8081/ (or 8082, ...).
+SSAS answers MSOLAP in its binary XML, compressed, where the client asks for it; the log then shows "binary" and the
+saved bodies are not readable. Excel sends plain XML when its connection string (Data > Queries & Connections >
+Properties > Definition) has "Protocol Format=XML;Transport Compression=None".
 
 With --https the same ports speak https instead of http (https://localhost:8081/, ...). The certificate is --cert and
 --key, or else a self-signed one for localhost (and this machine's name and the --bind address) that the proxy makes
@@ -77,8 +83,16 @@ def one_line(text, width):
     return text if len(text) <= width else text[:width - 3] + "..."
 
 
+def binary(body):
+    """SSAS's binary XML or compressed XMLA, which MSOLAP asks for unless told otherwise; not text to describe."""
+    head = body.lstrip()[:1]
+    return bool(body) and head != b"<" and not head.isspace()
+
+
 def describe_request(body):
     """The request type of a Discover or the statement of an Execute, plus the session handling."""
+    if binary(body):
+        return f"(binary, {len(body)} B: set Protocol Format=XML;Transport Compression=None)"
     text = text_of(body)
     session = ("BeginSession" if "BeginSession" in text else "EndSession" if "EndSession" in text
                else "Session" if re.search(r"<\w*:?Session\b", text) else "")
@@ -98,6 +112,8 @@ def describe_request(body):
 
 
 def describe_response(body):
+    if binary(body):
+        return "binary"
     text = text_of(body)
     fault = first(r"<faultstring>(.*?)</faultstring>", text)
     error = first(r'<Error\b[^>]*Description="([^"]*)"', text)
@@ -296,6 +312,8 @@ def main():
     parser.add_argument("--git-url", default="http://localhost:8091/emondrian/xmla")
     parser.add_argument("--release-port", type=int, default=8084)
     parser.add_argument("--release-url", default="http://localhost:8090/emondrian/xmla")
+    parser.add_argument("--ssas-port", type=int, default=8086)
+    parser.add_argument("--ssas-url", default="http://127.0.0.1:8087/msmdpump.dll")
     parser.add_argument("--bind", default="127.0.0.1", help="address to listen on (0.0.0.0 for other machines)")
     parser.add_argument("--backend", action="append", default=[], metavar="NAME=PORT=URL",
                         help="one more backend, e.g. other=8085=http://localhost:8095/emondrian/xmla")
@@ -324,7 +342,8 @@ def main():
     log_dir.mkdir(parents=True, exist_ok=True)
     servers = []
     backends = [("mondrian", args.mondrian_port, args.mondrian_url), ("sap", args.sap_port, args.sap_url),
-                ("git", args.git_port, args.git_url), ("release", args.release_port, args.release_url)]
+                ("git", args.git_port, args.git_url), ("release", args.release_port, args.release_url),
+                ("ssas", args.ssas_port, args.ssas_url)]
     for extra in args.backend:
         name, port, target = extra.split("=", 2)
         backends.append((name, int(port), target))
@@ -334,13 +353,16 @@ def main():
         challenges = args.challenge or [DEFAULT_CHALLENGE]
         handlers.append(("probe", args.auth_probe, "401 " + " | ".join(challenges), make_auth_probe(challenges, log_dir)))
     for backend, port, target, handler in handlers:
-        server = http.server.ThreadingHTTPServer((args.bind, port), handler)
+        # SSAS Developer edition is licensed to this machine's development and tests, not to be served to others
+        # (its license terms, section 6): its port listens on this machine only, whatever --bind says
+        bind = "127.0.0.1" if backend == "ssas" else args.bind
+        server = http.server.ThreadingHTTPServer((bind, port), handler)
         if tls:
             # the handshake runs in the request's thread, so a client that stalls in it blocks no other client
             server.socket = tls.wrap_socket(server.socket, server_side=True, do_handshake_on_connect=False)
         servers.append(server)
         threading.Thread(target=server.serve_forever, daemon=True).start()
-        print(f"{backend:8} {'https' if tls else 'http'}://{'localhost' if args.bind == '127.0.0.1' else args.bind}:{port}/ -> {target}")
+        print(f"{backend:8} {'https' if tls else 'http'}://{'localhost' if bind == '127.0.0.1' else bind}:{port}/ -> {target}")
     print(f"logging to {log_dir}", flush=True)
     try:
         threading.Event().wait()
