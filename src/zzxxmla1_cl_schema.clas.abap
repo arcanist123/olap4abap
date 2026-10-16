@@ -50,6 +50,9 @@ CLASS zzxxmla1_cl_schema DEFINITION
         generated_at TYPE timestampl,  " when the schema was last changed
         "! the empty cells of an answer are not written (the annotation c_omit_empty_cells)
         omit_empty_cells TYPE abap_bool,
+        "! the names of the cube's CalculatedMember elements: not implemented yet, so a query of the cube is refused
+        "! (ZZXXMLA1_CL_MDX_ENGINE) and the schema builder does not accept the schema (ZZXXMLA1_CL_SCHEMA_API)
+        calculated_members TYPE string_table,
       END OF ty_cube,
       ty_t_cube TYPE STANDARD TABLE OF ty_cube WITH EMPTY KEY.
     TYPES:
@@ -413,7 +416,10 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
                     fact_table   = fact->name
                     generated_at = updated
                     omit_empty_cells = cube_flag( annotations = cube-annotations name = c_omit_empty_cells
-                                                  cube_name   = cube-name ) ) TO all_cubes.
+                                                  cube_name   = cube-name )
+                    calculated_members = VALUE #( FOR calculated IN cube-calculated_members
+                                                  ( calculated-name ) ) )
+       TO all_cubes.
 
     DATA dimensions TYPE ty_t_cube_dimension.
     LOOP AT cube-dimensions INTO DATA(node).

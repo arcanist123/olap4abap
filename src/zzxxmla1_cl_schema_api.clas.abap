@@ -1276,10 +1276,16 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
     TRY.
-        zzxxmla1_cl_schema=>of_catalogs( catalogs ).
+        DATA(checked) = zzxxmla1_cl_schema=>of_catalogs( catalogs ).
       CATCH zzxxmla1_cx_xmla INTO DATA(error).
         RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400 message = error->description.
     ENDTRY.
+    " calculated members of the schema are not implemented: the engine refuses every query of their cube
+    LOOP AT checked->cubes( ) INTO DATA(cube) WHERE catalog_name = catalog AND calculated_members IS NOT INITIAL.
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400
+        message = |Cube '{ cube-cube_name }': calculated members of the schema are not implemented yet | &&
+                  |({ concat_lines_of( table = cube-calculated_members sep = `, ` ) })|.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD map_tables.

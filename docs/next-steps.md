@@ -1018,8 +1018,9 @@ Design in `schema-generator.md`. Order:
    `ZZXXMLA1_CL_WEB_APP` (since 2026-10-07 from the code, `ZZXXMLA1_CL_WEB_APP_FILES`), checked with `scripts/schema_ui_test.py`.
    Then (2026-10-06) removing a catalog (`POST remove`, Remove… on the start page; checked end to end with a
    throwaway catalog). One cube per catalog for the MVP (`mvp-scope.md`, Catalog decision).
-   Open: an accept through the UI checked by hand (the API's accept was); calculated members of the schema (the
-   reader ignores them) and aggregators other than `sum`/`count` (the engine sums them) are not offered.
+   Open: an accept through the UI checked by hand (the API's accept was); calculated members of the schema (check
+   and accept refuse them, a query of their cube fails) and aggregators other than `sum`/`count` (a query that reads
+   such a measure fails; a BW key figure with MIN or MAX is proposed so) are not implemented.
 ## Paused: texts
 
 Paused 2026-10-15 (decided with the user): the texts are useful as they are, and a report shows a characteristic as

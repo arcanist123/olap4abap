@@ -140,6 +140,12 @@ CLASS zzxxmla1_cl_model DEFINITION
       IMPORTING cube          TYPE csequence
       RETURNING VALUE(result) TYPE ty_t_measure
       RAISING   zzxxmla1_cx_xmla.
+    "! Refuses a value of a stored measure whose aggregator the engine cannot read yet: only sum and count are, the
+    "! fact reads sum every other measure, so its value would be wrong (min, max, avg, distinct-count). A fault of the
+    "! query, raised where a value of the measure is read (docs/known-issues.md).
+    CLASS-METHODS check_aggregator
+      IMPORTING measure TYPE ty_measure
+      RAISING   zzxxmla1_cx_xmla.
     "! The members of a hierarchy in hierarchy order (a parent before its children, children by key), as the reference
     "! reads them: the distinct values of the level columns of the dimension table, ordered by the keys from the
     "! first level, with the columns of the levels' member properties (SqlMemberSource.makeChildMemberSql).
@@ -364,6 +370,14 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
              |ON c."HIESID" = { hierarchy-bw_hierarchy-hiesid } | &&
              |AND c."SVER" = { zzxxmla1_cl_sql=>literal( CONV string( hierarchy-bw_hierarchy-sver ) ) } | &&
              |AND c."ANCESTOR_SID" = { own } WHERE { condition } )|.
+  ENDMETHOD.
+
+  METHOD check_aggregator.
+    IF measure-aggregator <> `sum` AND measure-aggregator <> `count`.
+      zzxxmla1_cx_xmla=>raise_code( kind = `Server` code = `00HSBB01` text = `XMLA SOAP Body processing error`
+                                    description = |olap4abap Error:Measure '{ measure-name }': the aggregator | &&
+                                                  |{ measure-aggregator } is not implemented yet| ).
+    ENDIF.
   ENDMETHOD.
 
   METHOD measures.

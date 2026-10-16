@@ -299,6 +299,10 @@ Read before designing anything:
   dimension's table is joined only for a column other than the one its foreign key refers to; that one (the SID of an
   InfoCube, the value of an aDSO, cast to the view's type) is read from the fact table: BW has master data for every
   value of a fact, so the join removes no row.
+  What the engine does not implement fails the query rather than giving a wrong number: a value of a measure whose
+  aggregator is not `sum` or `count` (`ZZXXMLA1_CL_MODEL=>check_aggregator`, where the evaluator, the fast and
+  cells-first cells and the native `TopCount`, `Filter` and `Order` read one), and any query of a cube with
+  `CalculatedMember`s in the schema (`ty_cube-calculated_members`; the schema API's check and accept refuse them too).
   MDX data definition the grammar does not know (`CREATE SESSION CUBE`, which Excel sends to group members of a
   PivotTable, `CREATE SUBCUBE`, `ALTER CUBE`, `DROP CUBE`) is answered with a fault "... statements are not supported"
   before parsing (`ZZXXMLA1_CL_XMLA_HANDLER=>unsupported_statement`); the reference gives a syntax error there.

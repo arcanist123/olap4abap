@@ -67,7 +67,8 @@ catalogs `NWCOMPANY` and `NWPRODUCT` (`examples/bw-schema/`):
   (`[0D_NW_CODE.0D_NW_CODE__0D_NW_CNTRY]`), its level named by the attribute, its text as property `Text`;
 - no user hierarchies and no nesting: BW's metadata does not say which attributes nest in which order, and BW does not
   nest them. The UI builds user hierarchies from the attributes, after the flat ones;
-- key figures with aggregation SUM, MIN or MAX become measures with that aggregator, named by the key figure,
+- key figures with aggregation SUM, MIN or MAX become measures with that aggregator (`min` and `max` are not
+  implemented yet: a query that reads such a measure fails), named by the key figure,
   captioned by its text, with a format string by the decimals of the fact column (`#,##0`, `#,##0.00`, at most 3
   decimals). Exception aggregation and non-cumulative key figures are listed as not proposed rather than mapped
   wrongly. The first measure is the default;

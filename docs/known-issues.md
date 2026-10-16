@@ -18,12 +18,6 @@ it is fixed. Read this before comparing answers with the reference or with BW.
 - **A measure's `caption` is not its caption in an Execute answer.** `ZCLVISNO` has `caption="Visits"`; the
   reference's axis shows `Visits`, olap4abap's `ZCLVISNO` (the schema reader reads the caption,
   `ZZXXMLA1_CL_SCHEMA`). Same example.
-- **Aggregators other than `sum` and `count` are summed.** The schema accepts `min`, `max`, `avg` and
-  `distinct-count`, and the fact reads (`ZZXXMLA1_CL_MDX_FACTS`) sum every measure but a count: a wrong value where
-  the right answer is the engine's "not implemented" fault. The proposal makes only `sum`; a hand-written schema can
-  have the others.
-- **Calculated members of a schema are ignored**, silently (`<CalculatedMember>` of a cube), where the right answer
-  is the engine's "not implemented" fault. The schema builder does not offer them.
 - **The Discover cache does not see BW loads.** It is cleared by a change of a server file and the time master data
   fill, not when BW activates master data or loads a request: a Discover answer can be up to 12 hours old
   (`mvp-scope.md`, Discover cache decision; `next-steps.md`, Later).

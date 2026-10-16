@@ -463,7 +463,8 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
                 filter_axes      TYPE zzxxmla1_cl_mdx_facts=>ty_t_index OPTIONAL
       EXPORTING done             TYPE abap_bool
                 cells            TYPE ty_t_cell
-                kept             TYPE ty_t_kept.
+                kept             TYPE ty_t_kept
+      RAISING   zzxxmla1_cx_xmla.
     TYPES:
       "! cells first: an axis of a grid, as the facts read it, and the id of its level
       BEGIN OF ty_grid_axis,
@@ -502,7 +503,8 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       IMPORTING evaluator  TYPE ty_evaluator
                 axes       TYPE ty_t_grid_axis
                 query_axes TYPE zzxxmla1_cl_mdx_parser=>ty_t_axis
-      CHANGING  result     TYPE ty_result.
+      CHANGING  result     TYPE ty_result
+      RAISING   zzxxmla1_cx_xmla.
     "! The path of an axis (1 or 2) in a grid row: the keys of its levels (ZZXXMLA1_CL_MODEL's path).
     CLASS-METHODS grid_path
       IMPORTING !row          TYPE zzxxmla1_cl_mdx_facts=>ty_grid_row
@@ -1812,6 +1814,11 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
     METHODS fail
       IMPORTING message TYPE string
       RAISING   zzxxmla1_cx_xmla.
+    "! Refuses a read of the stored measure at that position whose aggregator is not implemented
+    "! (ZZXXMLA1_CL_MODEL=>check_aggregator).
+    METHODS check_aggregator
+      IMPORTING measure TYPE i
+      RAISING   zzxxmla1_cx_xmla.
 ENDCLASS.
 
 CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
@@ -1828,6 +1835,11 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     ENDIF.
     schema_reader = zzxxmla1_cl_mdx_schema_reader=>for_cube( catalog = catalog name = query-cube ).
     DATA(cube) = schema_reader->cube.
+    " the schema's calculated members are not implemented: a query that cannot see them would answer without them
+    IF cube-calculated_members IS NOT INITIAL.
+      fail( |Cube '{ cube-cube_name }': calculated members of the schema are not implemented yet | &&
+            |({ concat_lines_of( table = cube-calculated_members sep = `, ` ) })| ).
+    ENDIF.
     fact_reader = NEW zzxxmla1_cl_mdx_facts( cube = cube hierarchies = schema_reader->get_model_hierarchies( )
                                              measures = schema_reader->measures ).
     DATA(resolved) = query.
@@ -3954,6 +3966,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
           INSERT member-hier_id INTO TABLE axis_hierarchies.
           INSERT member-hier_id INTO TABLE <axis>-hierarchies.
           IF member-hier_id = zzxxmla1_if_mdx_schema_reader=>c_measures.
+            check_aggregator( member-measure_index ).
             fast_tuple-measure = member-measure_index.
             measure_axis = axis_index.
           ELSEIF member-key_level > 0.
@@ -3998,6 +4011,9 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     DATA(base_measure) = context[ zzxxmla1_if_mdx_schema_reader=>c_measures + 1 ]-measure_index.
     IF base_measure = 0.
       RETURN.
+    ENDIF.
+    IF measure_axis = 0.
+      check_aggregator( base_measure ).
     ENDIF.
     DATA(stored_measures) = schema_reader->measures.
 
@@ -4395,6 +4411,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
     DATA(measure) = context[ zzxxmla1_if_mdx_schema_reader=>c_measures + 1 ]-measure_index.
+    check_aggregator( measure ).
     DATA(grid) = fact_reader->grid( axes = VALUE #( FOR a IN axes ( a-grid ) ) filters = filters measure = measure ).
 
     " the sets by GROUPING_ID; per axis the set its paths are taken from: grouped by it and by the fewest other axes
@@ -5794,6 +5811,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       ENDLOOP.
     ENDIF.
 
+    check_aggregator( value->element-member-measure_index ).
     DATA(rows) = fact_reader->top_count( operands      = top_operands
                                          filters       = filters
                                          measure       = value->element-member-measure_index
@@ -5894,6 +5912,9 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
 
+    LOOP AT condition INTO DATA(condition_item) WHERE operator = zzxxmla1_cl_mdx_facts=>c_condition-measure.
+      check_aggregator( condition_item-measure ).
+    ENDLOOP.
     DATA(rows) = fact_reader->ordered_paths( operands      = filter_operands
                                              filters       = filters
                                              items         = VALUE #( )
@@ -6078,6 +6099,9 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       RETURN.
     ENDIF.
 
+    LOOP AT items INTO DATA(order_item) WHERE measure > 0.
+      check_aggregator( order_item-measure ).
+    ENDLOOP.
     DATA(rows) = fact_reader->ordered_paths( operands      = top_operands
                                              filters       = filters
                                              items         = items
@@ -9584,6 +9608,10 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         ENDLOOP.
       ENDLOOP.
     ENDLOOP.
+  ENDMETHOD.
+
+  METHOD check_aggregator.
+    zzxxmla1_cl_model=>check_aggregator( schema_reader->measures[ measure ] ).
   ENDMETHOD.
 
   METHOD fail.

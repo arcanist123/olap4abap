@@ -26,6 +26,8 @@ CLASS ltc_model DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
     METHODS ordinal_column FOR TESTING.
     "! a dimension that shows only its members with facts is read from the rows whose key is in the fact table
     METHODS member_table FOR TESTING.
+    "! a measure of an aggregator other than sum and count is refused: its value would be a sum
+    METHODS check_aggregator FOR TESTING RAISING cx_static_check.
     METHODS hierarchy
       IMPORTING name_column   TYPE string OPTIONAL
       RETURNING VALUE(result) TYPE zzxxmla1_cl_model=>ty_hierarchy.
@@ -172,6 +174,21 @@ CLASS ltc_model IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals(
       act = zzxxmla1_cl_model=>member_table( rooms )
       exp = `( SELECT * FROM "V_ROOM" WHERE "SID" IN ( SELECT "SID_ROOM" FROM "/BIC/FCLINIC" ) ) AS mf` ).
+  ENDMETHOD.
+
+  METHOD check_aggregator.
+    zzxxmla1_cl_model=>check_aggregator( VALUE #( name = `Units` aggregator = `sum` ) ).
+    zzxxmla1_cl_model=>check_aggregator( VALUE #( name = `Fact Count` aggregator = `count` ) ).
+    LOOP AT VALUE string_table( ( `min` ) ( `max` ) ( `avg` ) ( `distinct-count` ) ) INTO DATA(aggregator).
+      TRY.
+          zzxxmla1_cl_model=>check_aggregator( VALUE #( name = `Units` aggregator = aggregator ) ).
+          cl_abap_unit_assert=>fail( |no fault for { aggregator }| ).
+        CATCH zzxxmla1_cx_xmla INTO DATA(fault).
+          cl_abap_unit_assert=>assert_equals(
+            act = fault->description
+            exp = |olap4abap Error:Measure 'Units': the aggregator { aggregator } is not implemented yet| ).
+      ENDTRY.
+    ENDLOOP.
   ENDMETHOD.
 
 ENDCLASS.

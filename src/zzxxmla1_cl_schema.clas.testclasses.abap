@@ -35,6 +35,8 @@ CLASS ltc_schema DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT
     "! the annotation olap4abap.omitEmptyCells of a cube: false without it, refused with a value other than true or
     "! false
     METHODS omit_empty_cells FOR TESTING RAISING cx_static_check.
+    "! a cube's CalculatedMember elements are kept by name, not dropped: the engine and the schema builder refuse them
+    METHODS calculated_members FOR TESTING RAISING cx_static_check.
     "! the annotation olap4abap.bwHierarchy of a Hierarchy: refused with levels, on a table that is no characteristic's
     "! view and for a hierarchy BW does not have
     METHODS bw_hierarchy_refused FOR TESTING.
@@ -397,6 +399,22 @@ CLASS ltc_schema IMPLEMENTATION.
           act = fault->description
           exp = `olap4abap Error:Dimension 'D': olap4abap.membersWithFacts is not supported on a time dimension` ).
     ENDTRY.
+  ENDMETHOD.
+
+  METHOD calculated_members.
+    DATA(schema) = read(
+      `<Schema name="S"><Dimension name="D" table="T"><DimensionAttribute name="K" usage="Key">` &&
+      `<KeyColumn dataType="Integer" columnName="SID"/></DimensionAttribute></Dimension>` &&
+      `<Cube name="A"><Table name="F"/><DimensionUsage name="D" source="D" foreignKey="X"/>` &&
+      `<Measure name="M" column="M" aggregator="sum"/>` &&
+      `<CalculatedMember name="Double" dimension="Measures" formula="[Measures].[M] * 2"/>` &&
+      `<CalculatedMember name="Half" dimension="Measures" formula="[Measures].[M] / 2"/></Cube>` &&
+      `<Cube name="B"><Table name="F"/><DimensionUsage name="D" source="D" foreignKey="X"/>` &&
+      `<Measure name="M" column="M" aggregator="sum"/></Cube></Schema>` ).
+    DATA(cubes) = schema->cubes( ).
+    cl_abap_unit_assert=>assert_equals( act = cubes[ cube_name = `A` ]-calculated_members
+                                        exp = VALUE string_table( ( `Double` ) ( `Half` ) ) ).
+    cl_abap_unit_assert=>assert_initial( cubes[ cube_name = `B` ]-calculated_members ).
   ENDMETHOD.
 
   METHOD omit_empty_cells.

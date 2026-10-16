@@ -532,6 +532,7 @@ CLASS zzxxmla1_cl_mdx_evaluator IMPLEMENTATION.
         ASSIGN current_members[ hierarchy + 1 ] TO FIELD-SYMBOL(<member>).
         APPEND VALUE #( hierarchy = hierarchy level = <member>-key_level path = <member>-path ) TO filters.
       ENDLOOP.
+      zzxxmla1_cl_model=>check_aggregator( measures[ current_members[ 1 ]-measure_index ] ).
       DATA(cell) = facts->value( filters = filters measure = current_members[ 1 ]-measure_index ).
       result = VALUE #( empty = cell-empty kind = c_value-numeric number = cell-amount ).
       RETURN.

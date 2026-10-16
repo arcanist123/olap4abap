@@ -458,7 +458,7 @@ the SID keeps the cells right; the members are named `DE/11`, `US/CA`, `AR/#`, .
 - Amounts in different currencies must not be summed: with several currencies keep `0CURRENCY` as a dimension users
   slice by, or convert in BW.
 - Calculated and restricted key figures belong in the MDX query (`WITH MEMBER`) until schema `CalculatedMember`s are
-  read (section 8).
+  implemented (section 8; a cube with one is refused).
 
 ## 7. Performance
 
@@ -501,11 +501,13 @@ Current limits of olap4abap:
     attribute's text for a navigation attribute's hierarchy ("Country", not "Country of Company").
   - Compounded characteristics are named by their compounding and their key, keyed by the SID on an aDSO too
     (its fact view) and ordered by their names (section 3.7). Their texts are joined on all key fields.
-- **Aggregation:** fact queries sum every measure; only `sum` (and the built-in `Fact Count`) are correct. A measure
-  with `aggregator="min"` or `"max"` is read as a sum by `ZZXXMLA1_CL_MDX_FACTS` today. Exception aggregation and
-  non-cumulative key figures are not supported.
-- **Schema calculated members** (`CalculatedMember` in a cube) are not read; schema `NamedSet`s, virtual cubes, roles
-  and parameters are refused.
+- **Aggregation:** only `sum` and `count` (and the built-in `Fact Count`) are implemented. A measure with another
+  aggregator (`min`, `max`, `avg`, `distinct-count`) is accepted in the schema, but a query that reads a value of it
+  fails with "Measure '...': the aggregator ... is not implemented yet" (`ZZXXMLA1_CL_MODEL=>check_aggregator`);
+  queries of the cube's other measures answer. Exception aggregation and non-cumulative key figures are not supported.
+- **Schema calculated members** (`CalculatedMember` in a cube) are not implemented: every query of their cube fails
+  with "calculated members of the schema are not implemented yet" and the schema builder's check and accept refuse
+  the schema; schema `NamedSet`s, virtual cubes, roles and parameters are refused when the schema is read.
 - **Not supported in levels:** `captionColumn`, expressions, `parentColumn`, `hideMemberIf`; property formatters.
   `ordinalColumn` (and an attribute's `OrderByColumn` or `orderBy`) orders the members, the key those of the same
   ordinal.
