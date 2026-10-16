@@ -361,6 +361,11 @@ Read before designing anything:
   `reference/schema/ClinicBW.xml`, built by `build-bw-reference-db.py` from an export of the InfoCube and the copy,
   checked against BW by `bw_hierarchy_test.py --reference`); its 68 cases (`execute_hier_*`, `members_hier_*`,
   `mdschema_*_hier`) are what the engine work has to pass (`docs/next-steps.md`, Reference scenario).
+  Decided 2026-10-16 after Excel failed on it: the reference is the oracle for everything but parent-child
+  hierarchies and is patched only to fix wrong answers, not to change its model; olap4abap puts each member of a BW
+  hierarchy on the level of its depth, as SSAS does (Excel needs it); the reference is to serve `ZCLDIAG_ICD` as a
+  balanced level hierarchy (`Level 01`-`Level 04`, placeholders under REST_H) and the cases are recaptured (next);
+  BW's MDX is the oracle for hierarchies without a level form.
 - Reference: eMondrian built from source and running in Docker; captured exchanges are in `reference/`.
 
 ## Syncing ABAP code with git

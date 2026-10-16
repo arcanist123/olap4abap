@@ -201,6 +201,17 @@ is known to be BW's hierarchy. BW's MDX stays the oracle for shared nodes, inter
 drill-through of a node, which the reference answered wrong, is answered right since `parent-child-closure.patch`
 (next-steps.md, Reference scenario).
 
+The reference is not the oracle of parent-child hierarchies (decided 2026-10-16, next-steps.md, Reference scenario):
+it puts every member of one on a single level, which Excel cannot expand (a live session), and it is patched only to
+fix answers wrong by its own rules, not to change its model. olap4abap puts a member on the level of its depth, as
+SSAS does. A BW hierarchy with a level form (`ZCLDIAG_ICD`) is therefore served by the reference as a balanced level
+hierarchy (`Level 01` to `Level 04`, placeholder members under REST_H so nothing is hidden), whose layout is
+olap4abap's; the cases stay out of REST_H's branch, which BW's MDX checks. Hierarchies without a level form (shared
+nodes, intervals, postable nodes) have BW's MDX as oracle; their subselects are checked as the node in the slicer and
+their drill-throughs by the facts' count under the closure. `Aggregate` and compound slicers of a node and a member
+below it count that member twice in the reference, as Microsoft specifies `Aggregate` for Sum, and olap4abap follows
+it. Excel cannot connect to BW's XMLA, so a session against olap4abap itself is the last check.
+
 ## Mondrian's own tests against our schema
 
 The eMondrian container serves only our reference catalog `ZFOODMART` (`scripts/deploy-reference-schema.sh`, installs

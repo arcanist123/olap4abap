@@ -297,8 +297,9 @@ Open:
    (`test-strategy.md`, BW hierarchies). BW's side passes its own checks; olap4abap's fails until the hierarchies are
    served (`[ZCLDIAG.ZCLDIAG_ICD]` not found).
 2. The schema: `parentColumn` with `<Closure>` as the reference models it, with our extensions (the closure's child
-   is the SID, members are occurrences); `ZZXXMLA1_CL_SCHEMA` refuses both today. The reference can be the oracle
-   for single-parent hierarchies only (the reference scenario below); for shared nodes, BW's own MDX
+   is the SID, members are occurrences); `ZZXXMLA1_CL_SCHEMA` refuses both today. Members are on the levels by depth
+   (decided 2026-10-16, reference scenario below). The reference can be the oracle for hierarchies with a level form
+   only (as a level hierarchy, the reference scenario below); for shared nodes, BW's own MDX
    (`ZZXXMLA1_BW_AUTH_PROBE`).
 3. Names and captions of nodes: a text node's name is its technical name, a leaf's the characteristic's key; the
    engine shows a member's name as its caption (`captionColumn` is paused with the texts).
@@ -383,11 +384,13 @@ Done (2026-10-15): the reference serves `ZCLDIAG_ICD`.
 - Cases: 60, captured with `capture-execute.py` and `capture-case.py`; 1,212 of their cells recomputed from the
   exported facts and the closure, all the same, and the NON EMPTY rows complete. Excel's queries are the shapes Excel
   sent through `xmla-proxy.py` before (pivot rows, expand, crossjoin, item path, filter list, children count, member
-  search, slicer), applied to the hierarchy; not yet a live Excel session against the reference.
+  search, slicer), applied to the hierarchy; the live Excel session against the reference is below (it fails).
 - What the reference answers on a parent-child level: every member is on the one level (`LNum` 1, its `DEPTH` the
   depth), `MDSCHEMA_LEVELS` shows the hierarchy as `Level 01` to `Level 04`, `PrevMember`/`NextMember` step to the
   member of the same depth in hierarchy order, a compound slicer or an `Aggregate` of a node and a member below it
-  counts that member twice (the reference sums the tuples; BW would count it once). It has no `IsLeaf` and no
+  counts that member twice (the reference sums the tuples, as Microsoft's `Aggregate` does for Sum: "the sum of values
+  over the set", only Distinct Count counts a member and its children once; olap4abap does the same, and Excel
+  multiselects with subselects, which count every fact once). It has no `IsLeaf` and no
   `IsAncestor` (`Children.Count = 0` and `Ascendants` stand in for them in the cases).
 - Fixed in the reference (2026-10-16, `scripts/patches/parent-child-closure.patch`, `docs/environment.md`): a
   subselect of a node (Excel's filter on a hierarchy) constrained the facts to the node's own key, so a node had no
@@ -398,6 +401,54 @@ Done (2026-10-15): the reference serves `ZCLDIAG_ICD`.
   same members in the slicer and on the axes, a drill-through's rows without `MAXROWS` against its cell (834). A
   binary `-` (`{All} - {node}`) in a subselect is not understood by the reference on any hierarchy (only Excel's
   unary `- {...}`), so it is not a case.
+- Excel against the reference (2026-10-16, through `xmla-proxy.py`, catalog `ZCLVISIT`): Excel cannot work with the
+  hierarchy there. Rows of the hierarchy show the All member's children, and expanding DIAGNOSES works; expanding a
+  chapter then changes nothing. Excel puts every expanded member into one `DrilldownMember({DrilldownLevel({All})},
+  {DIAGNOSES, RESPIRATORY, ...})`, as it does for members of one level, because the reference answers every member
+  with `LNum` 1; the chapters are not in the first set, so none is expanded, and Excel shows them at DIAGNOSES' depth
+  without +. Expand Entire Field sends `DrilldownLevel({DrilldownLevel({All})}, [ZCLDIAG.ZCLDIAG_ICD].[Level 01])`,
+  the level `MDSCHEMA_LEVELS` lists, and the reference fails: "MDX object '[ZCLDIAG.ZCLDIAG_ICD].[Level 01]' not
+  found" (its schema has one level `ZCLDIAG`; only its rowset shows the levels by depth). The session stopped there.
+- Decided with the user 2026-10-16:
+  - The reference is the oracle for everything but parent-child hierarchies. It is patched only to fix an answer
+    that is wrong by its own rules with a small fix (as `parent-child-closure.patch`), never to change its model
+    (levels by depth in its parent-child engine would be that).
+  - olap4abap serves a BW hierarchy as SSAS serves a parent-child one: unbalanced, nothing hidden, every member one
+    level below its parent and on the level of its depth (`Level 01` the roots, `LNum` the depth), which
+    `MDSCHEMA_LEVELS` lists and MDX resolves; so Excel nests `DrilldownMember` per level and `DrilldownLevel` of a
+    level works. Excel handles unbalanced hierarchies; it does not hide the members of a ragged level hierarchy
+    (`HideMemberIf` needs `MDX Compatibility=2`, Excel sends 1), which olap4abap does not need. Excel integration is
+    ours, with SSAS as the spec; Excel cannot connect to BW's XMLA.
+  - A BW hierarchy with a level form is served by the reference as a balanced level hierarchy instead of a
+    parent-child one, so the reference answers Excel's statements and lays members out by depth as olap4abap does.
+    `ZCLDIAG_ICD`: `Level 01` the real root DIAGNOSES and REST_H, `Level 02` the chapters, `Level 03` the groups,
+    `Level 04` the diagnoses; under REST_H one placeholder member `REST_H` on `Level 02` and one on `Level 03`, the
+    not-assigned values on `Level 04`. Nothing is hidden: the reference's ragged hierarchies are weak where two
+    levels in a row are hidden (`RaggedHierarchyTest`'s Vatican tests are disabled, they return a `[null]` member),
+    and Excel would show placeholders anyway. The real tree must be balanced (the build fails otherwise, no padding
+    outside REST_H). REST_H's branch differs from olap4abap's (its values one level below REST_H, decided
+    2026-10-15, and unique names without placeholders), so no case looks inside it (a whole level's members start
+    from DIAGNOSES); REST_H's value and the All member's total stay in the cases. Its branch is checked against BW's
+    MDX by `bw_hierarchy_test.py`.
+  - BW's MDX is the oracle for what has no level form: shared nodes (`ZCLPAT_PRG`), intervals (`ZCLSERV_CAT`),
+    postable nodes; their subselects are checked as the node in the slicer, their drill-throughs by the facts' count
+    under the closure. The reference gets no export of these hierarchies.
+- Next (the reference as a level hierarchy):
+  1. `build-bw-reference-db.py`: a flattened table of `ZCLDIAG_ICD` instead of the node and closure tables, a row per
+     SID with each level's name and position among its siblings (BW's order), the placeholders under REST_H; it
+     fails if a leaf of the real tree is not at depth 4.
+  2. `ClinicBW.xml`: the hierarchy with the levels `Level 01` to `Level 04` (name column, `ordinalColumn`).
+  3. `bw_hierarchy_test.py --reference` passes on the members outside REST_H's branch (depth, children, name, values,
+     order) and REST_H's value.
+  4. Recapture the 68 cases (`recapture-cases.py`); their values stay, `LNum`, `Level`, `.Ordinal`, `PrevMember` and
+     `MDSCHEMA_LEVELS` change. Cases that list a whole level are rewritten from DIAGNOSES. The cells are recomputed
+     from the exported facts again.
+  5. Check whether the 8 subselect and drill-through cases pass without `parent-child-closure.patch`; drop it if so.
+  6. Repeat the live Excel session against the reference (rows, expand a member, expand entire field, crossjoin,
+     the tree filter, Keep Only Selected Items, search, Filters area, slicer, label and value filters, double-click)
+     and capture the statements it sends as cases.
+  7. The engine (open 4) serves members on the levels by depth; the level-dependent expectations then hold on SAP,
+     and Excel against olap4abap (port 8082) is the last check.
 - SAP's answers on the clinic catalog differ from the reference's besides the hierarchy: member unique names by the
   name, not the key (`[ZCLDOC].[000]` where the reference has `[ZCLDOC].[0]`), the measure's name as its caption
   (`ZCLVISNO`, the reference `Visits`), the default drill-through with the measure; and SAP's schema annotates
