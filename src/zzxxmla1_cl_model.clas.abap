@@ -43,6 +43,8 @@ CLASS zzxxmla1_cl_model DEFINITION
         "! the copy of a BW hierarchy (the annotation olap4abap.bwHierarchy of ZZXXMLA1_CL_SCHEMA) at BW's version the
         "! schema was read at; initial for any other hierarchy
         bw_hierarchy    TYPE zzxxmla1_cl_bw_hierarchy_copy=>ty_hierarchy,
+        "! of a BW hierarchy: the column of the dimension table that names a leaf
+        bw_value_name   TYPE string,
       END OF ty_hierarchy,
       ty_t_hierarchy TYPE STANDARD TABLE OF ty_hierarchy WITH EMPTY KEY.
     TYPES:
@@ -96,9 +98,16 @@ CLASS zzxxmla1_cl_model DEFINITION
     "! with facts (the dimension's annotation olap4abap.membersWithFacts, our extension: a BW characteristic is shared by
     "! many providers and has many more values than one of them uses), the rows of the dimension table whose key is in
     "! the fact table, as a derived table. Fact queries join the dimension table itself: the facts restrict it anyway.
-    "! The members of a BW hierarchy are not read from the dimension table: until the engine reads them from the
-    "! hierarchy's copy (docs/next-steps.md, step 7), a read of them fails (ZZXXMLA1_CX_BW_HIERARCHY).
+    "! The members of a BW hierarchy are the copy's, as a level hierarchy (ZZXXMLA1_CL_BW_HIERARCHY_COPY=>levels_sql):
+    "! a row per member with its path's columns, the levels below it NULL, so a read of a level asks for its column
+    "! not NULL (bw_level_condition).
     CLASS-METHODS member_table
+      IMPORTING hierarchy     TYPE ty_hierarchy
+      RETURNING VALUE(result) TYPE string.
+    "! The dimension table a fact read joins on the foreign key. The level columns of a BW hierarchy are not columns of
+    "! it: until the facts are read through the copy's closure (docs/next-steps.md, step 7.3), such a read fails
+    "! (ZZXXMLA1_CX_BW_HIERARCHY).
+    CLASS-METHODS fact_join_table
       IMPORTING hierarchy     TYPE ty_hierarchy
       RETURNING VALUE(result) TYPE string.
     "! The measures of a cube in the order of the schema, plus the count of the fact rows that the reference adds to every
@@ -214,6 +223,11 @@ CLASS zzxxmla1_cl_model DEFINITION
       CHANGING hierarchies TYPE ty_t_hierarchy.
 
   PRIVATE SECTION.
+    "! Of a BW hierarchy: the condition that a member's path reaches a level (its key column not NULL); else empty.
+    CLASS-METHODS bw_level_condition
+      IMPORTING hierarchy     TYPE ty_hierarchy
+                level_no      TYPE i
+      RETURNING VALUE(result) TYPE string.
     "! The columns of the levels: per level its key, its name if it has a name column of its own, the columns of its
     "! member properties; and the key columns to order by.
     CLASS-METHODS level_columns
@@ -254,7 +268,8 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
                         dim_type        = dim-dim_type
                         fact_table      = the_cube-fact_table
                         members_with_facts = dim-members_with_facts
-                        bw_hierarchy    = hier-bw_hierarchy ) TO result.
+                        bw_hierarchy    = hier-bw_hierarchy
+                        bw_value_name   = hier-bw_value_name ) TO result.
       ENDLOOP.
     ENDLOOP.
     key_types( CHANGING hierarchies = result ).
@@ -262,10 +277,12 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
 
   METHOD member_table.
     IF hierarchy-bw_hierarchy IS NOT INITIAL.
-      RAISE EXCEPTION TYPE zzxxmla1_cx_bw_hierarchy
-        EXPORTING
-          error_message = |The members of the BW hierarchy { hierarchy-bw_hierarchy-name } of | &&
-                          |{ hierarchy-bw_hierarchy-characteristic } ({ hierarchy-unique_name }) are not supported yet|.
+      result = |( { zzxxmla1_cl_bw_hierarchy_copy=>levels_sql( hierarchy   = hierarchy-bw_hierarchy
+                                                                depth       = lines( hierarchy-levels )
+                                                                value_table = hierarchy-dim_table
+                                                                sid_column  = hierarchy-key_column
+                                                                name_column = hierarchy-bw_value_name ) } ) AS bw|.
+      RETURN.
     ENDIF.
     result = zzxxmla1_cl_sql=>quote( hierarchy-dim_table ).
     IF hierarchy-members_with_facts = abap_true.
@@ -273,6 +290,16 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
                |( SELECT { zzxxmla1_cl_sql=>quote( hierarchy-fk_column ) } | &&
                |FROM { zzxxmla1_cl_sql=>quote( hierarchy-fact_table ) } ) ) AS mf|.
     ENDIF.
+  ENDMETHOD.
+
+  METHOD fact_join_table.
+    IF hierarchy-bw_hierarchy IS NOT INITIAL.
+      RAISE EXCEPTION TYPE zzxxmla1_cx_bw_hierarchy
+        EXPORTING
+          error_message = |The cells of the BW hierarchy { hierarchy-bw_hierarchy-name } of | &&
+                          |{ hierarchy-bw_hierarchy-characteristic } ({ hierarchy-unique_name }) are not supported yet|.
+    ENDIF.
+    result = zzxxmla1_cl_sql=>quote( hierarchy-dim_table ).
   ENDMETHOD.
 
   METHOD measures.
@@ -321,9 +348,15 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
     DELETE down-levels FROM level_no + 1.
     level_columns( EXPORTING hierarchy = down IMPORTING columns = DATA(columns) order_by = DATA(order_by) ).
     DATA(direction) = COND string( WHEN descending = abap_true THEN ` DESC` ELSE ` ASC` ).
+    DATA(conditions) = VALUE string_table( ( bw_level_condition( hierarchy = hierarchy level_no = level_no ) ) ).
+    IF condition IS NOT INITIAL.
+      APPEND |( { condition } )| TO conditions.
+    ENDIF.
+    DELETE conditions WHERE table_line IS INITIAL.
     DATA(sql) = |SELECT DISTINCT { concat_lines_of( table = columns sep = `, ` ) } | &&
                 |FROM { member_table( hierarchy ) }| &&
-                COND #( WHEN condition IS NOT INITIAL THEN | WHERE { condition }| ) &&
+                COND #( WHEN conditions IS NOT INITIAL
+                        THEN | WHERE { concat_lines_of( table = conditions sep = ` AND ` ) }| ) &&
                 | ORDER BY { concat_lines_of( table = order_by sep = |{ direction }, | ) }{ direction }|.
     IF limit > 0.
       sql = |{ sql } LIMIT { limit }| && COND #( WHEN offset > 0 THEN | OFFSET { offset }| ).
@@ -335,6 +368,12 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
     SORT ancestors BY level_no ASCENDING path ASCENDING.
     DELETE ADJACENT DUPLICATES FROM ancestors COMPARING level_no path.
     DELETE result WHERE level_no <> target.
+  ENDMETHOD.
+
+  METHOD bw_level_condition.
+    IF hierarchy-bw_hierarchy IS NOT INITIAL.
+      result = |{ zzxxmla1_cl_sql=>quote( hierarchy-levels[ level_no ]-key_column ) } IS NOT NULL|.
+    ENDIF.
   ENDMETHOD.
 
   METHOD path_condition.
@@ -473,7 +512,10 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
       rows = zzxxmla1_cl_sql=>query(
         sql     = |SELECT { concat_lines_of( table = parents sep = `, ` ) }, COUNT( * ) FROM ( | &&
                   |SELECT DISTINCT { concat_lines_of( table = children sep = `, ` ) } FROM { table } | &&
-                  |WHERE { paths_condition( hierarchy = hierarchy level_no = level_no paths = chunk ) } ) AS c | &&
+                  |WHERE { paths_condition( hierarchy = hierarchy level_no = level_no paths = chunk ) }| &&
+                  |{ COND #( WHEN hierarchy-bw_hierarchy IS NOT INITIAL
+                             THEN | AND { bw_level_condition( hierarchy = hierarchy level_no = level_no + 1 ) }| ) }| &&
+                  | ) AS c | &&
                   |GROUP BY { concat_lines_of( table = parents sep = `, ` ) }|
         columns = level_no + 1 ).
       LOOP AT rows INTO DATA(row).
@@ -507,6 +549,10 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
         DATA(level_no) = sy-tabix.
         column = column + 1.
         DATA(key) = row[ column ].
+        IF key IS INITIAL AND hierarchy-bw_hierarchy IS NOT INITIAL.
+          " a member of a BW hierarchy above the deepest level: the levels below it are NULL
+          EXIT.
+        ENDIF.
         DATA(ordinal) = VALUE string( ).
         IF level-ordinal_column IS NOT INITIAL AND level-ordinal_column <> level-name_column.
           column = column + 1.
@@ -655,6 +701,15 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
       INSERT VALUE #( table = row[ 1 ] column = row[ 2 ] data_type = row[ 3 ] ) INTO TABLE columns.
     ENDLOOP.
     LOOP AT hierarchies ASSIGNING FIELD-SYMBOL(<hierarchy>).
+      IF <hierarchy>-bw_hierarchy IS NOT INITIAL.
+        " the copy's levels: SIDs and positions are numbers
+        <hierarchy>-typed = abap_true.
+        LOOP AT <hierarchy>-levels INTO DATA(bw_level).
+          APPEND bw_level-key_column TO <hierarchy>-numeric_columns.
+          APPEND bw_level-ordinal_column TO <hierarchy>-numeric_columns.
+        ENDLOOP.
+        CONTINUE.
+      ENDIF.
       " a key column the catalog does not know (an expression, another schema): the schema's types
       <hierarchy>-typed = abap_true.
       LOOP AT <hierarchy>-levels INTO DATA(level).

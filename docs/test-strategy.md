@@ -194,7 +194,8 @@ hierarchy on a flattened table of an export of the clinic InfoCube and the hiera
 and replayed like FoodMart's (`next-steps.md`, Reference scenario): `execute_hier_*`, `members_hier_*`,
 `mdschema_hierarchies_hier` and `mdschema_levels_hier`, 71 cases. On SAP they run against the test catalog `ZCLHIER`
 (`reference/schema/ClinicBW-sap.xml`, the hierarchy annotated `olap4abap.bwHierarchy`, `sap-files.py deploy`); the
-two rowsets pass, the others fail until the engine reads the hierarchy's members. Before capture,
+two rowsets and the `members_hier_*` cases pass (the members read from the copy, step 7.2), the `execute_hier_*`
+cases fail until the facts are read through the closure (step 7.3). Before capture,
 
     python scripts/bw_hierarchy_test.py --reference
 

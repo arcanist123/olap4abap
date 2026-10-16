@@ -910,7 +910,7 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
     DATA(source) = |{ zzxxmla1_cl_sql=>quote( cube-fact_table ) } f|.
     LOOP AT joins INTO DATA(id).
       DATA(hierarchy) = hierarchies[ id ].
-      source = source && | INNER JOIN { zzxxmla1_cl_sql=>quote( hierarchy-dim_table ) } d{ id }| &&
+      source = source && | INNER JOIN { zzxxmla1_cl_model=>fact_join_table( hierarchy ) } d{ id }| &&
                | ON d{ id }.{ zzxxmla1_cl_sql=>quote( hierarchy-key_column ) }| &&
                | = f.{ zzxxmla1_cl_sql=>quote( hierarchy-fk_column ) }|.
     ENDLOOP.
@@ -1045,7 +1045,7 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
     DATA(source) = |{ zzxxmla1_cl_sql=>quote( cube-fact_table ) } f|.
     LOOP AT joins INTO DATA(id).
       DATA(hierarchy) = hierarchies[ id ].
-      source = source && | INNER JOIN { zzxxmla1_cl_sql=>quote( hierarchy-dim_table ) } d{ id }| &&
+      source = source && | INNER JOIN { zzxxmla1_cl_model=>fact_join_table( hierarchy ) } d{ id }| &&
                | ON d{ id }.{ zzxxmla1_cl_sql=>quote( hierarchy-key_column ) }| &&
                | = f.{ zzxxmla1_cl_sql=>quote( hierarchy-fk_column ) }|.
     ENDLOOP.
@@ -1157,7 +1157,7 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
       APPEND predicate_sql( EXPORTING predicate = slicer index = 1 CHANGING joined = joined ) TO conditions.
     ENDIF.
     LOOP AT joined INTO DATA(id).
-      source = source && | INNER JOIN { zzxxmla1_cl_sql=>quote( hierarchies[ id ]-dim_table ) } s{ id }| &&
+      source = source && | INNER JOIN { zzxxmla1_cl_model=>fact_join_table( hierarchies[ id ] ) } s{ id }| &&
                | ON s{ id }.{ zzxxmla1_cl_sql=>quote( hierarchies[ id ]-key_column ) }| &&
                | = f.{ zzxxmla1_cl_sql=>quote( hierarchies[ id ]-fk_column ) }|.
     ENDLOOP.
@@ -1658,7 +1658,7 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
     LOOP AT joined_ids INTO DATA(id).
-      source = source && | INNER JOIN { zzxxmla1_cl_sql=>quote( hierarchies[ id ]-dim_table ) } d{ id }| &&
+      source = source && | INNER JOIN { zzxxmla1_cl_model=>fact_join_table( hierarchies[ id ] ) } d{ id }| &&
                | ON d{ id }.{ zzxxmla1_cl_sql=>quote( hierarchies[ id ]-key_column ) }| &&
                | = f.{ zzxxmla1_cl_sql=>quote( hierarchies[ id ]-fk_column ) }|.
     ENDLOOP.
@@ -1693,7 +1693,7 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
       DATA subcube_joined TYPE ty_t_index.
       DATA(condition) = predicate_sql( EXPORTING predicate = subcube index = 1 CHANGING joined = subcube_joined ).
       LOOP AT subcube_joined INTO id.
-        source = source && | INNER JOIN { zzxxmla1_cl_sql=>quote( hierarchies[ id ]-dim_table ) } s{ id }| &&
+        source = source && | INNER JOIN { zzxxmla1_cl_model=>fact_join_table( hierarchies[ id ] ) } s{ id }| &&
                  | ON s{ id }.{ zzxxmla1_cl_sql=>quote( hierarchies[ id ]-key_column ) }| &&
                  | = f.{ zzxxmla1_cl_sql=>quote( hierarchies[ id ]-fk_column ) }|.
       ENDLOOP.
@@ -1837,7 +1837,7 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
     LOOP AT filters INTO DATA(filter).
       DATA(id) = filter-hierarchy.
       DATA(hierarchy) = hierarchies[ id ].
-      source = source && | INNER JOIN { zzxxmla1_cl_sql=>quote( hierarchy-dim_table ) } d{ id }| &&
+      source = source && | INNER JOIN { zzxxmla1_cl_model=>fact_join_table( hierarchy ) } d{ id }| &&
                | ON d{ id }.{ zzxxmla1_cl_sql=>quote( hierarchy-key_column ) }| &&
                | = f.{ zzxxmla1_cl_sql=>quote( hierarchy-fk_column ) }|.
     ENDLOOP.
@@ -1861,7 +1861,7 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
     LOOP AT defaults INTO DATA(default).
       id = default-hierarchy.
       hierarchy = hierarchies[ id ].
-      source = source && | INNER JOIN { zzxxmla1_cl_sql=>quote( hierarchy-dim_table ) } d{ id }| &&
+      source = source && | INNER JOIN { zzxxmla1_cl_model=>fact_join_table( hierarchy ) } d{ id }| &&
                | ON d{ id }.{ zzxxmla1_cl_sql=>quote( hierarchy-key_column ) }| &&
                | = f.{ zzxxmla1_cl_sql=>quote( hierarchy-fk_column ) }|.
       DATA(default_keys) = path_keys( path = default-path level = default-level ).
@@ -2130,7 +2130,7 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
 
     DATA(source) = |{ zzxxmla1_cl_sql=>quote( cube-fact_table ) } f|.
     LOOP AT joins INTO DATA(id).
-      source = source && | INNER JOIN { zzxxmla1_cl_sql=>quote( hierarchies[ id ]-dim_table ) } d{ id }| &&
+      source = source && | INNER JOIN { zzxxmla1_cl_model=>fact_join_table( hierarchies[ id ] ) } d{ id }| &&
                | ON d{ id }.{ zzxxmla1_cl_sql=>quote( hierarchies[ id ]-key_column ) }| &&
                | = f.{ zzxxmla1_cl_sql=>quote( hierarchies[ id ]-fk_column ) }|.
     ENDLOOP.
@@ -2144,7 +2144,7 @@ CLASS zzxxmla1_cl_mdx_facts IMPLEMENTATION.
       APPEND predicate_sql( EXPORTING predicate = slicer index = 1 CHANGING joined = joined ) TO conditions.
     ENDIF.
     LOOP AT joined INTO id.
-      source = source && | INNER JOIN { zzxxmla1_cl_sql=>quote( hierarchies[ id ]-dim_table ) } s{ id }| &&
+      source = source && | INNER JOIN { zzxxmla1_cl_model=>fact_join_table( hierarchies[ id ] ) } s{ id }| &&
                | ON s{ id }.{ zzxxmla1_cl_sql=>quote( hierarchies[ id ]-key_column ) }| &&
                | = f.{ zzxxmla1_cl_sql=>quote( hierarchies[ id ]-fk_column ) }|.
     ENDLOOP.

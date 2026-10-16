@@ -364,8 +364,14 @@ Read before designing anything:
   `olap4abap.bwHierarchy` (its name, `RSHIEDIR-HIENM`, of the characteristic of the dimension's view,
   `ZZXXMLA1_CL_BW_VIEW_GEN=>characteristic_of_view`) without levels: `ZZXXMLA1_CL_SCHEMA` reads the copy's `current`
   and makes `Level 01` to `Level nn` from its `depth`, the model carries the copy (`bw_hierarchy`) and counts a
-  level's members in it (`level_cardinality`), so `MDSCHEMA_HIERARCHIES` and `MDSCHEMA_LEVELS` show it; a read of its
-  members fails (`member_table`) until the engine reads them from the copy. Not yet in accept.
+  level's members in it (`level_cardinality`), so `MDSCHEMA_HIERARCHIES` and `MDSCHEMA_LEVELS` show it. Its members
+  are read from the copy as from a level hierarchy (step 7.2): `member_table` is the derived table
+  `ZZXXMLA1_CL_BW_HIERARCHY_COPY=>levels_sql`, a row per member occurrence (node or leaf) with per level of its path
+  `Lnn_SID` (the key), `Lnn_NAME` (a node's `NODE_NAME`, a leaf's key from the view, `#` for the initial value) and
+  `Lnn_POS` (the ordinal, BW's order), the levels below it NULL (a level read asks for its column not NULL); REST_H
+  follows the roots with its values below it when shown; a level's `uniqueMembers` is false where a SID repeats
+  (`repeated_levels`). A fact read that joins such a hierarchy fails (`ZZXXMLA1_CL_MODEL=>fact_join_table`) until
+  step 7.3 reads the facts through the closure. Not yet in accept.
   The reference serves `ZCLDIAG_ICD` as a balanced level hierarchy (`Level 01`-`Level 04` on the flattened table
   `ZZXXMLA1_HL_ZCLDIAG_ICD`; catalog and cube `ZCLHIER`, `reference/schema/ClinicBW.xml`, built by
   `build-bw-reference-db.py` from an export of the InfoCube and the copy, checked against BW by

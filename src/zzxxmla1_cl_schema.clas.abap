@@ -25,7 +25,8 @@
 "! A Hierarchy annotated c_bw_hierarchy (our extension) is a BW hierarchy of the dimension's characteristic, served
 "! from its copy (ZZXXMLA1_CL_BW_HIERARCHY_COPY) at BW's current version: it has no levels in the schema, they are
 "! Level 01 to Level nn, nn the copy's depth, a member on the level of its depth as SSAS serves a parent-child
-"! hierarchy (docs/next-steps.md, Reference scenario, decided 2026-10-16).
+"! hierarchy (docs/next-steps.md, Reference scenario, decided 2026-10-16), on the columns of the copy's members as a
+"! level hierarchy (ZZXXMLA1_CL_BW_HIERARCHY_COPY=>levels_sql).
 CLASS zzxxmla1_cl_schema DEFINITION
   PUBLIC
   FINAL
@@ -80,6 +81,8 @@ CLASS zzxxmla1_cl_schema DEFINITION
         "! the copy of the BW hierarchy the annotation c_bw_hierarchy names, current when the schema was read; initial
         "! for any other hierarchy
         bw_hierarchy    TYPE zzxxmla1_cl_bw_hierarchy_copy=>ty_hierarchy,
+        "! of a BW hierarchy: the column of the dimension's table that names a leaf (the key attribute's name)
+        bw_value_name   TYPE string,
       END OF ty_hier,
       ty_t_hier TYPE STANDARD TABLE OF ty_hier WITH EMPTY KEY.
     TYPES:
@@ -713,23 +716,31 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
         row-bw_hierarchy = NEW zzxxmla1_cl_bw_hierarchy_copy( )->current( characteristic = CONV #( characteristic )
                                                                           name           = CONV #( bw_name ) ).
         DATA(depth) = zzxxmla1_cl_bw_hierarchy_copy=>depth( row-bw_hierarchy ).
+        DATA(repeated) = zzxxmla1_cl_bw_hierarchy_copy=>repeated_levels( row-bw_hierarchy ).
       CATCH zzxxmla1_cx_bw_hierarchy INTO DATA(error).
         fail( |{ where }: { error->get_text( ) }| ).
     ENDTRY.
+    row-bw_value_name = attribute_name_column( key ).
     append_hierarchy( row ).
-    " a member's key is its SID: a node's negative one, a value's the characteristic's (the key column of the view)
+    " the levels are the columns of the copy's members as a level hierarchy (ZZXXMLA1_CL_MODEL=>member_table): a
+    " member's key its SID (a node's negative one, a value's the characteristic's), named by the copy, in BW's order
     DO depth TIMES.
-      DATA(level_name) = |{ c_bw_level_prefix }{ sy-index WIDTH = 2 ALIGN = RIGHT PAD = `0` }|.
+      DATA(level_no) = sy-index.
+      DATA(level_name) = |{ c_bw_level_prefix }{ level_no WIDTH = 2 ALIGN = RIGHT PAD = `0` }|.
       APPEND VALUE #( cube_name      = hier-cube_name
                       dim_name       = hier-dim_name
                       hier_name      = hier-hier_name
-                      level_no       = sy-index
+                      level_no       = level_no
                       level_name     = level_name
                       caption        = level_name
-                      key_column     = key-key_column->column_name
-                      name_column    = key-key_column->column_name
+                      key_column     = zzxxmla1_cl_bw_hierarchy_copy=>level_column(
+                                         level = level_no part = zzxxmla1_cl_bw_hierarchy_copy=>c_level_part-sid )
+                      name_column    = zzxxmla1_cl_bw_hierarchy_copy=>level_column(
+                                         level = level_no part = zzxxmla1_cl_bw_hierarchy_copy=>c_level_part-name )
+                      ordinal_column = zzxxmla1_cl_bw_hierarchy_copy=>level_column(
+                                         level = level_no part = zzxxmla1_cl_bw_hierarchy_copy=>c_level_part-pos )
                       data_type      = `Numeric`
-                      unique_members = abap_true
+                      unique_members = xsdbool( NOT line_exists( repeated[ table_line = level_no ] ) )
                       level_type     = `Regular` ) TO all_levels.
     ENDDO.
   ENDMETHOD.

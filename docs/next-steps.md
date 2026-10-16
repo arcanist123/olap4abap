@@ -498,18 +498,33 @@ Done (2026-10-15): the reference serves `ZCLDIAG_ICD`.
         `Level 01` to `Level nn` from `ZZXXMLA1_CL_BW_HIERARCHY_COPY=>depth` (the deepest node row; 2 at least when
         REST_H is shown), keyed by the dimension's key column (the SID), and `ty_hier-bw_hierarchy` keeps the copy;
         `ZZXXMLA1_CL_MODEL` carries it, counts a level's members in the copy (`level_cardinality`: the node rows of
-        that depth, REST_H and its values when shown) and refuses a read of its members (`member_table`, a fault)
-        until step 7.2. The test catalog is `ZCLHIER` on both sides (decided with the user: SAP's `ZCLVISIT` is the
+        that depth, REST_H and its values when shown) and refused a read of its members until step 7.2. The test catalog is `ZCLHIER` on both sides (decided with the user: SAP's `ZCLVISIT` is the
         demo's, annotated, and a cube name is one cube of the server): the reference's catalog and cube renamed, the
         71 cases rewritten (names only; all pass against the reference), `reference/schema/ClinicBW-sap.xml` on SAP
         (`sap-files.py deploy`; the dimension `ZCLDIAG` has its table there). `mdschema_hierarchies_hier` and
         `mdschema_levels_hier` pass on SAP. Fixed on the way: a property given twice in a request (12 captured
         requests carry `Catalog` twice) has its last value, as in the reference's `DefaultXmlaRequest` (a map).
-     2. The members of a BW hierarchy from the copy (children by parent, a level by depth, descendants by `POS`
-        range, names from `NODE_NAME` and the characteristic's view, unique names as paths), so the `members_hier_*`
-        cases pass.
+     2. Done (2026-10-16): the members of a BW hierarchy from the copy. Not by reads of their own: the copy is a
+        level hierarchy to the model, so every member read the engine has (children, a level, by name, key or path,
+        `Lag`/`Lead`, ranges, children counts) works on it unchanged. `ZZXXMLA1_CL_MODEL=>member_table` of such a
+        hierarchy is the derived table `ZZXXMLA1_CL_BW_HIERARCHY_COPY=>levels_sql`: a row per member occurrence,
+        node or leaf, with per level of its path `Lnn_SID`, `Lnn_NAME` and `Lnn_POS` (read up the parents, a join per
+        level: an inner node's SID is its occurrence's), the levels below it NULL, so a member is on the level of its
+        depth; a level read and a children count ask for the level's column not NULL. Names: a node's `NODE_NAME`, a
+        leaf's key from the dimension's view (`#` for the initial value, as BW's MDX), unique names the paths of
+        names; order BW's (`POS` the ordinal). REST_H, when shown, follows the roots, its values (the closure's rows
+        under it) below it by name. The schema's levels are these columns, `uniqueMembers` false on a level where a
+        SID repeats (`repeated_levels`: a leaf under two parents). The 10 `members_hier_*` cases and the two Excel
+        cases that list members only (`execute_hier_excel_filter_children`, `_filter_roots`) pass on SAP;
+        `ZCLPAT_PRG` (links, postable nodes, duplicate leaves, REST_H) and `ZCLSERV_CAT` (intervals) read every level
+        with the copy's `level_cardinality`. A fact read joining such a hierarchy fails with "The cells of the BW
+        hierarchy ... are not supported yet" (`ZZXXMLA1_CL_MODEL=>fact_join_table`): 54 `execute_hier_*` cases.
+        Also found: `Hierarchize(..., POST)` is not evaluated yet (`execute_hier_hierarchize_post`), and
+        `execute_hier_drillthrough_subselect` names `[ZCLVTYPE].[2]` by key (`known-issues.md`, `sourceAttribute`).
      3. The cells: the closure in the fact reads (open 4), the planner marking such members computed first; then
-        the `execute_hier_*` cases and Excel.
+        the `execute_hier_*` cases and Excel. `fact_join_table` then goes; the engine's label predicates and
+        drill-through name level columns of the dimension's table, which a BW hierarchy's `Lnn_*` are not.
+        `execute_hier_hierarchize_post` also needs `Hierarchize(..., POST)`.
 - Simplified (2026-10-16, with the user): the reference cannot be the oracle of REST_H (it needed placeholders and the
   cases kept out of its branch), so it no longer pretends to be. `ZCLDIAG_ICD` assigns every value explicitly, the
   initial one (337 visits) as the leaf `#` under the chapter `NOT_RECORDED` (Not recorded) and the group

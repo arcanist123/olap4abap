@@ -68,6 +68,17 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
     CONSTANTS c_rest_ddl_prefix TYPE string VALUE `ZZXXMLA1_R`.
     "! The node name of BW's text nodes and of the not-assigned node (/BIC/K-NIOBJNM).
     CONSTANTS c_text_node TYPE rsniobjnm VALUE '0HIER_NODE'.
+    "! The name of the not-assigned node (BW's node name of REST_TOP_SID).
+    CONSTANTS c_rest_node_name TYPE string VALUE `REST_H`.
+    "! The name of the initial value as BW's MDX names it.
+    CONSTANTS c_initial_name TYPE string VALUE `#`.
+    "! The parts of a level's columns of levels_sql.
+    CONSTANTS:
+      BEGIN OF c_level_part,
+        sid  TYPE string VALUE `SID`,
+        name TYPE string VALUE `NAME`,
+        pos  TYPE string VALUE `POS`,
+      END OF c_level_part.
 
     TYPES:
       "! the generated objects of an InfoObject
@@ -161,6 +172,37 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
       IMPORTING hierarchy     TYPE ty_hierarchy
                 !level        TYPE i
       RETURNING VALUE(result) TYPE i.
+    "! The levels (1: the roots) on which a SID occurs more than once: a value that is a leaf under two parents, so
+    "! that its key alone does not tell the member (the level's uniqueMembers false). An inner node has an own SID per
+    "! occurrence, the not-assigned values are under no leaf.
+    CLASS-METHODS repeated_levels
+      IMPORTING hierarchy     TYPE ty_hierarchy
+      RETURNING VALUE(result) TYPE int4_table.
+    "! The column of a level of levels_sql: L01_SID, L01_NAME, L01_POS, ...
+    "! @parameter part | c_level_part
+    CLASS-METHODS level_column
+      IMPORTING !level        TYPE i
+                part          TYPE string
+      RETURNING VALUE(result) TYPE string.
+    "! The members of a copy as a level hierarchy (ZZXXMLA1_CL_MODEL=>member_table of a BW hierarchy), a query to use
+    "! as a derived table: a row per member, every occurrence of a node or a leaf (a leaf under two parents twice),
+    "! with per level of its path, from the roots down to its own, the member there (level_column): its SID, its name
+    "! and its position (POS, BW's order), the levels below it NULL; as the reference's flattened table of a level
+    "! hierarchy, but a member on the level of its depth whether it has children or not (SSAS's parent-child form). A
+    "! node is named by its node name (NODE_NAME, the key of a postable node), a leaf by the characteristic's value
+    "! (# for the initial one, as BW's MDX names it). When the hierarchy shows the not-assigned node, REST_H follows
+    "! the roots, its values (the closure's rows under it) below it in their names' order. The levels of a member are
+    "! read up its parents, one join each (an inner node's SID is its occurrence's), so depth is the number of levels.
+    "! @parameter value_table | the characteristic's table that names the leaves (the dimension's view)
+    "! @parameter sid_column | its SID column
+    "! @parameter name_column | its column of the value's name (the key)
+    CLASS-METHODS levels_sql
+      IMPORTING hierarchy     TYPE ty_hierarchy
+                depth         TYPE i
+                value_table   TYPE string
+                sid_column    TYPE string
+                name_column   TYPE string
+      RETURNING VALUE(result) TYPE string.
     "! Creates the objects of each characteristic and copies each of its time-independent hierarchies that are not
     "! version dependent (program ZZXXMLA1_HIERARCHY_COPY, the class run for scripts/hierarchy_copy_test.py).
     METHODS run
@@ -667,6 +709,83 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
                                      params = rest-params ).
       result = result + rows[ 1 ][ 1 ].
     ENDIF.
+  ENDMETHOD.
+
+  METHOD repeated_levels.
+    DATA(rows) = zzxxmla1_cl_sql=>query(
+      sql     = |SELECT DISTINCT "DEPTH" FROM { quote( hierarchy-node_table ) } | &&
+                |WHERE "HIESID" = ? AND "SVER" = ? AND "DEPTH" > 0 GROUP BY "DEPTH", "SID" HAVING COUNT( * ) > 1 | &&
+                |ORDER BY "DEPTH"|
+      columns = 1
+      params  = VALUE #( ( NEW i( hierarchy-hiesid ) ) ( NEW string( hierarchy-sver ) ) ) ).
+    LOOP AT rows INTO DATA(row).
+      APPEND CONV i( row[ 1 ] ) TO result.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD level_column.
+    result = |L{ level WIDTH = 2 ALIGN = RIGHT PAD = `0` }_{ part }|.
+  ENDMETHOD.
+
+  METHOD levels_sql.
+    " a member of depth d is the row n, its member on level k the parent d - k steps up (p1, p2, ...): a level's
+    " column is a CASE over n's depth. Parents are inner nodes (negative SIDs; the virtual root's parent 0 is none)
+    DATA(node) = quote( hierarchy-node_table ).
+    DATA(sver) = zzxxmla1_cl_sql=>literal( CONV string( hierarchy-sver ) ).
+    DATA(value_name) = |CASE WHEN n."SID" = 0 THEN '{ c_initial_name }' | &&
+                       |ELSE COALESCE( TO_NVARCHAR( v.{ quote( name_column ) } ), TO_NVARCHAR( n."SID" ) ) END|.
+    DATA(columns) = VALUE string_table( ).
+    DO depth TIMES.
+      DATA(level) = sy-index.
+      DATA(sids) = ``.
+      DATA(names) = ``.
+      DATA(positions) = ``.
+      DO depth - level + 1 TIMES.
+        DATA(up) = sy-index - 1.
+        DATA(alias) = COND string( WHEN up = 0 THEN `n` ELSE |p{ up }| ).
+        DATA(branch) = | WHEN { level + up } THEN |.
+        sids = |{ sids }{ branch }{ alias }."SID"|.
+        names = names && branch && COND string( WHEN up = 0 THEN |CASE WHEN n."SID" < 0 THEN TO_NVARCHAR( n."NODE_NAME" ) | &&
+                                                               |ELSE { value_name } END|
+                                              ELSE |TO_NVARCHAR( { alias }."NODE_NAME" )| ).
+        positions = |{ positions }{ branch }{ alias }."POS"|.
+      ENDDO.
+      APPEND |CASE n."DEPTH"{ sids } END AS { quote( level_column( level = level part = c_level_part-sid ) ) }|
+             TO columns.
+      APPEND |CASE n."DEPTH"{ names } END AS { quote( level_column( level = level part = c_level_part-name ) ) }|
+             TO columns.
+      APPEND |CASE n."DEPTH"{ positions } END AS { quote( level_column( level = level part = c_level_part-pos ) ) }|
+             TO columns.
+    ENDDO.
+    DATA(joins) = |LEFT OUTER JOIN { quote( value_table ) } AS v ON v.{ quote( sid_column ) } = n."SID" AND n."SID" >= 0|.
+    DO depth - 1 TIMES.
+      DATA(parent) = |p{ sy-index }|.
+      DATA(child) = COND string( WHEN sy-index = 1 THEN `n` ELSE |p{ sy-index - 1 }| ).
+      joins = |{ joins } LEFT OUTER JOIN { node } AS { parent } ON { parent }."HIESID" = n."HIESID" | &&
+              |AND { parent }."SVER" = n."SVER" AND { parent }."SID" = { child }."PARENT_SID" AND { parent }."SID" < 0|.
+    ENDDO.
+    result = |SELECT { concat_lines_of( table = columns sep = `, ` ) } FROM { node } AS n { joins } | &&
+             |WHERE n."HIESID" = { hierarchy-hiesid } AND n."SVER" = { sver } AND n."DEPTH" BETWEEN 1 AND { depth }|.
+    IF hierarchy-rest_shown = abap_false.
+      RETURN.
+    ENDIF.
+
+    " REST_H after the roots, its values below it: the closure's rows under it
+    DATA(below) = ``.
+    DO depth - 2 TIMES.
+      below = |{ below }, CAST( NULL AS INTEGER ), CAST( NULL AS NVARCHAR( 1 ) ), CAST( NULL AS INTEGER )|.
+    ENDDO.
+    DATA(rest) = |{ hierarchy-rest_top_sid }, '{ c_rest_node_name }', { c_rest_listno }|.
+    value_name = |CASE WHEN r."SID" = 0 THEN '{ c_initial_name }' | &&
+                 |ELSE COALESCE( TO_NVARCHAR( v.{ quote( name_column ) } ), TO_NVARCHAR( r."SID" ) ) END|.
+    result = |{ result } UNION ALL SELECT { rest }, CAST( NULL AS INTEGER ), CAST( NULL AS NVARCHAR( 1 ) ), | &&
+             |CAST( NULL AS INTEGER ){ below } FROM DUMMY| &&
+             | UNION ALL SELECT { rest }, r."SID", { value_name }, | &&
+             |{ c_rest_listno } + ROW_NUMBER( ) OVER ( ORDER BY { value_name } ){ below } | &&
+             |FROM { quote( hierarchy-closure ) } AS r | &&
+             |LEFT OUTER JOIN { quote( value_table ) } AS v ON v.{ quote( sid_column ) } = r."SID" | &&
+             |WHERE r."HIESID" = { hierarchy-hiesid } AND r."SVER" = { sver } | &&
+             |AND r."ANCESTOR_SID" = { hierarchy-rest_top_sid }|.
   ENDMETHOD.
 
   METHOD lock.
