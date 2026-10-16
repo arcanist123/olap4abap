@@ -388,8 +388,10 @@ Read before designing anything:
   level's members in it (`level_cardinality`), so `MDSCHEMA_HIERARCHIES` and `MDSCHEMA_LEVELS` show it. Its members
   are read from the copy as from a level hierarchy (step 7.2): `member_table` is the derived table
   `ZZXXMLA1_CL_BW_HIERARCHY_COPY=>levels_sql`, a row per member occurrence (node or leaf) with per level of its path
-  `Lnn_SID` (the key), `Lnn_NAME` (a node's `NODE_NAME`, a leaf's key from the view, `#` for the initial value) and
-  `Lnn_POS` (the ordinal, BW's order), the levels below it NULL (a level read asks for its column not NULL); REST_H
+  `Lnn_SID` (the key), `Lnn_NAME` (a node's `NODE_NAME`, a leaf named as the characteristic's member: the view's
+  column the level over the key attribute names it by, SID 0 too, `''` by `KEY_NAME`), `Lnn_POS` (the ordinal, BW's
+  order) and, where the key attribute's `NameColumn` captions the members, `Lnn_CAPTION` (a node's `NODE_NAME` until
+  the node texts come, a leaf's caption from the view; texts step 6), the levels below it NULL (a level read asks for its column not NULL); REST_H
   follows the roots with its values below it when shown; a level's `uniqueMembers` is false where a SID repeats
   (`repeated_levels`). The facts are read through the closure (step 7.3): a fact read joins, per BW hierarchy, the
   members of the level it groups or filters by with the SIDs below each (`ZZXXMLA1_CL_MODEL=>fact_join_table` with

@@ -87,6 +87,9 @@ CLASS zzxxmla1_cl_schema DEFINITION
         "! of a BW hierarchy: the column of the dimension's table that names a leaf, as it names the characteristic's
         "! members (the nameColumn of a level over the key attribute)
         bw_value_name   TYPE string,
+        "! of a BW hierarchy: the column of the dimension's table that captions a leaf, as it captions the
+        "! characteristic's members (the key attribute's NameColumn); empty when the name is the caption
+        bw_value_caption TYPE string,
       END OF ty_hier,
       ty_t_hier TYPE STANDARD TABLE OF ty_hier WITH EMPTY KEY.
     TYPES:
@@ -754,9 +757,15 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
         fail( |{ where }: { error->get_text( ) }| ).
     ENDTRY.
     row-bw_value_name = value_name_column( dimension = dimension key = key ).
+    " a caption of the column that names the member is the name (RolapLevel)
+    row-bw_value_caption = attribute_caption_column( key ).
+    IF row-bw_value_caption = row-bw_value_name.
+      CLEAR row-bw_value_caption.
+    ENDIF.
     append_hierarchy( row ).
     " the levels are the columns of the copy's members as a level hierarchy (ZZXXMLA1_CL_MODEL=>member_table): a
-    " member's key its SID (a node's negative one, a value's the characteristic's), named by the copy, in BW's order
+    " member's key its SID (a node's negative one, a value's the characteristic's), named and captioned by the copy
+    " (a leaf as the characteristic's member), in BW's order
     DO depth TIMES.
       DATA(level_no) = sy-index.
       DATA(level_name) = |{ c_bw_level_prefix }{ level_no WIDTH = 2 ALIGN = RIGHT PAD = `0` }|.
@@ -772,6 +781,10 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
                                          level = level_no part = zzxxmla1_cl_bw_hierarchy_copy=>c_level_part-name )
                       ordinal_column = zzxxmla1_cl_bw_hierarchy_copy=>level_column(
                                          level = level_no part = zzxxmla1_cl_bw_hierarchy_copy=>c_level_part-pos )
+                      caption_column = COND #( WHEN row-bw_value_caption IS NOT INITIAL
+                                               THEN zzxxmla1_cl_bw_hierarchy_copy=>level_column(
+                                                      level = level_no
+                                                      part  = zzxxmla1_cl_bw_hierarchy_copy=>c_level_part-caption ) )
                       data_type      = `Numeric`
                       unique_members = xsdbool( NOT line_exists( repeated[ table_line = level_no ] ) )
                       level_type     = `Regular` ) TO all_levels.

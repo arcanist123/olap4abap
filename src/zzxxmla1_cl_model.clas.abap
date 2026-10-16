@@ -45,6 +45,8 @@ CLASS zzxxmla1_cl_model DEFINITION
         bw_hierarchy    TYPE zzxxmla1_cl_bw_hierarchy_copy=>ty_hierarchy,
         "! of a BW hierarchy: the column of the dimension table that names a leaf
         bw_value_name   TYPE string,
+        "! of a BW hierarchy: the column of the dimension table that captions a leaf; empty when the name is the caption
+        bw_value_caption TYPE string,
       END OF ty_hierarchy,
       ty_t_hierarchy TYPE STANDARD TABLE OF ty_hierarchy WITH EMPTY KEY.
     TYPES:
@@ -301,7 +303,8 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
                         fact_table      = the_cube-fact_table
                         members_with_facts = dim-members_with_facts
                         bw_hierarchy    = hier-bw_hierarchy
-                        bw_value_name   = hier-bw_value_name ) TO result.
+                        bw_value_name   = hier-bw_value_name
+                        bw_value_caption = hier-bw_value_caption ) TO result.
       ENDLOOP.
     ENDLOOP.
     key_types( CHANGING hierarchies = result ).
@@ -350,7 +353,8 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
                                                               depth       = lines( hierarchy-levels )
                                                               value_table = hierarchy-dim_table
                                                               sid_column  = hierarchy-key_column
-                                                              name_column = hierarchy-bw_value_name ) } )|.
+                                                              name_column = hierarchy-bw_value_name
+                                                              caption_column = hierarchy-bw_value_caption ) } )|.
   ENDMETHOD.
 
   METHOD bw_member_condition.

@@ -201,9 +201,10 @@ def compare(total, key, expected, actual, args, check):
         if not args.with_facts and bw["children"] != ours["children"]:
             problems.append(f"children {ours['children']} != {bw['children']}")
         captions = {bw["caption"]} | ({bw["name"]} if args.names else set())
-        # the initial value (its key all zeros or empty) olap4abap names # as BW's MDX names it in unique names
-        if args.names and not bw["name"].strip("0 "):
-            captions.add("#")
+        # the initial value (BW's MDX names it #, its key is all zeros or empty) olap4abap names '' as the
+        # characteristic's member
+        if args.names and (bw["name"] == "#" or not bw["name"].strip("0 ")):
+            captions.add("")
         if ours["caption"] not in captions:
             problems.append(f"caption {ours['caption']!r} not in {sorted(captions)}")
         if not same_values(bw["values"], ours["values"]):

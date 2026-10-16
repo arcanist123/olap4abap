@@ -6,11 +6,6 @@ it is fixed. Read this before comparing answers with the reference or with BW.
 
 ## Debt
 
-- **The initial value has two names in one cube.** olap4abap's BW hierarchies
-  (`ZZXXMLA1_CL_BW_HIERARCHY_COPY=>levels_sql`, `c_initial_name`) name a characteristic's initial value (SID 0) `#`,
-  as BW's MDX does; the flat hierarchies on the characteristics' views name it by the view's value, `''` for a CHAR
-  characteristic (`[ZCLDIAG].[]`), BW's value for the others (`0000`). Decided 2026-10-16: `''` everywhere, every key
-  type, with `#` as the caption of a characteristic without texts (`next-steps.md`, Now: texts and captions).
 - **The Discover cache does not see BW loads.** It is cleared by a change of a server file and the time master data
   fill, not when BW activates master data or loads a request: a Discover answer can be up to 12 hours old
   (`mvp-scope.md`, Discover cache decision; `next-steps.md`, Later).

@@ -70,14 +70,13 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
     CONSTANTS c_text_node TYPE rsniobjnm VALUE '0HIER_NODE'.
     "! The name of the not-assigned node (BW's node name of REST_TOP_SID).
     CONSTANTS c_rest_node_name TYPE string VALUE `REST_H`.
-    "! The name of the initial value as BW's MDX names it.
-    CONSTANTS c_initial_name TYPE string VALUE `#`.
     "! The parts of a level's columns of levels_sql.
     CONSTANTS:
       BEGIN OF c_level_part,
-        sid  TYPE string VALUE `SID`,
-        name TYPE string VALUE `NAME`,
-        pos  TYPE string VALUE `POS`,
+        sid     TYPE string VALUE `SID`,
+        name    TYPE string VALUE `NAME`,
+        pos     TYPE string VALUE `POS`,
+        caption TYPE string VALUE `CAPTION`,
       END OF c_level_part.
 
     TYPES:
@@ -178,7 +177,7 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
     CLASS-METHODS repeated_levels
       IMPORTING hierarchy     TYPE ty_hierarchy
       RETURNING VALUE(result) TYPE int4_table.
-    "! The column of a level of levels_sql: L01_SID, L01_NAME, L01_POS, ...
+    "! The column of a level of levels_sql: L01_SID, L01_NAME, L01_POS, L01_CAPTION, ...
     "! @parameter part | c_level_part
     CLASS-METHODS level_column
       IMPORTING !level        TYPE i
@@ -186,23 +185,26 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
       RETURNING VALUE(result) TYPE string.
     "! The members of a copy as a level hierarchy (ZZXXMLA1_CL_MODEL=>member_table of a BW hierarchy), a query to use
     "! as a derived table: a row per member, every occurrence of a node or a leaf (a leaf under two parents twice),
-    "! with per level of its path, from the roots down to its own, the member there (level_column): its SID, its name
-    "! and its position (POS, BW's order), the levels below it NULL; as the reference's flattened table of a level
-    "! hierarchy, but a member on the level of its depth whether it has children or not (SSAS's parent-child form). A
-    "! node is named by its node name (NODE_NAME, the key of a postable node), a leaf by the characteristic's value
-    "! (# for the initial one, as BW's MDX names it). When the hierarchy shows the not-assigned node, REST_H follows
-    "! the roots, its values (the closure's rows under it) below it in their names' order. The levels of a member are
-    "! read up its parents, one join each (an inner node's SID is its occurrence's), so depth is the number of levels.
+    "! with per level of its path, from the roots down to its own, the member there (level_column): its SID, its name,
+    "! its position (POS, BW's order) and, with a caption column, its caption, the levels below it NULL; as the
+    "! reference's flattened table of a level hierarchy, but a member on the level of its depth whether it has children
+    "! or not (SSAS's parent-child form). A node is named and captioned by its node name (NODE_NAME, the key of a
+    "! postable node), a leaf named and captioned as the characteristic's member is, by the view's columns (the
+    "! initial value too: '' by KEY_NAME). When the hierarchy shows the not-assigned node, REST_H follows the roots, its
+    "! values (the closure's rows under it) below it in their names' order. The levels of a member are read up its
+    "! parents, one join each (an inner node's SID is its occurrence's), so depth is the number of levels.
     "! @parameter value_table | the characteristic's table that names the leaves (the dimension's view)
     "! @parameter sid_column | its SID column
-    "! @parameter name_column | its column of the value's name (the key)
+    "! @parameter name_column | its column of the value's name (the level's nameColumn over the key attribute)
+    "! @parameter caption_column | its column of the value's caption (the key attribute's NameColumn), if any
     CLASS-METHODS levels_sql
-      IMPORTING hierarchy     TYPE ty_hierarchy
-                depth         TYPE i
-                value_table   TYPE string
-                sid_column    TYPE string
-                name_column   TYPE string
-      RETURNING VALUE(result) TYPE string.
+      IMPORTING hierarchy      TYPE ty_hierarchy
+                depth          TYPE i
+                value_table    TYPE string
+                sid_column     TYPE string
+                name_column    TYPE string
+                caption_column TYPE string OPTIONAL
+      RETURNING VALUE(result)  TYPE string.
     "! Creates the objects of each characteristic and copies each of its time-independent hierarchies that are not
     "! version dependent (program ZZXXMLA1_HIERARCHY_COPY, the class run for scripts/hierarchy_copy_test.py).
     METHODS run
@@ -732,14 +734,17 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
     " column is a CASE over n's depth. Parents are inner nodes (negative SIDs; the virtual root's parent 0 is none)
     DATA(node) = quote( hierarchy-node_table ).
     DATA(sver) = zzxxmla1_cl_sql=>literal( CONV string( hierarchy-sver ) ).
-    DATA(value_name) = |CASE WHEN n."SID" = 0 THEN '{ c_initial_name }' | &&
-                       |ELSE COALESCE( TO_NVARCHAR( v.{ quote( name_column ) } ), TO_NVARCHAR( n."SID" ) ) END|.
+    " a leaf is named and captioned as the characteristic's member: by the view's columns, SID 0 too
+    DATA(value_name) = |COALESCE( TO_NVARCHAR( v.{ quote( name_column ) } ), TO_NVARCHAR( n."SID" ) )|.
+    DATA(value_caption) = COND string( WHEN caption_column IS NOT INITIAL
+                                       THEN |COALESCE( TO_NVARCHAR( v.{ quote( caption_column ) } ), { value_name } )| ).
     DATA(columns) = VALUE string_table( ).
     DO depth TIMES.
       DATA(level) = sy-index.
       DATA(sids) = ``.
       DATA(names) = ``.
       DATA(positions) = ``.
+      DATA(captions) = ``.
       DO depth - level + 1 TIMES.
         DATA(up) = sy-index - 1.
         DATA(alias) = COND string( WHEN up = 0 THEN `n` ELSE |p{ up }| ).
@@ -749,6 +754,10 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
                                                                |ELSE { value_name } END|
                                               ELSE |TO_NVARCHAR( { alias }."NODE_NAME" )| ).
         positions = |{ positions }{ branch }{ alias }."POS"|.
+        " a node is captioned by its node name until the texts of the nodes come (RSTHIENODE)
+        captions = captions && branch && COND string( WHEN up = 0 THEN |CASE WHEN n."SID" < 0 THEN TO_NVARCHAR( n."NODE_NAME" ) | &&
+                                                                     |ELSE { value_caption } END|
+                                                    ELSE |TO_NVARCHAR( { alias }."NODE_NAME" )| ).
       ENDDO.
       APPEND |CASE n."DEPTH"{ sids } END AS { quote( level_column( level = level part = c_level_part-sid ) ) }|
              TO columns.
@@ -756,6 +765,10 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
              TO columns.
       APPEND |CASE n."DEPTH"{ positions } END AS { quote( level_column( level = level part = c_level_part-pos ) ) }|
              TO columns.
+      IF caption_column IS NOT INITIAL.
+        APPEND |CASE n."DEPTH"{ captions } END AS { quote( level_column( level = level part = c_level_part-caption ) ) }|
+               TO columns.
+      ENDIF.
     ENDDO.
     DATA(joins) = |LEFT OUTER JOIN { quote( value_table ) } AS v ON v.{ quote( sid_column ) } = n."SID" AND n."SID" >= 0|.
     DO depth - 1 TIMES.
@@ -771,17 +784,20 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
     ENDIF.
 
     " REST_H after the roots, its values below it: the closure's rows under it
+    DATA(empty) = |CAST( NULL AS INTEGER ), CAST( NULL AS NVARCHAR( 1 ) ), CAST( NULL AS INTEGER )| &&
+                  COND string( WHEN caption_column IS NOT INITIAL THEN |, CAST( NULL AS NVARCHAR( 1 ) )| ).
     DATA(below) = ``.
     DO depth - 2 TIMES.
-      below = |{ below }, CAST( NULL AS INTEGER ), CAST( NULL AS NVARCHAR( 1 ) ), CAST( NULL AS INTEGER )|.
+      below = |{ below }, { empty }|.
     ENDDO.
-    DATA(rest) = |{ hierarchy-rest_top_sid }, '{ c_rest_node_name }', { c_rest_listno }|.
-    value_name = |CASE WHEN r."SID" = 0 THEN '{ c_initial_name }' | &&
-                 |ELSE COALESCE( TO_NVARCHAR( v.{ quote( name_column ) } ), TO_NVARCHAR( r."SID" ) ) END|.
-    result = |{ result } UNION ALL SELECT { rest }, CAST( NULL AS INTEGER ), CAST( NULL AS NVARCHAR( 1 ) ), | &&
-             |CAST( NULL AS INTEGER ){ below } FROM DUMMY| &&
-             | UNION ALL SELECT { rest }, r."SID", { value_name }, | &&
-             |{ c_rest_listno } + ROW_NUMBER( ) OVER ( ORDER BY { value_name } ){ below } | &&
+    DATA(rest) = |{ hierarchy-rest_top_sid }, '{ c_rest_node_name }', { c_rest_listno }| &&
+                 COND string( WHEN caption_column IS NOT INITIAL THEN |, '{ c_rest_node_name }'| ).
+    value_name = replace( val = value_name sub = `n."SID"` with = `r."SID"` occ = 0 ).
+    value_caption = replace( val = value_caption sub = `n."SID"` with = `r."SID"` occ = 0 ).
+    DATA(value) = |r."SID", { value_name }, { c_rest_listno } + ROW_NUMBER( ) OVER ( ORDER BY { value_name } )| &&
+                  COND string( WHEN caption_column IS NOT INITIAL THEN |, { value_caption }| ).
+    result = |{ result } UNION ALL SELECT { rest }, { empty }{ below } FROM DUMMY| &&
+             | UNION ALL SELECT { rest }, { value }{ below } | &&
              |FROM { quote( hierarchy-closure ) } AS r | &&
              |LEFT OUTER JOIN { quote( value_table ) } AS v ON v.{ quote( sid_column ) } = r."SID" | &&
              |WHERE r."HIESID" = { hierarchy-hiesid } AND r."SVER" = { sver } | &&

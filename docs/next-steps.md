@@ -168,12 +168,26 @@ The steps:
 5. A schema check against blank texts: the schema API's `check` (and accept) reports, per dimension, the members whose
    caption is blank (a count and examples), so the modeller sees them. A warning, never a refusal (decided
    2026-10-16): a modeller who wants blank captions keeps them.
-6. BW hierarchies: a leaf is named and captioned as the characteristic's member (`levels_sql`, `c_initial_name` `#`
-   goes: SID 0 is `''`); text nodes keep their technical name, their captions (RSTHIENODE's texts) come later. The
-   reference's `ZCLDIAG_ICD` names its initial leaf `#` (`build-bw-reference-db.py`): rebuilt, and the cases that name
-   it (`execute_hier_slicer_initial`, ...) rewritten and recaptured.
+6. Done (2026-10-16): BW hierarchies: a leaf is named and captioned as the characteristic's member; text nodes keep
+   their technical name, their captions (RSTHIENODE's texts) come later. `levels_sql` names a leaf by the view's
+   column the level over the key attribute names the members by (`value_name_column`), SID 0 too (`c_initial_name`
+   `#` is gone: `''` by `KEY_NAME`, or the view's key where a schema still names by the key), and, where the key
+   attribute's `NameColumn` captions the members (`attribute_caption_column`, `bw_value_caption` of the schema and the
+   model), gives each level a column `Lnn_CAPTION` (a node's `NODE_NAME`, a leaf's caption from the view, REST_H's
+   rows as wide), the level's `caption_column`. The reference's flattened `ZZXXMLA1_HL_ZCLDIAG_ICD` names its
+   initial leaf `''` (`build-bw-reference-db.py`, rebuilt with `--no-export`: its views stay those of before step 2
+   until step 7); `execute_hier_slicer_initial` and `execute_hier_ascendants` name `[NO_DIAGNOSIS].[]`, and the 9
+   cases with the initial leaf were recaptured (the name and caption `''`, nothing else changed).
+   `bw_hierarchy_test.py --names` accepts `''` for the initial value (BW's MDX names it `#`). `known-issues.md`'s
+   entry on `#` is gone: the initial value has one name in a cube.
+   Checked: the unit tests of `ZZXXMLA1_CL_BW_HIERARCHY_COPY` (7, `leaf_names` new), `_SCHEMA` (13) and `_MODEL` (9)
+   pass; `xmla_test.py` 371 of 372 (`execute_hier_drillthrough_subselect` waits for step 7; the Discover cache held
+   `members_hier_all`'s old answer until `sap-files.py deploy` cleared it); `bw_hierarchy_test.py --reference` and
+   `--catalog ZCLHIER --names` pass, the latter also with `ZCLPAT_PRG` and `ZCLSERV_CAT` added to `ZCLHIER` for the
+   run (72, 2,914 and 92 members), with names and with the three key attributes captioned by `TXTMD` (leaves
+   captioned by their texts, `[ZCLSERV.ZCLSERV_CAT].[REST_H].[0000]` by `''`).
 7. The reference database's copies of the views rebuilt, the clinic cases recaptured, the docs (`bw-schema-design-guide.md`
-   3.4 and 3.7, `schema-generator.md`) brought to what is built; `known-issues.md`'s entry on `#` goes.
+   3.4 and 3.7, `schema-generator.md`) brought to what is built.
 
 ## Then: time-independent BW hierarchies
 

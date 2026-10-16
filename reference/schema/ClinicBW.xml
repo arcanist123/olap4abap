@@ -14,7 +14,7 @@
   and, computed from the copy of the hierarchy (ZZXXMLA1_CL_BW_HIERARCHY_COPY) at the version current at the export,
   its flattened table ZZXXMLA1_HL_ZCLDIAG_ICD: a row per value SID (the fact's SID_ZCLDIAG joins it), per level its
   member's key Lnn_SID (the node's SID: negative for a text node, the value's SID for a value), name Lnn_NAME (a text
-  node's technical name or a value's key, # for the initial value, as BW's MDX names them) and Lnn_POS (its position
+  node's technical name or a value's key, '' for the initial value, as the characteristic's members are named) and Lnn_POS (its position
   among its siblings, BW's order). Every value is a leaf (the initial one under NOT_RECORDED > NO_DIAGNOSIS) and BW
   suppresses the not-assigned node, so the hierarchy has no REST_H.
 

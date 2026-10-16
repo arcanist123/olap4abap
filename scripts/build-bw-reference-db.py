@@ -31,7 +31,8 @@ depth, is served by the reference as a balanced level hierarchy (Level 01 to Lev
    Per hierarchy its flattened table (hierarchy_levels), computed from the copy: ZZXXMLA1_HL_<hierarchy>, a row per
    value SID (the fact's SID_<characteristic>, the key) with its member on each level, L01_SID, L01_NAME, L01_POS to
    the level of the values: the node's SID, its NAME (a text node's technical name, a value's key from the SID table,
-   # for the initial value, as BW's MDX names them) and its position among its siblings (BW's order). The virtual
+   '' for the initial value, as the characteristic's members are named) and its position among its siblings (BW's
+   order). The virtual
    root is the All member. The build fails unless the tree is balanced, its leaves values at the same depth, every
    node once, no value with children and every value of the characteristic a leaf (docs/next-steps.md, Reference
    scenario: the reference serves BW hierarchies with a level form as level hierarchies, every value assigned and the
@@ -261,8 +262,9 @@ def hierarchy_levels(data):
     fields = [f["name"] for f in data["nodes"]["fields"]]
     sid_table = json.loads(table_file(f"/BIC/S{c}").read_text(encoding="utf-8"))
     sid_fields = [f["name"] for f in sid_table["fields"]]
-    # BW's MDX names the initial value #
-    keys = {int(number(row[sid_fields.index("SID")])): row[sid_fields.index(f"/BIC/{c}")] or "#"
+    # a leaf is named as the characteristic's member: by its key, the initial value '' (docs/next-steps.md, Now:
+    # texts and captions)
+    keys = {int(number(row[sid_fields.index("SID")])): row[sid_fields.index(f"/BIC/{c}")]
             for row in sid_table["rows"]}
     nodes, children = {}, {}
     for row in data["nodes"]["rows"]:
