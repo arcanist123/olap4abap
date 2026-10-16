@@ -869,7 +869,7 @@ cases and the applicable statements passing:
    covers without a group has no facts. The native crossjoin's tuple read is constrained to its fixed members the same
    way. Applicable statements: same answers, the whole run 191 s instead of about 240 s; #46 and #85 (Order/TopCount
    over 100,000+ tuples) take about 105 s instead of about 80 s, the second pass evaluating every value again.
-8. Open: an unqualified member name (`[USA]`) is looked for by name in every hierarchy, one query each (100 on
+8. Open (`known-issues.md`, Performance): an unqualified member name (`[USA]`) is looked for by name in every hierarchy, one query each (100 on
    `ZXMLWIDE`).
    Done (2026-10-12): `Order` over large sets. #85 (`Head(Order(...), 5)` over the 85,000 tuples of a
    `NonEmptyCrossJoin` of customers and products, the query a pivot client generates) took 105 s: the merge sort made
@@ -895,7 +895,7 @@ cases and the applicable statements passing:
    #85: 1 s (eMondrian 3.6 s). All 90 applicable statements with `Order`, `Head`, `TopCount` or `BottomCount` and 16
    edge cases (`BDESC`, ties, string keys, an ancestor key, the All level, slicer, subselect, a chain of calculated
    measures, empty values in another context, named sets with `Generate`, the fallbacks, evaluation errors) give
-   eMondrian's answers; the whole run takes 104 s. Still open: a second pass of a phase evaluates the sort values of
+   eMondrian's answers; the whole run takes 104 s. Still open (`known-issues.md`, Performance): a second pass of a phase evaluates the sort values of
    an interpreted `Order` again (`sort_values` are kept per run).
 9. Done (2026-10-12): native `TopCount`/`BottomCount` (`RolapNativeTopCount`, `ZZXXMLA1_CL_MDX_ENGINE=>native_top_count`,
    `ZZXXMLA1_CL_MDX_FACTS=>top_count`): by a stored measure, of a crossjoin (`CrossJoin` or `*`, our extension: the
@@ -928,7 +928,7 @@ that have facts in it, by the annotation `olap4abap.membersWithFacts` on its `Di
    a characteristic is shared by many providers, which use few of its values); the cube pane's "Members with facts"
    column switches it per dimension, and marking a dimension as time removes it (`scripts/schema_ui_test.py`).
 4. Open: measure the semi-join on a large provider (`ZXMLWIDE` with more records).
-5. Open (noted 2026-10-15): on an aDSO the existence check of a member keyed by its value should read the aDSO's own
+5. Open (noted 2026-10-15; `known-issues.md`, Performance): on an aDSO the existence check of a member keyed by its value should read the aDSO's own
    fact table (its reporting view `/BIC/A<aDSO>7`), without the join. Today every check is
    `IN ( SELECT <key> FROM <the cube's fact table> )`, and with a compounded characteristic that is the fact view
    (`ZZXXMLA1_F_<aDSO>`, e.g. `ZZXXMLA1V0000015` of `ZCLVISITA`), which joins the SID of each compounded

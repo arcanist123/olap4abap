@@ -14,11 +14,11 @@ it is fixed. Read this before comparing answers with the reference or with BW.
   reference's axis shows `Visits`, olap4abap's `ZCLVISNO` (the schema reader reads the caption,
   `ZZXXMLA1_CL_SCHEMA`). Same example.
 - **Aggregators other than `sum` and `count` are summed.** The schema accepts `min`, `max`, `avg` and
-  `distinct-count`, and the fact reads (`ZZXXMLA1_CL_MDX_FACTS`) sum every measure but a count: a wrong value without
-  an error. The proposal makes only `sum`; a hand-written schema can have the others. Until they are built, the
-  schema should refuse them.
-- **Calculated members of a schema are ignored**, silently (`<CalculatedMember>` of a cube; the schema builder does
-  not offer them). Until they are built, the schema should refuse them.
+  `distinct-count`, and the fact reads (`ZZXXMLA1_CL_MDX_FACTS`) sum every measure but a count: a wrong value where
+  the right answer is the engine's "not implemented" fault. The proposal makes only `sum`; a hand-written schema can
+  have the others.
+- **Calculated members of a schema are ignored**, silently (`<CalculatedMember>` of a cube), where the right answer
+  is the engine's "not implemented" fault. The schema builder does not offer them.
 - **The Discover cache does not see BW loads.** It is cleared by a change of a server file and the time master data
   fill, not when BW activates master data or loads a request: a Discover answer can be up to 12 hours old
   (`mvp-scope.md`, Discover cache decision; `next-steps.md`, Later).
@@ -35,6 +35,28 @@ it is fixed. Read this before comparing answers with the reference or with BW.
   (`getCurrentMemberComparisonLevel`, as the reference does): the subcube is wrong there. Excel's label filters work
   on flat hierarchies (the schema builder's) and on the lowest level. The reference answers the same filter on a BW
   hierarchy's `Level 02` with every cell empty (below).
+
+## Performance
+
+Right answers, slower than they need to be; known, and waiting behind other priorities.
+
+- **A calculated measure is evaluated per cell.** Excel's 1,001 x 1,001 grid on `ZXMLWIDEA` takes 108 s with a
+  calculated measure, 3.5 s with the stored one: nearly all of it the evaluator's pass at about 100 µs per cell, and
+  a NON EMPTY axis of such a query is filtered by the evaluator too (`filter_by_evaluator`). Fix: formulas per group
+  (`next-steps.md`, Paused: query planning, step 7).
+- **An unqualified member name (`[USA]`) is looked for in every hierarchy, one query each** (100 on `ZXMLWIDE`).
+- **Members with facts on an aDSO read through the fact view.** The existence check of a member keyed by its value
+  is `IN ( SELECT <key> FROM <fact view> )`, which joins the SID of each compounded characteristic; only a
+  characteristic keyed by that SID needs it, every other one could read the aDSO's own table (`/BIC/A<aDSO>7`).
+  Seen in Excel's filter list on `ZCLVISITA`.
+- **Native `TopCount` and the native crossjoin give up on calculated members in the context.** Under a compound
+  slicer (applicable #73, #297 to #301) or an `Aggregate` member they are evaluated as before, about 8 s each
+  (`expandSupportedCalculatedMembers` not ported).
+- **An interpreted `Order` evaluates its sort values again in a second pass of a phase** (they are kept per run).
+- **A large axis with member properties**: Excel's crossjoin of diagnoses and patients on COLUMNS of `ZCLVISITA`
+  with 26 `DIMENSION PROPERTIES` takes 3.7 s, of which the engine about 2 s (native crossjoin, `fast_cells`,
+  `set_display_info`, `axis_properties`) and copying the 70 MB of axes as strings in `build` about 1.2 s (they could
+  go to the response in parts as the cells do).
 
 ## Deliberate deviations
 
