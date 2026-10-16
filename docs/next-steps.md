@@ -439,11 +439,13 @@ Done (2026-10-15): the reference serves `ZCLDIAG_ICD`.
      row per value SID (37: 36 diagnoses and `#` under REST_H), per level `Lnn_SID` (the key, the node's SID; REST_H's
      placeholders -37), `Lnn_NAME` and `Lnn_POS` (rank among its siblings in BW's order; REST_H 2 on `Level 01`). It
      fails if a leaf of the real tree is not at the depth of the others, a text node is a leaf, a node occurs twice,
-     a value has children or a value of the SID table has no row. Until step 2 the jar does not fit `ClinicBW.xml`
-     (its views are gone): deploy both together.
-  2. `ClinicBW.xml`: the hierarchy with the levels `Level 01` to `Level 04` (name column, `ordinalColumn`).
-  3. `bw_hierarchy_test.py --reference` passes on the members outside REST_H's branch (depth, children, name, values,
-     order) and REST_H's value.
+     a value has children or a value of the SID table has no row.
+  2. Done (2026-10-16): `ClinicBW.xml`'s `[ZCLDIAG.ZCLDIAG_ICD]` has the levels `Level 01` to `Level 04` on
+     `ZZXXMLA1_HL_ZCLDIAG_ICD` (`column` `Lnn_SID`, `nameColumn`, `ordinalColumn`), deployed with the jar. The
+     reference answers `DrilldownLevel(..., [ZCLDIAG.ZCLDIAG_ICD].[Level 01])` (Expand Entire Field) and nested
+     `DrilldownMember` with `LNum` the depth.
+  3. Done (2026-10-16): `bw_hierarchy_test.py --reference` passes (70 members, the All member the total): it leaves
+     out what is below REST_H on both sides and its children count, so only REST_H's value is compared there.
   4. Recapture the 68 cases (`recapture-cases.py`); their values stay, `LNum`, `Level`, `.Ordinal`, `PrevMember` and
      `MDSCHEMA_LEVELS` change. Cases that list a whole level are rewritten from DIAGNOSES. The cells are recomputed
      from the exported facts again.

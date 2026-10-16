@@ -9,8 +9,9 @@ and attribute tables of the characteristics of the cube, with BW's columns and v
 instead of NULL, SIDs equal to the FoodMart ids).
 
 The clinic InfoCube ZCLVISIT (docs/clinic-demo.md) is the reference scenario for BW hierarchies (docs/next-steps.md,
-Reference scenario): its hierarchy ZCLDIAG_ICD, in which every node occurs once, is served by the reference as a
-parent-child hierarchy with a closure table (reference/schema/ClinicBW.xml, catalog ZCLVISIT).
+Reference scenario): its hierarchy ZCLDIAG_ICD, in which every node occurs once and every leaf is a value at the same
+depth, is served by the reference as a balanced level hierarchy (Level 01 to Level 04) on a flattened table
+(reference/schema/ClinicBW.xml, catalog ZCLVISIT).
 
 1. Export (skipped with --no-export): the SQL of the generated views of the cubes' characteristics
    (ZZXXMLA1_CL_BW_VIEW_GEN, the plain views of table ZZXXMLA1_VIEW, the ones the accepted schemas name) from HANA's
@@ -28,13 +29,16 @@ parent-child hierarchy with a closure table (reference/schema/ClinicBW.xml, cata
    for that HIESID and SVER, into hierarchy_<name>.json.
 2. Build: adds the tables to data/foodmart-bw/hsqldb-foodmart.jar (the FoodMart data with the empty members, see
    scripts/add-empty-members.py): CREATE MEMORY TABLE after the last CREATE of foodmart.script, the rows at its end.
-   Then the characteristic views under their placeholder names, after the tables, and per hierarchy two reference
-   views (hierarchy_views): ZZXXMLA1_HN_<hierarchy>, the nodes without the virtual root (a root's PARENT_SID NULL),
-   REST_H and the not-assigned values added, each with its NAME (a text node's technical name, a value's key from the
-   characteristic's view, # for the initial value, as BW's MDX names them) and its POS (BW's order of siblings);
-   and ZZXXMLA1_HC_<hierarchy>, the closure (ANCESTOR_SID, SID) without the virtual root's rows. The copy's tables
-   keep SAP's names; only the reference views are named in ClinicBW.xml. Lines of an earlier run (they name /BIC/ or
-   ZZXXMLA1 objects) are removed first, so the script can run again.
+   Per hierarchy its flattened table (hierarchy_levels), computed from the copy: ZZXXMLA1_HL_<hierarchy>, a row per
+   value SID (the fact's SID_<characteristic>, the key) with its member on each level, L01_SID, L01_NAME, L01_POS to
+   the level of the values: the node's SID, its NAME (a text node's technical name, a value's key from the SID table,
+   # for the initial value, as BW's MDX names them) and its position among its siblings (BW's order). The virtual
+   root is the All member. REST_H is a root after the hierarchy with one placeholder REST_H on each level down to the
+   one above the values, which are the values under no leaf (by SID). The build fails unless the real tree is
+   balanced, its leaves values at the same depth, every node once and no value with children (docs/next-steps.md,
+   Reference scenario: the reference serves BW hierarchies with a level form as level hierarchies). The copy's own
+   tables are not loaded. Then the characteristic views under their placeholder names, after the tables. Lines of an
+   earlier run (they name /BIC/ or ZZXXMLA1 objects) are removed first, so the script can run again.
    Column types: NUMC, CHAR, LANG and DATS are VARCHAR of their length (HANA: NVARCHAR), INT4 is INTEGER, DEC is
    DECIMAL; a negative number comes from the data preview with its sign at the end (37-). Primary keys as in BW
    (none for the fact table, whose package key is not unique, and none for a view), a unique index on SID of the SID
@@ -62,13 +66,13 @@ CUBES = {
     "ZCLVISIT": (["ZCLPAT", "ZCLDOC", "ZCLDIAG", "ZCLVTYPE", "ZCLDATE", "ZCLSITE", "ZCLROOM", "ZCLFISCVR",
                   "ZCLFISCYR", "ZCLFISCPR", "ZCLSERV"], "/BIC/_ZCL%"),
 }
-# the BW hierarchies the reference serves as parent-child hierarchies with a closure: hierarchy -> characteristic;
-# only hierarchies in which every node occurs once and that show the not-assigned values (docs/next-steps.md,
-# Reference scenario)
+# the BW hierarchies the reference serves as level hierarchies: hierarchy -> characteristic; only balanced
+# hierarchies in which every node occurs once and that show the not-assigned values (docs/next-steps.md, Reference
+# scenario)
 HIERARCHIES = {"ZCLDIAG_ICD": "ZCLDIAG"}
 CR, NL = "\r", "\n"
 PLACEHOLDER = "ZZXXMLA1_C_"  # + characteristic: the reference schema's name of its view (ZZXXMLA1_CL_BW_VIEW_GEN)
-NODES, CLOSURE = "ZZXXMLA1_HN_", "ZZXXMLA1_HC_"  # + hierarchy: the reference views of a hierarchy
+LEVELS = "ZZXXMLA1_HL_"  # + hierarchy: the flattened table of a hierarchy
 OBJECT = re.compile(r'"(/BIC/|ZZXXMLA1)')  # a line of an earlier run names one of these
 CHUNK = 5000  # characters of a view's SQL per hdbsql query
 
@@ -249,31 +253,65 @@ def statements(data):
     return create, inserts
 
 
-def hierarchy_views(data):
-    """The reference views of a hierarchy over its copy: the nodes as a parent-child table and the closure."""
+def hierarchy_levels(data):
+    """The flattened table of a hierarchy: a row per value SID with its member on each level (SID, name and position
+    among its siblings), the values under no leaf below the placeholders of REST_H. Fails unless the real tree is
+    balanced with its values as leaves, so that it is a level hierarchy."""
     h, c = data["hierarchy"], data["characteristic"]
-    nodes, closure = data["nodes"]["table"], data["closure"]["table"]
-    root, rest = data["root_sid"], data["rest_top_sid"]
-    copy = f'"HIESID" = {data["hiesid"]} AND "SVER" = \'{data["sver"]}\''
-    pos = [f["name"] for f in data["nodes"]["fields"]].index("POS")
-    last = max(int(number(row[pos])) for row in data["nodes"]["rows"])
-    key = f'CASE WHEN V."{c}" = \'\' THEN \'#\' ELSE V."{c}" END'  # BW's MDX names the initial value #
-    node_view = (
-        f'CREATE VIEW PUBLIC."{NODES}{h}" AS '
-        # the nodes of the copy without the virtual root (the All member); a root has no parent
-        f'SELECT N."SID", CASE WHEN N."PARENT_SID" = {root} THEN NULL ELSE N."PARENT_SID" END AS "PARENT_SID", '
-        f'CASE WHEN N."NODE_IOBJ" <> \'\' THEN N."NODE_NAME" ELSE {key} END AS "NAME", N."POS" '
-        f'FROM PUBLIC."{nodes}" N LEFT JOIN PUBLIC."{PLACEHOLDER}{c}" V ON V."SID" = N."SID" '
-        f'WHERE N.{copy} AND N."PARENT_SID" <> 0 '
-        # REST_H, a root after the hierarchy, and the values under no leaf below it
-        f'UNION ALL SELECT {rest}, NULL, \'REST_H\', {last + 1} FROM (VALUES(0)) '
-        f'UNION ALL SELECT R."SID", {rest}, {key}, {last + 2} + R."SID" '
-        f'FROM PUBLIC."{closure}" R JOIN PUBLIC."{PLACEHOLDER}{c}" V ON V."SID" = R."SID" '
-        f'WHERE R.{copy} AND R."ANCESTOR_SID" = {rest}')
-    closure_view = (
-        f'CREATE VIEW PUBLIC."{CLOSURE}{h}" AS SELECT R."ANCESTOR_SID", R."SID" FROM PUBLIC."{closure}" R '
-        f'WHERE R.{copy} AND R."ANCESTOR_SID" <> {root}')
-    return [node_view, closure_view]
+    root, rest = int(data["root_sid"]), int(data["rest_top_sid"])
+    fields = [f["name"] for f in data["nodes"]["fields"]]
+    sid_table = json.loads(table_file(f"/BIC/S{c}").read_text(encoding="utf-8"))
+    sid_fields = [f["name"] for f in sid_table["fields"]]
+    # BW's MDX names the initial value #
+    keys = {int(number(row[sid_fields.index("SID")])): row[sid_fields.index(f"/BIC/{c}")] or "#"
+            for row in sid_table["rows"]}
+    nodes, children = {}, {}
+    for row in data["nodes"]["rows"]:
+        node = {f: row[i] for i, f in enumerate(fields)}
+        sid, parent = int(number(node["SID"])), int(number(node["PARENT_SID"]))
+        if parent == 0:  # the virtual root, the All member
+            assert sid == root, (h, sid)
+            continue
+        assert sid not in nodes, f"{h}: {sid} occurs twice, not a level hierarchy"
+        name = node["NODE_NAME"] if node["NODE_IOBJ"].strip() else keys[sid]
+        nodes[sid] = dict(parent=parent, depth=int(number(node["DEPTH"])), pos=int(number(node["POS"])), name=name)
+        children.setdefault(parent, []).append(sid)
+    rank = {}
+    for siblings in children.values():
+        for n, sid in enumerate(sorted(siblings, key=lambda s: nodes[s]["pos"]), 1):  # BW's order
+            rank[sid] = n
+    for sid, node in nodes.items():
+        expected = 1 if node["parent"] == root else nodes[node["parent"]]["depth"] + 1
+        assert node["depth"] == expected, f"{h}: {node['name']} at depth {node['depth']}, expected {expected}"
+    leaves = [sid for sid in nodes if sid not in children]
+    depth = max(nodes[sid]["depth"] for sid in leaves)
+    for sid in leaves:
+        assert nodes[sid]["depth"] == depth, f"{h}: leaf {nodes[sid]['name']} at depth {nodes[sid]['depth']}, " \
+                                             f"not {depth}: not a level hierarchy"
+        assert sid >= 0, f"{h}: text node {nodes[sid]['name']} is a leaf"
+    assert all(sid < 0 for sid in children if sid != root), f"{h}: a value with children (postable node)"
+    rows = []
+    for sid in sorted(leaves, key=lambda s: nodes[s]["pos"]):
+        path = [sid]
+        while nodes[path[0]]["parent"] != root:
+            path.insert(0, nodes[path[0]]["parent"])
+        rows.append([sid] + [v for s in path for v in (s, nodes[s]["name"], rank[s])])
+    # REST_H, a root after the hierarchy, its placeholders down to the level above the values, the values below
+    closure_fields = [f["name"] for f in data["closure"]["fields"]]
+    rest_values = sorted(int(number(row[closure_fields.index("SID")])) for row in data["closure"]["rows"]
+                         if int(number(row[closure_fields.index("ANCESTOR_SID")])) == rest)
+    assert all(sid >= 0 for sid in rest_values) and rest not in nodes, (h, rest_values)
+    placeholders = [(rest, "REST_H", len(children[root]) + 1)] + [(rest, "REST_H", 1)] * (depth - 2)
+    for n, sid in enumerate(rest_values, 1):
+        rows.append([sid] + [v for member in placeholders + [(sid, keys[sid], n)] for v in member])
+    assert sorted(row[0] for row in rows) == sorted(keys), f"{h}: values of {c} missing or twice"
+    name_length = max(len(row[i]) for row in rows for i in range(2, len(row), 3))
+    level_fields = [dict(name="SID", key=True, type="INT4", length=10, decimals=0)]
+    for level in range(1, depth + 1):
+        level_fields += [dict(name=f"L{level:02}_SID", key=False, type="INT4", length=10, decimals=0),
+                         dict(name=f"L{level:02}_NAME", key=False, type="CHAR", length=name_length, decimals=0),
+                         dict(name=f"L{level:02}_POS", key=False, type="INT4", length=10, decimals=0)]
+    return dict(table=LEVELS + h, fields=level_fields, rows=[[str(v) for v in row] for row in rows])
 
 
 def build():
@@ -285,16 +323,15 @@ def build():
         inserts += i
     hierarchies = [json.loads((EXPORT / f"hierarchy_{h}.json").read_text(encoding="utf-8")) for h in HIERARCHIES]
     for data in hierarchies:
-        for part in ("nodes", "closure"):
-            c, i = statements(data[part])
-            creates += c
-            inserts += i
+        levels = hierarchy_levels(data)
+        c, i = statements(levels)
+        creates += c
+        inserts += i
+        print(f"{levels['table']}: {len(levels['rows'])} rows, {(len(levels['fields']) - 1) // 3} levels")
     views = json.loads((EXPORT / "views.json").read_text(encoding="utf-8"))
     assert all(name.startswith(PLACEHOLDER) for name in views), "views.json of an earlier run: export again"
     for name, definition in views.items():
         creates.append(f'CREATE VIEW PUBLIC."{name}" AS ' + definition.replace(CR, " ").replace(NL, " "))
-    for data in hierarchies:
-        creates += hierarchy_views(data)
     assert all(OBJECT.search(c) for c in creates)  # so that a later run removes them
     with zipfile.ZipFile(JAR) as zin:
         items = [(item, zin.read(item.filename)) for item in zin.infolist()]

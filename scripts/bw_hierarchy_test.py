@@ -24,7 +24,9 @@ compares only the members with a value, in BW's order.
 --reference checks the reference server's copy of the hierarchies in which every node occurs once (docs/next-steps.md,
 Reference scenario; catalog ZCLVISIT, reference/schema/ClinicBW.xml, built by scripts/build-bw-reference-db.py) against
 BW's MDX instead, names as captions: so the export is known to be BW's hierarchy before cases are captured from it.
-BW is asked on the aDSO ZCLVISITA, the reference serves the InfoCube ZCLVISIT: both hold the same visits.
+BW is asked on the aDSO ZCLVISITA, the reference serves the InfoCube ZCLVISIT: both hold the same visits. The
+reference serves them as level hierarchies (Level 01 to Level 04), REST_H with placeholders down to the level above
+its values, so of REST_H's branch only REST_H's value is compared.
 
     python scripts/bw_hierarchy_test.py
     python scripts/bw_hierarchy_test.py --names --with-facts --url http://localhost:50000/zzxxmla1?sap-client=001
@@ -170,6 +172,18 @@ def bw_checks(total, key, members, check):
     check(f"BW {key[1]}: one not-assigned root", sum(m["kind"] == NOT_ASSIGNED for m in roots) == 1, roots)
 
 
+def without_rest_branch(members, is_rest):
+    """The members without the ones below the not-assigned root (a root, level 0, that is_rest finds)."""
+    kept, under_rest = [], False
+    for member in members:
+        if member["level"] == 0:
+            under_rest = bool(is_rest(member))
+        elif under_rest:
+            continue
+        kept.append(member)
+    return kept
+
+
 def compare(total, key, expected, actual, args, check):
     if actual and actual[0]["level"] == 0 and len([m for m in actual if m["level"] == 0]) == 1 \
             and len([m for m in expected if m["level"] == 0]) > 1:
@@ -177,6 +191,11 @@ def compare(total, key, expected, actual, args, check):
         check(f"{key[1]}: All member is the total", same_values(actual[0]["values"], total),
               f"{actual[0]['values']} != {total}")
         actual = [{**m, "level": m["level"] - 1} for m in actual[1:]]
+    if args.reference:
+        # the reference's REST_H has placeholders down to the level above its values, olap4abap's has its values one
+        # level below it: of its branch only REST_H itself is compared (its value)
+        expected = without_rest_branch(expected, lambda m: m["kind"] == NOT_ASSIGNED)
+        actual = without_rest_branch(actual, lambda m: re.fullmatch(r".*\]\.\[REST_H\]", m["unique"]))
     if args.with_facts:
         expected = [m for m in expected if any(v is not None for v in m["values"])]
         actual = [m for m in actual if any(v is not None for v in m["values"])]
@@ -190,7 +209,7 @@ def compare(total, key, expected, actual, args, check):
         problems = []
         if not under_rest and bw["level"] != ours["level"]:
             problems.append(f"level {ours['level']} != {bw['level']}")
-        if not args.with_facts and bw["children"] != ours["children"]:
+        if not args.with_facts and not (args.reference and under_rest) and bw["children"] != ours["children"]:
             problems.append(f"children {ours['children']} != {bw['children']}")
         captions = {bw["caption"]} | ({bw["name"]} if args.names else set())
         if ours["caption"] not in captions:

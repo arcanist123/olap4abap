@@ -4,19 +4,18 @@
   hierarchies (docs/next-steps.md, Reference scenario). It is SAP's accepted schema of the catalog ZCLVISIT (the
   schema generator's proposal) without its annotations (olap4abap's extensions, which the reference does not know) and
   with the dimension tables named by their placeholders (ZZXXMLA1_C_<characteristic>, as in FoodmartBW.xml), plus the
-  BW hierarchy ZCLDIAG_ICD of the diagnosis as a plain parent-child hierarchy with a closure table, as the reference
-  models FoodMart's Employees. SAP serves its own schema of ZCLVISIT; the test compares the answers of the catalogs of
-  the same name.
+  BW hierarchy ZCLDIAG_ICD of the diagnosis as a balanced level hierarchy, Level 01 to Level 04, a member on the level
+  of its depth as olap4abap serves it (docs/next-steps.md, Reference scenario, decided 2026-10-16). SAP serves its own
+  schema of ZCLVISIT; the test compares the answers of the catalogs of the same name.
 
   The reference database (scripts/build-bw-reference-db.py) holds BW's tables of the cube, the characteristics' views
-  and the copy of the hierarchy (ZZXXMLA1_CL_BW_HIERARCHY_COPY) at the version current at the export, and over the copy
-  two views:
-  - ZZXXMLA1_HN_ZCLDIAG_ICD: a row per node of the hierarchy (SID: negative for a text node, the value's SID for a
-    value), without BW's virtual root, so a root's PARENT_SID is NULL; REST_H (the not-assigned node, a root after the
-    hierarchy) and the values under no leaf below it; NAME, a text node's technical name or a value's key (# for the
-    initial value), as BW's MDX names them; POS, BW's order of siblings;
-  - ZZXXMLA1_HC_ZCLDIAG_ICD: the closure (ANCESTOR_SID, SID): per node the value SIDs below it, an identity row per
-    value. The fact's SID_ZCLDIAG joins its SID, the reference's closure child.
+  and, computed from the copy of the hierarchy (ZZXXMLA1_CL_BW_HIERARCHY_COPY) at the version current at the export,
+  its flattened table ZZXXMLA1_HL_ZCLDIAG_ICD: a row per value SID (the fact's SID_ZCLDIAG joins it), per level its
+  member's key Lnn_SID (the node's SID: negative for a text node, the value's SID for a value), name Lnn_NAME (a text
+  node's technical name or a value's key, # for the initial value, as BW's MDX names them) and Lnn_POS (its position
+  among its siblings, BW's order). Level 01 holds DIAGNOSES and REST_H (the not-assigned node, after the hierarchy);
+  under REST_H one placeholder REST_H on Level 02 and one on Level 03, the values under no leaf on Level 04. The
+  placeholders are not hidden: olap4abap puts these values one level below REST_H, so no case looks inside its branch.
 
   The dimension ZCLDIAG has no table of its own: the reference gives every hierarchy of a dimension with a table that
   table (RolapHierarchy), so each hierarchy names its own; the flat one is first, so the drill-through's attributes
@@ -187,12 +186,11 @@
       </Level>
     </Hierarchy>
     <Hierarchy name="ZCLDIAG_ICD" visible="true" hasAll="true" allMemberName="All Diagnoses by ICD-10 Chapter" caption="Diagnoses by ICD-10 Chapter" primaryKey="SID">
-      <Table name="ZZXXMLA1_HN_ZCLDIAG_ICD"/>
-      <Level name="ZCLDIAG" visible="true" column="SID" parentColumn="PARENT_SID" nameColumn="NAME" ordinalColumn="POS" type="Integer" uniqueMembers="true" levelType="Regular" hideMemberIf="Never" caption="Diagnosis">
-        <Closure parentColumn="ANCESTOR_SID" childColumn="SID">
-          <Table name="ZZXXMLA1_HC_ZCLDIAG_ICD"/>
-        </Closure>
-      </Level>
+      <Table name="ZZXXMLA1_HL_ZCLDIAG_ICD"/>
+      <Level name="Level 01" visible="true" column="L01_SID" nameColumn="L01_NAME" ordinalColumn="L01_POS" type="Integer" uniqueMembers="true" levelType="Regular" hideMemberIf="Never"/>
+      <Level name="Level 02" visible="true" column="L02_SID" nameColumn="L02_NAME" ordinalColumn="L02_POS" type="Integer" uniqueMembers="true" levelType="Regular" hideMemberIf="Never"/>
+      <Level name="Level 03" visible="true" column="L03_SID" nameColumn="L03_NAME" ordinalColumn="L03_POS" type="Integer" uniqueMembers="true" levelType="Regular" hideMemberIf="Never"/>
+      <Level name="Level 04" visible="true" column="L04_SID" nameColumn="L04_NAME" ordinalColumn="L04_POS" type="Integer" uniqueMembers="true" levelType="Regular" hideMemberIf="Never"/>
     </Hierarchy>
   </Dimension>
   <Dimension visible="true" highCardinality="false" table="ZZXXMLA1_C_ZCLVTYPE" name="ZCLVTYPE" caption="Visit Type">

@@ -188,15 +188,16 @@ their plain hierarchies, each checked against BW's rows and correction factors):
 refill none, and per hierarchy the node rows but the virtual root and the not-assigned values must be the members BW's
 MDX shows before and below REST_H.
 
-Hierarchies in which every node occurs once (`ZCLDIAG_ICD`) are also served by the reference, as a parent-child
-hierarchy with a closure table over an export of the clinic InfoCube and the hierarchy's copy (catalog `ZCLVISIT`,
+Hierarchies in which every node occurs once (`ZCLDIAG_ICD`) are also served by the reference, as a balanced level
+hierarchy on a flattened table of an export of the clinic InfoCube and the hierarchy's copy (catalog `ZCLVISIT`,
 `reference/schema/ClinicBW.xml`, exported by `build-bw-reference-db.py`), and their MDX cases are captured and replayed
 like FoodMart's (`next-steps.md`, Reference scenario): `execute_hier_*`, `members_hier_*`, `mdschema_hierarchies_hier`
 and `mdschema_levels_hier`, 68 cases, which fail on SAP until the engine serves the hierarchy. Before capture,
 
     python scripts/bw_hierarchy_test.py --reference
 
-checks the reference's members of `ZCLDIAG_ICD` against BW's MDX (depth, children, name, values, order), so the export
+checks the reference's members of `ZCLDIAG_ICD` against BW's MDX (depth, children, name, values, order; of REST_H's
+branch only REST_H's value), so the export
 is known to be BW's hierarchy. BW's MDX stays the oracle for shared nodes, intervals and postable nodes. A subselect or a
 drill-through of a node, which the reference answered wrong, is answered right since `parent-child-closure.patch`
 (next-steps.md, Reference scenario).
