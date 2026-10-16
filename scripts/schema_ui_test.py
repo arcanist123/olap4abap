@@ -125,13 +125,17 @@ def main():
         check("with the suggested level type", page.locator("tr:has(.kind) select").input_value() == "TimeMonths")
         shot(page, "4-adso-time")
 
-        # the member caption: the month's switches between its texts and the key (KEY_CAPTION); its members stay
-        # named by the key (the level's nameColumn)
-        def month_xml():
+        # the key display (docs/next-steps.md, Now: texts and captions, step 4): the month's pane switches between
+        # text as caption with the key as property Key, the key as caption (KEY_CAPTION) with the text as property
+        # Text, and the key only; its members stay named by the key (the level's nameColumn)
+        def schema_xml():
             page.click("role=tab[name='XML']")
             xml = page.input_value("textarea.xml")
             page.click("role=tab[name='Outline']")
-            found = re.search(r'<Dimension [^>]*name="0CALMONTH".*?</Dimension>', xml, re.S)
+            return xml
+
+        def dimension_xml(name, xml=None):
+            found = re.search(rf'<Dimension [^>]*name="{name}".*?</Dimension>', xml or schema_xml(), re.S)
             return found.group(0) if found else ""
 
         def key_caption(dimension):
@@ -139,20 +143,41 @@ def main():
             found = key and re.search(r'<NameColumn dataType="String" columnName="([^"]+)"', key.group(0))
             return found.group(1) if found else None
 
+        def properties(dimension):
+            return re.findall(r'<Property name="(Key|Text)"[^>]*sourceAttribute="([^"]+)"', dimension)
+
+        def loaded():
+            page.wait_for_selector(".status.busy", timeout=5000)
+            return "Loads" in status(page)
+
         page.click(".tree .item:has-text('0CALMONTH')")
-        caption = page.locator("select:has(option[value='KEY_CAPTION'])")
-        proposed = caption.input_value()
-        options = caption.locator("option").evaluate_all("os => os.map(o => o.value)")
-        check("caption proposed as the medium text, the key and the long text offered",
-              proposed == "TXTMD" and options == ["KEY_CAPTION", "TXTMD", "TXTLG"], (proposed, options))
-        caption.select_option("KEY_CAPTION")
-        page.wait_for_selector(".status.busy", timeout=5000)
-        loads = "Loads" in status(page)
-        month = month_xml()
-        check("caption by the key loads", loads and key_caption(month) == "KEY_CAPTION"
-              and re.search(r'<Level [^>]*nameColumn="KEY_NAME"', month) is not None, month[:800])
-        page.locator("select:has(option[value='KEY_CAPTION'])").select_option(proposed)
-        check("and back to the text", key_caption(month_xml()) == proposed)
+        display = page.locator("select[aria-label='Key display']")
+        field = page.locator("select[aria-label='Text field']")
+        options = field.locator("option").evaluate_all("os => os.map(o => o.value)")
+        check("proposed as text as caption, the medium and the long text offered",
+              display.input_value() == "text" and field.input_value() == "TXTMD" and options == ["TXTMD", "TXTLG"],
+              (display.input_value(), field.input_value(), options))
+        display.select_option("key")
+        loads = loaded()
+        month = dimension_xml("0CALMONTH")
+        check("key as caption loads: KEY_CAPTION, the text as property Text, no property Key",
+              loads and key_caption(month) == "KEY_CAPTION" and properties(month) == [("Text", "0CALMONTH Text")]
+              and re.search(r'<DimensionAttribute name="0CALMONTH Text"[^>]*>\s*<KeyColumn [^>]*columnName="TXTMD"', month)
+              and re.search(r'<Level [^>]*nameColumn="KEY_NAME"', month) is not None, month[:1500])
+        page.locator("select[aria-label='Text field']").select_option("TXTLG")
+        check("the text field moves the property Text", 'columnName="TXTLG"' in dimension_xml("0CALMONTH")
+              and key_caption(dimension_xml("0CALMONTH")) == "KEY_CAPTION")
+        page.locator("select[aria-label='Key display']").select_option("keyOnly")
+        loads = loaded()
+        month = dimension_xml("0CALMONTH")
+        check("key only loads: neither property", loads and key_caption(month) == "KEY_CAPTION" and not properties(month),
+              month[:1500])
+        page.locator("select[aria-label='Key display']").select_option("text")
+        month = dimension_xml("0CALMONTH")
+        check("and back to the text it kept, the key as property Key", key_caption(month) == "TXTLG"
+              and properties(month) == [("Key", "0CALMONTH Key")], month[:1500])
+        page.locator("select[aria-label='Text field']").select_option("TXTMD")
+        check("its text field captions again", key_caption(dimension_xml("0CALMONTH")) == "TXTMD")
 
         # members with facts: proposed on every dimension of the cube, dropped from the one marked time (the server
         # refuses it there); switched off for the store, its annotation goes
@@ -187,6 +212,35 @@ def main():
         page.click("role=tab[name='XML']")
         check("switched on again", '<Annotation name="olap4abap.omitEmptyCells">true</Annotation>'
               in page.input_value("textarea.xml"))
+        page.click("role=tab[name='Outline']")
+
+        # the cube's key display: read from its dimensions, a click sets every one; a dimension set apart greys it out
+        slider = page.locator(".segmented[aria-label='Key display']")
+        active = lambda: slider.locator("button.active").all_inner_texts()
+        check("the cube shows the proposal's text as caption", active() == ["Text as caption, key as attribute"]
+              and "mixed" not in (slider.get_attribute("class") or ""), active())
+        slider.locator("button:has-text('Key only')").click()
+        loads = loaded()
+        xml = schema_xml()
+        dimensions = re.findall(r'<Dimension [^>]*name="([^"]+)"', xml)
+        # a dimension without texts (most of FoodMart's) keeps its property Key: it has no key display
+        check("key only on every dimension loads", loads and active() == ["Key only"]
+              and '<Property name="Text"' not in xml and not properties(dimension_xml("0CALMONTH", xml))
+              and not properties(dimension_xml("0CALQUARTER", xml)), (loads, active()))
+        page.click(".tree .item:has-text('0CALQUARTER')")
+        page.locator("select[aria-label='Key display']").select_option("key")
+        page.click(".tree .item:has-text('ZFMSALESA') >> nth=1")
+        slider = page.locator(".segmented[aria-label='Key display']")
+        check("a dimension set apart greys the cube's out", not active() and "mixed" in slider.get_attribute("class")
+              and "1 key as caption" in page.inner_text(".form"), page.inner_text(".form"))
+        shot(page, "5-key-display-mixed")
+        slider.locator("button:has-text('Text as caption')").click()
+        loads = loaded()
+        xml = schema_xml()
+        # FoodMart's characteristics but the month and the quarter have no texts: they keep their property Key
+        keys = [d for d in dimensions if ("Key", f"{d} Key") in properties(dimension_xml(d, xml))]
+        check("a click sets every dimension again", loads and active() == ["Text as caption, key as attribute"]
+              and not re.search(r'<Property name="Text"', xml) and len(keys) == len(dimensions), (keys, dimensions))
         page.click("role=tab[name='Outline']")
 
         # the double-click columns: the proposal's default drill-through action (each characteristic's value, its

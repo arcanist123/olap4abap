@@ -35,7 +35,7 @@ The rules (decided 2026-10-16):
   ADBC: `rpad`, `concat` and `replace` trim them in the SQL HANA runs, only `concat_with_space` with a literal count
   keeps them); the blank handling is to be investigated (Later).
 - **The caption of a characteristic with texts is its text field** as configured (short, medium or long), a value
-  without text `''`, the initial value too. Blank captions are the modeller's to fix, not the engine's (step 4).
+  without text `''`, the initial value too. Blank captions are the modeller's to fix, not the engine's (step 5).
 - **The caption of a characteristic without texts is its key**, `#` for the initial value; a compounded one is
   captioned as `COMPOUND_KEY` names it today, the parts separated by `/` and `#` for an initial part (`K4/2024001`,
   `#/#`).
@@ -100,7 +100,7 @@ The steps:
    filtered views of `0D_NW_C01`'s fiscal defaults follow at its next accept. The schemas are unchanged, so nothing
    names the new columns yet (step 3); what changes in the answers is a blank text where BW has none (a member
    property `Text`, a drill-through `(Text)` column) and the name and caption of a compounded characteristic's
-   SID 0 (`''`, was `#/#`), until the reference database's views are rebuilt (step 6). HANA holds the blanks as
+   SID 0 (`''`, was `#/#`), until the reference database's views are rebuilt (step 7). HANA holds the blanks as
    `N''` (length 0, not a space). Checked: `xmla_test.py` 368 of 372, the new failure
    `execute_hier_drillthrough_subselect` (patient `000000` and physician `000`, SID 0, have no text: their `(Text)`
    column is blank, the reference's still the key); `compare-applicable.py` 394 of 395 as before.
@@ -126,21 +126,53 @@ The steps:
    by the `nameColumn` of the level over the key attribute (`value_name_column`). Found on the way: a property on
    the key column read the column twice, which HANA refuses in the `ORDER BY` ("column ambiguously defined"); a
    column read again is aliased now (`ZZXXMLA1_CL_MODEL=>level_columns`). The accepted catalogs on SAP (clinic, wide
-   demo) are unchanged until they are proposed again (the setup) or edited; the reference copies follow in step 6.
+   demo) are unchanged until they are proposed again (the setup) or edited; the reference copies follow in step 7.
    Checked: the unit tests of `ZZXXMLA1_CL_SCHEMA_PROPOSAL` (19), `_SCHEMA_FIX` (8, `captions` new), `_SCHEMA` (13)
    and `_SCHEMA_API` (27) pass; `schema_api_test.py`, `fixed_selection_test.py`, `fiscal_default_test.py` (both now
    compare member names, from the unique names: the captions are texts, blank for `0FISCYEAR`) and `clinic_test.py`
    pass; `schema_ui_test.py` passes but for the fiscal defaults' period selection, which it still expects as the
    twelve-row preset (the defaults are `I BT` with five `E CP` rows since 2026-10-15, a stale test); `xmla_test.py`
    368 of 372 (the four of step 2); `compare-applicable.py` 394 of 395 as before.
-4. A schema check against blank texts: the schema API's `check` (and accept) reports, per dimension, the members whose
+4. Done (2026-10-16): the key display in the schema builder (decided with the user 2026-10-16: Excel shows only captions, it cannot
+   switch between a member's name and its caption, so how a key is shown is the modeller's choice). Three modes per
+   dimension, each a form of the schema, so no annotation is needed and the builder reads a dimension's mode back
+   from the XML when it is reopened:
+   - **text as caption, key as attribute** (the proposal's default, as step 3 writes it): the key attribute's
+     `NameColumn` is the text, the property `Key`;
+   - **key as caption, text as attribute**: `NameColumn` `KEY_CAPTION`, a property `Text` with the text column
+     (back, in this mode only);
+   - **key only**: `NameColumn` `KEY_CAPTION`, no `Text` property (and no `Key` property, which would repeat the
+     caption).
+   The dimension pane's "Member caption" becomes the mode plus the text field (medium, long, short) that the caption
+   or the `Text` property shows. A characteristic without texts is key only whatever the mode and does not count in
+   the comparison below; a schema whose dimension matches none of the three (raw XML) is "custom". The mode is the
+   dimension's: its navigation attributes' hierarchies follow it (the attribute's key or its text as caption).
+   On the cube pane a three-position slider sets the mode of every dimension. When the dimensions' modes differ the
+   slider is greyed out at no position; a click on a position still applies, setting every dimension to it, and each
+   dimension's pane can change its own mode again afterwards. The cube's mode is not stored (no annotation, decided
+   with the user 2026-10-16): it is a convenience of the builder over what the schema says, read from the
+   dimensions, so a dimension added later gets the default mode. The proposal writes every dimension in the default
+   mode.
+   Built in the UI only (`web/schema/app.js`, `keyDisplayParts`, `keyDisplayOf`, `setKeyDisplay`): no ABAP changed.
+   The proposal already writes the default mode, and `ZZXXMLA1_CL_SCHEMA_FIX` touches neither the key attribute's
+   `NameColumn` (but `COMPOUND_KEY` of a fixed compounding) nor the properties, and its filtered views have the same
+   columns, so it keeps a dimension's mode. The text is an attribute `<C> Text` (as before step 3) keyed by the text
+   field; it is made by the key modes and stays after, so a dimension switched back (key only has no property to
+   remember it by) keeps its text field. A navigation attribute's hierarchy has the key as caption by having no
+   `NameColumn` (its key column, no `#` for the initial value), its text then the property `Text` on `<C>__<A> Text`.
+   A dimension's mode needs `KEY_CAPTION` in its view's `captionColumns` and a text: FoodMart's characteristics but
+   `0CALMONTH` and `0CALQUARTER` have none, so they have no key display and keep their property `Key`. The note
+   under the greyed slider counts the dimensions per mode. Checked: `schema_ui_test.py` (the month's three modes and
+   text field, the slider: proposed, key only, greyed with one dimension set apart, all set back) passes but for the
+   stale fiscal-period check of step 3. The server's check accepts all three forms (the test loads each one).
+5. A schema check against blank texts: the schema API's `check` (and accept) reports, per dimension, the members whose
    caption is blank (a count and examples), so the modeller sees them. A warning, never a refusal (decided
    2026-10-16): a modeller who wants blank captions keeps them.
-5. BW hierarchies: a leaf is named and captioned as the characteristic's member (`levels_sql`, `c_initial_name` `#`
+6. BW hierarchies: a leaf is named and captioned as the characteristic's member (`levels_sql`, `c_initial_name` `#`
    goes: SID 0 is `''`); text nodes keep their technical name, their captions (RSTHIENODE's texts) come later. The
    reference's `ZCLDIAG_ICD` names its initial leaf `#` (`build-bw-reference-db.py`): rebuilt, and the cases that name
    it (`execute_hier_slicer_initial`, ...) rewritten and recaptured.
-6. The reference database's copies of the views rebuilt, the clinic cases recaptured, the docs (`bw-schema-design-guide.md`
+7. The reference database's copies of the views rebuilt, the clinic cases recaptured, the docs (`bw-schema-design-guide.md`
    3.4 and 3.7, `schema-generator.md`) brought to what is built; `known-issues.md`'s entry on `#` goes.
 
 ## Then: time-independent BW hierarchies

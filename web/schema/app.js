@@ -236,20 +236,119 @@ function captionKeys(captionColumns) {
   for (const c of captionColumns || []) keys.set(c.table, [...(keys.get(c.table) || []), c.column]);
   return keys;
 }
-const CAPTION_LABELS = { KEY_CAPTION: 'Key', TXTMD: 'Medium text', TXTLG: 'Long text', TXTSH: 'Short text' };
+const CAPTION_LABELS = { TXTMD: 'Medium text', TXTLG: 'Long text', TXTSH: 'Short text' };
+const KEY_CAPTION = 'KEY_CAPTION';
 const keyAttributeOf = (dim) => attributesOf(dim).find((a) => attr(a, 'usage') === 'Key');
-// the column that captions the dimension's members: its key attribute's NameColumn (the levels over it are named by
-// their nameColumn, docs/next-steps.md, Now: texts and captions)
-const captionOf = (dim) => attr(kids(keyAttributeOf(dim), 'NameColumn')[0], 'columnName');
-function setCaption(doc, dim, column) {
-  const key = keyAttributeOf(dim);
-  let name = kids(key, 'NameColumn')[0];
+const nameColumnOf = (attribute) => attr(kids(attribute, 'NameColumn')[0], 'columnName');
+// an attribute's NameColumn captions the members of the levels over it (they are named by their nameColumn,
+// docs/next-steps.md, Now: texts and captions); none: its key captions them
+function setNameColumn(doc, attribute, column) {
+  let name = kids(attribute, 'NameColumn')[0];
+  if (!column) {
+    if (name) name.remove();
+    return;
+  }
   if (!name) {
     name = create(doc, 'NameColumn', {});
-    key.appendChild(name);
+    attribute.appendChild(name);
   }
   name.setAttribute('dataType', 'String');
   name.setAttribute('columnName', column);
+}
+
+// The key display (docs/next-steps.md, Now: texts and captions, step 4). Excel shows only captions, so how a key is
+// shown is the modeller's choice, in one of three forms of the schema (no annotation: the builder reads a dimension's
+// mode back from its XML). Text as caption: the key attribute's NameColumn is the text, the key the property Key; key
+// as caption: NameColumn KEY_CAPTION, the text the property Text; key only: NameColumn KEY_CAPTION, neither property.
+// The text is an attribute <C> Text in the key modes and stays one after, so a dimension keeps its text field across
+// switches. A navigation attribute's hierarchy (<C>__<A>) follows its dimension: captioned by its text (NameColumn
+// <A>_TXT) or by its key (no NameColumn), the text then the property Text. A part without texts has no mode.
+const KEY_DISPLAYS = [
+  { mode: 'text', label: 'Text as caption, key as attribute' },
+  { mode: 'key', label: 'Key as caption, text as attribute' },
+  { mode: 'keyOnly', label: 'Key only' },
+];
+const attributeNamed = (dim, name) => attributesOf(dim).find((a) => attr(a, 'name') === name);
+const levelsOver = (dim, attribute) => hierarchiesOf(dim).flatMap((h) => kids(h, 'Level'))
+  .filter((l) => attr(l, 'sourceAttribute') === attr(attribute, 'name'));
+const propertyOf = (level, name) => kids(level, 'Property').find((p) => attr(p, 'name') === name);
+// the parts of a dimension that have a key display: the characteristic (its key attribute, the attribute of its value
+// for the property Key, its text attribute) and each navigation attribute's hierarchy, with the columns that can be
+// their text
+function keyDisplayParts(dim, captions) {
+  const parts = [];
+  const key = keyAttributeOf(dim);
+  const columns = captions.get(attr(dim, 'table')) || [];
+  if (key && columns.includes(KEY_CAPTION) && levelsOver(dim, key).length) {
+    const base = attr(key, 'name').replace(/ (SID|Key)$/, '');
+    const value = keyColumn(key) === 'SID' ? attributeNamed(dim, `${base} Key`) : key;
+    const texts = columns.filter((c) => c !== KEY_CAPTION);
+    const textName = `${base} Text`;
+    const shown = nameColumnOf(key);
+    const stored = keyColumn(attributeNamed(dim, textName));
+    const text = shown !== KEY_CAPTION && shown ? shown : stored || texts[0] || '';
+    if (text) parts.push({ attribute: key, value, textName, text, texts, caption: dimCaptionOf(dim), keyCaption: KEY_CAPTION });
+  }
+  for (const a of attributesOf(dim).filter((x) => x !== key && attr(x, 'name').includes('__') && levelsOver(dim, x).length)) {
+    const textName = `${attr(a, 'name')} Text`;
+    const text = nameColumnOf(a) || keyColumn(attributeNamed(dim, textName));
+    if (text) parts.push({ attribute: a, value: null, textName, text, texts: [text], caption: attr(levelsOver(dim, a)[0], 'caption') || attr(a, 'name'), keyCaption: '' });
+  }
+  return parts;
+}
+const dimCaptionOf = (dim) => attr(dim, 'caption') || attr(dim, 'name');
+function partMode(dim, part) {
+  const caption = nameColumnOf(part.attribute);
+  const modes = new Set(levelsOver(dim, part.attribute).map((level) => {
+    const text = propertyOf(level, 'Text');
+    const key = propertyOf(level, 'Key');
+    if (caption && caption !== part.keyCaption && !text && (key || !part.value)) return 'text';
+    if (caption === part.keyCaption && text && !key) return 'key';
+    if (caption === part.keyCaption && !text && !key) return 'keyOnly';
+    return 'custom';
+  }));
+  return modes.size === 1 ? [...modes][0] : 'custom';
+}
+// a dimension's mode: its parts' if they agree, 'custom' if not, null if it has none
+function keyDisplayOf(dim, captions) {
+  const modes = new Set(keyDisplayParts(dim, captions).map((p) => partMode(dim, p)));
+  return modes.size === 0 ? null : modes.size === 1 ? [...modes][0] : 'custom';
+}
+// the text attribute of a part, keyed by its text column; made (after the attribute of its value) if it has none and
+// make is set
+function textAttributeOf(doc, dim, part, make = true) {
+  let text = attributeNamed(dim, part.textName);
+  if (!text && !make) return null;
+  if (!text) {
+    text = create(doc, 'DimensionAttribute', { name: part.textName, attributeHierarchyEnabled: 'false',
+      levelType: isTime(dim) ? 'TimeUndefined' : 'Regular' });
+    text.appendChild(create(doc, 'KeyColumn', { dataType: 'String', columnName: part.text }));
+    const after = part.value || part.attribute;
+    dim.insertBefore(text, after.nextSibling);
+  }
+  kids(text, 'KeyColumn')[0].setAttribute('columnName', part.text);
+  return text;
+}
+function setPartMode(doc, dim, part, mode) {
+  const text = textAttributeOf(doc, dim, part, mode !== 'text');
+  setNameColumn(doc, part.attribute, mode === 'text' ? part.text : part.keyCaption);
+  for (const level of levelsOver(dim, part.attribute)) {
+    ['Key', 'Text'].forEach((name) => propertyOf(level, name)?.remove());
+    const property = mode === 'text' && part.value
+      ? create(doc, 'Property', { name: 'Key', caption: `${part.caption} (Key)`, sourceAttribute: attr(part.value, 'name') })
+      : mode === 'key' ? create(doc, 'Property', { name: 'Text', caption: `${part.caption} (Text)`, sourceAttribute: attr(text, 'name') })
+        : null;
+    if (property) level.insertBefore(property, kids(level, 'Property')[0] || null);
+  }
+}
+const setKeyDisplay = (doc, dim, mode, captions) => keyDisplayParts(dim, captions).forEach((p) => setPartMode(doc, dim, p, mode));
+// the text field of the characteristic: its caption in mode text, its property Text in mode key, kept for both
+function setTextField(doc, dim, part, column, mode) {
+  part.text = column;
+  textAttributeOf(doc, dim, part, mode !== 'text');
+  if (mode === 'text' || (mode === 'custom' && nameColumnOf(part.attribute) !== part.keyCaption)) {
+    setNameColumn(doc, part.attribute, column);
+  }
 }
 
 function setTimeDimension(dim, on, suggestions) {
@@ -564,10 +663,19 @@ function SchemaPane({ doc, edit, source, catalog, notes }) {
   </div>`;
 }
 
-function CubePane({ doc, edit, cube, select, characteristics }) {
+function CubePane({ doc, edit, cube, select, characteristics, captions }) {
   const measures = kids(cube, 'Measure');
   const usages = kids(cube, 'DimensionUsage');
   const privates = kids(cube, 'Dimension');
+  // the cube's key display is read from its dimensions (not stored): one mode if they all have it, none (greyed) if
+  // they differ; a click sets every dimension (a shared one in the other cubes that use it too)
+  const keyDims = [...new Set([...usages.map((u) => sharedDims(doc).find((d) => attr(d, 'name') === attr(u, 'source'))), ...privates])]
+    .filter((d) => d && keyDisplayOf(d, captions));
+  const keyModes = new Set(keyDims.map((d) => keyDisplayOf(d, captions)));
+  const keyDisplay = keyModes.size === 1 ? [...keyModes][0] : null;
+  const keyCounts = [...KEY_DISPLAYS, { mode: 'custom', label: 'custom' }]
+    .map((d) => ({ ...d, count: keyDims.filter((dim) => keyDisplayOf(dim, captions) === d.mode).length }))
+    .filter((d) => d.count);
   const known = ['Table', 'DimensionUsage', 'Dimension', 'Measure', 'Annotations', 'DrillThroughAction'];
   const others = [...cube.children].filter((c) => !known.includes(c.tagName)).map((c) => c.tagName);
   const measureNames = measures.map((m) => attr(m, 'name'));
@@ -609,6 +717,17 @@ function CubePane({ doc, edit, cube, select, characteristics }) {
           onChange=${(on) => edit(() => setAnnotation(cube, OMIT_EMPTY_CELLS, on ? 'true' : null))} />
         <span class="muted small">only the cells with a value are sent (olap4abap.omitEmptyCells); a client takes a missing cell as empty. Off: every cell, as the reference sends it</span>
       </span>
+      ${keyDims.length > 0 && html`<label>Key display</label>
+      <span class="row">
+        <div class=${`segmented${keyDisplay && keyDisplay !== 'custom' ? '' : ' mixed'}`} role="group" aria-label="Key display">
+          ${KEY_DISPLAYS.map((d) => html`<button class=${keyDisplay === d.mode ? 'active' : ''} aria-pressed=${String(keyDisplay === d.mode)}
+            title=${`Sets every dimension of the cube to: ${d.label.toLowerCase()}`}
+            onClick=${() => edit(() => keyDims.forEach((dim) => setKeyDisplay(doc, dim, d.mode, captions)))}>${d.label}</button>`)}
+        </div>
+        <span class="muted small">${keyDisplay && keyDisplay !== 'custom'
+          ? `all ${keyDims.length} dimensions with texts; Excel shows only the caption, a dimension's pane overrides it`
+          : `the dimensions differ (${keyCounts.map((d) => `${d.count} ${d.label.toLowerCase()}`).join('; ')}): a click sets every dimension`}</span>
+      </span>`}
     </div>
 
     <section class="section">
@@ -902,8 +1021,8 @@ function SelectionField({ doc, dim, characteristics, onFix }) {
 
 function DimensionPane({ doc, edit, dim, sel, select, suggestions, captions, characteristics, onFix }) {
   const time = isTime(dim);
-  const captionColumns = keyAttributeOf(dim) ? captions.get(attr(dim, 'table')) || [] : [];
-  const caption = captionOf(dim) || '';
+  const keyDisplay = keyDisplayOf(dim, captions);
+  const characteristicPart = keyDisplayParts(dim, captions).find((p) => p.attribute === keyAttributeOf(dim));
   const attributes = attributesOf(dim);
   const hierarchies = hierarchiesOf(dim);
   const usages = isShared(dim) ? usagesOf(doc, dim) : [];
@@ -947,14 +1066,21 @@ function DimensionPane({ doc, edit, dim, sel, select, suggestions, captions, cha
         <${Check} checked=${time} label="Time dimension" onChange=${(on) => edit(() => setTimeDimension(dim, on, suggestions))} />
         <span class="muted small">enables the time functions (Ytd, ParallelPeriod, …); every level then needs a time level type</span>
       </span>
-      ${captionColumns.length > 0 && html`<label>Member caption</label>
+      ${keyDisplay && html`<label>Key display</label>
       <span class="row">
-        <select value=${caption} title="The column that captions the members (the key attribute's NameColumn); they stay named by their key"
-          onChange=${(e) => edit(() => setCaption(doc, dim, e.target.value))}>
-          ${!captionColumns.includes(caption) && html`<option value=${caption}>${caption || '–'}</option>`}
-          ${captionColumns.map((c) => html`<option value=${c}>${CAPTION_LABELS[c] || c} (${c})</option>`)}
+        <select value=${keyDisplay} aria-label="Key display"
+          title="Excel shows only the caption: the key or the text, the other one a member property; members stay named by their key"
+          onChange=${(e) => edit(() => setKeyDisplay(doc, dim, e.target.value, captions))}>
+          ${keyDisplay === 'custom' && html`<option value="custom" disabled>Custom (edited by hand)</option>`}
+          ${KEY_DISPLAYS.map((d) => html`<option value=${d.mode}>${d.label}</option>`)}
         </select>
-        <span class="muted small">members are named by their key; the caption is what reports show</span>
+        ${characteristicPart && characteristicPart.texts.length > 0 && html`<select value=${characteristicPart.text}
+          aria-label="Text field" title="The text the caption or the property Text shows"
+          onChange=${(e) => edit(() => setTextField(doc, dim, characteristicPart, e.target.value, keyDisplay))}>
+          ${!characteristicPart.texts.includes(characteristicPart.text) && html`<option value=${characteristicPart.text}>${characteristicPart.text}</option>`}
+          ${characteristicPart.texts.map((c) => html`<option value=${c}>${CAPTION_LABELS[c] || c} (${c})</option>`)}
+        </select>`}
+        <span class="muted small">overrides the cube's key display for this dimension</span>
       </span>`}
       ${isShared(dim) && html`<label>Used by</label>
         <span>${usages.length ? usages.map(({ cube, usage }, i) => html`${i > 0 && ', '}<button class="link"
@@ -1335,7 +1461,7 @@ function Editor({ session, onClose, onAccepted }) {
         </div>
         ${tab === 'xml' ? html`<${XmlPane} xml=${xml} replace=${replace} />`
           : shownSel.kind === 'cube' ? html`<${CubePane} key=${JSON.stringify(shownSel)} doc=${doc} edit=${edit} cube=${target} select=${setSel}
-              characteristics=${characteristics} />`
+              characteristics=${characteristics} captions=${captions} />`
             : shownSel.kind === 'dim' ? html`<${DimensionPane} key=${JSON.stringify(shownSel)} doc=${doc} edit=${edit} dim=${target} sel=${shownSel}
                 select=${setSel} suggestions=${suggestions} captions=${captions} characteristics=${characteristics} onFix=${fix} />`
               : html`<${SchemaPane} doc=${doc} edit=${edit} source=${source} catalog=${catalog} notes=${session.notes} />`}

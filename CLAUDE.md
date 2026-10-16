@@ -96,8 +96,10 @@ Read before designing anything:
   (BW's model): technical names as identifiers, texts as captions; per characteristic a flat unnamed hierarchy
   (members keyed by SID, named by the key: the level's `nameColumn` `KEY_NAME`, `COMPOUND_KEY` or the key; captioned
   by the EN text, the key attribute's `NameColumn` the medium, else long, else short text, `KEY_CAPTION` without
-  texts, which the dimension pane's "Member caption" switches between the view's caption columns, `captionColumns` of
-  the API; the key as member property `Key`, the display attributes as member properties, key and text, no `Text`
+  texts, the view's caption columns `captionColumns` of the API; the key display, Excel showing only captions, is
+  the builder's: per dimension "Key display" text as caption and key as property `Key`, key as caption (`KEY_CAPTION`)
+  and text as property `Text`, or key only, with the text field, and on the cube pane a slider that sets every
+  dimension, greyed out while they differ, read from the XML, no annotation; the key as member property `Key`, the display attributes as member properties, key and text, no `Text`
   property of the characteristic itself) and a flat hierarchy `<char>__<attribute>` per navigation attribute the
   provider switches on, captioned by the attribute's text; no attribute hierarchies, no user hierarchies (the user
   makes them in the UI); a default drill-through action with each characteristic's value, which the UI's

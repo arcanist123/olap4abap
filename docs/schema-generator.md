@@ -114,8 +114,18 @@ BW has; no dimension is built on the fact table's own columns, and the proposal 
   "As numbers" left the UI (2026-10-16).
 - **Member caption**: the proposal lists the columns of each view that can caption its characteristic
   (`KEY_CAPTION`, `TXTMD`, `TXTLG`, `TXTSH`), and so do a reopened schema (from the dictionary), a fix and an accept
-  (`captionColumns` of the API); the dimension pane's "Member caption" sets the key attribute's `NameColumn` to one of
-  them. The members stay named by their key.
+  (`captionColumns` of the API). The members stay named by their key.
+- **Key display** (Excel shows only captions, so how the key is shown is the modeller's choice; `next-steps.md`, Now:
+  texts and captions, step 4): the dimension pane's "Key display" is one of three forms of the schema, read back from
+  the XML (no annotation): **text as caption, key as attribute** (the proposal's: the key attribute's `NameColumn`
+  the text, the property `Key`), **key as caption, text as attribute** (`NameColumn` `KEY_CAPTION`, the property
+  `Text` on an attribute `<C> Text` keyed by the text) and **key only** (`NameColumn` `KEY_CAPTION`, neither
+  property); "Text field" picks the text (medium, long, short) the caption or the property shows. `<C> Text` stays
+  once made, so a dimension switched back keeps its text field. A navigation attribute's hierarchy follows its
+  dimension (its `<A>_TXT` as `NameColumn`, or none and the property `Text`). A dimension whose XML matches none of
+  the forms is "Custom"; one without texts has no key display. The cube pane's slider sets every dimension of the
+  cube (a shared one in its other cubes too); while the dimensions differ it is greyed out at no position, its note
+  counting them per mode, and a click still sets all.
 - **Any dimension can be marked as time** in the UI, like `ZFMDATE` of the reference schema: a switch writes
   `type="TimeDimension"`, every attribute gets a level type (pre-selected from the suggestions, else `TimeUndefined`,
   because Mondrian requires one on every level of a time dimension, the attribute hierarchies included), hierarchies
