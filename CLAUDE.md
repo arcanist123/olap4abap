@@ -399,7 +399,13 @@ Read before designing anything:
   order) and, where the key attribute's `NameColumn` captions the members, `Lnn_CAPTION` (a node's `NODE_NAME` until
   the node texts come, a leaf's caption from the view; texts step 6), the levels below it NULL (a level read asks for its column not NULL); REST_H
   follows the roots with its values below it when shown; a level's `uniqueMembers` is false where a SID repeats
-  (`repeated_levels`). The facts are read through the closure (step 7.3): a fact read joins, per BW hierarchy, the
+  (`repeated_levels`). A member's unique name is the key of its path as SSAS names it, `Lnn_IOBJ` (a node's
+  `NODE_IOBJ`, REST_H's `1HIER_REST`, a leaf's the characteristic) and `Lnn_NAME` per level:
+  `[ZCLSERV.ZCLSERV_LOC].[Level 02].&[0HIER_NODE]&[LOCATIONS]&[ZCLSITE]&[NORTH]`, so siblings of one name and
+  different InfoObjects differ (decided 2026-10-17, checked on SSAS; `docs/next-steps.md`, Multiple parents); the
+  schema reader finds it by that key with or without the level (`lookup_bw_member_by_key`), a path of names finds the
+  first member of each name, also in `MDSCHEMA_MEMBERS` (`bw_member_names`); `xmla_test.py` and `ssas_compare.py`
+  compare it as the path of names (`scripts/bw_names.py`). The facts are read through the closure (step 7.3): a fact read joins, per BW hierarchy, the
   members of the level it groups or filters by with the SIDs below each (`ZZXXMLA1_CL_MODEL=>fact_join_table` with
   the level: `levels_sql`'s rows of that level joined to the closure, the SID as the key column), so a member's value
   is the sum over its distinct values; a set in the subcube, a compound slicer or a drill-through is a semi-join on
@@ -427,7 +433,9 @@ Read before designing anything:
   (`docs/next-steps.md`, Reference scenario); the demo's own catalogs `ZCLVISIT` and `ZCLVISITA` have the four
   hierarchies as the setup ticks them (`bw_hierarchy_test.py --catalog ZCLVISIT --names` passes). `ZCLSERV_LOC`
   (Service Locations) has nodes of the external characteristics `ZCLSITE` and `ZCLROOM` (compounded): olap4abap names
-  and captions them by BW's node name (`NORTH     R01`), where BW captions them by their characteristic's text
+  them and captions them as the characteristic's members (`NORTH/R01`, Consultation Room 1; BW captions them by the
+  short text, its text properties give the medium one; the site `NORTH` has a text node `NORTH` as sibling), from its
+  view on the SID BW gives the node (`VALUE_SID`, `/BIC/K-OSID`; `ZZXXMLA1_CL_BW_HIERARCHY_COPY=>externals`)
   (`docs/clinic-demo.md`). Decided 2026-10-16 after Excel failed on the parent-child form: the
   reference is the oracle for everything but parent-child hierarchies and is not patched any more: its patches stay
   as they are, an answer it gets wrong (Expand Entire Field, Top 10 value filter, a label filter on an upper level)

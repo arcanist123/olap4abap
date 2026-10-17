@@ -770,6 +770,10 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
     IF row-bw_value_caption = row-bw_value_name.
       CLEAR row-bw_value_caption.
     ENDIF.
+    " an external characteristic's node is captioned by its text, whatever captions the leaves
+    IF row-bw_value_caption IS INITIAL AND row-bw_hierarchy-externals IS NOT INITIAL.
+      row-bw_value_caption = row-bw_value_name.
+    ENDIF.
     append_hierarchy( row ).
     " the levels are the columns of the copy's members as a level hierarchy (ZZXXMLA1_CL_MODEL=>member_table): a
     " member's key its SID (a node's negative one, a value's the characteristic's), named and captioned by the copy

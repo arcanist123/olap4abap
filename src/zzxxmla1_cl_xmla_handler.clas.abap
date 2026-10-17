@@ -183,6 +183,14 @@ CLASS zzxxmla1_cl_xmla_handler DEFINITION
                 reader        TYPE REF TO zzxxmla1_cl_mdx_schema_reader
                 hierarchy     TYPE string
       RETURNING VALUE(result) TYPE ty_t_member.
+    "! The request with each MEMBER_UNIQUE_NAME that names a member as the member's unique name: a member of a BW
+    "! hierarchy, uniquely named by the key of its path (ZZXXMLA1_CL_MODEL, ty_member-unique_name), is found by any of
+    "! its names, as SSAS finds it ([ZCLSERV.ZCLSERV_LOC].[LOCATIONS].[NORTH] too), where the reference takes only the
+    "! unique name.
+    METHODS bw_member_names
+      IMPORTING request       TYPE ty_request
+                reader        TYPE REF TO zzxxmla1_cl_mdx_schema_reader
+      RETURNING VALUE(result) TYPE ty_request.
     "! A member's relatives as TREE_OP asks for them (populate_member's): siblings, children or descendants, parent or
     "! ancestors.
     METHODS tree_members
@@ -1186,6 +1194,25 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
+  METHOD bw_member_names.
+    result = request.
+    LOOP AT result-restrictions ASSIGNING FIELD-SYMBOL(<restriction>) WHERE name = 'MEMBER_UNIQUE_NAME'.
+      TRY.
+          DATA(id) = zzxxmla1_cl_mdx_parser=>parse_expression( <restriction>-value ).
+        CATCH zzxxmla1_cx_xmla.
+          CONTINUE.
+      ENDTRY.
+      IF id->kind <> zzxxmla1_cl_mdx_node=>c_kind-id.
+        CONTINUE.
+      ENDIF.
+      DATA(element) = reader->lookup_compound( segments = id->segments
+                                               category = zzxxmla1_cl_mdx_type=>c_category-member ).
+      IF element-kind = zzxxmla1_cl_mdx_schema_reader=>c_element-member.
+        <restriction>-value = element-member-unique_name.
+      ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
   METHOD model_hierarchy.
     LOOP AT zzxxmla1_cl_model=>hierarchies( cube ) INTO result WHERE dim_name = dim AND hier_name = hier.
       RETURN.
@@ -1338,10 +1365,14 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
         IF hierarchy-unique <> `[Measures]` AND reader IS NOT BOUND.
           reader = zzxxmla1_cl_mdx_schema_reader=>for_cube( catalog = cube-catalog_name name = cube-cube_name ).
         ENDIF.
+        DATA(member_request) = request.
+        IF hierarchy-hier-bw_hierarchy IS NOT INITIAL.
+          member_request = bw_member_names( request = request reader = reader ).
+        ENDIF.
         DATA(members) = COND ty_t_member(
           WHEN hierarchy-unique = `[Measures]` THEN measure_members( cube-cube_name )
-          ELSE hierarchy_members( request = request reader = reader hierarchy = hierarchy-unique ) ).
-        APPEND LINES OF select_members( request = request members = members ) TO rows.
+          ELSE hierarchy_members( request = member_request reader = reader hierarchy = hierarchy-unique ) ).
+        APPEND LINES OF select_members( request = member_request members = members ) TO rows.
       ENDLOOP.
       SORT rows STABLE BY dimension ASCENDING hierarchy ASCENDING level ASCENDING number ASCENDING.
       LOOP AT rows INTO DATA(member).

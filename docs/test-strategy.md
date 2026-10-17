@@ -246,7 +246,8 @@ moves to SSAS (`next-steps.md`, Later, SSAS naming).
 `[H].[H]` is `[C.H]`, its occurrence `&[POS]` the path of `members.json`, its All member the schema's
 `allMemberName`; a characteristic's `[C].[C].&[SID]` stays, the SID is the key in both; DIMENSION PROPERTIES keeps
 the standard properties and asks `MEMBER_KEY`), then compares per axis the tuples as sets (a characteristic's member
-by its key, a BW hierarchy's by its unique name) and every cell by its tuples (decimal against double, relative
+by its key, a BW hierarchy's by its unique name, olap4abap's key of the path compared as the path of names,
+`scripts/bw_names.py`, as `xmla_test.py` compares the reference cases) and every cell by its tuples (decimal against double, relative
 1e-9; Excel's `__XLPath` strings with their names rewritten), the slicer not; a drill-through as distinct rows over
 the default action's columns, by dimension.
 

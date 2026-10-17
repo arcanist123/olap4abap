@@ -6,6 +6,7 @@ SAP's catalog ZCLHIER and compared by its values only; names, captions, levels, 
 The rewrite (SSAS's model is scripts/build-ssas-clinic-md.py's, olap4abap's the schema of ZCLHIER on SAP, which the
 clinic generator ZZXXMLA1_CL_BW_CLINIC_GEN deploys, read with scripts/sap-files.py):
 - a BW hierarchy [H].[H] is olap4abap's [C.H], its occurrence &[POS] the path of names data/foodmart-bw/ssas/members.json
+  (olap4abap's own unique name of it, the key of the path, is compared as that path, scripts/bw_names.py)
   gives, its All member olap4abap's allMemberName, its levels [Level nn] the same;
 - a characteristic's hierarchy [C].[C] is [C], its member [C].[C].&[SID] stays (the level's member by key, the SID
   in both);
@@ -32,6 +33,7 @@ import sys
 import xml.etree.ElementTree as ET
 from decimal import Decimal, InvalidOperation
 
+from bw_names import as_name_paths
 from xmla_test import DEFAULT_URL, local, post
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -163,7 +165,7 @@ class Model:
     def olap4abap_member(self, unique_name, hierarchy, key):
         if hierarchy in (u for u, _ in self.flat.values()) and unique_name not in (a for _, a in self.flat.values()):
             return (hierarchy, key)
-        return unique_name
+        return as_name_paths(unique_name)
 
     def rewrite_text(self, value):
         """A string cell (Excel's __XLPath: unique names joined by __XLPSEP) in olap4abap's names."""
@@ -274,6 +276,8 @@ def compare_md(model, expected_xml, actual_xml):
         e, a = number(value), number(actual[key])
         if isinstance(e, str):
             e = model.rewrite_text(e)
+        if isinstance(a, str):
+            a = as_name_paths(a)
         if not equal(e, a):
             differ.append(f"  {key}: {a}, expected {e}")
     if differ:

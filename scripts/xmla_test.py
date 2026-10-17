@@ -9,7 +9,8 @@ differ (URLs, descriptions, ...); `Name@Key=Text` limits that to rows that have 
 among the expected ones are dropped before the comparison, so the expected rows must still all be there, in their
 order (a rowset of all catalogs or schemas: the server may have catalogs besides FoodMart's). Responses are
 compared as canonical XML without whitespace-only text, so formatting does not matter, but names, namespaces, order
-and values do.
+and values do. olap4abap's unique names of BW hierarchy members (the key of the path, InfoObject and name per level)
+are compared as the path of names the reference gives them (scripts/bw_names.py).
 
     python scripts/xmla_test.py                          # SAP (default URL below)
     python scripts/xmla_test.py --url http://localhost:8080/emondrian/xmla   # check a case against eMondrian itself
@@ -23,6 +24,7 @@ import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
 
+from bw_names import as_name_paths
 from reference_texts import as_olap4abap
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -113,7 +115,8 @@ def run_case(url, case_dir):
         return [f"HTTP {status}, expected {expected_status}: {body[:300]}"]
     expected_rows = rows_of(as_olap4abap(expected_xml), ignore) if (case_dir / "subset.txt").exists() else None
     try:
-        actual = canonical(as_olap4abap(body), ignore, expected_rows)
+        # olap4abap names a BW hierarchy's members by the key of their path, the reference by the path of names
+        actual = canonical(as_olap4abap(as_name_paths(body)), ignore, expected_rows)
     except ET.ParseError as error:
         return [f"response is not XML ({error}): {body[:300]}"]
     expected = canonical(as_olap4abap(expected_xml), ignore)

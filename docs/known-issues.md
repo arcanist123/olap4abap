@@ -22,6 +22,11 @@ it is fixed. Read this before comparing answers with the reference or with BW.
   (`getCurrentMemberComparisonLevel`, as the reference does): the subcube is wrong there. Excel's label filters work
   on flat hierarchies (the schema builder's) and on the lowest level. The reference answers the same filter on a BW
   hierarchy's `Level 02` with every cell empty (below).
+- **A `TREE_OP` restriction of `MDSCHEMA_MEMBERS` that is not a number dumps** (`CONVT_NO_NUMBER` in
+  `ZZXXMLA1_CL_XMLA_HANDLER=>hierarchy_members`, found 2026-10-17): the request gets HTTP 500 instead of a fault.
+- **`clinic_test.py`'s "Text of two hierarchies on one axis" asks for a `Text` property the proposal no longer
+  writes** (the key display gives captions and a property `Key`, no `Text` of the characteristic itself): it fails on
+  `ZCLVISIT` and `ZCLVISITA` until it asks for a property the schemas have.
 
 ## Performance
 

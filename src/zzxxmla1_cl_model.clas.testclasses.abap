@@ -31,6 +31,9 @@ CLASS ltc_model DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
     "! the facts below a member of a BW hierarchy: the closure's SIDs where the dimension is keyed by the SID (an
     "! InfoCube), their values from the view where it is keyed by the value (an aDSO)
     METHODS bw_member_condition FOR TESTING.
+    "! a member of a BW hierarchy is uniquely named by the key of its path, InfoObject and name per level, as SSAS
+    "! names it: a text node and a site of one name under one parent, a leaf under two parents
+    METHODS bw_unique_name FOR TESTING.
     "! a measure of an aggregator other than sum and count is refused: its value would be a sum
     METHODS check_aggregator FOR TESTING RAISING cx_static_check.
     METHODS hierarchy
@@ -213,6 +216,44 @@ CLASS ltc_model IMPLEMENTATION.
       act = zzxxmla1_cl_model=>bw_member_condition( hierarchy = diagnoses fact_column = `f."DIAG"` key = `-7` )
       exp = |f."DIAG" IN ( SELECT v."DIAG" FROM "ZZXXMLA1C0000001" c INNER JOIN "V_DIAG" v ON v."SID" = c."SID" | &&
             |WHERE c."HIESID" = 43 AND { version } AND c."ANCESTOR_SID" = -7 )| ).
+  ENDMETHOD.
+
+  METHOD bw_unique_name.
+    DATA(locations) = VALUE zzxxmla1_cl_model=>ty_hierarchy( dim_name = `ZCLSERV` hier_name = `ZCLSERV_LOC`
+                                                            unique_name = `[ZCLSERV.ZCLSERV_LOC]` has_all = abap_true ).
+    locations-bw_hierarchy-hiesid = 7.
+    DO 3 TIMES.
+      DATA(column) = |L{ sy-index WIDTH = 2 ALIGN = RIGHT PAD = `0` }_|.
+      APPEND VALUE #( level_no = sy-index level_name = |Level { sy-index WIDTH = 2 ALIGN = RIGHT PAD = `0` }|
+                      key_column = |{ column }SID| name_column = |{ column }NAME| ordinal_column = |{ column }POS|
+                      data_type = `Numeric` ) TO locations-levels.
+    ENDDO.
+    " per level the SID, the position, the name and the InfoObject; LOCATIONS alone is the row of the root itself
+    DATA(members) = zzxxmla1_cl_model=>members_of_rows(
+      hierarchy = locations
+      rows      = VALUE #( ( VALUE #( ( `-1` ) ( `1` ) ( `LOCATIONS` ) ( `0HIER_NODE` ) ( `` ) ( `` ) ( `` ) ( `` )
+                                      ( `` ) ( `` ) ( `` ) ( `` ) ) )
+                           ( VALUE #( ( `-1` ) ( `1` ) ( `LOCATIONS` ) ( `0HIER_NODE` )
+                                      ( `-2` ) ( `2` ) ( `NORTH` ) ( `0HIER_NODE` ) ( `5` ) ( `3` ) ( `1001` ) ( `ZCLSERV` ) ) )
+                           ( VALUE #( ( `-1` ) ( `1` ) ( `LOCATIONS` ) ( `0HIER_NODE` )
+                                      ( `-3` ) ( `4` ) ( `NORTH` ) ( `ZCLSITE` ) ( `-4` ) ( `5` ) ( `1001` ) ( `0HIER_NODE` ) ) )
+                           ( VALUE #( ( `-1` ) ( `1` ) ( `LOCATIONS` ) ( `0HIER_NODE` )
+                                      ( `-3` ) ( `4` ) ( `NORTH` ) ( `ZCLSITE` ) ( `5` ) ( `6` ) ( `1001` ) ( `ZCLSERV` ) ) ) ) ).
+    DATA(root) = `[ZCLSERV.ZCLSERV_LOC].[Level 01].&[0HIER_NODE]&[LOCATIONS]`.
+    DATA(text_node) = `[ZCLSERV.ZCLSERV_LOC].[Level 02].&[0HIER_NODE]&[LOCATIONS]&[0HIER_NODE]&[NORTH]`.
+    DATA(site) = `[ZCLSERV.ZCLSERV_LOC].[Level 02].&[0HIER_NODE]&[LOCATIONS]&[ZCLSITE]&[NORTH]`.
+    cl_abap_unit_assert=>assert_equals(
+      act = VALUE string_table( FOR m IN members ( |{ m-name } { m-unique_name } { m-parent } { m-children }| ) )
+      exp = VALUE string_table(
+        ( |LOCATIONS { root }  2| )
+        ( |NORTH { text_node } { root } 1| )
+        ( |1001 [ZCLSERV.ZCLSERV_LOC].[Level 03].&[0HIER_NODE]&[LOCATIONS]&[0HIER_NODE]&[NORTH]&[ZCLSERV]&[1001] | &&
+          |{ text_node } 0| )
+        ( |NORTH { site } { root } 2| )
+        ( |1001 [ZCLSERV.ZCLSERV_LOC].[Level 03].&[0HIER_NODE]&[LOCATIONS]&[ZCLSITE]&[NORTH]&[0HIER_NODE]&[1001] | &&
+          |{ site } 0| )
+        ( |1001 [ZCLSERV.ZCLSERV_LOC].[Level 03].&[0HIER_NODE]&[LOCATIONS]&[ZCLSITE]&[NORTH]&[ZCLSERV]&[1001] | &&
+          |{ site } 0| ) ) ).
   ENDMETHOD.
 
   METHOD check_aggregator.

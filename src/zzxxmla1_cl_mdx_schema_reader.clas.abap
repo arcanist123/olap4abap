@@ -446,6 +446,13 @@ CLASS zzxxmla1_cl_mdx_schema_reader DEFINITION
       IMPORTING level         TYPE i
                 segment       TYPE zzxxmla1_cl_mdx_node=>ty_segment
       RETURNING VALUE(result) TYPE ty_element.
+    "! A member of a level of a BW hierarchy by its key as SSAS names it: InfoObject and name per level from the first
+    "! one down to this one, &amp;[0HIER_NODE]&amp;[LOCATIONS]&amp;[ZCLSITE]&amp;[NORTH] (ZZXXMLA1_CL_MODEL, ty_member-unique_name);
+    "! another number of keys is no member.
+    METHODS lookup_bw_member_by_key
+      IMPORTING level         TYPE i
+                segment       TYPE zzxxmla1_cl_mdx_node=>ty_segment
+      RETURNING VALUE(result) TYPE ty_element.
     METHODS lookup_child_of_cube
       IMPORTING segment       TYPE zzxxmla1_cl_mdx_node=>ty_segment
       RETURNING VALUE(result) TYPE ty_element.
@@ -1214,6 +1221,10 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
       IF element-key_level = 0.
         RETURN.
       ENDIF.
+      IF hierarchies[ element-hierarchy + 1 ]-model-bw_hierarchy IS NOT INITIAL.
+        result = lookup_bw_member_by_key( level = level segment = segment ).
+        RETURN.
+      ENDIF.
       " the keys from this level up to a level of unique members (the first level below the All level ends it too)
       DATA(model_levels) = hierarchies[ element-hierarchy + 1 ]-model-levels.
       DATA(number) = element-key_level.
@@ -1252,6 +1263,29 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
         RETURN.
       ENDIF.
     ENDLOOP.
+  ENDMETHOD.
+
+  METHOD lookup_bw_member_by_key.
+    " the key of the path: InfoObject and name per level from the first one (ZZXXMLA1_CL_MODEL, ty_member-unique_name)
+    DATA(element) = levels[ level ].
+    IF lines( segment-keys ) <> 2 * element-key_level.
+      RETURN.
+    ENDIF.
+    DATA(model) = model_hierarchies[ element-hierarchy ].
+    DATA(conditions) = VALUE string_table( ).
+    DO element-key_level TIMES.
+      DATA(level_no) = sy-index.
+      APPEND zzxxmla1_cl_sql=>key_condition(
+               column = zzxxmla1_cl_sql=>quote( zzxxmla1_cl_model=>bw_iobj_column( level_no ) )
+               key    = segment-keys[ 2 * level_no - 1 ]-name ) TO conditions.
+      APPEND zzxxmla1_cl_sql=>key_condition( column = zzxxmla1_cl_sql=>quote( model-levels[ level_no ]-name_column )
+                                             key    = segment-keys[ 2 * level_no ]-name ) TO conditions.
+    ENDDO.
+    DATA(found) = read( hierarchy = element-hierarchy level_no = element-key_level limit = 1
+                        condition = concat_lines_of( table = conditions sep = ` AND ` ) ).
+    IF found IS NOT INITIAL.
+      result = VALUE #( kind = c_element-member id = found[ 1 ]-level member = found[ 1 ] ).
+    ENDIF.
   ENDMETHOD.
 
   METHOD lookup_child_of_cube.
@@ -1302,8 +1336,17 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
 
   METHOD lookup_child_of_hierarchy.
     " HierarchyBase.lookupChild: a level, else a root member; a key segment searches the bottom level, whose
-    " lookupChild takes names only
+    " lookupChild takes names only. A BW hierarchy's member by its key without the level, as SSAS finds it: the level
+    " is the key's number of pairs
     IF segment-quoting = zzxxmla1_cl_mdx_node=>c_quoting-key.
+      IF hierarchies[ hierarchy + 1 ]-model-bw_hierarchy IS NOT INITIAL AND lines( segment-keys ) MOD 2 = 0.
+        DATA(levels_of) = hierarchies[ hierarchy + 1 ]-levels.
+        DATA(position) = lines( segment-keys ) / 2 + COND i( WHEN hierarchies[ hierarchy + 1 ]-has_all = abap_true
+                                                            THEN 1 ).
+        IF position BETWEEN 1 AND lines( levels_of ).
+          result = lookup_bw_member_by_key( level = levels_of[ position ] segment = segment ).
+        ENDIF.
+      ENDIF.
       RETURN.
     ENDIF.
     LOOP AT hierarchies[ hierarchy + 1 ]-levels INTO DATA(level_id).

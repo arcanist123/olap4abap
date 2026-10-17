@@ -33,8 +33,11 @@ CLASS ltc_bw_hierarchy_copy DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DUR
     "! the generated objects are named by their prefixes and 7 digits, 16 characters as the DDIC allows
     METHODS table_names FOR TESTING.
     "! a leaf is named and captioned by the view's columns, the initial value too (no #); the caption columns only
-    "! with a caption column, REST_H's rows as wide as the others
+    "! with a caption column, REST_H's rows as wide as the others; a member's InfoObject per level
     METHODS leaf_names FOR TESTING.
+    "! a node of an external characteristic is named and captioned by its view, on the SID BW gives it (VALUE_SID);
+    "! without external characteristics the node table is read as it is
+    METHODS external_node_names FOR TESTING.
     METHODS params
       IMPORTING statement     TYPE zzxxmla1_cl_bw_hierarchy_copy=>ty_statement
       RETURNING VALUE(result) TYPE string_table.
@@ -173,7 +176,14 @@ CLASS ltc_bw_hierarchy_copy IMPLEMENTATION.
     cl_abap_unit_assert=>assert_char_np( act = named exp = `*'##'*` ).
     cl_abap_unit_assert=>assert_char_cp( act = named exp = `*COALESCE( TO_NVARCHAR( v."ZCLSERV" ), TO_NVARCHAR( n."SID" ) )*` ).
     cl_abap_unit_assert=>assert_char_np( act = named exp = `*CAPTION*` ).
-    cl_abap_unit_assert=>assert_char_cp( act = named exp = `*SELECT -35, 'REST_H', *, CAST( NULL AS INTEGER ) FROM DUMMY*` ).
+    cl_abap_unit_assert=>assert_char_cp(
+      act = named
+      exp = `*SELECT -35, 'REST_H', *, '1HIER_REST', CAST( NULL AS INTEGER ), *, CAST( NULL AS NVARCHAR( 1 ) ) FROM DUMMY*` ).
+    " a member's InfoObject: a node's NODE_IOBJ, a leaf's the characteristic
+    cl_abap_unit_assert=>assert_char_cp(
+      act = named
+      exp = `*CASE n."DEPTH" WHEN 1 THEN CASE WHEN n."SID" < 0 THEN TO_NVARCHAR( n."NODE_IOBJ" ) ELSE 'ZCLSERV' END ` &&
+            `WHEN 2 THEN TO_NVARCHAR( p1."NODE_IOBJ" ) WHEN 3 THEN TO_NVARCHAR( p2."NODE_IOBJ" ) END AS "L01_IOBJ"*` ).
 
     DATA(captioned) = zzxxmla1_cl_bw_hierarchy_copy=>levels_sql( hierarchy      = services( abap_true )
                                                                   depth          = 3
@@ -182,15 +192,51 @@ CLASS ltc_bw_hierarchy_copy IMPLEMENTATION.
                                                                   name_column    = `KEY_NAME`
                                                                   caption_column = `TXTMD` ).
     cl_abap_unit_assert=>assert_char_np( act = captioned exp = `*'##'*` ).
-    cl_abap_unit_assert=>assert_char_cp( act = captioned exp = `*AS "L03_CAPTION" FROM*` ).
+    cl_abap_unit_assert=>assert_char_cp( act = captioned exp = `*AS "L03_CAPTION", CASE n."DEPTH"* END AS "L03_IOBJ" FROM*` ).
     cl_abap_unit_assert=>assert_char_cp( act = captioned exp = `*COALESCE( TO_NVARCHAR( v."TXTMD" ), *` ).
-    " REST_H and its values: SID, NAME, POS, CAPTION of level 1 and 2, then level 3 empty
+    " REST_H and its values: SID, NAME, POS, CAPTION, IOBJ of level 1 and 2, then level 3 empty
     cl_abap_unit_assert=>assert_char_cp(
       act = captioned
-      exp = `*SELECT -35, 'REST_H', *, 'REST_H', CAST( NULL AS INTEGER ), CAST( NULL AS NVARCHAR( 1 ) ), ` &&
-            `CAST( NULL AS INTEGER ), CAST( NULL AS NVARCHAR( 1 ) ), CAST( NULL AS INTEGER ), ` &&
-            `CAST( NULL AS NVARCHAR( 1 ) ), CAST( NULL AS INTEGER ), CAST( NULL AS NVARCHAR( 1 ) ) FROM DUMMY*` ).
-    cl_abap_unit_assert=>assert_char_cp( act = captioned exp = `*COALESCE( TO_NVARCHAR( v."TXTMD" ), COALESCE( TO_NVARCHAR( v."KEY_NAME" ), TO_NVARCHAR( r."SID" ) ) ), CAST( NULL*` ).
+      exp = `*SELECT -35, 'REST_H', *, 'REST_H', '1HIER_REST', CAST( NULL AS INTEGER ), CAST( NULL AS NVARCHAR( 1 ) ), ` &&
+            `CAST( NULL AS INTEGER ), CAST( NULL AS NVARCHAR( 1 ) ), CAST( NULL AS NVARCHAR( 1 ) ), CAST( NULL AS INTEGER ), ` &&
+            `CAST( NULL AS NVARCHAR( 1 ) ), CAST( NULL AS INTEGER ), CAST( NULL AS NVARCHAR( 1 ) ), ` &&
+            `CAST( NULL AS NVARCHAR( 1 ) ) FROM DUMMY*` ).
+    cl_abap_unit_assert=>assert_char_cp(
+      act = captioned
+      exp = `*COALESCE( TO_NVARCHAR( v."TXTMD" ), COALESCE( TO_NVARCHAR( v."KEY_NAME" ), TO_NVARCHAR( r."SID" ) ) ), 'ZCLSERV', CAST( NULL*` ).
+  ENDMETHOD.
+
+  METHOD external_node_names.
+    DATA(hierarchy) = services( abap_false ).
+    hierarchy-externals = VALUE #( ( iobjnm = 'ZCLSITE' view = 'ZZXXMLA1V0000175' name_column = `ZCLSITE`
+                                     caption_column = `TXTMD` )
+                                   ( iobjnm = 'ZCLROOM' view = 'ZZXXMLA1V0000176' name_column = `COMPOUND_KEY`
+                                     caption_column = `TXTMD` ) ).
+    DATA(sql) = zzxxmla1_cl_bw_hierarchy_copy=>levels_sql( hierarchy      = hierarchy
+                                                           depth          = 4
+                                                           value_table    = `ZZXXMLA1V0000180`
+                                                           sid_column     = `SID`
+                                                           name_column    = `KEY_NAME`
+                                                           caption_column = `TXTMD` ).
+    cl_abap_unit_assert=>assert_char_cp(
+      act = sql
+      exp = `*LEFT OUTER JOIN "ZZXXMLA1V0000176" AS x2 ON k."NODE_IOBJ" = 'ZCLROOM' AND x2."SID" = k."VALUE_SID"*` ).
+    cl_abap_unit_assert=>assert_char_cp(
+      act = sql
+      exp = `*COALESCE( TO_NVARCHAR( x1."ZCLSITE" ), TO_NVARCHAR( x2."COMPOUND_KEY" ), TO_NVARCHAR( k."NODE_NAME" ) ) AS "NODE_NAME"*` ).
+    cl_abap_unit_assert=>assert_char_cp(
+      act = sql
+      exp = `*COALESCE( TO_NVARCHAR( x1."TXTMD" ), TO_NVARCHAR( x2."TXTMD" ), TO_NVARCHAR( k."NODE_NAME" ) ) AS "NODE_CAPTION"*` ).
+    cl_abap_unit_assert=>assert_char_cp( act = sql exp = `*TO_NVARCHAR( p1."NODE_CAPTION" )*` ).
+
+    DATA(plain) = zzxxmla1_cl_bw_hierarchy_copy=>levels_sql( hierarchy      = services( abap_false )
+                                                             depth          = 4
+                                                             value_table    = `ZZXXMLA1V0000180`
+                                                             sid_column     = `SID`
+                                                             name_column    = `KEY_NAME`
+                                                             caption_column = `TXTMD` ).
+    cl_abap_unit_assert=>assert_char_np( act = plain exp = `*NODE_CAPTION*` ).
+    cl_abap_unit_assert=>assert_char_cp( act = plain exp = `*FROM "ZZXXMLA1H0000001" AS n *` ).
   ENDMETHOD.
 
 ENDCLASS.

@@ -19,9 +19,10 @@ characteristics ZCLSITE and ZCLROOM, compounded). What BW shows and the test exp
   left out.
 
 Per member: level (relative to the first root, not under the not-assigned node; a member's DEPTH where it has one,
-as the members of a parent-child level all have the level's number), number of children, caption (BW's text; with
---names a text node's technical name or a leaf's key is accepted too, as long as olap4abap has no texts) and the
-values. Members BW shows without value are left out by olap4abap's members-with-facts dimensions; --with-facts
+as the members of a parent-child level all have the level's number), number of children, caption (BW's text: its
+medium text property, else the long, else the short one, which for a node of an external characteristic is not BW's
+caption, the short text; with --names a text node's technical name or a leaf's key is accepted too, as long as
+olap4abap has no texts) and the values. Members BW shows without value are left out by olap4abap's members-with-facts dimensions; --with-facts
 compares only the members with a value, in BW's order.
 
 --reference checks the reference server's copy of the hierarchies in which every node occurs once (docs/next-steps.md,
@@ -111,9 +112,9 @@ def bw_members():
     total, hierarchies = None, {}
     for line in output.stdout.splitlines():
         fields = line.split("\t")
-        if len(fields) < 6:
+        if len(fields) < 9:
             continue
-        hierarchy, ordinal, level, children, unique, caption, *values = fields
+        hierarchy, ordinal, level, children, unique, caption, short, medium, long, *values = fields
         if caption.startswith("ERROR"):
             sys.exit(f"{PROBE}: {hierarchy} {caption}")
         values = [bw_number(v) for v in values]
@@ -129,6 +130,9 @@ def bw_members():
             name, kind = node[:32], node[32:]
         hierarchies.setdefault((found.group(1), found.group(2)), []).append({
             "level": int(level), "children": int(children), "caption": caption, "values": values,
+            # the text olap4abap captions the member by: the characteristic's medium, else long, else short text
+            # (BW's caption of a node of an external characteristic is its short text)
+            "text": medium or long or short or caption,
             "name": name.strip(), "kind": kind})
     return total, hierarchies
 
@@ -228,7 +232,7 @@ def compare(total, key, expected, actual, args, check):
             problems.append(f"level {ours['level']} != {bw['level']}")
         if not args.with_facts and bw["children"] != ours["children"]:
             problems.append(f"children {ours['children']} != {bw['children']}")
-        captions = {bw["caption"]} | ({bw["name"]} if args.names else set())
+        captions = {bw["text"]} | ({bw["name"]} if args.names else set())
         # the initial value (BW's MDX names it #, its key is all zeros or empty) olap4abap names '' as the
         # characteristic's member
         if args.names and (bw["name"] == "#" or not bw["name"].strip("0 ")):
@@ -241,6 +245,22 @@ def compare(total, key, expected, actual, args, check):
             differences.append(f"#{position} {bw['caption']} ({ours['unique']}): {', '.join(problems)}")
     check(f"{key[1]}: members the same as BW's, in BW's order", not differences,
           f"{len(differences)} differ; " + "; ".join(differences[:args.show]))
+    if args.url in ("ssas", REFERENCE_URL):
+        return
+    # olap4abap names a member by the key of its path, InfoObject and name per level, as SSAS names it
+    # ([ZCLSERV.ZCLSERV_LOC].[Level 02].&[0HIER_NODE]&[LOCATIONS]&[ZCLSITE]&[NORTH]): unique, and a member's own
+    # InfoObject is BW's (a node's from BW's unique name, a leaf's the characteristic)
+    uniques = [m["unique"] for m in actual]
+    check(f"{key[1]}: unique names unique", len(set(uniques)) == len(uniques),
+          sorted({u for u in uniques if uniques.count(u) > 1})[:args.show])
+    wrong = []
+    for position, (bw, ours) in enumerate(zip(expected, actual)):
+        keys = [k.replace("]]", "]") for k in re.findall(r"&\[((?:[^\]]|\]\])*)\]", ours["unique"])]
+        own = keys[-2] if len(keys) >= 2 and len(keys) % 2 == 0 else None
+        if own != (bw["kind"] or key[0]):
+            wrong.append(f"#{position} {ours['unique']}: InfoObject {own}, BW's {bw['kind'] or key[0]}")
+    check(f"{key[1]}: members keyed by BW's InfoObject and name", not wrong,
+          f"{len(wrong)} differ; " + "; ".join(wrong[:args.show]))
 
 
 def main():

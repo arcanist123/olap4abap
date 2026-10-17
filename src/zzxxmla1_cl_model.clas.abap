@@ -66,7 +66,12 @@ CLASS zzxxmla1_cl_model DEFINITION
         name        TYPE string,
         caption     TYPE string,   " the value of the level's caption column; the name if it has none
         path        TYPE string,   " the keys of the levels 1 to level_no, separated by c_separator
-        unique_name TYPE string,   " the hierarchy's unique name, then the names from the first level
+        "! the hierarchy's unique name, then the names from the first level; of a BW hierarchy the level, then the
+        "! key of the path, InfoObject and name per level as SSAS names a member by a composite key
+        "! ([ZCLSERV.ZCLSERV_LOC].[Level 02].&amp;[0HIER_NODE]&amp;[LOCATIONS]&amp;[ZCLSITE]&amp;[NORTH]): BW keys a node by
+        "! InfoObject and name, so a text node and a site of one name can be siblings, and a leaf under two parents is
+        "! two members
+        unique_name TYPE string,
         parent      TYPE string,   " unique name of the parent; empty on the first level
         "! hierarchy order: the order keys of the keys from the first level, each after c_separator and 0 (order_key)
         order_key   TYPE string,
@@ -209,7 +214,8 @@ CLASS zzxxmla1_cl_model DEFINITION
       RETURNING VALUE(result) TYPE ty_t_child_count.
     "! The members of a level built from rows of the level columns: each row holds per level the key, its ordinal if
     "! it has an ordinal column other than the name column, the name if it has a name column of its own, the caption
-    "! if it has a caption column, then the values of the level's properties; the rows are in hierarchy order. A
+    "! if it has a caption column, of a BW hierarchy its InfoObject (bw_iobj_column), then the values of the level's
+    "! properties; the rows are in hierarchy order. A
     "! member's properties are the ones of its first row.
     CLASS-METHODS members_of_rows
       IMPORTING hierarchy     TYPE ty_hierarchy
@@ -256,6 +262,12 @@ CLASS zzxxmla1_cl_model DEFINITION
     "! Reads the types of the columns of the hierarchies' dimension tables from HANA's catalog (one query for all).
     CLASS-METHODS key_types
       CHANGING hierarchies TYPE ty_t_hierarchy.
+
+    "! Of a BW hierarchy: the column of member_table with the InfoObject of a level's member (from 1), which with its
+    "! name keys it.
+    CLASS-METHODS bw_iobj_column
+      IMPORTING level_no      TYPE i
+      RETURNING VALUE(result) TYPE string.
 
   PRIVATE SECTION.
     "! Of a BW hierarchy: its members as a derived table without alias (ZZXXMLA1_CL_BW_HIERARCHY_COPY=>levels_sql).
@@ -431,6 +443,7 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
   METHOD level_columns.
     CLEAR: columns, order_by.
     LOOP AT hierarchy-levels INTO DATA(level).
+      DATA(level_no) = sy-tabix.
       APPEND zzxxmla1_cl_sql=>quote( level-key_column ) TO columns.
       " an ordinal column orders the members, the key the ones of the same ordinal (SqlMemberSource); it is read
       " once, also when it is the name column
@@ -446,6 +459,9 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
       ENDIF.
       IF level-caption_column IS NOT INITIAL.
         APPEND zzxxmla1_cl_sql=>quote( level-caption_column ) TO columns.
+      ENDIF.
+      IF hierarchy-bw_hierarchy IS NOT INITIAL.
+        APPEND zzxxmla1_cl_sql=>quote( bw_iobj_column( level_no ) ) TO columns.
       ENDIF.
       LOOP AT level-properties INTO DATA(property).
         APPEND zzxxmla1_cl_sql=>quote( property-column ) TO columns.
@@ -490,6 +506,11 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
     SORT ancestors BY level_no ASCENDING path ASCENDING.
     DELETE ADJACENT DUPLICATES FROM ancestors COMPARING level_no path.
     DELETE result WHERE level_no <> target.
+  ENDMETHOD.
+
+  METHOD bw_iobj_column.
+    result = zzxxmla1_cl_bw_hierarchy_copy=>level_column( level = level_no
+                                                          part  = zzxxmla1_cl_bw_hierarchy_copy=>c_level_part-iobj ).
   ENDMETHOD.
 
   METHOD bw_level_condition.
@@ -657,6 +678,8 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
       END OF ty_count.
     DATA counts TYPE HASHED TABLE OF ty_count WITH UNIQUE KEY parent.
     DATA last_paths TYPE string_table.
+    " of a BW hierarchy: the key of the member's path, its InfoObject and name per level (ty_member-unique_name)
+    DATA bw_keys TYPE string.
     DATA(depth) = lines( hierarchy-levels ).
     last_paths = VALUE #( FOR i = 1 UNTIL i > depth ( ) ).
 
@@ -690,6 +713,11 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
           column = column + 1.
           caption = row[ column ].
         ENDIF.
+        DATA(iobj) = VALUE string( ).
+        IF hierarchy-bw_hierarchy IS NOT INITIAL.
+          column = column + 1.
+          iobj = row[ column ].
+        ENDIF.
         " the order key of a level with an ordinal column: the ordinal's, then the key's (RolapMemberBase.compareTo)
         IF level-ordinal_column IS NOT INITIAL.
           IF level-ordinal_column = level-name_column.
@@ -709,6 +737,10 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
         ENDDO.
         path = COND #( WHEN level_no = 1 THEN key ELSE path && c_separator && key ).
         DATA(unique_name) = parent_unique && `.` && quote_name( name ).
+        IF hierarchy-bw_hierarchy IS NOT INITIAL.
+          bw_keys = COND #( WHEN level_no = 1 THEN `` ELSE bw_keys ) && `&` && quote_name( iobj ) && `&` && quote_name( name ).
+          unique_name = |{ hierarchy-unique_name }.{ quote_name( level-level_name ) }.{ bw_keys }|.
+        ENDIF.
         " a new member when the keys down to this level differ from the previous row's
         IF first_row = abap_true OR path <> last_paths[ level_no ].
           last_paths[ level_no ] = path.

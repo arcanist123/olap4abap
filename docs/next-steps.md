@@ -88,9 +88,15 @@ Next, in this order:
    aggregates visits with equal keys).
    Done (2026-10-17): external characteristics in hierarchies. The clinic's `ZCLSERV_LOC` (Service Locations: all
    locations > site `ZCLSITE` > room `ZCLROOM`, compounded > service) has nodes of other InfoObjects; members, levels,
-   children and values are BW's (`bw_hierarchy_test.py`). Open: such a node is named and captioned by BW's node name
-   (`NORTH     R01`, the site padded to 10), where BW captions it by its characteristic's text (North Site, Room 1);
-   its name could be olap4abap's compounded form (`NORTH/R01`); with the node texts. And the clinic generator deploys
+   children and values are BW's (`bw_hierarchy_test.py`). Done (2026-10-17): such a node is named and captioned by
+   its characteristic's view, on the SID BW gives it (`/BIC/K-OSID`, the copy's `VALUE_SID`;
+   `ZZXXMLA1_CL_BW_HIERARCHY_COPY=>externals`, `external_nodes_sql`): named as the characteristic's members are
+   (`COMPOUND_KEY`, else `KEY_NAME`, else the key: `[LOCATIONS].[NORTH].[NORTH/R01]`) and captioned by the same text
+   as its members (the preferred text, medium, else long, else short; else `KEY_CAPTION`: Consultation Room 1); a
+   characteristic without a view keeps BW's node name. BW's MDX captions such a node by the short text (Room 1), but
+   its text properties (`[ZCLSERV].[1ZCLSERV]`, `[5ZCLSERV]`, `[4ZCLSERV]`: short, medium, long) give the
+   characteristic's texts; the probe reads them and `bw_hierarchy_test.py` compares the caption with the medium text
+   (else long, else short). Without `--names` only the text nodes' captions differ (the node texts). And the clinic generator deploys
    the test catalog `ZCLHIER` (`ClinicBW-sap.xml` and its `sap-files.py deploy` are gone): a clinic run deleted the
    views the deployed file named, so the next accept was refused.
 4. Smaller: texts step 5 (the check against blank texts); the debt that keeps about 30 hierarchy cases red on SAP
@@ -325,10 +331,21 @@ Decided with the user 2026-10-15:
   value more than once without a link, each occurrence with children of its own). Its subtree has the same shape under
   each (decided with the user 2026-10-15): BW lets one duplicate of a value have a subtree and another have none or a
   different one, which we refuse; a link node has its original's subtree, so it always qualifies. Members are its occurrences (one per path, as BW shows it): every member has one parent,
-  so `Parent`, `Ancestor` and drill-down keep their meaning, and unique names are paths
-  (`[ZCLDIAG.ZCLDIAG_ICD].[ROOT].[A00-B99].[A00]`), stable across rebuilds while the structure is (an occurrence id
-  would change with each rebuild and break saved Excel pivots). `&[key]` of a value with several occurrences finds
-  the first one (hand-written MDX only; Excel sends back the unique names it got).
+  so `Parent`, `Ancestor` and drill-down keep their meaning, and unique names are paths, stable across rebuilds while
+  the structure is (an occurrence id would change with each rebuild and break saved Excel pivots). Since 2026-10-17
+  (decided with the user) the path is of keys, not of names, as SSAS names a member by a composite key: InfoObject and
+  name per level, `[ZCLSERV.ZCLSERV_LOC].[Level 02].&[0HIER_NODE]&[LOCATIONS]&[ZCLSITE]&[NORTH]` (a text node's
+  `0HIER_NODE`, REST_H's `1HIER_REST` as BW's MDX names it, a leaf's the characteristic). BW keys a node by InfoObject
+  and name, so a text node `NORTH` and the site `NORTH` can be siblings, and a path of names could not tell them
+  apart; the member's own pair alone is not enough either (a leaf under two parents is two members). Checked on SSAS
+  Multidimensional with such siblings and a duplicate leaf: it names them so, finds them by the key with or without
+  the level, by a path of names the first one, and gives a partial key no member (olap4abap: not found). The clinic's
+  `ZCLSERV_LOC` has such siblings, the site `NORTH` and the text node `NORTH` (a partner laboratory) under
+  `LOCATIONS` (2026-10-17, `bw_hierarchy_test.py` passes on `ZCLVISIT`, `ZCLVISITA` and `ZCLHIER`). The facts
+  still join the closure by SID; the key only names and finds. Names and captions stay as they were. A path of names
+  (`[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY]`) finds the first member of each name, also in an
+  `MDSCHEMA_MEMBERS` restriction (SSAS's way; the reference takes only the unique name there); the reference cases,
+  whose answers name ZCLDIAG_ICD's members by the path of names, are compared through `scripts/bw_names.py`.
 - **No double counting.** A node's value is the sum over the distinct values below it: a value reached by two paths
   counts once. The rows are a materialized closure `(ancestor occurrence, SID)`, distinct, which the facts join by an
   equi-join, filtered to the ancestors asked for; no range join, `DISTINCT` or hierarchy function at query time
@@ -372,7 +389,8 @@ Decided with the user 2026-10-15:
   `/BIC/K<char>`, also the occurrences inside an expanded link subtree (`ZCLPAT_PRG`: the link SENIOR -13, the HEART
   and FALLS under it -14 and -15, `LINKNO` 2 and 1), the postable nodes and `REST_H`; node SIDs are unique per
   InfoObject across its hierarchies. A leaf has the characteristic's SID, so a leaf occurrence is (parent node SID,
-  SID). No ids of our own: unique names stay paths, and a rebuild takes BW's numbering as it is.
+  SID). No ids of our own: unique names stay paths of BW's keys (InfoObject and name, above), and a rebuild takes
+  BW's numbering as it is.
 - **The All member and the hierarchy key** (decided with the user 2026-10-15): `RSRHIEDIR_OLAP` gives each
   hierarchy its own virtual root `ROOTSID`, not-assigned leaf `RESTLEAFSID` and `REST_H` node `RESTTOPSID`, in the
   same per-InfoObject range (`ZCLDOC`: -2, -16, -31, ... for its eight hierarchies). The All member is the `ROOTSID`,

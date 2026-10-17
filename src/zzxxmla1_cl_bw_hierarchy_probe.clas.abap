@@ -10,11 +10,12 @@
 * Copyright (C) 2005-2021 Hitachi Vantara and others, Copyright (C) 2021-2025 Sergei Semenkov. See the NOTICE file.
 *----------------------------------------------------------------------------------------------------------------------*
 "! BW's own answers on the clinic demo's plain hierarchies (sapcli class execute): per hierarchy every member with its
-"! unique name, level, number of children, caption and the values of the measures, read through BW's MDX engine
+"! unique name, level, number of children, caption, short, medium and long text (BW's properties 1, 5 and 4 followed by
+"! the characteristic: [1ZCLSERV], [5ZCLSERV], [4ZCLSERV]) and the values of the measures, read through BW's MDX engine
 "! (BAPI_MDDATASET_*) with the members of the hierarchy on the rows; first the provider's total. These are the expected
 "! answers for olap4abap's BW hierarchies (docs/next-steps.md, time-independent BW hierarchies): BW counts a value
 "! reached by several paths once per node. Output: a line per member, fields separated by tabs (hierarchy, ordinal,
-"! level, children, unique name, caption, the measures); scripts/bw_hierarchy_capture.py keeps it as JSON.
+"! level, children, unique name, caption, the three texts, the measures); scripts/bw_hierarchy_capture.py keeps it as JSON.
 CLASS zzxxmla1_cl_bw_hierarchy_probe DEFINITION
   PUBLIC
   FINAL
@@ -30,6 +31,8 @@ CLASS zzxxmla1_cl_bw_hierarchy_probe DEFINITION
              children  TYPE i,
              unique    TYPE string,
              caption   TYPE string,
+             "! short, medium and long text
+             texts     TYPE string_table,
              values    TYPE string_table,
            END OF ty_member.
     TYPES ty_members TYPE STANDARD TABLE OF ty_member WITH EMPTY KEY.
@@ -56,10 +59,11 @@ CLASS zzxxmla1_cl_bw_hierarchy_probe DEFINITION
     METHODS hierarchies
       IMPORTING characteristic TYPE string
       RETURNING VALUE(result)  TYPE string_table.
-    "! runs a statement, its rows (axis 1, if any) with their values
+    "! runs a statement, its rows (axis 1, if any) with their values and, with a characteristic, its texts
     METHODS execute
-      IMPORTING hierarchy     TYPE string
-                rows          TYPE string OPTIONAL
+      IMPORTING hierarchy      TYPE string
+                rows           TYPE string OPTIONAL
+                characteristic TYPE string OPTIONAL
       RETURNING VALUE(result) TYPE ty_members.
 ENDCLASS.
 
@@ -73,8 +77,13 @@ CLASS zzxxmla1_cl_bw_hierarchy_probe IMPLEMENTATION.
       APPEND LINES OF members( characteristic ) TO members.
     ENDLOOP.
     LOOP AT members INTO DATA(member).
+      " three text fields on every line, the total's empty
+      WHILE lines( member-texts ) < 3.
+        APPEND `` TO member-texts.
+      ENDWHILE.
       out->write( |{ member-hierarchy }\t{ member-ordinal }\t{ member-level }\t{ member-children }\t{
-                  member-unique }\t{ member-caption }\t{ concat_lines_of( table = member-values sep = |\t| ) }| ).
+                  member-unique }\t{ member-caption }\t{ concat_lines_of( table = member-texts sep = |\t| ) }\t{
+                  concat_lines_of( table = member-values sep = |\t| ) }| ).
     ENDLOOP.
   ENDMETHOD.
 
@@ -88,8 +97,9 @@ CLASS zzxxmla1_cl_bw_hierarchy_probe IMPLEMENTATION.
 
   METHOD members.
     LOOP AT hierarchies( characteristic ) INTO DATA(hierarchy).
-      APPEND LINES OF execute( hierarchy = hierarchy
-                               rows      = |\{{ hierarchy }.Members\}| ) TO result.
+      APPEND LINES OF execute( hierarchy      = hierarchy
+                               rows           = |\{{ hierarchy }.Members\}|
+                               characteristic = characteristic ) TO result.
     ENDLOOP.
   ENDMETHOD.
 
@@ -128,11 +138,21 @@ CLASS zzxxmla1_cl_bw_hierarchy_probe IMPLEMENTATION.
     DATA header TYPE STANDARD TABLE OF bapi6111fsd.
     DATA data TYPE STANDARD TABLE OF bapi6111fsd.
     DATA axis TYPE bapi6111axi-axis VALUE 1.
+    DATA property_keys TYPE STANDARD TABLE OF bapi6111opk.
+    DATA property_values TYPE STANDARD TABLE OF bapi6111opv.
+    " short, medium and long text
+    DATA(properties) = VALUE string_table( ( |1{ characteristic }| ) ( |5{ characteristic }| )
+                                           ( |4{ characteristic }| ) ).
 
     DATA(mdx) = |SELECT \{{ concat_lines_of( table = VALUE string_table( FOR m IN measures
                                                                          ( |[Measures].[{ m }]| ) ) sep = `, ` ) }\} ON 0|.
     IF rows IS NOT INITIAL.
-      mdx = |{ mdx }, { rows } ON 1|.
+      IF characteristic IS NOT INITIAL.
+        DATA(names) = VALUE string_table( FOR p IN properties ( |[{ characteristic }].[{ p }]| ) ).
+        mdx = |{ mdx }, { rows } DIMENSION PROPERTIES { concat_lines_of( table = names sep = `, ` ) } ON 1|.
+      ELSE.
+        mdx = |{ mdx }, { rows } ON 1|.
+      ENDIF.
     ENDIF.
     mdx = |{ mdx } FROM [{ cube }]|.
     " lines of 75 characters, which BW joins respecting blanks (ZZXXMLA1_CL_BW_AUTH_PROBE=>command_lines)
@@ -161,7 +181,9 @@ CLASS zzxxmla1_cl_bw_hierarchy_probe IMPLEMENTATION.
         IMPORTING
           return        = return
         TABLES
-          mndtry_prptys = tuples.
+          mndtry_prptys      = tuples
+          option_prptys_keys = property_keys
+          option_prptys_vals = property_values.
     ENDIF.
     IF return-type NA 'EAX'.
       CALL FUNCTION 'BAPI_MDDATASET_GET_FLAT_DATA'
@@ -209,6 +231,16 @@ CLASS zzxxmla1_cl_bw_hierarchy_probe IMPLEMENTATION.
           <member>-children = tuple-children.
           <member>-unique = tuple-mem_unam.
           <member>-caption = tuple-mem_cap.
+        ENDIF.
+        IF characteristic IS NOT INITIAL.
+          LOOP AT properties INTO DATA(property).
+            DATA(text) = ``.
+            LOOP AT property_keys INTO DATA(property_key) WHERE prpty_nam CS |[{ property }]|.
+              text = VALUE #( property_values[ tuple_ordinal = <member>-ordinal
+                                               prpty_key     = property_key-prpty_key ]-prpty_val OPTIONAL ).
+            ENDLOOP.
+            APPEND text TO <member>-texts.
+          ENDLOOP.
         ENDIF.
       ENDLOOP.
       IF lines( tuples ) <> lines( result ) AND rows IS NOT INITIAL.

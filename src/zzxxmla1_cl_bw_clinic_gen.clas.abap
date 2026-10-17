@@ -25,7 +25,8 @@
 "! - the service ZCLSERV (52 services by a four-digit code, a dimension of both providers), with the plain hierarchy
 "!   ZCLSERV_CAT (all services > category > ranges of codes) of intervals: overlapping ones, a linked text node with its
 "!   range and a linked range, and the plain hierarchy ZCLSERV_LOC (all locations > site > room > service) whose sites
-"!   and rooms are nodes of the external characteristics ZCLSITE and ZCLROOM (compounded with the site),
+"!   and rooms are nodes of the external characteristics ZCLSITE and ZCLROOM (compounded with the site), the site
+"!   NORTH next to a text node NORTH (a partner laboratory),
 "! - the room ZCLROOM, compounded with the site ZCLSITE: the same rooms R01 to R04 at both sites, so a room is a member
 "!   only with its site (docs/bw-schema-design-guide.md, section 3.7),
 "! - the fiscal time, a dimension of its own: the fiscal year variant ZCLFISCVR (K1, K2, K4), the fiscal year ZCLFISCYR
@@ -204,15 +205,17 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
       "! a node of a hierarchy: a text node (with a text), a value of the characteristic (its key, no text), a value of
       "! an external characteristic (iobjnm, named by its key as BW names it: the compounding first, each part at its
       "! full length) or an interval of values (from and to, named by from); a link node shows the subtree of the node
-      "! of its name that is no link
+      "! of its name that is no link; parent_iobjnm the parent's InfoObject where two nodes of the parent's name differ
+      "! by it (a text node and a site NORTH), else every node of that name is the parent (a duplicate node)
       BEGIN OF ty_hie_node,
-        name   TYPE string,
-        parent TYPE string,
-        text   TYPE string,
-        iobjnm TYPE rsiobjnm,
-        link   TYPE abap_bool,
-        from   TYPE string,
-        to     TYPE string,
+        name          TYPE string,
+        parent        TYPE string,
+        parent_iobjnm TYPE rsiobjnm,
+        text          TYPE string,
+        iobjnm        TYPE rsiobjnm,
+        link          TYPE abap_bool,
+        from          TYPE string,
+        to            TYPE string,
       END OF ty_hie_node,
       ty_t_hie_node TYPE STANDARD TABLE OF ty_hie_node WITH EMPTY KEY.
     TYPES:
@@ -340,8 +343,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     "! node, a patient in a second program a duplicate node or a link node; in family care a parent is a postable node
     "! with their children below them.
     METHODS care_program_nodes RETURNING VALUE(result) TYPE ty_t_hie_node.
-    "! The nodes of ZCLSERV_LOC: all locations > site (ZCLSITE) > room (ZCLROOM) > service, and the laboratory's
-    "! services under a text node; every service once.
+    "! The nodes of ZCLSERV_LOC: all locations > site (ZCLSITE) > room (ZCLROOM) > service, and the laboratories'
+    "! services under text nodes, one of them NORTH next to the site NORTH; every service once.
     METHODS service_location_nodes RETURNING VALUE(result) TYPE ty_t_hie_node.
     "! The nodes of ZCLSERV_CAT: all services > category > interval of codes, and care pathways with overlapping
     "! intervals, a linked category and a linked interval.
@@ -918,7 +921,9 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     " A room is named by BW's key of ZCLROOM: the site (ZCLSITE, CHAR 10) at its full length, then the room. The
     " rooms follow their type (master_data): consultations and mental health in consultation rooms, therapy, prevention
     " and emergency care in treatment rooms, imaging and functional tests in the imaging room; the laboratory is no
-    " room of the clinic, so its services are under a text node. No service is in two rooms.
+    " room of the clinic, so its services are under text nodes: the external laboratory's and the rapid tests and
+    " cultures of a partner laboratory, the text node NORTH next to the site NORTH (BW keys a node by InfoObject and
+    " name, so the two are siblings; their unique names differ by the InfoObject). No service is in two places.
     DATA(rooms) = VALUE string_table(
       ( `NORTH R01 1001 1005` ) ( `NORTH R02 5001 5003` ) ( `NORTH R03 3001 3007` ) ( `NORTH R04 3051 3055` )
       ( `NORTH R05 2101 2206` ) ( `SOUTH R01 4001 4007` ) ( `SOUTH R02 1010 1012` ) ).
@@ -929,14 +934,18 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     LOOP AT rooms INTO DATA(room).
       SPLIT room AT ` ` INTO DATA(site) DATA(number) DATA(first) DATA(last).
       DATA(key) = |{ site WIDTH = 10 }{ number }|.
-      APPEND VALUE #( name = key parent = site iobjnm = 'ZCLROOM' ) TO result.
+      APPEND VALUE #( name = key parent = site parent_iobjnm = 'ZCLSITE' iobjnm = 'ZCLROOM' ) TO result.
       LOOP AT catalog INTO DATA(service) WHERE code BETWEEN first AND last.
         APPEND VALUE #( name = service-code parent = key ) TO result.
       ENDLOOP.
     ENDLOOP.
     APPEND VALUE #( name = `LAB` parent = `LOCATIONS` text = `External Laboratory` ) TO result.
-    LOOP AT catalog INTO service WHERE code BETWEEN `2001` AND `2099`.
+    LOOP AT catalog INTO service WHERE code BETWEEN `2001` AND `2007`.
       APPEND VALUE #( name = service-code parent = `LAB` ) TO result.
+    ENDLOOP.
+    APPEND VALUE #( name = `NORTH` parent = `LOCATIONS` text = `North Partner Laboratory` ) TO result.
+    LOOP AT catalog INTO service WHERE code BETWEEN `2008` AND `2099`.
+      APPEND VALUE #( name = service-code parent = `NORTH` parent_iobjnm = '0HIER_NODE' ) TO result.
     ENDLOOP.
   ENDMETHOD.
 
@@ -1174,10 +1183,11 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
   METHOD add_node.
     DATA previous TYPE rshienodid.
     DATA(nodeid) = CONV rshienodid( lines( htab ) + 1 ).
-    APPEND VALUE #( nodeid   = nodeid
-                    iobjnm   = COND #( WHEN node-iobjnm IS NOT INITIAL THEN node-iobjnm
+    DATA(node_iobjnm) = COND rsiobjnm( WHEN node-iobjnm IS NOT INITIAL THEN node-iobjnm
                                        WHEN node-text IS INITIAL THEN iobjnm
-                                       ELSE '0HIER_NODE' )
+                                       ELSE '0HIER_NODE' ).
+    APPEND VALUE #( nodeid   = nodeid
+                    iobjnm   = node_iobjnm
                     nodename = node-name
                     tlevel   = tlevel
                     link     = node-link
@@ -1191,7 +1201,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     IF node-link = abap_true OR node-name IS INITIAL.
       RETURN.
     ENDIF.
-    LOOP AT nodes INTO DATA(child) WHERE parent = node-name.
+    LOOP AT nodes INTO DATA(child) WHERE parent = node-name
+                                     AND ( parent_iobjnm IS INITIAL OR parent_iobjnm = node_iobjnm ).
       DATA(childid) = CONV rshienodid( lines( htab ) + 1 ).
       IF previous IS INITIAL.
         htab[ nodeid ]-childid = childid.
