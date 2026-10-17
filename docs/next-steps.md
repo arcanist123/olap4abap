@@ -35,8 +35,12 @@ since accept does not build them yet (step 3 below).
 
 Next, in this order:
 
-1. A test catalog on SAP with the three hierarchies: `ZCLPAT_PRG` and `ZCLSERV_CAT` in `ClinicBW-sap.xml` next to
-   `ZCLDIAG_ICD`, so `bw_hierarchy_test.py --catalog ZCLHIER` runs without editing the schema (open of step 7.3).
+1. Done (2026-10-17): a test catalog on SAP with the three hierarchies: `ZCLPAT_PRG` (caption Care Programs) and
+   `ZCLSERV_CAT` (Service Catalog) in `ClinicBW-sap.xml` next to `ZCLDIAG_ICD`, annotated as it is, so
+   `bw_hierarchy_test.py --catalog ZCLHIER --names` runs without editing the schema (open of step 7.3): 72, 2,914 and
+   92 members, all BW's. Without `--names` only the text nodes' captions differ (their technical names until the
+   node texts come). No reference case names them; `ZCLPAT_PRG` moves `ZCLDIAG_ICD`'s `HIERARCHY_ORDINAL` from 4 to
+   5, which `mdschema_hierarchies_hier` ignores (`ignore.txt`). `xmla_test.py` on the 75 `*_hier*` cases: all pass.
 2. Excel's statements on shared nodes, checked by SSAS: a live Excel session against `ssasmd` on `ZCLPAT_PRG` and
    `ZCLSERV_CAT` (expand linked subtrees, slicers and filters on overlapping programs, drill-through on a duplicate
    leaf), captured with `--ssas multidimensional` (`execute_ssasmd_*`); a comparison that rewrites each statement into
@@ -776,7 +780,7 @@ Done (2026-10-15): the reference serves `ZCLDIAG_ICD`.
         `ZCLHIER`'s schema for the run (annotated as `ZCLDIAG_ICD`), all members' values BW's (72, 2,914 and 92
         members). The test read an empty cell's value from the next cell (fixed; it accepts `#` for the initial
         value with `--names` and has `--catalog`). Open: a test catalog on SAP with the three hierarchies, so the
-        BW check runs without editing the schema; the measure caption (30 cases); a BW hierarchy on an aDSO, whose
+        BW check runs without editing the schema (done 2026-10-17, the order from here, step 1); the measure caption (30 cases); a BW hierarchy on an aDSO, whose
         fact column holds the value, not the SID the closure has; Excel against olap4abap.
         Done (2026-10-16): `Hierarchize(..., POST)` (`hierarchize` with `post`: each member's key ends with
         U+FFFF, so an ancestor sorts after its descendants), and a visual total's `CHILDREN_CARDINALITY` is the

@@ -6,7 +6,10 @@
   its levels Level 01 to Level nn from the copy's depth (docs/next-steps.md, Reference scenario, decided 2026-10-16),
   where the reference reads its flattened table ZZXXMLA1_HL_ZCLDIAG_ICD. The dimension ZCLDIAG has its table, as the
   dimensions of olap4abap's schemas have; no other olap4abap annotation (membersWithFacts, omitEmptyCells), so the
-  answers are the reference's. Keep it equal to ClinicBW.xml but for this hierarchy and the dimension's table.
+  answers are the reference's. Keep it equal to ClinicBW.xml but for this hierarchy and the dimension's table, and
+  for ZCLPAT_PRG and ZCLSERV_CAT in the same form, which the reference cannot model (shared nodes, intervals,
+  REST_H): no reference case names them; scripts/bw_hierarchy_test.py with the catalog ZCLHIER checks them against
+  BW's MDX. ZCLPAT_PRG moves ZCLDIAG_ICD's HIERARCHY_ORDINAL up by one, which mdschema_hierarchies_hier ignores.
   python scripts/sap-files.py deploy writes it with the characteristics' views in place of the placeholders.
 -->
 <Schema name="ZCLHIER">
@@ -86,6 +89,11 @@
         <Property name="ZCLREGIO" sourceAttribute="ZCLREGIO" type="String" caption="Region"/>
         <Property name="ZCLREGIO Text" sourceAttribute="ZCLREGIO Text" type="String" caption="Region (Text)"/>
       </Level>
+    </Hierarchy>
+    <Hierarchy name="ZCLPAT_PRG" visible="true" hasAll="true" allMemberName="All Care Programs" caption="Care Programs">
+      <Annotations>
+        <Annotation name="olap4abap.bwHierarchy">ZCLPAT_PRG</Annotation>
+      </Annotations>
     </Hierarchy>
   </Dimension>
   <Dimension visible="true" highCardinality="false" table="ZZXXMLA1_C_ZCLDOC" name="ZCLDOC" caption="Physician">
@@ -378,6 +386,11 @@
         <Property name="ZCLSETNG" sourceAttribute="ZCLSETNG" type="String" caption="Care Setting"/>
         <Property name="ZCLSETNG Text" sourceAttribute="ZCLSETNG Text" type="String" caption="Care Setting (Text)"/>
       </Level>
+    </Hierarchy>
+    <Hierarchy name="ZCLSERV_CAT" visible="true" hasAll="true" allMemberName="All Service Catalog" caption="Service Catalog">
+      <Annotations>
+        <Annotation name="olap4abap.bwHierarchy">ZCLSERV_CAT</Annotation>
+      </Annotations>
     </Hierarchy>
   </Dimension>
   <Cube name="ZCLHIER" caption="Clinic Visits" visible="true" defaultMeasure="ZCLVISNO" cache="true" enabled="true">

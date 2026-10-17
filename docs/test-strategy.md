@@ -194,7 +194,9 @@ hierarchy on a flattened table of an export of the clinic InfoCube and the hiera
 and replayed like FoodMart's (`next-steps.md`, Reference scenario): `execute_hier_*`, `members_hier_*`,
 `mdschema_hierarchies_hier` and `mdschema_levels_hier`, 71 cases. On SAP they run against the test catalog `ZCLHIER`
 (`reference/schema/ClinicBW-sap.xml`, the hierarchy annotated `olap4abap.bwHierarchy`, `sap-files.py deploy`); all
-pass. Both schemas name and caption members as the proposal does (texts step 3: named by the key, `KEY_NAME` for
+pass. The test catalog also has `ZCLPAT_PRG` and `ZCLSERV_CAT` in the same form, which the reference cannot model and
+no case names, so that `bw_hierarchy_test.py --catalog ZCLHIER --names` checks all three against BW's MDX
+(`mdschema_hierarchies_hier` ignores the `HIERARCHY_ORDINAL` that `ZCLPAT_PRG` moves up by one). Both schemas name and caption members as the proposal does (texts step 3: named by the key, `KEY_NAME` for
 a NUMC or DATS key, captioned by the text, the property `Key`), and the flattened table captions the hierarchy's
 members by `Lnn_CAPTION` (a leaf's text, a text node's technical name), as olap4abap does. Before capture,
 

@@ -409,7 +409,9 @@ Read before designing anything:
   2026-10-16). Its 71 cases (`execute_hier_*`, `members_hier_*`, `mdschema_*_hier`; the Excel ones from a live
   session against it) are what the engine work has to pass, on the test catalog `ZCLHIER` of SAP
   (`reference/schema/ClinicBW-sap.xml`, written by `sap-files.py deploy`): `ClinicBW.xml` with the hierarchy in
-  olap4abap's form (annotation `olap4abap.bwHierarchy`, no levels), no other annotation (`docs/next-steps.md`,
+  olap4abap's form (annotation `olap4abap.bwHierarchy`, no levels) and `ZCLPAT_PRG` and `ZCLSERV_CAT` in the same
+  form, which no case names (`bw_hierarchy_test.py --catalog ZCLHIER --names` checks all three against BW's MDX), no
+  other annotation (`docs/next-steps.md`,
   Reference scenario); the demo's own catalog `ZCLVISIT` stays as the setup made it. Decided 2026-10-16 after Excel failed on the parent-child form: the
   reference is the oracle for everything but parent-child hierarchies and is not patched any more: its patches stay
   as they are, an answer it gets wrong (Expand Entire Field, Top 10 value filter, a label filter on an upper level)
