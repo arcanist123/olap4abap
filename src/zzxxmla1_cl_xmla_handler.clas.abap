@@ -266,6 +266,11 @@ CLASS zzxxmla1_cl_xmla_handler DEFINITION
                 restriction   TYPE string
                 value         TYPE clike
       RETURNING VALUE(result) TYPE abap_bool.
+    "! The TREE_OP restriction as a number (Rowset.getRestrictionValueAsInt): 0 without one, -1 for one that is not an
+    "! integer or for several, which the reference answers with no rows.
+    CLASS-METHODS tree_op
+      IMPORTING request       TYPE ty_request
+      RETURNING VALUE(result) TYPE i.
     "! One rowset row: an element per column, in the given order; an empty value gives an empty element.
     METHODS row_xml
       IMPORTING columns       TYPE ty_t_pair
@@ -1116,8 +1121,10 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
     DATA(members) = VALUE zzxxmla1_cl_mdx_schema_reader=>ty_t_member( ).
     IF line_exists( request-restrictions[ name = 'MEMBER_UNIQUE_NAME' ] ).
       " the members named (exactly as they are named), with TREE_OP the first one's relatives
-      DATA(tree_op) = COND i( WHEN line_exists( request-restrictions[ name = 'TREE_OP' ] )
-                              THEN request-restrictions[ name = 'TREE_OP' ]-value ).
+      DATA(operation) = tree_op( request ).
+      IF operation = -1.
+        RETURN.
+      ENDIF.
       LOOP AT request-restrictions INTO DATA(restriction) WHERE name = 'MEMBER_UNIQUE_NAME'.
         TRY.
             DATA(id) = zzxxmla1_cl_mdx_parser=>parse_expression( restriction-value ).
@@ -1134,8 +1141,8 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
           CONTINUE.
         ENDIF.
         APPEND element-member TO members.
-        IF tree_op <> 0.
-          APPEND LINES OF tree_members( reader = reader member = element-member tree_op = tree_op ) TO members.
+        IF operation <> 0.
+          APPEND LINES OF tree_members( reader = reader member = element-member tree_op = operation ) TO members.
           EXIT.
         ENDIF.
       ENDLOOP.
@@ -1255,8 +1262,11 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
       IF sy-subrc <> 0.
         RETURN.
       ENDIF.
-      populate_member( EXPORTING members = members member = anchor
-                                 tree_op = CONV i( request-restrictions[ name = 'TREE_OP' ]-value )
+      DATA(operation) = tree_op( request ).
+      IF operation = -1.
+        RETURN.
+      ENDIF.
+      populate_member( EXPORTING members = members member = anchor tree_op = operation
                        CHANGING  result  = candidates ).
     ELSE.
       LOOP AT members INTO DATA(member).
@@ -1664,6 +1674,27 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
     IF line_exists( request-restrictions[ name = restriction ] ).
       result = xsdbool( line_exists( request-restrictions[ name = restriction value = value ] ) ).
     ENDIF.
+  ENDMETHOD.
+
+  METHOD tree_op.
+    DATA count TYPE i.
+    LOOP AT request-restrictions INTO DATA(restriction) WHERE name = 'TREE_OP'.
+      count = count + 1.
+    ENDLOOP.
+    IF count = 0.
+      RETURN.
+    ENDIF.
+    result = -1.
+    " Integer.parseInt: an optional sign and digits, nothing else
+    DATA(value) = request-restrictions[ name = 'TREE_OP' ]-value.
+    IF count > 1 OR NOT matches( val = value regex = `[+-]?\d+` ).
+      RETURN.
+    ENDIF.
+    TRY.
+        result = value.
+      CATCH cx_sy_conversion_error.
+        result = -1.
+    ENDTRY.
   ENDMETHOD.
 
   METHOD mdschema_properties.

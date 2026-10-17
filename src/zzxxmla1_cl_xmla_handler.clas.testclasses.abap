@@ -15,6 +15,7 @@ CLASS ltc_xmla_handler DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION
     METHODS unsupported_statements FOR TESTING.
     METHODS supported_statements FOR TESTING.
     METHODS discover_key FOR TESTING.
+    METHODS tree_op FOR TESTING.
 ENDCLASS.
 
 CLASS zzxxmla1_cl_xmla_handler DEFINITION LOCAL FRIENDS ltc_xmla_handler.
@@ -81,6 +82,26 @@ CLASS ltc_xmla_handler IMPLEMENTATION.
     " another URL
     cl_abap_unit_assert=>assert_differs( act = zzxxmla1_cl_xmla_handler=>discover_key( request = request url = `http://y/zzxxmla1` )
                                          exp = key ).
+  ENDMETHOD.
+
+  METHOD tree_op.
+    " Rowset.getRestrictionValueAsInt: Integer.parseInt of the only value, else -1
+    DATA(request) = VALUE zzxxmla1_cl_xmla_handler=>ty_request( method = `DISCOVER` type = `MDSCHEMA_MEMBERS` ).
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_xmla_handler=>tree_op( request ) exp = 0 ).
+    request-restrictions = VALUE #( ( name = `TREE_OP` value = `24` ) ).
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_xmla_handler=>tree_op( request ) exp = 24 ).
+    request-restrictions = VALUE #( ( name = `TREE_OP` value = `+8` ) ).
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_xmla_handler=>tree_op( request ) exp = 8 ).
+    request-restrictions = VALUE #( ( name = `TREE_OP` value = `children` ) ).
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_xmla_handler=>tree_op( request ) exp = -1 ).
+    request-restrictions = VALUE #( ( name = `TREE_OP` value = ` 1` ) ).
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_xmla_handler=>tree_op( request ) exp = -1 ).
+    request-restrictions = VALUE #( ( name = `TREE_OP` value = `1.5` ) ).
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_xmla_handler=>tree_op( request ) exp = -1 ).
+    request-restrictions = VALUE #( ( name = `TREE_OP` value = `99999999999` ) ).
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_xmla_handler=>tree_op( request ) exp = -1 ).
+    request-restrictions = VALUE #( ( name = `TREE_OP` value = `1` ) ( name = `TREE_OP` value = `8` ) ).
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_xmla_handler=>tree_op( request ) exp = -1 ).
   ENDMETHOD.
 
 ENDCLASS.

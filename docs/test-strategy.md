@@ -611,6 +611,7 @@ name column (numbers without leading zeros), unique name the hierarchy's and the
 member's (`[Store].[USA].[CA]`); MEMBER_ORDINAL is always 0; types 2 (All), 1 (regular), 3 (measure); PARENT_LEVEL is
 the depth minus one. A tree operation (TREE_OP: 1 children, 2 siblings, 4 parent, 8 self, 16 descendants, 32
 ancestors, added) is relative to MEMBER_UNIQUE_NAME (`populateMember`: self, siblings, descendants or children,
-ancestors or parent); TREE_OP without a member is ignored. A MEMBER_TYPE restriction gives no rows (as Mondrian does),
+ancestors or parent); TREE_OP without a member is ignored, one that is not an integer gives no rows
+(`Rowset.getRestrictionValueAsInt` gives -1; `members_treeop_not_number`). A MEMBER_TYPE restriction gives no rows (as Mondrian does),
 MEMBER_CAPTION is ignored. The members of a hierarchy are read from its dimension view (`SELECT DISTINCT` of the level
 columns, ordered by the keys), only for the hierarchies the request selects.
