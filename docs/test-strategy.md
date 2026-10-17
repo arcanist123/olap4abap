@@ -240,6 +240,15 @@ is captioned by the patient's text in BW, as olap4abap does. SSAS answers a dril
 row twice (on a leaf once), so its drill-throughs are compared as sets of distinct rows. Long term the caption oracle
 moves to SSAS (`next-steps.md`, Later, SSAS naming).
 
+`python scripts/ssas_compare.py` (or some case names, `--show` prints the rewritten statement) runs the
+`execute_ssasmd_*` cases on SAP's `ZCLHIER`: it rewrites each statement into olap4abap's names (a BW hierarchy
+`[H].[H]` is `[C.H]`, its occurrence `&[POS]` the path of `members.json`, its All member the schema's
+`allMemberName`; a characteristic's `[C].[C].&[SID]` stays, the SID is the key in both; DIMENSION PROPERTIES keeps
+the standard properties and asks `MEMBER_KEY`), then compares per axis the tuples as sets (a characteristic's member
+by its key, a BW hierarchy's by its unique name) and every cell by its tuples (decimal against double, relative
+1e-9; Excel's `__XLPath` strings with their names rewritten), the slicer not; a drill-through as distinct rows over
+the default action's columns, by dimension.
+
 ## Mondrian's own tests against our schema
 
 The eMondrian container serves only our reference catalog `ZFOODMART` (`scripts/deploy-reference-schema.sh`, installs

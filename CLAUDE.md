@@ -68,7 +68,8 @@ Read before designing anything:
 - XMLA tests: `python scripts/xmla_test.py` replays `reference/<case>/` against SAP (see `docs/test-strategy.md`);
   `python scripts/compare-applicable.py` runs Mondrian's test statements on eMondrian and SAP and groups the gaps.
   BW hierarchies: `python scripts/bw_hierarchy_test.py` compares with BW's own MDX, asked live
-  (`ZZXXMLA1_CL_BW_HIERARCHY_PROBE`).
+  (`ZZXXMLA1_CL_BW_HIERARCHY_PROBE`). Shared nodes: `python scripts/ssas_compare.py` asks SAP's `ZCLHIER` the
+  `execute_ssasmd_*` statements in olap4abap's names and compares the values with SSAS's.
 - The model is the catalogs' Mondrian schemas, configured as in Mondrian: the server has files (table `ZZXXMLA1_FILE`,
   `ZZXXMLA1_CL_FILES`), `/WEB-INF/datasources.xml` (`reference/schema/datasources-sap.xml`) lists the data sources and
   their catalogs, read by `ZZXXMLA1_CL_REPOSITORY` (Mondrian's `FileRepository`/`DataSourcesConfig`), and each catalog's

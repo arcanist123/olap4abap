@@ -57,7 +57,12 @@ Next, in this order:
    `execute_ssasmd_*` (`prg_*` Care Programs, `srv_*` Service Catalog, `prg_srv_*` both crossed, `pat_prg_*`,
    `room_srv_*`, `drillthrough_*`), each the statement Excel sent, its answer's cell count Excel's; left out: member
    lists and children counts (shape, BW's), the capped drill-through #0944 and the Patient grids over 5 MB (#1195,
-   #1201, #1204, #1221). `xmla_test.py` skips them (`ssas.txt`). Next: the comparison script.
+   #1201, #1204, #1221). `xmla_test.py` skips them (`ssas.txt`). The comparison is `scripts/ssas_compare.py`
+   (2026-10-17, `test-strategy.md`): 24 of 36 pass, every drill-through, expand, slicer list and fiscal year
+   slicer and the subselects on another hierarchy; every value of a tuple both answers have is SSAS's. The 12 others
+   are a subselect on the axis' own BW hierarchy: olap4abap shows the members outside the subselect that share
+   facts with it (`known-issues.md`, Debt), none is missing. Next: the subselect restricts its own hierarchy's
+   members, then all 36 pass.
 3. Hierarchies in the schema builder (open 5 below): the proposal and the UI offer the hierarchies a characteristic
    has in `RSHIEDIR`, accept creates their copies; then `ZCLVISIT` and `ZCLVISITA` have them in Excel. Before the
    aDSO: a BW hierarchy on an aDSO, whose fact column holds the value, not the SID the closure has.
