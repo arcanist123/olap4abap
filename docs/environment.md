@@ -118,8 +118,9 @@ and the generated characteristic views with the SQL HANA has for them, named by 
 (`ZZXXMLA1_C_ZFMSTORE`, the schema's names; SAP's `ZZXXMLA1V...` is found in table `ZZXXMLA1_VIEW`). The catalog `ZFMDRILL` (`reference/schema/FoodmartBWDrill.xml`, drill-through
 actions) needs no tables of its own: its cube is on ZFMSALES's; nor does `ZFMCAPT` (`reference/schema/FoodmartBWCaption.xml`,
 captions that differ from names). On SAP it is a catalog of `/WEB-INF/datasources.xml` next
-to the ones the schema builder added there. So is the clinic's test catalog `ZCLHIER`, from
-`reference/schema/ClinicBW-sap.xml` (the reference's `ClinicBW.xml` with the BW hierarchy in olap4abap's form). Only views over copied tables are taken; SAP has views of other providers too:
+to the ones the schema builder added there. So is the clinic's test catalog `ZCLHIER`, which the clinic generator
+deploys with the InfoCube (the reference's `ClinicBW.xml` with the BW hierarchies in olap4abap's form; not from a file
+of the repository, `docs/clinic-demo.md`, The schemas). Only views over copied tables are taken; SAP has views of other providers too:
 
     python scripts/add-empty-members.py           # FoodMart data with the empty members (once, from the original jar)
     sapcli class execute ZZXXMLA1_CL_BW_VIEW_GEN  # the CDS views of the characteristics (logon as in sap-sync.sh)

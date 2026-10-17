@@ -24,7 +24,8 @@
 "!   children below them in family care (postable nodes),
 "! - the service ZCLSERV (52 services by a four-digit code, a dimension of both providers), with the plain hierarchy
 "!   ZCLSERV_CAT (all services > category > ranges of codes) of intervals: overlapping ones, a linked text node with its
-"!   range and a linked range,
+"!   range and a linked range, and the plain hierarchy ZCLSERV_LOC (all locations > site > room > service) whose sites
+"!   and rooms are nodes of the external characteristics ZCLSITE and ZCLROOM (compounded with the site),
 "! - the room ZCLROOM, compounded with the site ZCLSITE: the same rooms R01 to R04 at both sites, so a room is a member
 "!   only with its site (docs/bw-schema-design-guide.md, section 3.7),
 "! - the fiscal time, a dimension of its own: the fiscal year variant ZCLFISCVR (K1, K2, K4), the fiscal year ZCLFISCYR
@@ -58,11 +59,14 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     CONSTANTS c_infoarea TYPE rsinfoarea VALUE 'ZCLINIC'.
     CONSTANTS c_cube     TYPE rsinfocube VALUE 'ZCLVISIT'.
     CONSTANTS c_adso     TYPE rsoadsonm VALUE 'ZCLVISITA'.
+    "! the test catalog of the InfoCube: the reference's schema reference/schema/ClinicBW.xml
+    CONSTANTS c_test_catalog TYPE string VALUE `ZCLHIER`.
     CONSTANTS c_hierarchy_org  TYPE rshienm VALUE 'ZCLDOC_ORG'.
     CONSTANTS c_hierarchy_site TYPE rshienm VALUE 'ZCLDOC_SITE'.
     CONSTANTS c_hierarchy_diag TYPE rshienm VALUE 'ZCLDIAG_ICD'.
     CONSTANTS c_hierarchy_prg  TYPE rshienm VALUE 'ZCLPAT_PRG'.
     CONSTANTS c_hierarchy_serv TYPE rshienm VALUE 'ZCLSERV_CAT'.
+    CONSTANTS c_hierarchy_loc  TYPE rshienm VALUE 'ZCLSERV_LOC'.
 
     "! Deletes everything and generates the InfoObjects with their master data and hierarchies, and the providers
     "! asked for with their data, schemas and catalogs; the log of the run.
@@ -116,6 +120,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
         hie_timedep   TYPE abap_bool,
         hie_intervals TYPE abap_bool,
         auth_relevant TYPE abap_bool,
+        "! the external characteristics whose values can be nodes of its hierarchies
+        hie_external  TYPE ty_t_iobjnm,
       END OF ty_cha,
       ty_t_cha TYPE STANDARD TABLE OF ty_cha WITH EMPTY KEY.
     TYPES:
@@ -195,13 +201,15 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
       END OF ty_physician,
       ty_t_physician TYPE STANDARD TABLE OF ty_physician WITH EMPTY KEY.
     TYPES:
-      "! a node of a hierarchy: a text node (with a text), a value of the characteristic (its key, no text) or an
-      "! interval of values (from and to, named by from); a link node shows the subtree of the node of its name that is
-      "! no link
+      "! a node of a hierarchy: a text node (with a text), a value of the characteristic (its key, no text), a value of
+      "! an external characteristic (iobjnm, named by its key as BW names it: the compounding first, each part at its
+      "! full length) or an interval of values (from and to, named by from); a link node shows the subtree of the node
+      "! of its name that is no link
       BEGIN OF ty_hie_node,
         name   TYPE string,
         parent TYPE string,
         text   TYPE string,
+        iobjnm TYPE rsiobjnm,
         link   TYPE abap_bool,
         from   TYPE string,
         to     TYPE string,
@@ -309,7 +317,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
                 registered TYPE abap_bool DEFAULT abap_false.
     METHODS build_physicians.
     METHODS build_diagnoses.
-    "! The time slices of the versions of ZCLDOC_ORG and ZCLDOC_SITE, ZCLDIAG_ICD and ZCLPAT_PRG.
+    "! The time slices of the versions of ZCLDOC_ORG and ZCLDOC_SITE, ZCLDIAG_ICD, ZCLPAT_PRG, ZCLSERV_CAT and
+    "! ZCLSERV_LOC.
     METHODS hierarchies RETURNING VALUE(result) TYPE ty_t_hierarchy.
     "! The nodes of a time slice of ZCLDOC_ORG: the text nodes and below its department every physician, moved ones
     "! elsewhere.
@@ -331,6 +340,9 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     "! node, a patient in a second program a duplicate node or a link node; in family care a parent is a postable node
     "! with their children below them.
     METHODS care_program_nodes RETURNING VALUE(result) TYPE ty_t_hie_node.
+    "! The nodes of ZCLSERV_LOC: all locations > site (ZCLSITE) > room (ZCLROOM) > service, and the laboratory's
+    "! services under a text node; every service once.
+    METHODS service_location_nodes RETURNING VALUE(result) TYPE ty_t_hie_node.
     "! The nodes of ZCLSERV_CAT: all services > category > interval of codes, and care pathways with overlapping
     "! intervals, a linked category and a linked interval.
     METHODS service_catalog_nodes RETURNING VALUE(result) TYPE ty_t_hie_node.
@@ -417,9 +429,20 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
       IMPORTING providers TYPE string_table.
     "! Adds to the schema of a provider every BW hierarchy BW has for the characteristic of one of its dimensions and
     "! olap4abap serves (ZZXXMLA1_CL_BW_HIERARCHY_COPY=>offered), as the user ticks them in the schema builder
-    "! (ZCLDIAG_ICD, ZCLPAT_PRG and ZCLSERV_CAT on ZCLVISIT and ZCLVISITA).
+    "! (ZCLDIAG_ICD, ZCLPAT_PRG, ZCLSERV_CAT and ZCLSERV_LOC on ZCLVISIT and ZCLVISITA).
     METHODS tick_hierarchies
       CHANGING !schema TYPE zzxxmla1_cl_schema_def=>ty_schema.
+    "! The test catalog ZCLHIER from the InfoCube's schema: the reference's reference/schema/ClinicBW.xml, catalog and
+    "! cube named ZCLHIER, with the BW hierarchies (olap4abap's form, no reference case names but ZCLDIAG_ICD) and
+    "! without olap4abap's extensions (membersWithFacts, omitEmptyCells), so its answers are the reference's
+    "! (scripts/xmla_test.py, the *_hier* cases; scripts/ssas_compare.py).
+    METHODS test_schema
+      IMPORTING !schema       TYPE zzxxmla1_cl_schema_def=>ty_schema
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_schema_def=>ty_schema.
+    "! The annotations but olap4abap's extensions membersWithFacts and omitEmptyCells, as a new object; none left: unbound.
+    METHODS without_extensions
+      IMPORTING annotations   TYPE REF TO zzxxmla1_cl_schema_def=>ty_annotations
+      RETURNING VALUE(result) TYPE REF TO zzxxmla1_cl_schema_def=>ty_annotations.
     "! The proposal for a provider.
     METHODS propose
       IMPORTING provider      TYPE csequence
@@ -564,7 +587,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       ( name = 'ZCLVTYPE' text = 'Visit Type' leng = 20
         attributes = VALUE #( ( 'ZCLSETNG' ) ) )
       ( name = 'ZCLSERV'  text = 'Service'    datatp = 'NUMC' leng = 4
-        attributes = VALUE #( ( 'ZCLSETNG' ) ) hierarchies = abap_true hie_intervals = abap_true )
+        attributes = VALUE #( ( 'ZCLSETNG' ) ) hierarchies = abap_true hie_intervals = abap_true
+        hie_external = VALUE #( ( 'ZCLSITE' ) ( 'ZCLROOM' ) ) )
       " the day as YYYYMMDD; a plain characteristic, not a BW time characteristic, so it can have attributes
       ( name = 'ZCLDATE'  text = 'Date'       datatp = 'NUMC' leng = 8
         attributes = VALUE #( ( 'ZCLTHEDT' ) ( 'ZCLDAYNM' ) ( 'ZCLMONNM' ) ( 'ZCLYEAR' ) ( 'ZCLQTR' ) ( 'ZCLMONTH' )
@@ -885,6 +909,35 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     " the services by intervals of their codes, plain too
     APPEND VALUE #( iobjnm = 'ZCLSERV' name = c_hierarchy_serv dateto = '99991231' text = `Service Catalog`
                     nodes = service_catalog_nodes( ) ) TO result.
+    " the services by where they are given, nodes of the sites and rooms (external characteristics), plain too
+    APPEND VALUE #( iobjnm = 'ZCLSERV' name = c_hierarchy_loc dateto = '99991231' text = `Service Locations`
+                    nodes = service_location_nodes( ) ) TO result.
+  ENDMETHOD.
+
+  METHOD service_location_nodes.
+    " A room is named by BW's key of ZCLROOM: the site (ZCLSITE, CHAR 10) at its full length, then the room. The
+    " rooms follow their type (master_data): consultations and mental health in consultation rooms, therapy, prevention
+    " and emergency care in treatment rooms, imaging and functional tests in the imaging room; the laboratory is no
+    " room of the clinic, so its services are under a text node. No service is in two rooms.
+    DATA(rooms) = VALUE string_table(
+      ( `NORTH R01 1001 1005` ) ( `NORTH R02 5001 5003` ) ( `NORTH R03 3001 3007` ) ( `NORTH R04 3051 3055` )
+      ( `NORTH R05 2101 2206` ) ( `SOUTH R01 4001 4007` ) ( `SOUTH R02 1010 1012` ) ).
+    DATA(catalog) = services( ).
+    result = VALUE #( ( name = `LOCATIONS` text = `All Locations` )
+                      ( name = `NORTH` parent = `LOCATIONS` iobjnm = 'ZCLSITE' )
+                      ( name = `SOUTH` parent = `LOCATIONS` iobjnm = 'ZCLSITE' ) ).
+    LOOP AT rooms INTO DATA(room).
+      SPLIT room AT ` ` INTO DATA(site) DATA(number) DATA(first) DATA(last).
+      DATA(key) = |{ site WIDTH = 10 }{ number }|.
+      APPEND VALUE #( name = key parent = site iobjnm = 'ZCLROOM' ) TO result.
+      LOOP AT catalog INTO DATA(service) WHERE code BETWEEN first AND last.
+        APPEND VALUE #( name = service-code parent = key ) TO result.
+      ENDLOOP.
+    ENDLOOP.
+    APPEND VALUE #( name = `LAB` parent = `LOCATIONS` text = `External Laboratory` ) TO result.
+    LOOP AT catalog INTO service WHERE code BETWEEN `2001` AND `2099`.
+      APPEND VALUE #( name = service-code parent = `LAB` ) TO result.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD service_catalog_nodes.
@@ -1122,7 +1175,9 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     DATA previous TYPE rshienodid.
     DATA(nodeid) = CONV rshienodid( lines( htab ) + 1 ).
     APPEND VALUE #( nodeid   = nodeid
-                    iobjnm   = COND #( WHEN node-text IS INITIAL THEN iobjnm ELSE '0HIER_NODE' )
+                    iobjnm   = COND #( WHEN node-iobjnm IS NOT INITIAL THEN node-iobjnm
+                                       WHEN node-text IS INITIAL THEN iobjnm
+                                       ELSE '0HIER_NODE' )
                     nodename = node-name
                     tlevel   = tlevel
                     link     = node-link
@@ -1701,6 +1756,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     DATA iobj TYPE bapi6108-infoobject.
     DATA attributes TYPE STANDARD TABLE OF bapi6108at WITH DEFAULT KEY.
     DATA compounds TYPE STANDARD TABLE OF bapi6108cm WITH DEFAULT KEY.
+    DATA external TYPE STANDARD TABLE OF bapi6108hc WITH DEFAULT KEY.
+    external = VALUE #( FOR e IN cha-hie_external ( chabasnm = cha-name iobjnm = e ) ).
     DATA(datatp) = COND datatype_d( WHEN cha-datatp IS INITIAL THEN 'CHAR' ELSE cha-datatp ).
     DATA(details) = VALUE bapi6108(
       infoobject = cha-name
@@ -1752,6 +1809,7 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       TABLES
         compounds   = compounds
         attributes  = attributes
+        hierarchycharacteristics = external
         returntable = return.
     IF iobj IS INITIAL.
       write( |create { cha-name }: FAILED| ).
@@ -2339,7 +2397,39 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
       ENDTRY.
       tick_hierarchies( CHANGING schema = schema ).
       accept( catalog = provider schema = schema ).
+      IF provider = c_cube.
+        accept( catalog = c_test_catalog schema = test_schema( schema ) ).
+      ENDIF.
     ENDLOOP.
+  ENDMETHOD.
+
+  METHOD test_schema.
+    DATA usage TYPE zzxxmla1_cl_schema_def=>ty_dimension_usage.
+    result = schema.
+    result-name = c_test_catalog.
+    LOOP AT result-cubes ASSIGNING FIELD-SYMBOL(<cube>).
+      <cube>-name = c_test_catalog.
+      <cube>-annotations = without_extensions( <cube>-annotations ).
+      " copies, so the InfoCube's schema keeps its annotations
+      LOOP AT <cube>-dimensions ASSIGNING FIELD-SYMBOL(<node>) WHERE name = `DimensionUsage`.
+        DATA(source) = CAST zzxxmla1_cl_schema_def=>ty_dimension_usage( <node>-def ).
+        usage = source->*.
+        usage-annotations = without_extensions( usage-annotations ).
+        <node>-def = NEW zzxxmla1_cl_schema_def=>ty_dimension_usage( usage ).
+      ENDLOOP.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD without_extensions.
+    IF annotations IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    DATA(kept) = VALUE zzxxmla1_cl_schema_def=>ty_t_annotation(
+      FOR a IN annotations->array WHERE ( name <> zzxxmla1_cl_schema=>c_members_with_facts
+                                          AND name <> zzxxmla1_cl_schema=>c_omit_empty_cells ) ( a ) ).
+    IF kept IS NOT INITIAL.
+      result = NEW #( array = kept ).
+    ENDIF.
   ENDMETHOD.
 
   METHOD tick_hierarchies.
@@ -2386,8 +2476,10 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
   METHOD remove_catalogs.
     DATA(datasources) = zzxxmla1_cl_files=>read( zzxxmla1_cl_files=>c_datasources )-content.
     DATA(api) = NEW zzxxmla1_cl_schema_api( ).
-    " the catalogs of both providers, and the ones fixing the fiscal year variant to K4 that earlier runs deployed
-    LOOP AT VALUE string_table( ( CONV #( c_cube ) ) ( CONV #( c_adso ) ) ( |{ c_cube }_K4| ) ( |{ c_adso }_K4| ) )
+    " the catalogs of both providers and the test catalog, and the ones fixing the fiscal year variant to K4 that
+    " earlier runs deployed
+    LOOP AT VALUE string_table( ( CONV #( c_cube ) ) ( CONV #( c_adso ) ) ( c_test_catalog ) ( |{ c_cube }_K4| )
+                                ( |{ c_adso }_K4| ) )
          INTO DATA(catalog).
       IF datasources NS |<Catalog name="{ catalog }">|.
         CONTINUE.

@@ -51,7 +51,8 @@ on a test system: the visits are thinned evenly over the days, so every day keep
   tables and checks no authorizations.
 - The patient `ZCLPAT` has the hierarchy `ZCLPAT_PRG` with **duplicate and link nodes** (shared subtrees and patients
   under two parents, see below), the test case of BW hierarchies with shared nodes; it is not authorization relevant.
-- The service `ZCLSERV` has the hierarchy `ZCLSERV_CAT` of **intervals**, overlapping and linked (see below).
+- The service `ZCLSERV` has the hierarchy `ZCLSERV_CAT` of **intervals**, overlapping and linked, and the hierarchy
+  `ZCLSERV_LOC` with nodes of the **external characteristics** site and room (see below).
 - Key figures: `ZCLVISNO` (1 per visit: the aDSO adds up visits with the same keys, so counting rows would not count
   visits), `ZCLDUR` duration, `ZCLWAIT` waiting time (minutes), `ZCLLABS` lab tests, `ZCLCHRG` charges.
 - Texts: every characteristic has language-dependent short, medium and long texts (a text table `/BIC/T...`), and the
@@ -219,6 +220,36 @@ the eight consultations, `LISTNO` 3); the links are expanded too (the linked Ima
 deeper, the linked interval to its seven services). A value in more than one place has one more row under the root
 with `LISTNO` 0 (as in `/BIC/IZCLPAT`).
 
+Its second hierarchy `ZCLSERV_LOC`, Service Locations, is plain and has nodes of **external characteristics** (the
+characteristic's "external characteristics in hierarchies", `RSDHIECHA`, `HIERARCHYCHARACTERISTICS` of
+`BAPI_IOBJ_CREATE`): the site `ZCLSITE` and the room `ZCLROOM`, which is compounded with the site. Every service is in
+it once, by the room it is given in (the room types of the master data); the laboratory is no room of the clinic:
+
+```
+All Locations  LOCATIONS
+├── North Site  NORTH (ZCLSITE)
+│   ├── Room 1  NORTH     R01 (ZCLROOM)   1001-1005 consultations
+│   ├── Room 2  NORTH     R02             5001-5003 mental health
+│   ├── Room 3  NORTH     R03             3001-3007 minor procedures
+│   ├── Room 4  NORTH     R04             3051-3055 therapy
+│   └── Room 5  NORTH     R05             2101-2106, 2201-2206 imaging and functional tests
+├── South Site  SOUTH (ZCLSITE)
+│   ├── Room 1  SOUTH     R01             4001-4007 prevention
+│   └── Room 2  SOUTH     R02             1010-1012 emergency care
+└── External Laboratory  LAB             2001-2010
+```
+
+63 nodes; the not-assigned node is shown (it holds `#` only). A node of an external characteristic is named by its key
+as BW names it, the compounding first at its full length (`ZCLSITE` is CHAR 10: `NORTH     R01`, as
+`RSNDI_SHIE_BW_NODENAMESCREATE4` puts it together), and has no text of its own: BW's MDX captions it by the external
+characteristic's short text (North Site, Room 1, so the two sites' Room 1 have the same caption) and names it
+`[NORTH     R01                   ZCLROOM]` (the name padded to 32, then the InfoObject). These nodes are the test case
+of external characteristics: olap4abap's copy takes `/BIC/K`'s node name as it is (`NODE_IOBJ` `ZCLROOM`, `NODE_NAME`
+the padded key). Checked 2026-10-17 (`bw_hierarchy_test.py`): members, levels, children and values are BW's; such a
+node is named and captioned by BW's node name, as a text node is until the node texts come (`NORTH`,
+`[ZCLSERV.ZCLSERV_LOC].[LOCATIONS].[NORTH].[NORTH     R01]` captioned `NORTH     R01`), where BW captions it by the
+external characteristic's text and olap4abap's own form of a compounded key is `NORTH/R01`.
+
 The run deletes the characteristics' hierarchies before the InfoObjects. An analysis authorization on a hierarchy node
 also stores the hierarchy's `HIEID` (`RSECHIE`), and every run creates new ones: check the hierarchy authorizations
 after a run (not tried yet).
@@ -260,9 +291,17 @@ are compounded: keyed by the SID on both providers, named by `COMPOUND_KEY` (`NO
 hierarchies (Region > City > Patient and the like are for the UI to add) and marks no dimension as time.
 The run then ticks every BW hierarchy BW serves on the providers' dimensions, as the schema builder's "BW hierarchies"
 does (`tick_hierarchies`): `ZCLVISIT` and `ZCLVISITA` have `[ZCLDIAG.ZCLDIAG_ICD]`, `[ZCLPAT.ZCLPAT_PRG]` and
-`[ZCLSERV.ZCLSERV_CAT]`, captioned by BW's texts; the physician's are time and version dependent. On the aDSO, whose
+`[ZCLSERV.ZCLSERV_CAT]` and `[ZCLSERV.ZCLSERV_LOC]`, captioned by BW's texts; the physician's are time and version dependent. On the aDSO, whose
 facts hold the value, the closure's SIDs are mapped to the values on the characteristic's view
 (`ZZXXMLA1_CL_MODEL=>bw_fact_value`).
+
+With the InfoCube the run also deploys the **test catalog `ZCLHIER`** (`test_schema`): the InfoCube's schema with its
+BW hierarchies, schema and cube named `ZCLHIER`, without olap4abap's extensions `membersWithFacts` and
+`omitEmptyCells`, so it is the reference's `reference/schema/ClinicBW.xml` but for the BW hierarchies' form (compared
+2026-10-17: nothing else differs). The hierarchy cases (`execute_hier_*`, `members_hier_*`, `mdschema_*_hier`) and
+`ssas_compare.py` run against it. The run removes it with the demo's other catalogs: the run deletes and regenerates
+the views it names, so a test catalog deployed from elsewhere would be left naming deleted views. The generator builds
+everything the SAP side's tests need, as its provider checkboxes ask.
 
 Every dimension is annotated `olap4abap.membersWithFacts` on the cube's `DimensionUsage` (`mvp-scope.md`, Members with
 facts decision): its members are only those with visits, so the 300 registered patients are no members

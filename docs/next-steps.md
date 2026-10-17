@@ -86,6 +86,13 @@ Next, in this order:
    --names` passes: 72, 2,914 and 92 members as BW's); a slicer, compound slicer, subselect, label filter and
    drill-through of a node give the InfoCube's answers (the aDSO's drill-through has fewer rows of the same sum: it
    aggregates visits with equal keys).
+   Done (2026-10-17): external characteristics in hierarchies. The clinic's `ZCLSERV_LOC` (Service Locations: all
+   locations > site `ZCLSITE` > room `ZCLROOM`, compounded > service) has nodes of other InfoObjects; members, levels,
+   children and values are BW's (`bw_hierarchy_test.py`). Open: such a node is named and captioned by BW's node name
+   (`NORTH     R01`, the site padded to 10), where BW captions it by its characteristic's text (North Site, Room 1);
+   its name could be olap4abap's compounded form (`NORTH/R01`); with the node texts. And the clinic generator deploys
+   the test catalog `ZCLHIER` (`ClinicBW-sap.xml` and its `sap-files.py deploy` are gone): a clinic run deleted the
+   views the deployed file named, so the next accept was refused.
 4. Smaller: texts step 5 (the check against blank texts); the debt that keeps about 30 hierarchy cases red on SAP
    (measure captions, member names on `sourceAttribute` levels, `known-issues.md`).
 

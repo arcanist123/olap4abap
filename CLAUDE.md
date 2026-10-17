@@ -418,13 +418,17 @@ Read before designing anything:
   `bw_hierarchy_test.py --reference`). The reference cannot model REST_H, so `ZCLDIAG_ICD` assigns every value (the
   initial one as leaf `#` under `NOT_RECORDED` > `NO_DIAGNOSIS`) and suppresses the not-assigned node (decided
   2026-10-16). Its 71 cases (`execute_hier_*`, `members_hier_*`, `mdschema_*_hier`; the Excel ones from a live
-  session against it) are what the engine work has to pass, on the test catalog `ZCLHIER` of SAP
-  (`reference/schema/ClinicBW-sap.xml`, written by `sap-files.py deploy`): `ClinicBW.xml` with the hierarchy in
-  olap4abap's form (annotation `olap4abap.bwHierarchy`, no levels) and `ZCLPAT_PRG` and `ZCLSERV_CAT` in the same
-  form, which no case names (`bw_hierarchy_test.py --catalog ZCLHIER --names` checks all three against BW's MDX), no
-  other annotation (`docs/next-steps.md`,
-  Reference scenario); the demo's own catalog `ZCLVISIT` has the three hierarchies as the setup ticks them (`bw_hierarchy_test.py
-  --catalog ZCLVISIT --names` passes). Decided 2026-10-16 after Excel failed on the parent-child form: the
+  session against it) are what the engine work has to pass, on the test catalog `ZCLHIER` of SAP, which the clinic
+  generator deploys with the InfoCube (`ZZXXMLA1_CL_BW_CLINIC_GEN=>test_schema`; the generator builds everything the
+  SAP side tests need, as its provider checkboxes ask): `ZCLVISIT`'s schema with its BW hierarchies (olap4abap's form,
+  annotation `olap4abap.bwHierarchy`, no levels), catalog and cube named `ZCLHIER`, without `membersWithFacts` and
+  `omitEmptyCells`, so it is `ClinicBW.xml` but for the hierarchies' form; `ZCLPAT_PRG`, `ZCLSERV_CAT` and
+  `ZCLSERV_LOC` no case names (`bw_hierarchy_test.py --catalog ZCLHIER --names` checks all four against BW's MDX)
+  (`docs/next-steps.md`, Reference scenario); the demo's own catalogs `ZCLVISIT` and `ZCLVISITA` have the four
+  hierarchies as the setup ticks them (`bw_hierarchy_test.py --catalog ZCLVISIT --names` passes). `ZCLSERV_LOC`
+  (Service Locations) has nodes of the external characteristics `ZCLSITE` and `ZCLROOM` (compounded): olap4abap names
+  and captions them by BW's node name (`NORTH     R01`), where BW captions them by their characteristic's text
+  (`docs/clinic-demo.md`). Decided 2026-10-16 after Excel failed on the parent-child form: the
   reference is the oracle for everything but parent-child hierarchies and is not patched any more: its patches stay
   as they are, an answer it gets wrong (Expand Entire Field, Top 10 value filter, a label filter on an upper level)
   waits for SSAS (2016, the version olap4abap reports), the spec for hierarchies and Excel's behaviour; olap4abap puts each member of a BW hierarchy on the level of its depth, as SSAS does (Excel

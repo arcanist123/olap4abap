@@ -3,7 +3,8 @@
 docs/test-strategy.md, Clinic demo: BW hierarchies): each statement is rewritten into olap4abap's names, asked of
 SAP's catalog ZCLHIER and compared by its values only; names, captions, levels, parents and order are BW's to check.
 
-The rewrite (SSAS's model is scripts/build-ssas-clinic-md.py's, olap4abap's reference/schema/ClinicBW-sap.xml):
+The rewrite (SSAS's model is scripts/build-ssas-clinic-md.py's, olap4abap's the schema of ZCLHIER on SAP, which the
+clinic generator ZZXXMLA1_CL_BW_CLINIC_GEN deploys, read with scripts/sap-files.py):
 - a BW hierarchy [H].[H] is olap4abap's [C.H], its occurrence &[POS] the path of names data/foodmart-bw/ssas/members.json
   gives, its All member olap4abap's allMemberName, its levels [Level nn] the same;
 - a characteristic's hierarchy [C].[C] is [C], its member [C].[C].&[SID] stays (the level's member by key, the SID
@@ -23,8 +24,10 @@ of distinct rows over the columns of the default action (SSAS answers a node's r
 import argparse
 import html
 import json
+import os
 import pathlib
 import re
+import subprocess
 import sys
 import xml.etree.ElementTree as ET
 from decimal import Decimal, InvalidOperation
@@ -34,8 +37,9 @@ from xmla_test import DEFAULT_URL, local, post
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 PREFIX = "execute_ssasmd_"
 MEMBERS = ROOT / "data/foodmart-bw/ssas/members.json"
-SCHEMA = ROOT / "reference/schema/ClinicBW-sap.xml"
 CATALOG = "ZCLHIER"
+# the schema file of the catalog on SAP (ZZXXMLA1_CL_SCHEMA_API's accept writes /WEB-INF/schema/<catalog>.xml)
+SCHEMA = f"/WEB-INF/schema/{CATALOG}.xml"
 STANDARD_PROPERTIES = {"PARENT_UNIQUE_NAME", "HIERARCHY_UNIQUE_NAME", "MEMBER_KEY", "CHILDREN_CARDINALITY",
                        "PARENT_LEVEL", "PARENT_COUNT", "MEMBER_TYPE", "MEMBER_NAME", "MEMBER_CAPTION", "DESCRIPTION",
                        "LEVEL_UNIQUE_NAME", "LEVEL_NUMBER", "MEMBER_UNIQUE_NAME", "DIMENSION_UNIQUE_NAME"}
@@ -45,6 +49,15 @@ SHOWN = 10  # differences printed per case
 # a compound identifier: [name] or &[key] segments joined by dots (]] inside a name is a ])
 SEGMENT = r"&?\[(?:[^\]]|\]\])*\]"
 COMPOUND = re.compile(rf"{SEGMENT}(?:\s*\.\s*{SEGMENT})*")
+
+
+def server_file(path):
+    """A file of the server (scripts/sap-files.py get)."""
+    result = subprocess.run([sys.executable, str(ROOT / "scripts/sap-files.py"), "get", path], capture_output=True,
+                            text=True, encoding="utf-8", env={**os.environ, "MSYS_NO_PATHCONV": "1"})
+    if result.returncode or "<Schema" not in result.stdout:
+        sys.exit(f"{path} not read from SAP: {result.stdout[-1000:]}{result.stderr[-1000:]}")
+    return result.stdout.encode("utf-8")
 
 
 def quote(name):
@@ -61,7 +74,7 @@ class Model:
     """The names of both servers: per hierarchy of SSAS olap4abap's hierarchy and All member, and the occurrences."""
 
     def __init__(self):
-        schema = ET.parse(SCHEMA).getroot()
+        schema = ET.fromstring(server_file(SCHEMA))
         self.flat, self.bw = {}, {}  # SSAS's hierarchy name -> (olap4abap's hierarchy, olap4abap's All member)
         self.drill_columns = {}  # olap4abap's drill-through column name -> dimension
         for dimension in schema.findall("Dimension"):
@@ -79,7 +92,7 @@ class Model:
         members = json.loads(MEMBERS.read_text(encoding="utf-8"))
         self.occurrence = {h: {m["pos"]: m["olap4abap"] for m in rows} for h, rows in members.items()}
         missing = set(self.occurrence) - set(self.bw)
-        assert not missing, f"hierarchies of members.json not in {SCHEMA.name}: {missing}"
+        assert not missing, f"hierarchies of members.json not in {SCHEMA}: {missing}"
 
     # --- statements ----------------------------------------------------------------------------------------------
 

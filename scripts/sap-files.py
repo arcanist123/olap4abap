@@ -36,8 +36,8 @@ DEPLOY = [
     ("reference/schema/FoodmartBW.xml", "/WEB-INF/schema/FoodmartBW.xml"),
     ("reference/schema/FoodmartBWDrill.xml", "/WEB-INF/schema/FoodmartBWDrill.xml"),
     ("reference/schema/FoodmartBWCaption.xml", "/WEB-INF/schema/FoodmartBWCaption.xml"),
-    ("reference/schema/ClinicBW-sap.xml", "/WEB-INF/schema/ClinicBW.xml"),
 ]
+# the clinic's test catalog ZCLHIER is the clinic generator's (ZZXXMLA1_CL_BW_CLINIC_GEN), not deployed from here
 # the data sources file `deploy` merges its catalogs from
 DATASOURCES = ("reference/schema/datasources-sap.xml", "/WEB-INF/datasources.xml")
 MISSING = "<<file does not exist>>"

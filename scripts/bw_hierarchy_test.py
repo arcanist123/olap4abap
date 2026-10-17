@@ -6,7 +6,8 @@ in BW's order, with its level, number of children, caption and the values of the
 for the same members through XMLA and compares them position by position.
 
 The hierarchies (docs/clinic-demo.md): ZCLDIAG_ICD (a plain tree), ZCLPAT_PRG (link nodes, recursively, duplicate and
-link leaves, postable nodes) and ZCLSERV_CAT (intervals, overlapping and linked). What BW shows and the test expects:
+link leaves, postable nodes), ZCLSERV_CAT (intervals, overlapping and linked) and ZCLSERV_LOC (nodes of the external
+characteristics ZCLSITE and ZCLROOM, compounded). What BW shows and the test expects:
 - a member per occurrence (a node under two parents is two members, its subtree under each); BW's unique names repeat
   for the occurrences of a node, so members are compared by position, not by unique name;
 - a node's value is the sum over the distinct values below it (a value reached by two paths counts once);
@@ -58,6 +59,7 @@ HIERARCHIES = {
     ("ZCLDIAG", "ZCLDIAG_ICD"): "[ZCLDIAG.ZCLDIAG_ICD]",
     ("ZCLPAT", "ZCLPAT_PRG"): "[ZCLPAT.ZCLPAT_PRG]",
     ("ZCLSERV", "ZCLSERV_CAT"): "[ZCLSERV.ZCLSERV_CAT]",
+    ("ZCLSERV", "ZCLSERV_LOC"): "[ZCLSERV.ZCLSERV_LOC]",
 }
 NOT_ASSIGNED = "1HIER_REST"
 # --reference: the reference server, its catalog and the hierarchies it serves
