@@ -133,8 +133,17 @@ Next, in this order:
    version-dependent one without its version), `schema_ui_test.py`'s BW hierarchy checks, unit tests of the copy,
    `xmla_test.py` 372 of 372, `ssas_compare.py` 36 of 36, `hierarchy_copy_test.py`. Open: other slices than
    9999-12-31 wait for the key date; a time-dependent structure.
+7. The `REFRESH CUBE <cube>` statement, before the key date. The parser parses it already
+   (`ZZXXMLA1_CL_MDX_PARSER=>refresh_statement`, kind `REFRESH`), but `ZZXXMLA1_CL_XMLA_HANDLER` answers it with the
+   fault "REFRESH statements are not implemented yet". The reference (`XmlaHandler`, `Refresh`) looks up the cube
+   (an unknown one is its error), calls `RolapCube.flushCache` and answers an empty Execute. olap4abap keeps no member
+   or cell cache across requests (the `MemberCache` lives for one request). What it does keep is the Discover cache,
+   so a refresh clears `ZZXXMLA1_DSCACHE` (`ZZXXMLA1_CL_DISCOVER_CACHE`). That gives users a way to see BW master data
+   and loads before the 12 hours run out (`mvp-scope.md`, Discover cache decision, Not in the MVP). Capture the
+   reference's answers for a known and an unknown cube as cases (`execute_refresh_cube*`), and note the decision in
+   `mvp-scope.md`.
 
-Later, as noted: the key date (then the other slices of time-dependent hierarchies, and time-dependent structures); the performance risks (below, Paused:
+Later, as noted: after step 7, the key date (then the other slices of time-dependent hierarchies, and time-dependent structures); the performance risks (below, Paused:
 query planning); query planning step 7.
 
 ## Now: texts and captions
