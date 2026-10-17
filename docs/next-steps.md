@@ -47,7 +47,17 @@ Next, in this order:
    olap4abap's names through `data/foodmart-bw/ssas/members.json` (occurrence `&[POS]` to the path of names), runs it on
    SAP's `ZCLHIER` and compares the cell values per tuple. Taken from SSAS: values only; levels, parents, children
    counts and order are olap4abap's and BW's. SSAS's cells are `xsd:decimal` (measures `Currency`, exact), olap4abap's
-   `xsd:double`.
+   `xsd:double`. The Excel session is done (2026-10-17, `logs/xmla-proxy/20261017-110127/`, connection string with
+   `Protocol Format=XML;Transport Compression=None`): linked subtrees, Expand Entire Field, duplicate leaves, the
+   postable family nodes and their own leaves, REST_H, filters and slicers of overlapping programs (#0995, #0998,
+   #1016) and services (#1259), intervals and the linked text node and interval, both hierarchies crossed (#1173) and
+   crossed with Patient and Room, drill-throughs on a node, a duplicate leaf and a postable node's own leaf; no
+   fault. Not done: label and Top 10 value filters (known issues). SSAS doubles the rows of a drill-through on a node
+   (#0944, #1231; a leaf's are single): compared as distinct rows. Captured (2026-10-17): 36 cases
+   `execute_ssasmd_*` (`prg_*` Care Programs, `srv_*` Service Catalog, `prg_srv_*` both crossed, `pat_prg_*`,
+   `room_srv_*`, `drillthrough_*`), each the statement Excel sent, its answer's cell count Excel's; left out: member
+   lists and children counts (shape, BW's), the capped drill-through #0944 and the Patient grids over 5 MB (#1195,
+   #1201, #1204, #1221). `xmla_test.py` skips them (`ssas.txt`). Next: the comparison script.
 3. Hierarchies in the schema builder (open 5 below): the proposal and the UI offer the hierarchies a characteristic
    has in `RSHIEDIR`, accept creates their copies; then `ZCLVISIT` and `ZCLVISITA` have them in Excel. Before the
    aDSO: a BW hierarchy on an aDSO, whose fact column holds the value, not the SID the closure has.
@@ -1536,6 +1546,12 @@ evaluation (`MemberArrayValueCalc`; before, `([Measures].[Foo], [Time].CurrentMe
   always. The switch would rewrite about 135 requests, recapture about 230 answers and change the Mondrian test
   statements of `applicable.json`, whose expectations come from the reference's naming. Revisit when a client needs
   SSAS names, or before a release that claims SSAS compatibility.
+  Part of that migration (decided with the user 2026-10-17): SSAS becomes the oracle of the BW hierarchies' members
+  too, not of their values only. Until then BW is the oracle of names, captions, levels, parents, children counts and
+  order, SSAS of the values only, and SSAS's captions are olap4abap's own (`test-strategy.md`, Clinic demo: BW
+  hierarchies, which oracle checks what). With SSAS naming the nodes are named as SSAS names them, the SSAS model is
+  built from BW's texts, not from our schema, so that its names and captions are independent of olap4abap, and the
+  comparison of `execute_ssasmd_*` takes the whole answer, not the cells only.
 - The result limit is a class attribute; a setting (per system, like Mondrian's property file) would let it be changed
   without a transport.
 - Done: the native NON EMPTY crossjoin. Not yet: its context constraint with calculated members (Aggregate members

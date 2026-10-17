@@ -1,0 +1,6 @@
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<SOAP-ENV:Body>
+<Execute xmlns="urn:schemas-microsoft-com:xml-analysis" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<Command><Statement>SELECT NON EMPTY Hierarchize({DrilldownLevel({DrilldownLevel({DrilldownLevel({DrilldownLevel({[ZCLPAT_PRG].[ZCLPAT_PRG].[All ZCLPAT_PRG]},,,INCLUDE_CALC_MEMBERS)},[ZCLPAT_PRG].[ZCLPAT_PRG].[Level 01],INCLUDE_CALC_MEMBERS)},[ZCLPAT_PRG].[ZCLPAT_PRG].[Level 02],INCLUDE_CALC_MEMBERS)},[ZCLPAT_PRG].[ZCLPAT_PRG].[Level 03],INCLUDE_CALC_MEMBERS)}) DIMENSION PROPERTIES PARENT_UNIQUE_NAME,HIERARCHY_UNIQUE_NAME,[ZCLPAT_PRG].[ZCLPAT_PRG].[ZCLPAT_PRG] ON COLUMNS  FROM (SELECT ({[ZCLPAT_PRG].[ZCLPAT_PRG].&amp;[3]}) ON COLUMNS  FROM [ZCLHIER]) WHERE ([Measures].[ZCLVISNO]) CELL PROPERTIES VALUE, FORMAT_STRING, LANGUAGE, BACK_COLOR, FORE_COLOR, FONT_FLAGS</Statement></Command>
+<Properties><PropertyList><DataSourceInfo>ABAP BW</DataSourceInfo><Catalog>ZCLHIER</Catalog><Format>Multidimensional</Format><AxisFormat>TupleFormat</AxisFormat><Content>SchemaData</Content></PropertyList></Properties>
+</Execute></SOAP-ENV:Body></SOAP-ENV:Envelope>

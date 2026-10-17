@@ -221,6 +221,25 @@ their drill-throughs by the facts' count under the closure. `Aggregate` and comp
 below it count that member twice in the reference, as Microsoft specifies `Aggregate` for Sum, and olap4abap follows
 it. Excel cannot connect to BW's XMLA, so a session against olap4abap itself is the last check.
 
+Which oracle checks what (decided with the user 2026-10-17):
+
+| What | Oracle |
+|---|---|
+| Cell values of shared nodes, links, postable nodes, intervals, REST_H (Excel's MDX) | SSAS Multidimensional (`execute_ssasmd_*`, values only) |
+| Values and Excel's behaviour on a hierarchy with a level form (`ZCLDIAG_ICD`) | the reference (its 71 cases) |
+| Names, captions, levels, parents, children counts, order | BW (`bw_hierarchy_test.py`, BW's MDX; the Query Monitor RSRT by eye) |
+
+SSAS's captions are never compared: `build-ssas-clinic-md.py` takes them from `ClinicBW.xml` and our views, so they
+are olap4abap's own (a text node shows its technical name in SSAS only because olap4abap has no node texts yet), and a
+comparison would check olap4abap against itself. The reference's captured captions are olap4abap's too (its database
+is built from our copy): when the node texts come, `bw_hierarchy_test.py` has to pass without `--names`, the reference
+database and the SSAS model are rebuilt and the 71 `*_hier*` cases recaptured; the `execute_ssasmd_*` cases do not
+change. Checked 2026-10-17 by eye, Excel on SSAS against RSRT on `ZCLVISIT` (Care Programs down to the family
+nodes): every value the same, only the text nodes' captions differ (`CHRONIC` against Chronic Care); a postable node
+is captioned by the patient's text in BW, as olap4abap does. SSAS answers a drill-through on a node with every fact
+row twice (on a leaf once), so its drill-throughs are compared as sets of distinct rows. Long term the caption oracle
+moves to SSAS (`next-steps.md`, Later, SSAS naming).
+
 ## Mondrian's own tests against our schema
 
 The eMondrian container serves only our reference catalog `ZFOODMART` (`scripts/deploy-reference-schema.sh`, installs
