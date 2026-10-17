@@ -18,10 +18,6 @@ it is fixed. Read this before comparing answers with the reference or with BW.
   2026-10-13; the user disagrees long term): one join to the SID table per such characteristic in the fact view,
   where its value would do. Fix: key it by its value and have `POST fix` rename the key attribute and what refers to
   it.
-- **A label filter of Excel on a level above the lowest of a user hierarchy compares the lowest level**
-  (`getCurrentMemberComparisonLevel`, as the reference does): the subcube is wrong there. Excel's label filters work
-  on flat hierarchies (the schema builder's) and on the lowest level. The reference answers the same filter on a BW
-  hierarchy's `Level 02` with every cell empty (below).
 - **A `TREE_OP` restriction of `MDSCHEMA_MEMBERS` that is not a number dumps** (`CONVT_NO_NUMBER` in
   `ZZXXMLA1_CL_XMLA_HANDLER=>hierarchy_members`, found 2026-10-17): the request gets HTTP 500 instead of a fault.
 - **`clinic_test.py`'s "Text of two hierarchies on one axis" asks for a `Text` property the proposal no longer
@@ -63,6 +59,12 @@ olap4abap answers differently on purpose; a comparison has to allow for these.
   name or caption column, as SSAS does; the reference compares its key column, so on a level keyed by the SID its
   answer is empty, everything or a cast error. Those cases take their answer from an equivalent member set
   (`execute_caption_subcube_*`, `capture-execute.py --answer-of`).
+- A label condition of a subselect `Filter` of a level's members (`<Level>.AllMembers`, Excel's label filters on any
+  level) compares that level, where `<Hierarchy>.CurrentMember` stands for one of them; the reference compares the
+  lowest level (`getCurrentMemberComparisonLevel`), so on an upper level of a user or BW hierarchy its subcube is
+  wrong or empty. Its `InStr` (contains) ignores case as the evaluator's (`Vba.inStr`) and SSAS's do; the
+  reference's subcube compares case (`subcube-filter-label.patch`). Cases `execute_subselect_filter_label_upper` and
+  `execute_hier_excel_label_upper` take their answer from an equivalent member set.
 - A subselect `Filter` whose condition is a constant true (`1 = 1`) does not restrict the subcube; the reference fails
   with a NullPointerException (`LiteralStarPredicate` has no column).
 - The native crossjoin has no bound on an enumeration (the reference's `MaxConstraints` 1,000,
@@ -89,4 +91,4 @@ Known faults of the reference server (eMondrian); its answer is not the oracle t
     `[Level 03]` on `ZCLDIAG_ICD`: 203 tuples of 75 members);
   - Excel's Top 10 value filter is refused ("MDX object '[XL_Filter_Set_0]' not found");
   - a label filter on an upper level (contains `RESP` on `ZCLDIAG_ICD`'s `Level 02`, in a subselect) leaves every
-    cell empty, the All member's too.
+    cell empty, the All member's too (olap4abap's answer: deliberate deviations above).

@@ -809,7 +809,8 @@ Done (2026-10-15): the reference serves `ZCLDIAG_ICD`.
      - a label filter on an upper level (contains `RESP` on `Level 02`, `Filter([Level 02].AllMembers, InStr(...))`
        in a subselect): every cell empty, the All member's too, where RESPIRATORY has 9,900 visits; the same filter on
        an axis and the label filters on `Level 04` are right (`subcube-filter-label.patch`,
-       `Query.getCurrentMemberPropertyReference`).
+       `Query.getCurrentMemberPropertyReference`). olap4abap answers it since 2026-10-17 (9,900;
+       `execute_hier_excel_label_upper`).
      Original plan: repeat the live Excel session against the reference (rows, expand a member, expand entire field, crossjoin,
      the tree filter, Keep Only Selected Items, search, Filters area, slicer, label and value filters, double-click)
      and capture the statements it sends as cases.
@@ -1550,8 +1551,9 @@ add_subcube_filter`: `=`, `<>`, `NOT`, `AND`, `OR`, `IsEmpty` of the current mem
 `Properties(...)` against a literal, as a `VALUE` predicate on the level's column), and `MEMBER_CAPTION`/`MEMBER_NAME`
 count as `Caption`/`Name` in olap4abap and in the reference (`scripts/patches/subcube-filter-member-caption.patch`), so
 Excel's "equals"/"does not equal" label filters work. The current member of a hierarchy compares its lowest level
-(`getCurrentMemberComparisonLevel`), so they work on flat hierarchies (the schema builder's), not on a level above the
-lowest of a user hierarchy. Extended 2026-10-13 to all of Excel's label filters in both servers (comparisons,
+(`getCurrentMemberComparisonLevel`), so they worked on flat hierarchies (the schema builder's), not on a level above
+the lowest of a user hierarchy; since 2026-10-17 olap4abap compares the level the `Filter` filters (`known-issues.md`,
+deliberate deviations). Extended 2026-10-13 to all of Excel's label filters in both servers (comparisons,
 between, begins/ends with, contains; `scripts/patches/subcube-filter-label.patch`, `label_predicate`; cases
 `execute_subselect_filter_label_compare` and `_text`); value filters and Top 10 still fail as in the reference. One
 deviation: a constant true condition (`1 = 1`) makes eMondrian fail with a NullPointerException

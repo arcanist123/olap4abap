@@ -2569,13 +2569,28 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     IF lines( node->args ) <> 2.
       unsupported_subcube( |Filter in subcube must have 2 args: { node->unparse( ) }| ).
     ENDIF.
+    " the members of a level (Excel's label filters: <Level>.AllMembers): CurrentMember there is a member of that level,
+    " not of the lowest one as getCurrentMemberComparisonLevel has it (our deviation, SSAS's answer)
+    DATA(outer_level) = filter_level.
+    DATA(set) = node->args[ 1 ].
+    IF set->kind = zzxxmla1_cl_mdx_node=>c_kind-resolved_call AND lines( set->args ) = 1
+        AND ( to_upper( set->fun_def-name ) = `MEMBERS` OR to_upper( set->fun_def-name ) = `ALLMEMBERS` )
+        AND set->args[ 1 ]->kind = zzxxmla1_cl_mdx_node=>c_kind-level.
+      DATA(level) = schema_reader->get_level( set->args[ 1 ]->element-id ).
+      IF level-key_level > 0.
+        filter_level = VALUE #( found = abap_true hierarchy = level-hierarchy level = level-key_level ).
+      ENDIF.
+    ENDIF.
     " only conditions that are predicates, no Filter that would have to be evaluated
     DATA(condition) = node->args[ 2 ].
     IF is_subcube_condition( condition ) = abap_false.
+      filter_level = outer_level.
       unsupported_subcube( |Unsupported Filter condition in subcube axis: { condition->unparse( ) }| ).
     ENDIF.
-    add_subcube_set( EXPORTING node = node->args[ 1 ] negated = negated CHANGING sets = sets predicate = predicate ).
+    " a level's members restrict nothing: no filter_level is read there
+    add_subcube_set( EXPORTING node = set negated = negated CHANGING sets = sets predicate = predicate ).
     DATA(index) = condition_predicate( EXPORTING node = condition CHANGING predicate = predicate ).
+    filter_level = outer_level.
     IF index = 0.
       RETURN.
     ENDIF.
@@ -2788,7 +2803,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
         RETURN.
       ENDIF.
       " InStr is 0 if the string does not contain the search, a position from 1 on if it does: the comparison must hold
-      " for all positions or for none
+      " for all positions or for none; InStr ignores case (Vba.inStr, java_in_str), in the subcube too (our deviation:
+      " the reference's subcube compares case, SSAS's does not)
       DATA(number) = value->number.
       DATA(contains) = COND string( WHEN ( comparison = `>` AND number = 0 ) OR ( comparison = `>=` AND number = 1 )
                                       THEN `X`
@@ -2800,7 +2816,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       ENDIF.
       APPEND VALUE #( kind   = zzxxmla1_cl_mdx_facts=>c_predicate-value
                       column = VALUE #( hierarchy = reference-hierarchy column = reference-column value = search->value
-                                        quoted    = abap_true operator = `CONTAINS` ) ) TO predicate.
+                                        quoted    = abap_true operator = `ICONTAINS` ) ) TO predicate.
       result = lines( predicate ).
       IF contains = `-`.
         APPEND VALUE #( kind = zzxxmla1_cl_mdx_facts=>c_predicate-not children = VALUE #( ( result ) ) ) TO predicate.
@@ -5989,10 +6005,6 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
          WHERE ( kind = zzxxmla1_cl_mdx_facts=>c_predicate-value AND column-hierarchy <> arg-hierarchy )
             OR ( kind = zzxxmla1_cl_mdx_facts=>c_predicate-member AND member-hierarchy <> arg-hierarchy ).
       RETURN.
-    ENDLOOP.
-    " InStr ignores case (Vba.inStr, java_in_str); the subcube's contains does not (our patch of the reference)
-    LOOP AT predicate ASSIGNING FIELD-SYMBOL(<part>) WHERE column-operator = `CONTAINS`.
-      <part>-column-operator = `ICONTAINS`.
     ENDLOOP.
     LOOP AT schema_reader->get_level_members_where(
               level     = arg-level

@@ -557,7 +557,9 @@ subselect label filters on `Name` and `Caption` (`execute_caption_subcube_*`) ar
 the level's key column there (`known-issues.md`, deliberate deviations), so `capture-execute.py --answer-of` takes the
 answer of an equivalent member set, kept in the case's `equivalent.txt` (`recapture-cases.py` asks that one). So
 are Excel's label filters on the clinic's hierarchy, `execute_hier_excel_label_begins` and `_between` (since texts
-step 7 the captions of its leaves are the diagnoses' texts, which the reference does not compare).
+step 7 the captions of its leaves are the diagnoses' texts, which the reference does not compare). So are the label
+filters on an upper level, `execute_subselect_filter_label_upper` (`Store State`) and `execute_hier_excel_label_upper`
+(`Level 02`): the reference compares the lowest level there.
 
 Drill-through actions (`execute_drillthrough_action*`, catalog `ZFMDRILL`, `reference/schema/FoodmartBWDrill.xml`: a
 cube on ZFMSALES's facts with a non-default action and a default one): without `RETURN` the default action's columns

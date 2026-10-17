@@ -308,8 +308,9 @@ Read before designing anything:
   name, caption or key of the current member (`addFilterToSubcubePredicates`; also `member_caption`, Excel's "equals"
   label filter, our fix of eMondrian, `scripts/patches/subcube-filter-member-caption.patch`) are understood, and all of
   Excel's label filters: `<`, `<=`, `>`, `>=` (between, not between), `Left`/`Right(..., Len("s")) = "s"` (begins, ends
-  with) and `InStr(1, ..., "s") > 0`/`= 0` (contains), as comparisons and `LIKE` on the level's column (our extension of
-  eMondrian, `scripts/patches/subcube-filter-label.patch`, `ZZXXMLA1_CL_MDX_ENGINE=>label_predicate`); any other
+  with) and `InStr(1, ..., "s") > 0`/`= 0` (contains, ignoring case), as comparisons and `LIKE` on the level's column (our extension of
+  eMondrian, `scripts/patches/subcube-filter-label.patch`, `ZZXXMLA1_CL_MDX_ENGINE=>label_predicate`), the level the
+  `Filter` filters (`<Level>.AllMembers`, also an upper level; the reference compares the lowest); any other
   function or condition fails the query as in eMondrian. On a BW hierarchy a NON EMPTY axis also keeps only the
   members related to those a subselect names as a member set (them, their ancestors and descendants), as SSAS does
   where values are shared (`restrict_to_subcube`, `scripts/ssas_compare.py`).
