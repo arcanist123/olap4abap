@@ -398,7 +398,7 @@ def main():
 
         # BW hierarchies (docs/next-steps.md, order step 3): the proposal names none, a dimension's pane offers the
         # ones BW has for its characteristic; a ticked one is a Hierarchy annotated olap4abap.bwHierarchy that the
-        # check loads, on an InfoCube and on an aDSO; the time- and version-dependent ones cannot be ticked
+        # check loads, on an InfoCube and on an aDSO; a version-dependent one per version
         bw = "section:has(h3:text-is('BW hierarchies'))"
 
         def bw_box(name):
@@ -422,9 +422,22 @@ def main():
               ">ZCLSERV_CAT</Annotation>" in xml and 'caption="Service Catalog"' in xml and "Loads" in state, state)
         bw_box("ZCLSERV_CAT").uncheck()
         check("unticked: gone again", "olap4abap.bwHierarchy" not in xml_of())
+        # the physician's: per version, its slice valid to 9999-12-31, the Hierarchy named by name and version
         open_dimension("ZCLDOC")
-        check("the physician's time-dependent hierarchies cannot be ticked", bw_box("ZCLDOC_ORG").count() == 1
-              and bw_box("ZCLDOC_ORG").is_disabled() and "time or version dependent" in page.inner_text(bw))
+        plan = page.locator(f"{bw} tr:has-text('ZCLDOC_ORG'):has-text('002') input[type=checkbox]")
+        check("the physician's hierarchies are offered per version", bw_box("ZCLDOC_ORG").count() == 2
+              and bw_box("ZCLDOC_SITE").count() == 2 and plan.is_enabled()
+              and "Clinic Organization (Plan)" in page.inner_text(bw))
+        page.wait_for_selector(".status.ok", timeout=CHECK)
+        plan.check()
+        page.wait_for_selector(".status.busy", timeout=5000)
+        state = status(page)
+        xml = xml_of()
+        check("ticked: named by name and version, annotated with both, which the check loads",
+              'name="ZCLDOC_ORG_002"' in xml and ">ZCLDOC_ORG</Annotation>" in xml
+              and '<Annotation name="olap4abap.bwHierarchyVersion">002</Annotation>' in xml and "Loads" in state, state)
+        plan.uncheck()
+        check("unticked: gone again", "olap4abap.bwHierarchy" not in xml_of())
 
         page = browser.new_page(viewport={"width": 1400, "height": 900})
         page.on("pageerror", lambda e: errors.append(str(e)))

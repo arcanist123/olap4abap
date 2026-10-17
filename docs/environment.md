@@ -197,7 +197,7 @@ administrators are set per Windows user, a local administrator's elevated sessio
 its BW hierarchies, which Tabular cannot model: `python scripts/build-ssas-clinic-md.py` (`--no-load` keeps the SQL
 Server database) loads the database `olap4abap_ssas` as `build-ssas-clinic.py` does and adds per hierarchy of the
 export (`build-bw-reference-db.py` exports `ZCLPAT_PRG` and `ZCLSERV_CAT` from their copies too; the time-dependent
-`ZCLDOC_ORG` and `ZCLDOC_SITE` have no copy and are out of scope) `H_<h>` (a row per occurrence of the copy's node
+`ZCLDOC_ORG` and `ZCLDOC_SITE` are not in the SSAS model) `H_<h>` (a row per occurrence of the copy's node
 table, keyed by `POS`, `PARENT_POS` the enclosing occurrence, REST_H and its values after the roots where the
 hierarchy shows it), `HV_<h>` (named and captioned as olap4abap names them: a leaf as the characteristic's member, a
 node by its `NODE_NAME`) and the bridge `B_<h>` (per occurrence the distinct SIDs of its subtree, the closure). The

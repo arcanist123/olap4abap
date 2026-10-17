@@ -356,8 +356,11 @@ Implemented (2026-10-06):
   `TimeUndefined`, removed again when switched off); user hierarchies (name, All member and its name, default
   member, levels from attributes with level type, unique members and order, member properties); BW hierarchies ("BW
   hierarchies": the ones the server offers for the dimension's table, ticked into a `<Hierarchy>` annotated
-  `olap4abap.bwHierarchy` named by BW and captioned by its text, the caption editable; greyed out when time or version
-  dependent; one BW no longer offers can be unticked). An aDSO's dimension, keyed by the value, has them too. The XML tab edits
+  `olap4abap.bwHierarchy` named by BW and captioned by its text, the caption editable; per version where BW's are
+  version dependent, named `<name>_<version>` and annotated `olap4abap.bwHierarchyVersion`, the version's text
+  followed by the version where two versions share it; of an entirely time-dependent one the slice valid to
+  9999-12-31; greyed out when its structure is time dependent or no slice is valid to 9999-12-31; one BW no longer
+  offers can be unticked). An aDSO's dimension, keyed by the value, has them too. The XML tab edits
   everything else as text. Undo (Ctrl+Z) keeps the last 100 states.
 - Every change is sent to `check` (debounced, the last request wins); its refusal is shown in full under the top bar
   and keeps Accept disabled. Accept shows what `check` answered (the file, new or replaced catalog, the views to

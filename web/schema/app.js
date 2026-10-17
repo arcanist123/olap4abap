@@ -139,23 +139,31 @@ function setAnnotation(el, name, value) {
 }
 // Our extension (ZZXXMLA1_CL_SCHEMA, c_bw_hierarchy): a Hierarchy without levels that names a BW hierarchy of the
 // dimension's characteristic, served from its copy at BW's current version; the server offers the hierarchies BW has
-// for the characteristic of each table (bwHierarchies of the API), the user ticks them.
+// for the characteristic of each table (bwHierarchies of the API), the user ticks them. A version-dependent one names
+// its version too (c_bw_hierarchy_version); of a time-dependent one the slice valid to 9999-12-31 is served.
 const BW_HIERARCHY = 'olap4abap.bwHierarchy';
+const BW_HIERARCHY_VERSION = 'olap4abap.bwHierarchyVersion';
 const bwNameOf = (h) => (annotationOf(h, BW_HIERARCHY)?.textContent || '').trim();
+const bwVersionOf = (h) => (annotationOf(h, BW_HIERARCHY_VERSION)?.textContent || '').trim();
+// a BW hierarchy as name and version: the name of its Hierarchy (ZZXXMLA1_CL_BW_HIERARCHY_COPY=>hierarchy_name)
+const bwKey = (name, version) => (version ? `${name}_${version}` : name);
+const bwKeyOf = (h) => (bwNameOf(h) ? bwKey(bwNameOf(h), bwVersionOf(h)) : '');
 const bwHierarchyKeys = (entries) => new Map((entries || []).map((e) => [e.table, e]));
 // adds the BW hierarchy to the dimension (named by BW, captioned by its text), or removes it
 function setBwHierarchy(doc, dim, offered, on) {
-  const existing = hierarchiesOf(dim).filter((h) => bwNameOf(h) === offered.name);
+  const key = bwKey(offered.name, offered.version);
+  const existing = hierarchiesOf(dim).filter((h) => bwKeyOf(h) === key);
   if (!on) {
     existing.forEach((h) => h.remove());
     return;
   }
   if (existing.length) return;
   const names = [...attributesOf(dim), ...hierarchiesOf(dim)].map((e) => attr(e, 'name'));
-  let name = offered.name;
-  for (let n = 2; names.includes(name); n++) name = `${offered.name} ${n}`;
+  let name = key;
+  for (let n = 2; names.includes(name); n++) name = `${key} ${n}`;
   const h = create(doc, 'Hierarchy', { name, visible: 'true', hasAll: 'true', allMemberName: `All ${offered.text}`, caption: offered.text });
   setAnnotation(h, BW_HIERARCHY, offered.name);
+  if (offered.version) setAnnotation(h, BW_HIERARCHY_VERSION, offered.version);
   insertAfterLast(dim, h, ['Hierarchy', 'DimensionAttribute']);
 }
 // Our extension (ZZXXMLA1_CL_SCHEMA, c_omit_empty_cells): a cube leaves its empty cells but the first out of the answer.
@@ -1040,30 +1048,33 @@ function SelectionField({ doc, dim, characteristics, onFix }) {
     </span>`;
 }
 
-// The BW hierarchies of the dimension's characteristic, ticked if the dimension has them; one the server does not
-// offer (time or version dependent, or no longer in BW) can only be unticked.
+// The BW hierarchies of the dimension's characteristic, per name and version, ticked if the dimension has them; one the
+// server does not offer (a time-dependent structure, no slice valid to 9999-12-31, or no longer in BW) can only be
+// unticked.
 function BwHierarchySection({ doc, edit, dim, bwHierarchies }) {
   const offered = bwHierarchies.get(attr(dim, 'table'));
   const ticked = hierarchiesOf(dim).filter(bwNameOf);
   if (!offered && !ticked.length) return null;
   const rows = [...(offered ? offered.hierarchies : [])];
   for (const h of ticked) {
-    if (!rows.some((r) => r.name === bwNameOf(h))) {
-      rows.push({ name: bwNameOf(h), text: attr(h, 'caption'), supported: false, reason: 'BW has no such hierarchy of the characteristic' });
+    if (!rows.some((r) => bwKey(r.name, r.version) === bwKeyOf(h))) {
+      rows.push({ name: bwNameOf(h), version: bwVersionOf(h), text: attr(h, 'caption'), supported: false, reason: 'BW has no such hierarchy of the characteristic' });
     }
   }
   return html`<section class="section">
     <header><h3>BW hierarchies</h3><span class="spacer"></span>
-      <span class="muted small">a ticked hierarchy is served from its copy of BW's current version, its levels Level 01, … by depth</span></header>
+      <span class="muted small">a ticked hierarchy is served from its copy of BW's current state (a time-dependent one: the slice valid to 9999-12-31), its levels Level 01, … by depth</span></header>
     <div class="body scroll-x"><table>
-      <thead><tr><th></th><th>BW hierarchy</th><th>Text</th><th>Caption</th><th></th></tr></thead>
+      <thead><tr><th></th><th>BW hierarchy</th><th>Version</th><th>Text</th><th>Caption</th><th></th></tr></thead>
       <tbody>${rows.map((r) => {
-        const h = ticked.find((t) => bwNameOf(t) === r.name);
+        const key = bwKey(r.name, r.version);
+        const h = ticked.find((t) => bwKeyOf(t) === key);
         const why = !r.supported ? `Not offered: ${r.reason}` : '';
-        return html`<tr key=${r.name}>
+        return html`<tr key=${key}>
           <td><${Check} checked=${!!h} disabled=${!h && !!why} title=${why || 'A hierarchy of the dimension'}
             onChange=${(on) => edit(() => setBwHierarchy(doc, dim, r, on))} /></td>
           <td class="mono small">${r.name}</td>
+          <td class="mono small">${r.version || ''}</td>
           <td>${r.text}</td>
           <td>${h && html`<${TextField} value=${attr(h, 'caption')} placeholder=${attr(h, 'name')}
             onCommit=${(v) => edit(() => setAttr(h, 'caption', v))} />`}</td>

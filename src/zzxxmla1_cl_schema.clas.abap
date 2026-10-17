@@ -23,7 +23,8 @@
 "! key column of their sourceAttribute, or their own column. A TimeDimension needs time level types on all its levels, a standard dimension none
 "! (RolapLevel, RolapDimension); without a type the first level decides.
 "! A Hierarchy annotated c_bw_hierarchy (our extension) is a BW hierarchy of the dimension's characteristic, served
-"! from its copy (ZZXXMLA1_CL_BW_HIERARCHY_COPY) at BW's current version: it has no levels in the schema, they are
+"! from its copy (ZZXXMLA1_CL_BW_HIERARCHY_COPY) at BW's current version, of the version c_bw_hierarchy_version names
+"! and the slice valid to 9999-12-31 where BW's hierarchies are version or time dependent: it has no levels in the schema, they are
 "! Level 01 to Level nn, nn the copy's depth, a member on the level of its depth as SSAS serves a parent-child
 "! hierarchy (docs/next-steps.md, Reference scenario, decided 2026-10-16), on the columns of the copy's members as a
 "! level hierarchy (ZZXXMLA1_CL_BW_HIERARCHY_COPY=>levels_sql).
@@ -163,6 +164,9 @@ CLASS zzxxmla1_cl_schema DEFINITION
     "! (RSHIEDIR-HIENM) of the characteristic of the dimension's table (ZZXXMLA1_CL_BW_VIEW_GEN=>characteristic_of_view):
     "! the hierarchy has no Level elements, its levels are made from the copy's depth.
     CONSTANTS c_bw_hierarchy TYPE string VALUE `olap4abap.bwHierarchy`.
+    "! The annotation of such a Hierarchy whose value is the version of the BW hierarchy (RSHIEDIR-VERSION), where the
+    "! characteristic's hierarchies are version dependent; without it the version is blank.
+    CONSTANTS c_bw_hierarchy_version TYPE string VALUE `olap4abap.bwHierarchyVersion`.
     "! The names of a BW hierarchy's levels: Level 01, Level 02, ...
     CONSTANTS c_bw_level_prefix TYPE string VALUE `Level `.
     "! The SID column of a characteristic's view, which the closure of a BW hierarchy's copy holds: an InfoCube's
@@ -287,10 +291,11 @@ CLASS zzxxmla1_cl_schema DEFINITION
       RAISING   zzxxmla1_cx_xmla.
     "! A Hierarchy element annotated c_bw_hierarchy: the copy of the BW hierarchy it names and its levels by depth.
     METHODS add_bw_hierarchy
-      IMPORTING hier      TYPE ty_hier
-                dimension TYPE zzxxmla1_cl_schema_def=>ty_dimension
-                hierarchy TYPE zzxxmla1_cl_schema_def=>ty_hierarchy
-                bw_name   TYPE string
+      IMPORTING hier       TYPE ty_hier
+                dimension  TYPE zzxxmla1_cl_schema_def=>ty_dimension
+                hierarchy  TYPE zzxxmla1_cl_schema_def=>ty_hierarchy
+                bw_name    TYPE string
+                bw_version TYPE string
       RAISING   zzxxmla1_cx_xmla.
     "! The value of an annotation, initial without it.
     CLASS-METHODS annotation
@@ -671,7 +676,12 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
                                 origin          = 1 ).
     DATA(bw_name) = condense( annotation( annotations = hierarchy-annotations name = c_bw_hierarchy ) ).
     IF bw_name IS NOT INITIAL.
-      add_bw_hierarchy( hier = hier dimension = dimension hierarchy = hierarchy bw_name = bw_name ).
+      add_bw_hierarchy( hier       = hier
+                        dimension  = dimension
+                        hierarchy  = hierarchy
+                        bw_name    = bw_name
+                        bw_version = condense( annotation( annotations = hierarchy-annotations
+                                                           name        = c_bw_hierarchy_version ) ) ).
       RETURN.
     ENDIF.
     IF hierarchy-levels IS INITIAL.
@@ -758,7 +768,8 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
     DATA(row) = hier.
     TRY.
         row-bw_hierarchy = NEW zzxxmla1_cl_bw_hierarchy_copy( )->current( characteristic = CONV #( characteristic )
-                                                                          name           = CONV #( bw_name ) ).
+                                                                          name           = CONV #( bw_name )
+                                                                          version        = CONV #( bw_version ) ).
         DATA(depth) = zzxxmla1_cl_bw_hierarchy_copy=>depth( row-bw_hierarchy ).
         DATA(repeated) = zzxxmla1_cl_bw_hierarchy_copy=>repeated_levels( row-bw_hierarchy ).
       CATCH zzxxmla1_cx_bw_hierarchy INTO DATA(error).

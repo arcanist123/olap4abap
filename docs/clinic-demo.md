@@ -298,7 +298,10 @@ are compounded: keyed by the SID on both providers, named by `COMPOUND_KEY` (`NO
 hierarchies (Region > City > Patient and the like are for the UI to add) and marks no dimension as time.
 The run then ticks every BW hierarchy BW serves on the providers' dimensions, as the schema builder's "BW hierarchies"
 does (`tick_hierarchies`): `ZCLVISIT` and `ZCLVISITA` have `[ZCLDIAG.ZCLDIAG_ICD]`, `[ZCLPAT.ZCLPAT_PRG]` and
-`[ZCLSERV.ZCLSERV_CAT]` and `[ZCLSERV.ZCLSERV_LOC]`, captioned by BW's texts; the physician's are time and version dependent. On the aDSO, whose
+`[ZCLSERV.ZCLSERV_CAT]` and `[ZCLSERV.ZCLSERV_LOC]`, captioned by BW's texts, and the physician's per version at
+their slice valid to 9999-12-31: `[ZCLDOC.ZCLDOC_ORG_001]`, `[ZCLDOC.ZCLDOC_ORG_002]` (Clinic Organization (Plan)),
+`[ZCLDOC.ZCLDOC_SITE_001]` and `[ZCLDOC.ZCLDOC_SITE_002]`, the 2025 structures; `bw_hierarchy_test.py` compares them
+with BW's MDX at key date 9999-12-31 (the probe sets it). On the aDSO, whose
 facts hold the value, the closure's SIDs are mapped to the values on the characteristic's view
 (`ZZXXMLA1_CL_MODEL=>bw_fact_value`).
 

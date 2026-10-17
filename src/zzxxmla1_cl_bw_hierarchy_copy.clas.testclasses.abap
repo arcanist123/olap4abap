@@ -41,6 +41,10 @@ CLASS ltc_bw_hierarchy_copy DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DUR
     "! a text node is captioned by its text, the medium, else the long, else the short one, else its name; REST_H by
     "! the hierarchy's caption of it; without a caption column the node table is read as it is
     METHODS node_texts FOR TESTING.
+    "! a hierarchy is offered per name and version, served if it has a slice valid to 9999-12-31, with the text of
+    "! its latest slice (the version added where two versions have the same text); none with a time-dependent
+    "! structure; its Hierarchy is named by the name and the version
+    METHODS offered_slices FOR TESTING.
     METHODS params
       IMPORTING statement     TYPE zzxxmla1_cl_bw_hierarchy_copy=>ty_statement
       RETURNING VALUE(result) TYPE string_table.
@@ -63,6 +67,34 @@ CLASS ltc_bw_hierarchy_copy IMPLEMENTATION.
                       root_sid       = -19
                       rest_top_sid   = -35
                       rest_shown     = rest_shown ).
+  ENDMETHOD.
+
+  METHOD offered_slices.
+    DATA(rows) = VALUE zzxxmla1_cl_bw_hierarchy_copy=>ty_t_directory_text(
+      ( hienm = 'ZCLDOC_ORG' version = '001' dateto = '20241231' txtmd = `Old Organization` )
+      ( hienm = 'ZCLDOC_ORG' version = '001' dateto = '99991231' txtmd = `Clinic Organization` )
+      ( hienm = 'ZCLDOC_ORG' version = '002' dateto = '99991231' txtmd = `Clinic Organization` )
+      ( hienm = 'ZCLDOC_ORG' version = '003' dateto = '20241231' txtlg = `Ended` )
+      ( hienm = 'ZCLDIAG_ICD' dateto = '99991231' txtsh = `Diagnoses` ) ).
+    DATA(offered) = zzxxmla1_cl_bw_hierarchy_copy=>offer( rows = rows structure_time_dep = abap_false ).
+    cl_abap_unit_assert=>assert_equals( exp = 4 act = lines( offered ) ).
+    cl_abap_unit_assert=>assert_equals(
+      exp = VALUE zzxxmla1_cl_bw_hierarchy_copy=>ty_offered( name = `ZCLDIAG_ICD` hierarchy = `ZCLDIAG_ICD`
+                                                             text = `Diagnoses` supported = abap_true )
+      act = offered[ 1 ] ).
+    cl_abap_unit_assert=>assert_equals(
+      exp = VALUE zzxxmla1_cl_bw_hierarchy_copy=>ty_offered( name = `ZCLDOC_ORG` version = `001`
+                                                             hierarchy = `ZCLDOC_ORG_001`
+                                                             text = `Clinic Organization (001)` supported = abap_true )
+      act = offered[ 2 ] ).
+    cl_abap_unit_assert=>assert_equals( exp = `Clinic Organization (002)` act = offered[ 3 ]-text ).
+    cl_abap_unit_assert=>assert_equals( exp = `Ended` act = offered[ 4 ]-text ).
+    cl_abap_unit_assert=>assert_false( offered[ 4 ]-supported ).
+    cl_abap_unit_assert=>assert_equals( exp = `it has no slice valid to 9999-12-31` act = offered[ 4 ]-reason ).
+    offered = zzxxmla1_cl_bw_hierarchy_copy=>offer( rows = rows structure_time_dep = abap_true ).
+    cl_abap_unit_assert=>assert_false( xsdbool( line_exists( offered[ supported = abap_true ] ) ) ).
+    cl_abap_unit_assert=>assert_equals( exp = `ZCLDIAG_ICD`
+                                        act = zzxxmla1_cl_bw_hierarchy_copy=>hierarchy_name( name = 'ZCLDIAG_ICD' ) ).
   ENDMETHOD.
 
   METHOD params.

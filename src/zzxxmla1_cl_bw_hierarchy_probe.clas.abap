@@ -9,13 +9,16 @@
 * olap4abap contains code derived from Mondrian (Eclipse Public License 1.0): Copyright (C) 1998-2005 Julian Hyde,
 * Copyright (C) 2005-2021 Hitachi Vantara and others, Copyright (C) 2021-2025 Sergei Semenkov. See the NOTICE file.
 *----------------------------------------------------------------------------------------------------------------------*
-"! BW's own answers on the clinic demo's plain hierarchies (sapcli class execute): per hierarchy every member with its
+"! BW's own answers on the clinic demo's hierarchies (sapcli class execute): per hierarchy every member with its
 "! unique name, level, number of children, caption, short, medium and long text (BW's properties 1, 5 and 4 followed by
 "! the characteristic: [1ZCLSERV], [5ZCLSERV], [4ZCLSERV]) and the values of the measures, read through BW's MDX engine
 "! (BAPI_MDDATASET_*) with the members of the hierarchy on the rows; first the provider's total. These are the expected
 "! answers for olap4abap's BW hierarchies (docs/next-steps.md, time-independent BW hierarchies): BW counts a value
 "! reached by several paths once per node. Output: a line per member, fields separated by tabs (hierarchy, ordinal,
 "! level, children, unique name, caption, the three texts, the measures); scripts/bw_hierarchy_capture.py keeps it as JSON.
+"! BW's MDX shows per name and version of a time-dependent hierarchy (the physician's ZCLDOC_ORG and ZCLDOC_SITE) the
+"! slice valid at the key date: the probe sets it to 9999-12-31, the slice olap4abap serves
+"! (ZZXXMLA1_CL_BW_HIERARCHY_COPY=>c_valid_to).
 CLASS zzxxmla1_cl_bw_hierarchy_probe DEFINITION
   PUBLIC
   FINAL
@@ -72,8 +75,19 @@ ENDCLASS.
 CLASS zzxxmla1_cl_bw_hierarchy_probe IMPLEMENTATION.
 
   METHOD if_oo_adt_classrun~main.
+    CALL FUNCTION 'RRT_SET_KEY_DATE'
+      EXPORTING
+        i_key_date = zzxxmla1_cl_bw_hierarchy_copy=>c_valid_to
+        i_explicit = abap_true
+      EXCEPTIONS
+        x_message  = 1
+        OTHERS     = 2.
+    IF sy-subrc <> 0.
+      out->write( |TOTAL\t0\t0\t0\t\tERROR RRT_SET_KEY_DATE failed ({ sy-subrc })\t\t\t| ).
+      RETURN.
+    ENDIF.
     DATA(members) = total( ).
-    LOOP AT VALUE string_table( ( `ZCLDIAG` ) ( `ZCLPAT` ) ( `ZCLSERV` ) ) INTO DATA(characteristic).
+    LOOP AT VALUE string_table( ( `ZCLDIAG` ) ( `ZCLPAT` ) ( `ZCLSERV` ) ( `ZCLDOC` ) ) INTO DATA(characteristic).
       APPEND LINES OF members( characteristic ) TO members.
     ENDLOOP.
     LOOP AT members INTO DATA(member).

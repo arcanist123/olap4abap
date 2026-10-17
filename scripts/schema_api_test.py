@@ -253,19 +253,35 @@ def main():
     # a ticked one loads on an InfoCube, keyed by the SID (check creates its InfoObject's copy tables), and on an aDSO,
     # keyed by the value
     status, body, _ = call(args.url, args.client, "GET", "proposal", {"provider": "ZCLVISIT"})
-    offered = {h["name"]: h for e in body.get("bwHierarchies") or [] for h in e["hierarchies"]}
+    # the physician's are version dependent and entirely time dependent: offered per version (its slice valid to
+    # 9999-12-31), the Hierarchy named by name and version
+    offered = {h["hierarchy"]: h for e in body.get("bwHierarchies") or [] for h in e["hierarchies"]}
     check("proposal offers the clinic's hierarchies, names none",
           status == 200 and "olap4abap.bwHierarchy" not in body.get("xml", "")
           and all(offered.get(n, {}).get("supported") for n in ("ZCLDIAG_ICD", "ZCLPAT_PRG", "ZCLSERV_CAT"))
-          and offered.get("ZCLDOC_ORG", {}).get("supported") is False
-          and "time or version dependent" in offered.get("ZCLDOC_ORG", {}).get("reason", ""), body.get("bwHierarchies"))
-    ticked = ('<Hierarchy name="ZCLSERV_CAT" hasAll="true" caption="Service Catalog"><Annotations>'
-              '<Annotation name="olap4abap.bwHierarchy">ZCLSERV_CAT</Annotation></Annotations></Hierarchy>')
+          and all(offered.get(n, {}).get("supported") for n in ("ZCLDOC_ORG_001", "ZCLDOC_ORG_002",
+                                                                 "ZCLDOC_SITE_001", "ZCLDOC_SITE_002"))
+          and offered.get("ZCLDOC_ORG_002", {}).get("version") == "002"
+          and offered.get("ZCLDOC_ORG_002", {}).get("text") == "Clinic Organization (Plan)", body.get("bwHierarchies"))
+    ticked = {"ZCLSERV": ('<Hierarchy name="ZCLSERV_CAT" hasAll="true" caption="Service Catalog"><Annotations>'
+                          '<Annotation name="olap4abap.bwHierarchy">ZCLSERV_CAT</Annotation></Annotations></Hierarchy>'),
+              "ZCLDOC": ('<Hierarchy name="ZCLDOC_ORG_002" hasAll="true" caption="Clinic Organization (Plan)">'
+                         '<Annotations><Annotation name="olap4abap.bwHierarchy">ZCLDOC_ORG</Annotation>'
+                         '<Annotation name="olap4abap.bwHierarchyVersion">002</Annotation></Annotations></Hierarchy>')}
     for provider in ("ZCLVISIT", "ZCLVISITA"):
-        xml = proposals[provider]
-        end = re.search(r'<Dimension [^>]*name="ZCLSERV"[^>]*>.*?(</Dimension>)', xml, re.S).start(1)
-        status, body, _ = call(args.url, args.client, "POST", "check", {"catalog": provider}, xml[:end] + ticked + xml[end:])
-        check(f"a ticked BW hierarchy loads on {provider}", status == 200, body)
+        for dimension, hierarchy in ticked.items():
+            xml = proposals[provider]
+            end = re.search(rf'<Dimension [^>]*name="{dimension}"[^>]*>.*?(</Dimension>)', xml, re.S).start(1)
+            status, body, _ = call(args.url, args.client, "POST", "check", {"catalog": provider},
+                                   xml[:end] + hierarchy + xml[end:])
+            check(f"a ticked BW hierarchy of {dimension} loads on {provider}", status == 200, body)
+    xml = proposals["ZCLVISIT"]
+    end = re.search(r'<Dimension [^>]*name="ZCLDOC"[^>]*>.*?(</Dimension>)', xml, re.S).start(1)
+    unversioned = ticked["ZCLDOC"].replace('<Annotation name="olap4abap.bwHierarchyVersion">002</Annotation>', '')
+    status, body, _ = call(args.url, args.client, "POST", "check", {"catalog": "ZCLVISIT"},
+                           xml[:end] + unversioned + xml[end:])
+    check("a version-dependent BW hierarchy without its version is refused",
+          status != 200 and "no active hierarchy ZCLDOC_ORG of ZCLDOC" in str(body), body)
 
     print(f"{'all passed' if not failures else str(len(failures)) + ' failed'} ({args.url})")
     sys.exit(1 if failures else 0)

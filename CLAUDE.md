@@ -105,8 +105,10 @@ Read before designing anything:
   provider switches on, captioned by the attribute's text; no attribute hierarchies, no user hierarchies (the user
   makes them in the UI), no BW hierarchies (offered per dimension as `bwHierarchies` of the API, the ones `RSHIEDIR`
   has for its characteristic, `ZZXXMLA1_CL_BW_HIERARCHY_COPY=>offered`; the dimension pane's "BW hierarchies" ticks
-  them, a ticked one a `<Hierarchy>` annotated `olap4abap.bwHierarchy`, captioned by BW's text; time- or
-  version-dependent ones cannot be ticked; an aDSO's too); a default drill-through action with each characteristic's value, which the UI's
+  them, a ticked one a `<Hierarchy>` annotated `olap4abap.bwHierarchy`, captioned by BW's text; a version-dependent
+  one per version, named `<name>_<version>` (`ZCLDOC_ORG_001`) and annotated `olap4abap.bwHierarchyVersion` too; of
+  an entirely time-dependent one the slice valid to 9999-12-31, as the texts; a time-dependent structure cannot be
+  ticked; an aDSO's too); a default drill-through action with each characteristic's value, which the UI's
   "Double-click columns" adjusts; every dimension of the cube annotated
   `olap4abap.membersWithFacts`, which the UI's "Members with facts" switches per dimension (not on time ones); the cube
   annotated `olap4abap.omitEmptyCells`, which the cube pane's "Omit empty cells" switches. The views (`ZZXXMLA1_CL_BW_VIEW_GEN`, one per basic
@@ -362,7 +364,8 @@ Read before designing anything:
   project's own demo data; FoodMart stays the test source.
   For looking into BW's analysis authorizations its physician `ZCLDOC` is authorization relevant and has two
   hierarchies, `ZCLDOC_ORG` and `ZCLDOC_SITE` (two names are needed for authorization tests): version dependent,
-  entire hierarchy time dependent, two versions of two time slices each; the diagnosis `ZCLDIAG` is authorization
+  entire hierarchy time dependent, two versions of two time slices each (served per version, the slice valid to
+  9999-12-31: `ZCLDOC_ORG_001`, `_002`, `ZCLDOC_SITE_001`, `_002`, ticked by the setup); the diagnosis `ZCLDIAG` is authorization
   relevant with the plain hierarchy `ZCLDIAG_ICD`, for authorizations that combine the two characteristics. The
   patient `ZCLPAT` has the plain hierarchy `ZCLPAT_PRG` (care programs) with link nodes (subtrees under two parents,
   recursively), duplicate and link leaves (patients in two programs) and postable nodes (parents with their

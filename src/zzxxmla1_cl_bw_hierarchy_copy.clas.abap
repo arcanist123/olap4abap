@@ -9,10 +9,16 @@
 * olap4abap contains code derived from Mondrian (Eclipse Public License 1.0): Copyright (C) 1998-2005 Julian Hyde,
 * Copyright (C) 2005-2021 Hitachi Vantara and others, Copyright (C) 2021-2025 Sergei Semenkov. See the NOTICE file.
 *----------------------------------------------------------------------------------------------------------------------*
-"! The copies of BW's time-independent hierarchies that the engine reads (docs/next-steps.md, Now: time-independent BW
-"! hierarchies, part one): per InfoObject a node table, a closure table and a view of the closure with the
-"! not-assigned values, holding all of its hierarchies, as BW's SID structure /BIC/I of the characteristic does, and
-"! per copy a row of the directory ZZXXMLA1_HIEDIR (keyed by HIEID, HIESID and SVER).
+"! The copies of BW's hierarchies that the engine reads (docs/next-steps.md, Now: time-independent BW hierarchies,
+"! part one): per InfoObject a node table, a closure table and a view of the closure with the not-assigned values,
+"! holding all of its hierarchies, as BW's SID structure /BIC/I of the characteristic does, and per copy a row of the
+"! directory ZZXXMLA1_HIEDIR (keyed by HIEID, HIESID and SVER).
+"! A hierarchy is a name and a version (RSHIEDIR-HIENM, VERSION; blank where the characteristic's hierarchies are not
+"! version dependent), served as BW serves it at the key date 9999-12-31, as the views read time-dependent attributes
+"! (ZZXXMLA1_CL_BW_VIEW_GEN): where the entire hierarchy is time dependent (RSDCHABAS-HIENMTFL) BW keeps a row of
+"! RSHIEDIR, its own HIEID, per slice, and the one valid to 9999-12-31 (c_valid_to) is copied; a version without such
+"! a slice is not served. A time-dependent structure (nodes with validity, RSDCHABAS-HIENDTFL) is refused. The copy
+"! of a slice that is no longer valid to 9999-12-31 is deleted by the next refill of the name.
 "! - Node table (ZZXXMLA1H followed by 7 digits): a row per occurrence, the shared subtrees expanded as BW's SID
 "!   structure /BIC/I holds them, keyed by HIESID, SVER, PARENT_SID and SID. An inner node has its own negative node SID of
 "!   /BIC/K (also each occurrence inside an expanded link, the postable nodes and the virtual root ROOTSID of
@@ -47,7 +53,7 @@
 "! lock ENQUEUE_E_TABLE on ZZXXMLA1_HIEDIR, which another query of the hierarchy waits for. The refill stays in the
 "! database (INSERT ... SELECT from /BIC/I and /BIC/K) and refuses, as a fault of the query
 "! (ZZXXMLA1_CX_BW_HIERARCHY): a value both an inner node and a leaf, a value twice as an inner node with different
-"! subtrees, more than one current row of RSRHIEDIR_OLAP, a time- or version-dependent hierarchy; and a copy whose
+"! subtrees, more than one current row of RSRHIEDIR_OLAP, a time-dependent structure; and a copy whose
 "! distinct values per node differ from BW's (its leaf rows plus the correction rows, LISTNO 0, of it and the inner
 "! nodes below it, with their factors).
 "! No limit on occurrences: shared subtrees are expanded whatever their size.
@@ -72,6 +78,8 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
     CONSTANTS c_rest_node_name TYPE string VALUE `REST_H`.
     "! The InfoObject BW's MDX gives the not-assigned node, which keys it with its name.
     CONSTANTS c_rest_iobj TYPE string VALUE `1HIER_REST`.
+    "! The validity of the slice of a time-dependent hierarchy that is served: BW's key date 9999-12-31.
+    CONSTANTS c_valid_to TYPE d VALUE '99991231'.
     "! The language of the node texts, as of the characteristics' texts in the views (ZZXXMLA1_CL_BW_VIEW_GEN).
     CONSTANTS c_language TYPE string VALUE `E`.
     "! The parts of a level's columns of levels_sql.
@@ -116,6 +124,7 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
         hieid          TYPE rshieid,
         characteristic TYPE rsiobjnm,
         name           TYPE rshienm,
+        version        TYPE rshiedir-version,
         node_table     TYPE tabname,
         closure_table  TYPE tabname,
         closure        TYPE tabname,
@@ -142,6 +151,7 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
       BEGIN OF ty_run,
         characteristic TYPE rsiobjnm,
         name           TYPE rshienm,
+        version        TYPE rshiedir-version,
         error          TYPE string,
         tables         TYPE ty_tables,
         hierarchy      TYPE ty_hierarchy,
@@ -157,10 +167,12 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
       END OF ty_run,
       ty_t_run TYPE STANDARD TABLE OF ty_run WITH EMPTY KEY.
     TYPES:
-      "! a hierarchy BW has for a characteristic (offered): its name, its text, and whether olap4abap can serve it,
-      "! else why not
+      "! a hierarchy BW has for a characteristic (offered): its name and version, the name of its Hierarchy in a
+      "! schema (hierarchy_name), its text, and whether olap4abap can serve it, else why not
       BEGIN OF ty_offered,
         name      TYPE string,
+        version   TYPE string,
+        hierarchy TYPE string,
         text      TYPE string,
         supported TYPE abap_bool,
         reason    TYPE string,
@@ -179,12 +191,19 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
     "! the view reads BW's SID table, so BW cannot delete the InfoObject while it exists (the clinic demo's run).
     METHODS delete_tables
       IMPORTING characteristic TYPE rsiobjnm.
-    "! The current copy of a hierarchy of a characteristic (the basic one, RSHIEDIR-IOBJNM), refilled first if BW's
-    "! is newer. Raises ZZXXMLA1_CX_BW_HIERARCHY.
+    "! The current copy of a hierarchy of a characteristic (the basic one, RSHIEDIR-IOBJNM) by name and version (its
+    "! slice valid to 9999-12-31), refilled first if BW's is newer. Raises ZZXXMLA1_CX_BW_HIERARCHY.
     METHODS current
       IMPORTING characteristic TYPE rsiobjnm
                 name           TYPE rshienm
+                version        TYPE rshiedir-version OPTIONAL
       RETURNING VALUE(result)  TYPE ty_hierarchy.
+    "! The name of a hierarchy's Hierarchy in a schema: BW's name, followed by _ and the version where it has one
+    "! (ZCLDOC_ORG_001).
+    CLASS-METHODS hierarchy_name
+      IMPORTING name          TYPE csequence
+                version       TYPE csequence OPTIONAL
+      RETURNING VALUE(result) TYPE string.
     "! The statement of the SIDs below a member of the copy, node or leaf, one column SID: its rows of the closure the
     "! hierarchy is read from (the not-assigned node's and the All member's with the values under no leaf when the
     "! hierarchy shows the not-assigned node).
@@ -240,21 +259,33 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
                 name_column    TYPE string
                 caption_column TYPE string OPTIONAL
       RETURNING VALUE(result)  TYPE string.
-    "! Creates the objects of each characteristic and copies each of its time-independent hierarchies that are not
-    "! version dependent (program ZZXXMLA1_HIERARCHY_COPY, the class run for scripts/hierarchy_copy_test.py).
+    "! Creates the objects of each characteristic and copies each of its hierarchies, per name and version the slice
+    "! valid to 9999-12-31 (program ZZXXMLA1_HIERARCHY_COPY, the class run for scripts/hierarchy_copy_test.py).
     METHODS run
       IMPORTING characteristics TYPE ty_r_iobjnm
                 hierarchies     TYPE ty_r_hienm OPTIONAL
       RETURNING VALUE(result)   TYPE ty_t_run.
-    "! The active hierarchies BW has for a characteristic (the basic one, RSHIEDIR-IOBJNM), by name, which the schema
-    "! builder offers: each with its text in the logon language (medium, else long, else short, else the name), served
-    "! if it is neither time nor version dependent (one row of RSHIEDIR, as current asks).
+    "! The active hierarchies BW has for a characteristic (the basic one, RSHIEDIR-IOBJNM), by name and version, which
+    "! the schema builder offers: each with the text of its latest slice in the logon language (medium, else long, else
+    "! short, else the name; followed by the version where two versions have the same text), served if it has a slice
+    "! valid to 9999-12-31 and its structure is not time dependent (as current asks).
     CLASS-METHODS offered
       IMPORTING characteristic TYPE rsiobjnm
       RETURNING VALUE(result)  TYPE ty_t_offered.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
+    TYPES:
+      "! a row of RSHIEDIR as offered reads it: a slice of a hierarchy and its texts in the logon language
+      BEGIN OF ty_directory_text,
+        hienm   TYPE rshienm,
+        version TYPE rshiedir-version,
+        dateto  TYPE d,
+        txtsh   TYPE string,
+        txtmd   TYPE string,
+        txtlg   TYPE string,
+      END OF ty_directory_text,
+      ty_t_directory_text TYPE STANDARD TABLE OF ty_directory_text WITH EMPTY KEY.
     TYPES:
       "! the tables of BW a refill reads
       BEGIN OF ty_bw_tables,
@@ -268,6 +299,7 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
         hieid        TYPE rshieid,
         iobjnm       TYPE rsiobjnm,
         hienm        TYPE rshienm,
+        version      TYPE rshiedir-version,
         norestnodes  TYPE rshiernorest,
         hiesid       TYPE i,
         sver         TYPE rsrsver,
@@ -301,12 +333,27 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
     DATA package TYPE devclass.
     DATA handler TYPE REF TO if_dd_ddl_handler.
 
-    "! BW's current state of a hierarchy: its row of RSHIEDIR (time-independent, not version dependent) and its
+    "! BW's current state of a hierarchy: its row of RSHIEDIR of the name and version valid to 9999-12-31 and its
     "! current row of RSRHIEDIR_OLAP (DELETETIMESTMP 0, which must be one).
     METHODS bw_state
       IMPORTING characteristic TYPE rsiobjnm
                 name           TYPE rshienm
+                version        TYPE rshiedir-version
       RETURNING VALUE(result)  TYPE ty_bw_state.
+    "! The offered hierarchies of the slices of RSHIEDIR (offered), by name and version; none is served where the
+    "! characteristic's structure is time dependent.
+    CLASS-METHODS offer
+      IMPORTING rows               TYPE ty_t_directory_text
+                structure_time_dep TYPE abap_bool
+      RETURNING VALUE(result)      TYPE ty_t_offered.
+    "! Whether the characteristic's hierarchy structures are time dependent (RSDCHABAS-HIENDTFL: nodes with validity).
+    CLASS-METHODS structure_time_dependent
+      IMPORTING characteristic TYPE rsiobjnm
+      RETURNING VALUE(result)  TYPE abap_bool.
+    "! Deletes the copies of the other slices of a hierarchy's name that are no longer valid to 9999-12-31.
+    METHODS delete_old_slices
+      IMPORTING bw     TYPE ty_bw_state
+                tables TYPE ty_tables.
     METHODS bw_tables
       IMPORTING characteristic TYPE rsiobjnm
       RETURNING VALUE(result)  TYPE ty_bw_tables.
@@ -481,17 +528,16 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD run.
-    SELECT iobjnm, hienm FROM rshiedir
-      WHERE iobjnm IN @characteristics AND hienm IN @hierarchies AND objvers = 'A' AND version = ''
-        AND dateto = '99991231'
-      ORDER BY iobjnm ASCENDING, hienm ASCENDING
+    SELECT iobjnm, hienm, version FROM rshiedir
+      WHERE iobjnm IN @characteristics AND hienm IN @hierarchies AND objvers = 'A' AND dateto = @c_valid_to
+      ORDER BY iobjnm ASCENDING, hienm ASCENDING, version ASCENDING
       INTO TABLE @DATA(rows).
     LOOP AT rows INTO DATA(row).
-      DATA(line) = VALUE ty_run( characteristic = row-iobjnm name = row-hienm ).
+      DATA(line) = VALUE ty_run( characteristic = row-iobjnm name = row-hienm version = row-version ).
       TRY.
           line-tables = create_tables( row-iobjnm ).
           GET RUN TIME FIELD DATA(started).
-          line-hierarchy = current( characteristic = row-iobjnm name = row-hienm ).
+          line-hierarchy = current( characteristic = row-iobjnm name = row-hienm version = row-version ).
           GET RUN TIME FIELD DATA(stopped).
           line-microseconds = stopped - started.
           DATA(hiesid) = NEW i( line-hierarchy-hiesid ).
@@ -529,37 +575,65 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD offered.
+    DATA rows TYPE ty_t_directory_text.
     SELECT d~hienm, d~version, d~dateto, t~txtsh, t~txtmd, t~txtlg
       FROM rshiedir AS d
       LEFT OUTER JOIN rshiedirt AS t ON t~hieid = d~hieid AND t~objvers = d~objvers AND t~langu = @sy-langu
       WHERE d~iobjnm = @characteristic AND d~objvers = 'A'
-      ORDER BY d~hienm ASCENDING, d~dateto DESCENDING, d~version ASCENDING
-      INTO TABLE @DATA(rows).
-    LOOP AT rows INTO DATA(row) GROUP BY row-hienm INTO DATA(group).
-      DATA(entry) = VALUE ty_offered( name = condense( group ) supported = abap_true ).
-      DATA(count) = 0.
+      INTO CORRESPONDING FIELDS OF TABLE @rows.
+    result = offer( rows = rows structure_time_dep = structure_time_dependent( characteristic ) ).
+  ENDMETHOD.
+
+  METHOD offer.
+    DATA(sorted) = rows.
+    SORT sorted BY hienm ASCENDING version ASCENDING dateto DESCENDING.
+    LOOP AT sorted INTO DATA(row) GROUP BY ( hienm = row-hienm version = row-version ) INTO DATA(group).
+      DATA(entry) = VALUE ty_offered( name      = condense( group-hienm )
+                                      version   = condense( group-version )
+                                      hierarchy = hierarchy_name( name = group-hienm version = group-version ) ).
       LOOP AT GROUP group INTO DATA(member).
-        count = count + 1.
+        " the latest slice first: its text, also of a version without a slice valid to 9999-12-31
         IF entry-text IS INITIAL.
           entry-text = condense( COND string( WHEN member-txtmd IS NOT INITIAL THEN member-txtmd
                                               WHEN member-txtlg IS NOT INITIAL THEN member-txtlg
                                               ELSE member-txtsh ) ).
         ENDIF.
-        IF member-version IS NOT INITIAL OR member-dateto <> '99991231'.
-          entry-supported = abap_false.
+        IF member-dateto = c_valid_to.
+          entry-supported = abap_true.
         ENDIF.
       ENDLOOP.
-      IF count > 1.
+      IF structure_time_dep = abap_true.
         entry-supported = abap_false.
-      ENDIF.
-      IF entry-supported = abap_false.
-        entry-reason = `time or version dependent, which olap4abap does not support yet`.
+        entry-reason = `its structure is time dependent, which olap4abap does not support yet`.
+      ELSEIF entry-supported = abap_false.
+        entry-reason = |it has no slice valid to { c_valid_to DATE = ISO }|.
       ENDIF.
       IF entry-text IS INITIAL.
         entry-text = entry-name.
       ENDIF.
       APPEND entry TO result.
     ENDLOOP.
+    " versions of the same text are told apart by the version
+    DATA(texts) = result.
+    LOOP AT result ASSIGNING FIELD-SYMBOL(<entry>) WHERE version IS NOT INITIAL.
+      DATA(same) = REDUCE i( INIT n = 0 FOR t IN texts WHERE ( text = <entry>-text ) NEXT n = n + 1 ).
+      IF same > 1.
+        <entry>-text = |{ <entry>-text } ({ <entry>-version })|.
+      ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD structure_time_dependent.
+    SELECT SINGLE hiendtfl FROM rsdchabas WHERE chabasnm = @characteristic AND objvers = 'A' INTO @DATA(flag).
+    result = xsdbool( sy-subrc = 0 AND flag IS NOT INITIAL ).
+  ENDMETHOD.
+
+  METHOD hierarchy_name.
+    result = condense( CONV string( name ) ).
+    DATA(suffix) = condense( CONV string( version ) ).
+    IF suffix IS NOT INITIAL.
+      result = |{ result }_{ suffix }|.
+    ENDIF.
   ENDMETHOD.
 
   METHOD create_tables.
@@ -666,10 +740,11 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD current.
-    DATA(bw) = bw_state( characteristic = characteristic name = name ).
+    DATA(bw) = bw_state( characteristic = characteristic name = name version = version ).
     DATA(tables) = registered_tables( bw-iobjnm ).
     IF tables IS INITIAL OR tables_exist( tables ) = abap_false.
-      refuse( |The hierarchy { name } of { characteristic } has no tables: accept a schema that names it| ).
+      refuse( |The hierarchy { hierarchy_name( name = name version = version ) } of { characteristic } has no | &&
+              |tables: accept a schema that names it| ).
     ENDIF.
     SELECT SINGLE * FROM zzxxmla1_hiedir WHERE hieid = @bw-hieid AND hiesid = @bw-hiesid AND sver = @bw-sver
       INTO @DATA(directory).
@@ -689,6 +764,7 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
       unlock( bw-hieid ).
     ENDIF.
     result = hierarchy_of( directory = directory tables = tables ).
+    result-version = bw-version.
     result-refilled = refilled.
     result-externals = externals( result ).
     IF result-rest_shown = abap_true.
@@ -779,22 +855,29 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD bw_state.
+    DATA(shown) = hierarchy_name( name = name version = version ).
     SELECT hieid, iobjnm, hienm, version, dateto, norestnodes FROM rshiedir
-      WHERE iobjnm = @characteristic AND hienm = @name AND objvers = 'A'
+      WHERE iobjnm = @characteristic AND hienm = @name AND version = @version AND objvers = 'A'
+      ORDER BY dateto DESCENDING
       INTO TABLE @DATA(rows).
     IF rows IS INITIAL.
-      refuse( |BW has no active hierarchy { name } of { characteristic }| ).
+      refuse( |BW has no active hierarchy { shown } of { characteristic }| ).
     ENDIF.
-    IF lines( rows ) > 1 OR rows[ 1 ]-version IS NOT INITIAL OR rows[ 1 ]-dateto <> '99991231'.
-      refuse( |The hierarchy { name } of { characteristic } is time or version dependent, which olap4abap does not support yet| ).
+    IF structure_time_dependent( characteristic ) = abap_true.
+      refuse( |The hierarchy { shown } of { characteristic } has a time-dependent structure, which olap4abap does | &&
+              |not support yet| ).
+    ENDIF.
+    IF rows[ 1 ]-dateto <> c_valid_to.
+      refuse( |The hierarchy { shown } of { characteristic } has no slice valid to { c_valid_to DATE = ISO }| ).
     ENDIF.
     DATA(row) = rows[ 1 ].
-    result = VALUE #( hieid = row-hieid iobjnm = row-iobjnm hienm = row-hienm norestnodes = row-norestnodes ).
+    result = VALUE #( hieid = row-hieid iobjnm = row-iobjnm hienm = row-hienm version = row-version
+                      norestnodes = row-norestnodes ).
     SELECT hiesid, sver, timestmp, rootsid, resttopsid FROM rsrhiedir_olap
       WHERE hieid = @row-hieid AND objvers = 'A' AND deletetimestmp = 0
       INTO TABLE @DATA(olap).
     IF lines( olap ) <> 1.
-      refuse( |The hierarchy { name } of { characteristic } has { lines( olap ) } current rows in RSRHIEDIR_OLAP| &&
+      refuse( |The hierarchy { shown } of { characteristic } has { lines( olap ) } current rows in RSRHIEDIR_OLAP| &&
               |, olap4abap understands exactly one| ).
     ENDIF.
     result-hiesid = olap[ 1 ]-hiesid.
@@ -831,6 +914,19 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
                       AND directory-hiesid = bw-hiesid
                       AND directory-sver = bw-sver
                       AND directory-timestmp = bw-timestmp ).
+  ENDMETHOD.
+
+  METHOD delete_old_slices.
+    " a new slice of an entirely time-dependent hierarchy is a new HIEID: the copy of the slice it ends is read no more
+    SELECT * FROM zzxxmla1_hiedir
+      WHERE iobjnm = @bw-iobjnm AND hienm = @bw-hienm AND hieid <> @bw-hieid
+        AND hieid NOT IN ( SELECT hieid FROM rshiedir
+                             WHERE iobjnm = @bw-iobjnm AND hienm = @bw-hienm AND objvers = 'A' AND dateto = @c_valid_to )
+      INTO TABLE @DATA(old).
+    LOOP AT old INTO DATA(copy).
+      delete_copy( tables = tables hiesid = copy-hiesid sver = copy-sver ).
+      DELETE FROM zzxxmla1_hiedir WHERE hieid = @copy-hieid AND hiesid = @copy-hiesid AND sver = @copy-sver.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD stale_copies.
@@ -1051,6 +1147,7 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
           delete_copy( tables = tables hiesid = stale-hiesid sver = stale-sver ).
           DELETE FROM zzxxmla1_hiedir WHERE hieid = @stale-hieid AND hiesid = @stale-hiesid AND sver = @stale-sver.
         ENDLOOP.
+        delete_old_slices( bw = bw tables = tables ).
         " rows of this SVER that no directory row names (a refill that did not finish)
         delete_copy( tables = tables hiesid = bw-hiesid sver = bw-sver ).
         zzxxmla1_cl_sql=>execute( sql    = nodes_sql( tables = tables bw_tables = bw_tables )

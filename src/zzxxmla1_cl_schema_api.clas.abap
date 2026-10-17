@@ -20,7 +20,7 @@
 "!   periods restricted to the regular ones, both time dimensions; its notes join the proposal's); any other
 "!   selection is an edit (fix); with it, as with fix, schema and accept, the BW hierarchies of the characteristics
 "!   of its tables (bwHierarchies, ZZXXMLA1_CL_BW_HIERARCHY_COPY=>offered), which the UI offers to be ticked: a ticked
-"!   one is a Hierarchy annotated olap4abap.bwHierarchy, none is in the proposal;
+"!   one is a Hierarchy annotated olap4abap.bwHierarchy (and olap4abap.bwHierarchyVersion), none is in the proposal;
 "! - A selection (docs/bw-schema-design-guide.md, section 3.8) is given by parameters, one per characteristic:
 "!   filter.CHARACTERISTIC=rows (filter the cube), members.CHARACTERISTIC=rows (restrict members), the rows as the
 "!   annotations write them (I EQ 'K4';E CP '*013'), and fixed.CHARACTERISTIC=value, filter the cube with I EQ value;
@@ -403,7 +403,8 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
       RETURNING VALUE(result)   TYPE string.
     "! The hierarchies BW has for the characteristics whose views the tables are (a placeholder or a generated view;
     "! ZZXXMLA1_CL_BW_HIERARCHY_COPY=>offered), which the UI lists on a dimension of such a table to be ticked:
-    "! [{table, characteristic, hierarchies: [{name, text, supported, reason}]}], no entry for a characteristic without.
+    "! [{table, characteristic, hierarchies: [{name, version, hierarchy, text, supported, reason}]}] (hierarchy the name
+    "! of its Hierarchy, ZZXXMLA1_CL_BW_HIERARCHY_COPY=>hierarchy_name), no entry for a characteristic without.
     METHODS bw_hierarchies_json
       IMPORTING tables        TYPE string_table
       RETURNING VALUE(result) TYPE string.
@@ -1529,7 +1530,8 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
       ENDIF.
       DATA(hierarchies) = VALUE string_table(
         FOR h IN zzxxmla1_cl_bw_hierarchy_copy=>offered( CONV #( characteristic ) )
-        ( |\{"name":{ json( h-name ) },"text":{ json( h-text ) },"supported":{ json_bool( h-supported ) },| &&
+        ( |\{"name":{ json( h-name ) },"version":{ json( h-version ) },"hierarchy":{ json( h-hierarchy ) },| &&
+          |"text":{ json( h-text ) },"supported":{ json_bool( h-supported ) },| &&
           |"reason":{ json( h-reason ) }\}| ) ).
       IF hierarchies IS NOT INITIAL.
         APPEND |\{"table":{ json( table ) },"characteristic":{ json( characteristic ) },| &&
@@ -1561,7 +1563,11 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
       IF sy-subrc = 0.
         DATA(bw_name) = condense( annotation-cdata ).
         IF bw_name IS NOT INITIAL.
-          APPEND bw_name TO names.
+          READ TABLE hierarchy-annotations->array INTO DATA(version)
+            WITH KEY name = zzxxmla1_cl_schema=>c_bw_hierarchy_version.
+          APPEND zzxxmla1_cl_bw_hierarchy_copy=>hierarchy_name(
+                   name    = bw_name
+                   version = COND string( WHEN sy-subrc = 0 THEN condense( version-cdata ) ) ) TO names.
         ENDIF.
       ENDIF.
     ENDLOOP.
@@ -1575,7 +1581,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     ENDIF.
     DATA(offered) = zzxxmla1_cl_bw_hierarchy_copy=>offered( characteristic ).
     LOOP AT names INTO DATA(name).
-      IF line_exists( offered[ name = name supported = abap_true ] ).
+      IF line_exists( offered[ hierarchy = name supported = abap_true ] ).
         TRY.
             NEW zzxxmla1_cl_bw_hierarchy_copy( )->create_tables( characteristic ).
           CATCH zzxxmla1_cx_bw_hierarchy INTO DATA(error).

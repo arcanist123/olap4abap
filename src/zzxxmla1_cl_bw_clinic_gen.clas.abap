@@ -432,7 +432,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
       IMPORTING providers TYPE string_table.
     "! Adds to the schema of a provider every BW hierarchy BW has for the characteristic of one of its dimensions and
     "! olap4abap serves (ZZXXMLA1_CL_BW_HIERARCHY_COPY=>offered), as the user ticks them in the schema builder
-    "! (ZCLDIAG_ICD, ZCLPAT_PRG, ZCLSERV_CAT and ZCLSERV_LOC on ZCLVISIT and ZCLVISITA).
+    "! (ZCLDIAG_ICD, ZCLPAT_PRG, ZCLSERV_CAT, ZCLSERV_LOC and per version ZCLDOC_ORG and ZCLDOC_SITE, their slices valid
+    "! to 9999-12-31: ZCLDOC_ORG_001, ..., on ZCLVISIT and ZCLVISITA).
     METHODS tick_hierarchies
       CHANGING !schema TYPE zzxxmla1_cl_schema_def=>ty_schema.
     "! The test catalog ZCLHIER from the InfoCube's schema: the reference's reference/schema/ClinicBW.xml, catalog and
@@ -2454,7 +2455,11 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
         DATA(annotations) = NEW zzxxmla1_cl_schema_def=>ty_annotations(
           array = VALUE zzxxmla1_cl_schema_def=>ty_t_annotation( ( name = zzxxmla1_cl_schema=>c_bw_hierarchy
                                                                    cdata = offered-name ) ) ).
-        APPEND VALUE #( name            = offered-name
+        IF offered-version IS NOT INITIAL.
+          APPEND VALUE #( name = zzxxmla1_cl_schema=>c_bw_hierarchy_version cdata = offered-version )
+            TO annotations->array.
+        ENDIF.
+        APPEND VALUE #( name            = offered-hierarchy
                         visible         = abap_true
                         has_all         = abap_true
                         all_member_name = |All { offered-text }|

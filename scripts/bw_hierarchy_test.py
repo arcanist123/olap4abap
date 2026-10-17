@@ -61,6 +61,12 @@ HIERARCHIES = {
     ("ZCLPAT", "ZCLPAT_PRG"): "[ZCLPAT.ZCLPAT_PRG]",
     ("ZCLSERV", "ZCLSERV_CAT"): "[ZCLSERV.ZCLSERV_CAT]",
     ("ZCLSERV", "ZCLSERV_LOC"): "[ZCLSERV.ZCLSERV_LOC]",
+    # version dependent and entirely time dependent: per version the slice valid to 9999-12-31, the key date the probe
+    # sets; BW's name is the hierarchy's and the version's, olap4abap's Hierarchy is named by both
+    ("ZCLDOC", "ZCLDOC_ORG_001"): "[ZCLDOC.ZCLDOC_ORG_001]",
+    ("ZCLDOC", "ZCLDOC_ORG_002"): "[ZCLDOC.ZCLDOC_ORG_002]",
+    ("ZCLDOC", "ZCLDOC_SITE_001"): "[ZCLDOC.ZCLDOC_SITE_001]",
+    ("ZCLDOC", "ZCLDOC_SITE_002"): "[ZCLDOC.ZCLDOC_SITE_002]",
 }
 NOT_ASSIGNED = "1HIER_REST"
 # --reference: the reference server, its catalog and the hierarchies it serves
@@ -121,14 +127,16 @@ def bw_members():
         if hierarchy == "TOTAL":
             total = values
             continue
-        found = re.fullmatch(r"\[(\S+)\s+(\S+)\]", hierarchy)
+        # [characteristic<blanks>name] or, version dependent, [characteristic<blanks>name<blanks>version]
+        found = re.fullmatch(r"\[(\S+)\s+(\S+)(?:\s+(\S+))?\]", hierarchy)
         node = re.fullmatch(r".*\]\.\[(.*)\]", unique).group(1)
         # a node is its name padded to 32 characters and its InfoObject: a name of 32 leaves no blank between them
         if " " in node:
             name, _, kind = node.rpartition(" ")
         else:
             name, kind = node[:32], node[32:]
-        hierarchies.setdefault((found.group(1), found.group(2)), []).append({
+        name_version = found.group(2) + (f"_{found.group(3)}" if found.group(3) else "")
+        hierarchies.setdefault((found.group(1), name_version), []).append({
             "level": int(level), "children": int(children), "caption": caption, "values": values,
             # the text olap4abap captions the member by: the characteristic's medium, else long, else short text
             # (BW's caption of a node of an external characteristic is its short text)

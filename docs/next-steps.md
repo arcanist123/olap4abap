@@ -27,7 +27,8 @@ visits once, and Excel shows the subtotals right over HTTP (pump on 8089, proxy 
 `capture-execute.py --ssas multidimensional` keeps its answers as cases. It is the oracle for Excel's MDX on what
 neither the reference nor BW's MDX can check: shared nodes, links, postable nodes, intervals and REST_H. `ZCLDIAG_ICD`
 stays the reference's (its 71 cases); in SSAS it is the control only, no cases are captured on it there. The
-time-dependent `ZCLDOC_ORG` and `ZCLDOC_SITE` have no copy and are out of scope until the key date.
+time-dependent `ZCLDOC_ORG` and `ZCLDOC_SITE` are served per version at their slice valid to 9999-12-31 since
+2026-10-17 (step 6 below).
 
 Checked today in Excel against olap4abap: the setup's catalogs `ZCLVISIT` and `ZCLVISITA` show the flat diagnosis
 only (37 diagnoses with visits, every value and the total BW's); a BW hierarchy is in the test catalog `ZCLHIER` only,
@@ -73,7 +74,7 @@ Next, in this order:
    hierarchies `RSHIEDIR` has for the characteristic of its view (`bwHierarchies`,
    `ZZXXMLA1_CL_BW_HIERARCHY_COPY=>offered`: name, text in the logon language, supported or why not), and the
    dimension pane's "BW hierarchies" ticks them: a ticked one is a `<Hierarchy>` named by BW, captioned by its text,
-   annotated `olap4abap.bwHierarchy`. Time- or version-dependent ones cannot be ticked. The schema API's check (and
+   annotated `olap4abap.bwHierarchy`. Time- or version-dependent ones could not be ticked then (step 6). The schema API's check (and
    so accept) creates the copy tables of an InfoObject a ticked hierarchy names, since the schema reader reads the
    levels from the copy (a change of check, which wrote nothing before: the tables stay when the hierarchy is
    unticked). The clinic setup ticks every one BW serves (`ZCLVISIT`: `ZCLDIAG_ICD`, `ZCLPAT_PRG`, `ZCLSERV_CAT`;
@@ -116,8 +117,24 @@ Next, in this order:
    which the SSAS model has never had (not in `SSAS_HIERARCHIES`).
 5. Smaller: texts step 5 (the check against blank texts); the debt that keeps hierarchy cases red on SAP (measure
    captions, member names on `sourceAttribute` levels, `known-issues.md`); `xmla_test.py` passes all 372 today.
+6. Done (2026-10-17): version-dependent and entirely time-dependent hierarchies, as the texts (decided with the
+   user): each version is a hierarchy of its own, its version part of the name, served at the slice valid to
+   9999-12-31, no key date. BW keeps a row of `RSHIEDIR` per name, version and slice, each its own `HIEID` with one
+   SID structure in `RSRHIEDIR_OLAP` (`HDATE` blank), so the copy is unchanged: `ZZXXMLA1_CL_BW_HIERARCHY_COPY=>current`
+   takes the version and picks the row valid to 9999-12-31 (`c_valid_to`); a refill deletes the copies of the
+   name's slices that no longer are (`delete_old_slices`). The schema names it by `olap4abap.bwHierarchy` (the
+   name) and `olap4abap.bwHierarchyVersion` (the version), the `<Hierarchy>` `<name>_<version>`
+   (`hierarchy_name`: `ZCLDOC_ORG_001`); `offered` lists one per name and version with the latest slice's text
+   (followed by `(version)` where two versions share it) and refuses a time-dependent structure
+   (`RSDCHABAS-HIENDTFL`, none in the demo) and a version without a slice valid to 9999-12-31. The schema builder
+   shows the version, the clinic setup ticks all four (`ZCLDOC_ORG_001`, `_002`, `ZCLDOC_SITE_001`, `_002`).
+   Checked: `bw_hierarchy_test.py --catalog ZCLVISIT`, `ZCLVISITA` and `ZCLHIER` (the probe asks BW's MDX at key
+   date 9999-12-31; 34, 32, 28 and 28 members, all BW's), `schema_api_test.py` (also the refusal of a
+   version-dependent one without its version), `schema_ui_test.py`'s BW hierarchy checks, unit tests of the copy,
+   `xmla_test.py` 372 of 372, `ssas_compare.py` 36 of 36, `hierarchy_copy_test.py`. Open: other slices than
+   9999-12-31 wait for the key date; a time-dependent structure.
 
-Later, as noted: the key date, then time- and version-dependent hierarchies; the performance risks (below, Paused:
+Later, as noted: the key date (then the other slices of time-dependent hierarchies, and time-dependent structures); the performance risks (below, Paused:
 query planning); query planning step 7.
 
 ## Now: texts and captions
@@ -315,8 +332,9 @@ captions. Decided with the user 2026-10-15: the next big piece of work is BW's e
 `/BIC/H<char>`, directory `RSHIEDIR`) that are neither time nor version dependent, ahead of planning step 7 (paused
 below). Users report on BW hierarchies, and none of them can be shown today. A plain hierarchy
 needs no key date, so this does not wait for one. Afterwards the key date (time-dependent attributes, texts and
-navigation attributes read on a date instead of 9999-12-31; open: how a client, Excel above all, sends it), then time-
-and version-dependent hierarchies on both (the clinic demo's `ZCLDOC_ORG`, `ZCLDOC_SITE`).
+navigation attributes read on a date instead of 9999-12-31; open: how a client, Excel above all, sends it), then the
+other slices of time-dependent hierarchies (the clinic demo's `ZCLDOC_ORG`, `ZCLDOC_SITE`; their versions and the
+slices valid to 9999-12-31 are served since 2026-10-17, the order from here, step 6).
 
 Test cases: the clinic demo's `ZCLDIAG_ICD` (All Diagnoses > chapter > group > diagnosis, 69 nodes, plain;
 `clinic-demo.md`, The hierarchy of the diagnoses) and, for shared nodes, `ZCLPAT_PRG` (care programs > program >
