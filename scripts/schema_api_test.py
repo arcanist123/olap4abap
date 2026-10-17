@@ -242,6 +242,17 @@ def main():
           status == 200 and body.get("from") == "1997-01-01" and found.get("0CALMONTH", {}).get("expected") == 12
           and found.get("0CALWEEK", {}).get("expected") == 53 and found.get("0WEEKDAY1", {}).get("attributeTable") is None,
           body)
+    check("time: the text tables of the characteristics with texts",
+          found.get("0CALMONTH", {}).get("textTable") == "/BI0/TCALMONTH" and found.get("0CALYEAR", {}).get("textTable") is None
+          and isinstance(found.get("0CALMONTH", {}).get("missingTexts"), int), found.get("0CALMONTH"))
+    status, body, _ = call(args.url, args.client, "GET", "time/missing",
+                           {"characteristic": "0calmonth", "from": "1997-01-01", "to": "1997-12-31"})
+    check("time/missing: the values without SID, attribute row or text",
+          status == 200 and body.get("characteristic") == "0CALMONTH"
+          and all(isinstance(body.get(k, {}).get("values"), list) for k in ("sids", "attributes", "texts"))
+          and body["texts"]["count"] == found.get("0CALMONTH", {}).get("missingTexts"), body)
+    status, body, _ = call(args.url, args.client, "GET", "time/missing", {"characteristic": "0CALDAY"})
+    check("time/missing refuses a characteristic it does not fill", status == 400 and "0CALDAY" in body.get("error", ""), body)
     status, body, _ = call(args.url, args.client, "GET", "time", {"from": "1997-02-30"})
     check("time refuses an impossible date", status == 400 and "not a date" in body.get("error", ""), body)
     status, body, headers = call(args.url, args.client, "GET", "time/fill")

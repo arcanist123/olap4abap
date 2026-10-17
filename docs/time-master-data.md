@@ -1,10 +1,11 @@
 # Master data of the time characteristics
 
-The views of the characteristics (`ZZXXMLA1_CL_BW_VIEW_GEN`) take their members from the SID table (`/BI0/S...`) and
-their attributes from the attribute table (`/BI0/P...`). BW fills neither for its calendar characteristics, so a time
-dimension shows only the periods that have data, without `DATEFROM`, `DATETO`, `NUMDAY`, `NUMWDAY` or the year, month
-or quarter a period belongs to. `ZZXXMLA1_CL_TIME_MD` fills both for an interval; the page
-`/zzxxmla1/schema/time.html` shows the state and fills them.
+The views of the characteristics (`ZZXXMLA1_CL_BW_VIEW_GEN`) take their members from the SID table (`/BI0/S...`),
+their attributes from the attribute table (`/BI0/P...`) and their texts from the text table (`/BI0/T...`, English).
+BW fills none of them for its calendar characteristics, so a time dimension shows only the periods that have data,
+without `DATEFROM`, `DATETO`, `NUMDAY`, `NUMWDAY` or the year, month or quarter a period belongs to, and without texts
+(its members' captions are blank). `ZZXXMLA1_CL_TIME_MD` fills all three for an interval; the page
+`/zzxxmla1/schema/time.html` shows the state, lists the values each characteristic misses and fills them.
 
 ## What BW does (analysed on the 2025 system, 2026-10-07)
 
@@ -34,6 +35,17 @@ Neither touches the SID or attribute tables. The button *Recreate* on tab 1001 (
    and then creates the missing SIDs, for `0DATE` and `0CALMONTH` only (`0CALQUARTER` and `0FISCPER` are "to do"). The
    new SIDs get no attribute rows until a second run. `0CALYEAR` and `0CALWEEK` never get attribute rows.
 
+**Texts** (analysed 2026-10-17): the text tables of `0CALMONTH`, `0CALQUARTER`, `0CALMONTH2`, `0CALQUART1`,
+`0WEEKDAY1` and `0FISCYEAR` exist and are empty, and nothing in BW fills them. BW's queries do not read them for most
+of these: the master data reader of a characteristic (`CL_RSMD_RS_FACTORY`) is a class of its own for `0CALMONTH`,
+`0CALMONTH2`, `0CALQUART1`, `0WEEKDAY1` and `0FISCPER` (`CL_RSMD_RS_0CALMONTH`, ...), whose `GET_TEXT` makes the texts
+when asked, in the logon language: the month names of `T247` with the year (`CL_RSMD_RS_0CALMONTH`: medium `JAN 1997`,
+long `January 1997`), the weekday names of `T246` (short `MO`, medium and long `Monday`), the quarter from the text
+pool of `SAPLRRSV` (`Q01` read into 10 places, `Q02` into 20: short `Q1`, long `Quarter 1`) and *Not assigned* (text
+pool of `SAPLRSDM`, `001`) for the initial value. `0CALQUARTER` and `0FISCYEAR` have no such class: BW reads their
+empty tables. `0CALYEAR`, `0CALWEEK` and `0HALFYEAR1` have no texts; `0FISCPER` has texts in its metadata but no
+text table on the development system (its reader makes them).
+
 So on the development system the attribute tables of `0CALYEAR`, `0CALQUARTER`, `0CALMONTH` and `0CALWEEK` hold only
 the initial row. Their SID tables hold the values that FoodMart, the clinic demo and the SAP demo cube loaded.
 `0HALFYEAR1` and `0WEEKDAY1` have no SIDs at all.
@@ -49,6 +61,16 @@ the initial row. Their SID tables hold the values that FoodMart, the clinic demo
 | `0HALFYEAR1`, `0CALQUART1`, `0CALMONTH2`, `0WEEKDAY1` | all their values | no attribute table |
 | `0FISCYEAR` | under K4 (below), every year of the interval, as `0CALYEAR` | `DATEFROM`, `DATETO`, `NUMDAY`, `NUMWDAY` of the calendar year |
 | `0FISCPER` | under K4, every month of the interval as period 001 to 012, as `0CALMONTH` | the month's dates and days, `FISCYEAR`, `FISCPER3`; period 000 and the special periods only `FISCYEAR` and `FISCPER3` |
+
+| Characteristic | Texts (English: short, medium, long as the table has them) |
+| --- | --- |
+| `0CALMONTH` | medium `JAN 1997`, long `January 1997` (as `CL_RSMD_RS_0CALMONTH`) |
+| `0CALQUARTER` | short `Q3 1997`, long `Quarter 3 1997` (`0CALQUART1`'s with the year) |
+| `0CALMONTH2` | medium `JAN`, long `January` |
+| `0CALQUART1` | short `Q3`, long `Quarter 3` |
+| `0WEEKDAY1` | short `MO`, long `Monday` |
+| `0FISCYEAR` | under K4: medium `1997`, long `Fiscal year 1997` |
+| the initial value of each | `Not assigned` |
 
 - The interval is the one in `RSADMINS` (above) unless the request gives `from` and `to`. Nothing is written to
   `RSADMINS`; change BW's interval in RSRHIERARCHYVIRT. The schema proposal restricts the members of its time
@@ -78,6 +100,15 @@ the initial row. Their SID tables hold the values that FoodMart, the clinic demo
   page shows it as "not active" and cannot select it, and a fill of it is an error that writes nothing. Without its
   attribute table it is filled like a characteristic without master data: SIDs only (not checked), and the fill
   answers a warning. `GET time` lists both cases per characteristic as `missingTables`.
+- **Texts** (added 2026-10-17): written in English (`ZZXXMLA1_CL_TIME_MD=>c_language`, the language the views read)
+  for every value with a SID and for the initial value (`Not assigned`, so the SID 0 member is captioned as in BW),
+  with the wording of BW's readers (above), the names read from `T247`, `T246` and the two text pools in English.
+  Existing rows are replaced. Only the text fields the table has are written. A characteristic whose text table the
+  system does not have gets no texts, and the fill answers a warning. Values of another variant than K4 get none.
+- **Missing values**: the state counts, per characteristic, the values of the interval without SID and the values of
+  the interval or with a SID without attribute row or text row, counting only values this class can fill (since
+  2026-10-17 a value of another fiscal year variant is no missing attribute row any more). `GET time/missing` lists
+  them.
 - Not filled: `0CALDAY` (no SID table of its own that the views use, `docs/schema-generator.md`).
 
 **Filling changes the cubes' members.** Every view on these tables (the schemas of `ZFMSALESA`, the clinic demo,
@@ -91,12 +122,18 @@ differ in the time dimensions.
 
 - `GET time?from=YYYY-MM-DD&to=YYYY-MM-DD`: the interval (each date BW's if not given), the factory calendar and, per
   characteristic, `sids`, `attributes`, `expected` (values of the interval), `missingSids`, `missingAttributes` and
-  the smallest and largest value with a SID. The initial value (SID 0) is not counted.
+  the smallest and largest value with a SID, and with a text table (`textTable`) `texts` and `missingTexts`. The
+  initial value (SID 0) is not counted.
+- `GET time/missing?characteristic=0CALMONTH&from=...&to=...`: the values the characteristic misses, as the page shows
+  them (`K4/2024001`): `sids`, `attributes` and `texts`, each `count`, `truncated` and the first 1,000 `values`. Refused
+  (400): no characteristic, one the class does not fill.
 - `POST time/fill?from=...&to=...&characteristics=0CALMONTH,0CALYEAR`: fills the characteristics (all without
-  `characteristics`) and answers `filled` (per characteristic `createdSids`, `attributeRows`, `error`) and the state
+  `characteristics`) and answers `filled` (per characteristic `createdSids`, `attributeRows`, `textRows`, `error`,
+  `warning`) and the state
   afterwards. Refused (400): a date that is none, `from` after `to`, an interval longer than 100 years.
 
 The page `time.html` (`web/schema/time.js`, linked from the schema builder and the MDX console) shows the state for
-the interval, selects the incomplete characteristics and fills the selected ones after a confirmation.
-`scripts/schema_api_test.py` checks `GET time` and the refusals of `time/fill`; it does not fill.
+the interval (SIDs, attribute rows and texts), shows per incomplete characteristic its missing values ("Show
+missing"), selects the incomplete characteristics and fills the selected ones after a confirmation.
+`scripts/schema_api_test.py` checks `GET time`, `GET time/missing` and the refusals of `time/fill`; it does not fill.
 `scripts/fiscal_default_test.py` needs the fiscal ones filled (it checks twelve periods for every fiscal year).

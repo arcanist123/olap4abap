@@ -9,6 +9,10 @@
 * olap4abap contains code derived from Mondrian (Eclipse Public License 1.0): Copyright (C) 1998-2005 Julian Hyde,
 * Copyright (C) 2005-2021 Hitachi Vantara and others, Copyright (C) 2021-2025 Sergei Semenkov. See the NOTICE file.
 *----------------------------------------------------------------------------------------------------------------------*
+CLASS ltc_time_md DEFINITION DEFERRED.
+" before the definition: its helper returns a private type
+CLASS zzxxmla1_cl_time_md DEFINITION LOCAL FRIENDS ltc_time_md.
+
 "! The values and periods of the time characteristics; nothing is written.
 CLASS ltc_time_md DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
   PRIVATE SECTION.
@@ -39,9 +43,18 @@ CLASS ltc_time_md DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHOR
     METHODS missing_tables FOR TESTING.
     "! a characteristic without SID table is not filled: an error, nothing written
     METHODS fill_without_tables FOR TESTING.
+    "! the texts of months, quarters and weekdays as BW's readers make them, the initial value Not assigned
+    METHODS texts FOR TESTING.
+    "! a value that is none, of a characteristic without texts or of another variant, has no texts
+    METHODS no_texts FOR TESTING.
+    "! the initial value: zeros, a fiscal one without variant
+    METHODS initial_value FOR TESTING.
+    "! a text symbol is its entry up to its length, the default without entry
+    METHODS text_symbol FOR TESTING.
+    "! the month names, quarter labels and the initial value's text as English text
+    METHODS labels
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_time_md=>ty_labels.
 ENDCLASS.
-
-CLASS zzxxmla1_cl_time_md DEFINITION LOCAL FRIENDS ltc_time_md.
 
 CLASS ltc_time_md IMPLEMENTATION.
 
@@ -202,6 +215,80 @@ CLASS ltc_time_md IMPLEMENTATION.
       interval       = VALUE #( from = '19970101' to = '19971231' calendar = '01' ) ).
     cl_abap_unit_assert=>assert_char_cp( act = result-error exp = `*ZZXXMLA1_NO_SUCH_TABLE does not exist*` ).
     cl_abap_unit_assert=>assert_equals( act = result-created_sids exp = 0 ).
+  ENDMETHOD.
+
+  METHOD labels.
+    result = VALUE #( months        = VALUE #( ( number = 1 short = `JAN` long = `January` )
+                                               ( number = 12 short = `DEC` long = `December` ) )
+                      weekdays      = VALUE #( ( number = 1 short = `MO` long = `Monday` ) )
+                      quarter_short = `Q`
+                      quarter_long  = `Quarter`
+                      not_assigned  = `Not assigned` ).
+  ENDMETHOD.
+
+  METHOD texts.
+    DATA(labels) = labels( ).
+    DATA(texts) = zzxxmla1_cl_time_md=>texts( name = `0CALMONTH` value = '199712' labels = labels ).
+    cl_abap_unit_assert=>assert_equals( act = texts exp = VALUE zzxxmla1_cl_time_md=>ty_texts(
+      known = abap_true short = `DEC 1997` medium = `DEC 1997` long = `December 1997` ) ).
+    texts = zzxxmla1_cl_time_md=>texts( name = `0CALMONTH2` value = '01' labels = labels ).
+    cl_abap_unit_assert=>assert_equals( act = texts-long exp = `January` ).
+    cl_abap_unit_assert=>assert_equals( act = texts-medium exp = `JAN` ).
+    texts = zzxxmla1_cl_time_md=>texts( name = `0CALQUARTER` value = '19973' labels = labels ).
+    cl_abap_unit_assert=>assert_equals( act = texts-short exp = `Q3 1997` ).
+    cl_abap_unit_assert=>assert_equals( act = texts-long exp = `Quarter 3 1997` ).
+    texts = zzxxmla1_cl_time_md=>texts( name = `0CALQUART1` value = '4' labels = labels ).
+    cl_abap_unit_assert=>assert_equals( act = texts-short exp = `Q4` ).
+    cl_abap_unit_assert=>assert_equals( act = texts-long exp = `Quarter 4` ).
+    texts = zzxxmla1_cl_time_md=>texts( name = `0WEEKDAY1` value = '1' labels = labels ).
+    cl_abap_unit_assert=>assert_equals( act = texts-short exp = `MO` ).
+    cl_abap_unit_assert=>assert_equals( act = texts-long exp = `Monday` ).
+    texts = zzxxmla1_cl_time_md=>texts( name = `0FISCYEAR` value = 'K42024' labels = labels ).
+    cl_abap_unit_assert=>assert_equals( act = texts-medium exp = `2024` ).
+    cl_abap_unit_assert=>assert_equals( act = texts-long exp = `Fiscal year 2024` ).
+    " a month without name in T247: its number, as BW writes it
+    texts = zzxxmla1_cl_time_md=>texts( name = `0CALMONTH` value = '199705' labels = labels ).
+    cl_abap_unit_assert=>assert_equals( act = texts-long exp = `05 1997` ).
+    texts = zzxxmla1_cl_time_md=>texts( name = `0CALMONTH` value = '000000' labels = labels ).
+    cl_abap_unit_assert=>assert_equals( act = texts-medium exp = `Not assigned` ).
+    texts = zzxxmla1_cl_time_md=>texts( name = `0FISCYEAR` value = '  0000' labels = labels ).
+    cl_abap_unit_assert=>assert_equals( act = texts-long exp = `Not assigned` ).
+  ENDMETHOD.
+
+  METHOD no_texts.
+    DATA(labels) = labels( ).
+    cl_abap_unit_assert=>assert_false(
+      zzxxmla1_cl_time_md=>texts( name = `0CALMONTH` value = '199713' labels = labels )-known ).
+    cl_abap_unit_assert=>assert_false(
+      zzxxmla1_cl_time_md=>texts( name = `0CALQUARTER` value = '19975' labels = labels )-known ).
+    cl_abap_unit_assert=>assert_false(
+      zzxxmla1_cl_time_md=>texts( name = `0WEEKDAY1` value = '8' labels = labels )-known ).
+    cl_abap_unit_assert=>assert_false(
+      zzxxmla1_cl_time_md=>texts( name = `0FISCYEAR` value = 'K12024' labels = labels )-known ).
+    cl_abap_unit_assert=>assert_false(
+      zzxxmla1_cl_time_md=>texts( name = `0CALYEAR` value = '1997' labels = labels )-known ).
+  ENDMETHOD.
+
+  METHOD text_symbol.
+    " SAPLRRSV's Q01: Q padded to 10 places, then a translator's note
+    DATA(pool) = VALUE textpool_table( ( id = 'I' key = 'Q01' entry = 'Q          ; Q for quarter' length = 70 )
+                                       ( id = 'I' key = 'Q02' entry = 'Quarter' length = 20 ) ).
+    cl_abap_unit_assert=>assert_equals(
+      act = zzxxmla1_cl_time_md=>text_symbol( pool = pool key = 'Q01' width = 10 default = `x` ) exp = `Q` ).
+    cl_abap_unit_assert=>assert_equals(
+      act = zzxxmla1_cl_time_md=>text_symbol( pool = pool key = 'Q02' width = 20 default = `x` ) exp = `Quarter` ).
+    cl_abap_unit_assert=>assert_equals(
+      act = zzxxmla1_cl_time_md=>text_symbol( pool = pool key = '001' width = 60 default = `Not assigned` )
+      exp = `Not assigned` ).
+  ENDMETHOD.
+
+  METHOD initial_value.
+    DATA(characteristics) = zzxxmla1_cl_time_md=>characteristics( ).
+    cl_abap_unit_assert=>assert_equals(
+      act = zzxxmla1_cl_time_md=>initial_value( characteristics[ name = `0CALMONTH` ] ) exp = '000000' ).
+    DATA(initial) = zzxxmla1_cl_time_md=>initial_value( characteristics[ name = `0FISCYEAR` ] ).
+    cl_abap_unit_assert=>assert_equals( act = initial(2) exp = '  ' ).
+    cl_abap_unit_assert=>assert_equals( act = initial+2(4) exp = '0000' ).
   ENDMETHOD.
 
 ENDCLASS.

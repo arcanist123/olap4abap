@@ -171,7 +171,11 @@ Read before designing anything:
   `0CALMONTH`, for K4: its periods 001 to 012 are the months; BW's SID conversion adds 000 and the special periods of
   each year) for BW's interval of RSRHIERARCHYVIRT (`RSADMINS`) or a given one
   (`ZZXXMLA1_CL_TIME_MD`). BW fills neither: its Recreate button only fills characteristics that have navigation
-  attributes. Filling adds members to every time view; see `docs/time-master-data.md`.
+  attributes. It also writes the text tables (`0CALMONTH`, `0CALQUARTER`, `0CALMONTH2`, `0CALQUART1`, `0WEEKDAY1`,
+  `0FISCYEAR`) in English with the wording BW's readers make at query time and never store (`CL_RSMD_RS_0CALMONTH`:
+  `JAN 1997`, `January 1997`; the initial value `Not assigned`), and `GET time/missing` (the page's "Show missing")
+  lists the values a characteristic misses a SID, attribute row or text for. Filling adds members to every time view;
+  see `docs/time-master-data.md`.
 - Trace: `/zzxxmla1/schema/trace.html` (`web/schema/trace.js`) switches the trace of XMLA calls on and off per SAP
   user (table `ZZXXMLA1_TRCUSR`) and lists the traced calls (table `ZZXXMLA1_TRACE`, `ZZXXMLA1_CL_TRACE`): per call
   the SOAP request, Discover with its rowset or Execute with its MDX statement, status, fault, runtime, the SQL

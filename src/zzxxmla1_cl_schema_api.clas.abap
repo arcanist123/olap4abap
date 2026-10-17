@@ -69,10 +69,13 @@
 "! - GET time?from=YYYY-MM-DD&to=YYYY-MM-DD: the master data of the calendar time characteristics
 "!   (ZZXXMLA1_CL_TIME_MD): the interval (without from and to BW's, the one of RSRHIERARCHYVIRT) and, per
 "!   characteristic, its values with SID and with attributes and those of the interval that are missing, and its
-"!   tables the system does not have (missingTables: no SID table, the characteristic is not active);
+"!   tables the system does not have (missingTables: no SID table, the characteristic is not active); with texts
+"!   (textTable) its text rows in English and the values that miss one (texts, missingTexts);
+"! - GET time/missing?characteristic=0CALMONTH&from=...&to=...: the values of the characteristic that miss a SID, an
+"!   attribute row or a text row (sids, attributes, texts; the first c_missing_max of each, truncated if more);
 "! - POST time/fill?from=...&to=...&characteristics=0CALMONTH,0CALYEAR: makes the SIDs of the interval's values and
-"!   writes the attribute rows (without characteristics all of them), committed per characteristic. Answers what was
-"!   done and the state afterwards.
+"!   writes the attribute rows and texts (without characteristics all of them), committed per characteristic. Answers
+"!   what was done and the state afterwards.
 "! - GET trace[?filter=U][&method=DISCOVER|EXECUTE][&max=N]: the trace of the XMLA endpoint (ZZXXMLA1_CL_TRACE): the
 "!   current user, the users with the trace on and the newest N traced calls (200 without max, at most 10,000; of user
 "!   U, of that method), newest first, without request and response;
@@ -131,6 +134,8 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
     "! how many traced calls GET trace lists without max, and at most with it
     CONSTANTS c_trace_max_default TYPE i VALUE 200.
     CONSTANTS c_trace_max TYPE i VALUE 10000.
+    "! how many missing values GET time/missing lists per kind (SIDs, attribute rows, texts)
+    CONSTANTS c_missing_max TYPE i VALUE 1000.
     TYPES:
       "! a request of check or accept that passed the checks
       BEGIN OF ty_checked,
@@ -233,6 +238,14 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
       IMPORTING request       TYPE ty_request
       RETURNING VALUE(result) TYPE string
       RAISING   zzxxmla1_cx_api_refused.
+    METHODS time_missing
+      IMPORTING request       TYPE ty_request
+      RETURNING VALUE(result) TYPE string
+      RAISING   zzxxmla1_cx_api_refused.
+    "! The first c_missing_max values as a JSON array.
+    METHODS missing_values_json
+      IMPORTING !values       TYPE string_table
+      RETURNING VALUE(result) TYPE string.
     "! GET trace[?filter=U][&method=M][&max=N]: the current user, the users with the trace on and the newest N traced
     "! calls (c_trace_max_default, 1 to c_trace_max; of U, of method M: DISCOVER or EXECUTE), newest first.
     METHODS trace_status
@@ -461,7 +474,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     DATA(resource) = COND string( WHEN is_api( request-path )
                                   THEN substring( val = request-path off = strlen( c_path ) ) ).
     DATA(allow) = SWITCH string( resource WHEN `providers` OR `proposal` OR `values` OR `schemas` OR `schema` OR `time`
-                                            OR `trace` OR `trace/entry` OR `trace/response`
+                                            OR `time/missing` OR `trace` OR `trace/entry` OR `trace/response`
                                           THEN `GET`
                                           WHEN `check` OR `accept` OR `remove` OR `fix` OR `probe` OR `time/fill`
                                             OR `trace/on` OR `trace/off` OR `trace/clear`
@@ -487,6 +500,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
                                          WHEN `probe`     THEN probe( request )
                                          WHEN `time`      THEN time_status( request )
                                          WHEN `time/fill` THEN fill_time( request )
+                                         WHEN `time/missing` THEN time_missing( request )
                                          WHEN `trace`     THEN trace_status( request )
                                          WHEN `trace/entry` THEN trace_entry( request )
                                          WHEN `trace/response` THEN trace_response( request )
@@ -947,12 +961,35 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     DATA filled TYPE string_table.
     LOOP AT time_md->fill( interval = interval names = names ) INTO DATA(entry).
       APPEND |\{"name":{ json( entry-name ) },"createdSids":{ entry-created_sids },| &&
-             |"attributeRows":{ entry-attribute_rows },| &&
+             |"attributeRows":{ entry-attribute_rows },"textRows":{ entry-text_rows },| &&
              |"error":{ COND string( WHEN entry-error IS INITIAL THEN `null` ELSE json( entry-error ) ) },| &&
              |"warning":{ COND string( WHEN entry-warning IS INITIAL THEN `null` ELSE json( entry-warning ) ) }\}|
         TO filled.
     ENDLOOP.
     result = |\{"filled":{ json_array( filled ) },{ time_status_json( time_md = time_md interval = interval ) }\}|.
+  ENDMETHOD.
+
+  METHOD time_missing.
+    DATA(name) = parameter( request = request name = `characteristic` ).
+    IF name IS INITIAL.
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400 message = `Parameter characteristic missing`.
+    ENDIF.
+    DATA(missing) = NEW zzxxmla1_cl_time_md( )->missing( interval = time_interval( request ) name = name ).
+    IF missing-error IS NOT INITIAL.
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400 message = missing-error.
+    ENDIF.
+    result = |\{"characteristic":{ json( missing-name ) },"max":{ c_missing_max },| &&
+             |"sids":{ missing_values_json( missing-sids ) },"attributes":{ missing_values_json( missing-attributes ) },| &&
+             |"texts":{ missing_values_json( missing-texts ) }\}|.
+  ENDMETHOD.
+
+  METHOD missing_values_json.
+    DATA entries TYPE string_table.
+    LOOP AT values INTO DATA(value) TO c_missing_max.
+      APPEND json( value ) TO entries.
+    ENDLOOP.
+    result = |\{"count":{ lines( values ) },"truncated":{ json_bool( xsdbool( lines( values ) > c_missing_max ) ) },| &&
+             |"values":{ json_array( entries ) }\}|.
   ENDMETHOD.
 
   METHOD trace_status.
@@ -1112,6 +1149,9 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
                                                ELSE json( entry-characteristic-attribute_table ) ) },| &&
              |"sids":{ entry-sids },"attributes":{ entry-attributes },"expected":{ entry-expected },| &&
              |"missingSids":{ entry-missing_sids },"missingAttributes":{ entry-missing_attributes },| &&
+             |"textTable":{ COND string( WHEN entry-characteristic-text_table IS INITIAL THEN `null`
+                                          ELSE json( entry-characteristic-text_table ) ) },| &&
+             |"texts":{ entry-texts },"missingTexts":{ entry-missing_texts },| &&
              |"first":{ json( entry-first ) },"last":{ json( entry-last ) },| &&
              |"missingTables":{ json_array( VALUE #( FOR table IN entry-missing_tables ( json( table ) ) ) ) }\}|
         TO entries.
