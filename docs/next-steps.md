@@ -38,8 +38,8 @@ Next, in this order:
 1. Done (2026-10-17): a test catalog on SAP with the three hierarchies: `ZCLPAT_PRG` (caption Care Programs) and
    `ZCLSERV_CAT` (Service Catalog) in `ClinicBW-sap.xml` next to `ZCLDIAG_ICD`, annotated as it is, so
    `bw_hierarchy_test.py --catalog ZCLHIER --names` runs without editing the schema (open of step 7.3): 72, 2,914 and
-   92 members, all BW's. Without `--names` only the text nodes' captions differ (their technical names until the
-   node texts come). No reference case names them; `ZCLPAT_PRG` moves `ZCLDIAG_ICD`'s `HIERARCHY_ORDINAL` from 4 to
+   92 members, all BW's. Without `--names` only the text nodes' captions differed (their technical names; the node
+   texts, step 4, fixed them). No reference case names them; `ZCLPAT_PRG` moves `ZCLDIAG_ICD`'s `HIERARCHY_ORDINAL` from 4 to
    5, which `mdschema_hierarchies_hier` ignores (`ignore.txt`). `xmla_test.py` on the 75 `*_hier*` cases: all pass.
 2. Excel's statements on shared nodes, checked by SSAS: a live Excel session against `ssasmd` on `ZCLPAT_PRG` and
    `ZCLSERV_CAT` (expand linked subtrees, slicers and filters on overlapping programs, drill-through on a duplicate
@@ -96,11 +96,26 @@ Next, in this order:
    characteristic without a view keeps BW's node name. BW's MDX captions such a node by the short text (Room 1), but
    its text properties (`[ZCLSERV].[1ZCLSERV]`, `[5ZCLSERV]`, `[4ZCLSERV]`: short, medium, long) give the
    characteristic's texts; the probe reads them and `bw_hierarchy_test.py` compares the caption with the medium text
-   (else long, else short). Without `--names` only the text nodes' captions differ (the node texts). And the clinic generator deploys
+   (else long, else short). Without `--names` only the text nodes' captions differed (fixed by the node texts, step 4). And the clinic generator deploys
    the test catalog `ZCLHIER` (`ClinicBW-sap.xml` and its `sap-files.py deploy` are gone): a clinic run deleted the
    views the deployed file named, so the next accept was refused.
-4. Smaller: texts step 5 (the check against blank texts); the debt that keeps about 30 hierarchy cases red on SAP
-   (measure captions, member names on `sourceAttribute` levels, `known-issues.md`).
+4. Done (2026-10-17): the node texts. BW keeps them in `RSTHIERNODE` (per language, `HIEID` and node name: `TXTSH`,
+   `TXTMD`, `TXTLG`; the table is not `RSTHIENODE`), for the text nodes only. `levels_sql` reads the node rows
+   through `ZZXXMLA1_CL_BW_HIERARCHY_COPY=>node_rows_sql` wherever the levels have a caption column: a text node is
+   captioned by its English text (medium, else long, else short, as BW's MDX gives its text properties and as the
+   views caption the characteristics), else by its name; read live, as the leaves' texts from the view, so the copy
+   is unchanged. A postable node (the characteristic's own value) is captioned as its value in the dimension's view
+   (`VALUE_SID`), as its leaf is (it was the key), and REST_H as BW's MDX captions it, `Not Assigned Service (s)`
+   from the characteristic's long text in `RSDIOBJT` (`rest_caption`, read by `current`). The initial value under
+   REST_H stays `''` (BW: Not assigned), the rule of `Now: texts and captions`; `bw_hierarchy_test.py` accepts it
+   without `--names` now. The reference's flattened `ZZXXMLA1_HL_ZCLDIAG_ICD` and the SSAS model (`H_<h>.CAPTION`)
+   caption the text nodes by the texts `build-bw-reference-db.py` now exports with the copy (`hierarchy_<h>.json`,
+   `texts`). Checked: unit tests of the copy (9), `bw_hierarchy_test.py --catalog ZCLHIER`, `ZCLVISIT` and
+   `ZCLVISITA` without `--names` (every caption BW's), `--reference`; 56 `*_hier*` cases recaptured (captions only),
+   `xmla_test.py` 372 of 372, `ssas_compare.py` 36 of 36. `bw_hierarchy_test.py --ssas` fails on `ZCLSERV_LOC`,
+   which the SSAS model has never had (not in `SSAS_HIERARCHIES`).
+5. Smaller: texts step 5 (the check against blank texts); the debt that keeps hierarchy cases red on SAP (measure
+   captions, member names on `sourceAttribute` levels, `known-issues.md`); `xmla_test.py` passes all 372 today.
 
 Later, as noted: the key date, then time- and version-dependent hierarchies; the performance risks (below, Paused:
 query planning); query planning step 7.
@@ -592,8 +607,9 @@ Open:
    (decided 2026-10-16, reference scenario below). The reference can be the oracle for hierarchies with a level form
    only (as a level hierarchy, the reference scenario below); for shared nodes, BW's own MDX
    (`ZZXXMLA1_BW_AUTH_PROBE`).
-3. Names and captions of nodes: a text node's name is its technical name, a leaf's the characteristic's key; the
-   engine shows a member's name as its caption until the texts give it a caption column (`Now: texts and captions`).
+3. Done (2026-10-17, order step 4 above): names and captions of nodes: a text node's name is its technical name, a
+   leaf's the characteristic's key; a text node is captioned by its `RSTHIERNODE` text, a leaf and a postable node by
+   the view, REST_H as BW's MDX.
 4. The engine: members of a parent-child level and the closure in the fact reads; the planner marks such members
    computed at first, so the evaluator answers them, native and grouped reads later.
 5. Done (2026-10-17, order step 3 above), aDSOs too: the proposal and the UI offer the hierarchies a characteristic

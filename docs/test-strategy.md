@@ -173,8 +173,9 @@ captured: a regeneration of the demo or a change of its hierarchies needs no new
 asks olap4abap for `[ZCLDIAG.ZCLDIAG_ICD].Members` (and the others; the names are a table in the script) on catalog
 `ZCLVISITA` and compares position by position: BW's unique names repeat for the occurrences of a node, so they are not
 compared. olap4abap's All member is checked against the total and left out; levels are compared up to the
-not-assigned node, whose values BW puts on its deepest level. `--names` accepts a node's technical name or a leaf's key
-as caption (while olap4abap has no texts), `--with-facts` compares only the members with a value (for dimensions with
+not-assigned node, whose values BW puts on its deepest level. Captions are BW's texts (a text node's
+`RSTHIERNODE` text since 2026-10-17); the initial value's `''` is accepted (BW: Not assigned, olap4abap's rule).
+`--names` accepts a node's technical name or a leaf's key as caption too, `--with-facts` compares only the members with a value (for dimensions with
 members with facts). What BW shows is in `next-steps.md`, time-independent BW hierarchies. One difference is
 intended: BW gives the values below the not-assigned node REST_H the hierarchy's deepest level, olap4abap the level
 below REST_H (decided with the user 2026-10-15); the script is to accept it for those values only.
@@ -231,11 +232,11 @@ Which oracle checks what (decided with the user 2026-10-17):
 | Names, captions, levels, parents, children counts, order | BW (`bw_hierarchy_test.py`, BW's MDX; the Query Monitor RSRT by eye) |
 
 SSAS's captions are never compared: `build-ssas-clinic-md.py` takes them from `ClinicBW.xml` and our views, so they
-are olap4abap's own (a text node shows its technical name in SSAS only because olap4abap has no node texts yet), and a
-comparison would check olap4abap against itself. The reference's captured captions are olap4abap's too (its database
-is built from our copy): when the node texts come, `bw_hierarchy_test.py` has to pass without `--names`, the reference
-database and the SSAS model are rebuilt and the 71 `*_hier*` cases recaptured; the `execute_ssasmd_*` cases do not
-change. Checked 2026-10-17 by eye, Excel on SSAS against RSRT on `ZCLVISIT` (Care Programs down to the family
+are olap4abap's own (its text nodes captioned by the `RSTHIERNODE` texts of the export), and a comparison would check
+olap4abap against itself. The reference's captured captions are olap4abap's too (its database is built from our copy
+and the exported node texts). Done 2026-10-17 with the node texts: `bw_hierarchy_test.py` passes without `--names`
+on `ZCLHIER`, `ZCLVISIT` and `ZCLVISITA`, the reference database and the SSAS model were rebuilt and the 56
+`*_hier*` cases whose captions changed recaptured; the `execute_ssasmd_*` cases did not change. Checked 2026-10-17 by eye, Excel on SSAS against RSRT on `ZCLVISIT` (Care Programs down to the family
 nodes): every value the same, only the text nodes' captions differ (`CHRONIC` against Chronic Care); a postable node
 is captioned by the patient's text in BW, as olap4abap does. SSAS answers a drill-through on a node with every fact
 row twice (on a leaf once), so its drill-throughs are compared as sets of distinct rows. Long term the caption oracle

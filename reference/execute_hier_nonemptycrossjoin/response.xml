@@ -175,8 +175,8 @@
         <CubeInfo>
           <Cube>
             <CubeName>ZCLHIER</CubeName>
-            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T15:42:35</LastDataUpdate>
-            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T15:42:35</LastSchemaUpdate>
+            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-17T15:40:07</LastDataUpdate>
+            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-17T15:40:07</LastSchemaUpdate>
           </Cube>
         </CubeInfo>
         <AxesInfo>
@@ -256,7 +256,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</UName>
-                <Caption>DIAGNOSES</Caption>
+                <Caption>All Diagnoses</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 01]</LName>
                 <LNum>1</LNum>
                 <DisplayInfo>65546</DisplayInfo>
@@ -272,7 +272,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY]</UName>
-                <Caption>RESPIRATORY</Caption>
+                <Caption>Respiratory</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
                 <LNum>2</LNum>
                 <DisplayInfo>65540</DisplayInfo>
@@ -288,7 +288,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[UPPER_RESPIRATORY_INFECTIONS]</UName>
-                <Caption>UPPER_RESPIRATORY_INFECTIONS</Caption>
+                <Caption>Upper respiratory infections</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
                 <LNum>3</LNum>
                 <DisplayInfo>65539</DisplayInfo>
@@ -336,7 +336,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[INFLUENZA]</UName>
-                <Caption>INFLUENZA</Caption>
+                <Caption>Influenza</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
                 <LNum>3</LNum>
                 <DisplayInfo>65537</DisplayInfo>
@@ -368,7 +368,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[LOWER_RESPIRATORY_DISEASES]</UName>
-                <Caption>LOWER_RESPIRATORY_DISEASES</Caption>
+                <Caption>Lower respiratory diseases</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
                 <LNum>3</LNum>
                 <DisplayInfo>65538</DisplayInfo>
@@ -400,7 +400,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[CHRONIC_LOWER_RESPIRATORY_DISEAS]</UName>
-                <Caption>CHRONIC_LOWER_RESPIRATORY_DISEAS</Caption>
+                <Caption>Chronic lower respiratory diseases</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
                 <LNum>3</LNum>
                 <DisplayInfo>65538</DisplayInfo>
@@ -432,7 +432,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[SKIN]</UName>
-                <Caption>SKIN</Caption>
+                <Caption>Skin</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
                 <LNum>2</LNum>
                 <DisplayInfo>65538</DisplayInfo>
@@ -448,7 +448,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[SKIN].[DERMATITIS]</UName>
-                <Caption>DERMATITIS</Caption>
+                <Caption>Dermatitis</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
                 <LNum>3</LNum>
                 <DisplayInfo>65538</DisplayInfo>
@@ -480,7 +480,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INFECTIONS]</UName>
-                <Caption>INFECTIONS</Caption>
+                <Caption>Infections</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
                 <LNum>2</LNum>
                 <DisplayInfo>65538</DisplayInfo>
@@ -496,7 +496,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INFECTIONS].[INTESTINAL_INFECTIONS]</UName>
-                <Caption>INTESTINAL_INFECTIONS</Caption>
+                <Caption>Intestinal infections</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
                 <LNum>3</LNum>
                 <DisplayInfo>65537</DisplayInfo>
@@ -528,7 +528,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INFECTIONS].[VIRAL_INFECTIONS]</UName>
-                <Caption>VIRAL_INFECTIONS</Caption>
+                <Caption>Viral infections</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
                 <LNum>3</LNum>
                 <DisplayInfo>65538</DisplayInfo>
@@ -576,7 +576,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INJURIES]</UName>
-                <Caption>INJURIES</Caption>
+                <Caption>Injuries</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
                 <LNum>2</LNum>
                 <DisplayInfo>65538</DisplayInfo>
@@ -592,7 +592,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INJURIES].[INJURIES_OF_LIMBS]</UName>
-                <Caption>INJURIES_OF_LIMBS</Caption>
+                <Caption>Injuries of limbs</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
                 <LNum>3</LNum>
                 <DisplayInfo>65539</DisplayInfo>
@@ -624,7 +624,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CHECK_UPS]</UName>
-                <Caption>CHECK_UPS</Caption>
+                <Caption>Check-ups</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
                 <LNum>2</LNum>
                 <DisplayInfo>65538</DisplayInfo>
@@ -640,7 +640,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CHECK_UPS].[EXAMINATIONS]</UName>
-                <Caption>EXAMINATIONS</Caption>
+                <Caption>Examinations</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
                 <LNum>3</LNum>
                 <DisplayInfo>65538</DisplayInfo>
@@ -688,7 +688,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
-                <Caption>NOT_RECORDED</Caption>
+                <Caption>Not recorded</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
                 <LNum>2</LNum>
                 <DisplayInfo>65537</DisplayInfo>
@@ -704,7 +704,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED].[NO_DIAGNOSIS]</UName>
-                <Caption>NO_DIAGNOSIS</Caption>
+                <Caption>No diagnosis</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
                 <LNum>3</LNum>
                 <DisplayInfo>65537</DisplayInfo>

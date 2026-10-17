@@ -396,8 +396,10 @@ Read before designing anything:
   `ZZXXMLA1_CL_BW_HIERARCHY_COPY=>levels_sql`, a row per member occurrence (node or leaf) with per level of its path
   `Lnn_SID` (the key), `Lnn_NAME` (a node's `NODE_NAME`, a leaf named as the characteristic's member: the view's
   column the level over the key attribute names it by, SID 0 too, `''` by `KEY_NAME`), `Lnn_POS` (the ordinal, BW's
-  order) and, where the key attribute's `NameColumn` captions the members, `Lnn_CAPTION` (a node's `NODE_NAME` until
-  the node texts come, a leaf's caption from the view; texts step 6), the levels below it NULL (a level read asks for its column not NULL); REST_H
+  order) and, where the key attribute's `NameColumn` captions the members, `Lnn_CAPTION` (a text node's text of BW's
+  `RSTHIERNODE` in English, medium, else long, else short, else its name, read live; a postable node's and a leaf's
+  caption from the view; REST_H `Not Assigned <characteristic's text> (s)` as BW's MDX; `node_rows_sql`,
+  `rest_caption`), the levels below it NULL (a level read asks for its column not NULL); REST_H
   follows the roots with its values below it when shown; a level's `uniqueMembers` is false where a SID repeats
   (`repeated_levels`). A member's unique name is the key of its path as SSAS names it, `Lnn_IOBJ` (a node's
   `NODE_IOBJ`, REST_H's `1HIER_REST`, a leaf's the characteristic) and `Lnn_NAME` per level:

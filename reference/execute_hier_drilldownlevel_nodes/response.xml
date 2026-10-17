@@ -175,8 +175,8 @@
         <CubeInfo>
           <Cube>
             <CubeName>ZCLHIER</CubeName>
-            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T15:42:35</LastDataUpdate>
-            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T15:42:35</LastSchemaUpdate>
+            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-17T15:40:07</LastDataUpdate>
+            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-17T15:40:07</LastSchemaUpdate>
           </Cube>
         </CubeInfo>
         <AxesInfo>
@@ -236,7 +236,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</UName>
-                <Caption>DIAGNOSES</Caption>
+                <Caption>All Diagnoses</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 01]</LName>
                 <LNum>1</LNum>
                 <DisplayInfo>65546</DisplayInfo>
@@ -248,7 +248,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY]</UName>
-                <Caption>CIRCULATORY</Caption>
+                <Caption>Circulatory</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
                 <LNum>2</LNum>
                 <DisplayInfo>3</DisplayInfo>
@@ -260,7 +260,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
-                <Caption>NOT_RECORDED</Caption>
+                <Caption>Not recorded</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
                 <LNum>2</LNum>
                 <DisplayInfo>131073</DisplayInfo>
@@ -272,7 +272,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY].[HYPERTENSIVE_DISEASES]</UName>
-                <Caption>HYPERTENSIVE_DISEASES</Caption>
+                <Caption>Hypertensive diseases</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
                 <LNum>3</LNum>
                 <DisplayInfo>1</DisplayInfo>
@@ -284,7 +284,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY].[ISCHAEMIC_HEART_DISEASES]</UName>
-                <Caption>ISCHAEMIC_HEART_DISEASES</Caption>
+                <Caption>Ischaemic heart diseases</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
                 <LNum>3</LNum>
                 <DisplayInfo>131074</DisplayInfo>
@@ -296,7 +296,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY].[OTHER_HEART_DISEASES]</UName>
-                <Caption>OTHER_HEART_DISEASES</Caption>
+                <Caption>Other heart diseases</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
                 <LNum>3</LNum>
                 <DisplayInfo>131074</DisplayInfo>
@@ -308,7 +308,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED].[NO_DIAGNOSIS]</UName>
-                <Caption>NO_DIAGNOSIS</Caption>
+                <Caption>No diagnosis</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
                 <LNum>3</LNum>
                 <DisplayInfo>1</DisplayInfo>

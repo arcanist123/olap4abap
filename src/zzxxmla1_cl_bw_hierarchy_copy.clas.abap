@@ -72,6 +72,8 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
     CONSTANTS c_rest_node_name TYPE string VALUE `REST_H`.
     "! The InfoObject BW's MDX gives the not-assigned node, which keys it with its name.
     CONSTANTS c_rest_iobj TYPE string VALUE `1HIER_REST`.
+    "! The language of the node texts, as of the characteristics' texts in the views (ZZXXMLA1_CL_BW_VIEW_GEN).
+    CONSTANTS c_language TYPE string VALUE `E`.
     "! The parts of a level's columns of levels_sql.
     CONSTANTS:
       BEGIN OF c_level_part,
@@ -107,8 +109,9 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
     TYPES:
       "! a hierarchy's current copy, as a query reads it: its tables, the closure a query reads (the not-assigned view
       "! when the hierarchy shows that node, else the closure table), BW's HIESID and SVER it is a copy of (to bind
-      "! in each statement), the SIDs of its All member and of its not-assigned node, whether it shows that node, and
-      "! the external characteristics of its nodes that have a view (the others are named by BW's node name)
+      "! in each statement), the SIDs of its All member and of its not-assigned node, whether it shows that node and
+      "! its caption (rest_caption), and the external characteristics of its nodes that have a view (the others are
+      "! named by BW's node name)
       BEGIN OF ty_hierarchy,
         hieid          TYPE rshieid,
         characteristic TYPE rsiobjnm,
@@ -121,6 +124,7 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
         root_sid       TYPE i,
         rest_top_sid   TYPE i,
         rest_shown     TYPE abap_bool,
+        rest_caption   TYPE string,
         refilled       TYPE abap_bool,
         externals      TYPE ty_t_external,
       END OF ty_hierarchy.
@@ -219,9 +223,9 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
     "! 0HIER_NODE of a text node, 1HIER_REST of REST_H, a leaf's the characteristic), which with the name is BW's
     "! key of a node, the levels below it NULL; as the
     "! reference's flattened table of a level hierarchy, but a member on the level of its depth whether it has children
-    "! or not (SSAS's parent-child form). A node is named and captioned by its node name (NODE_NAME, the key of a
-    "! postable node), a leaf named and captioned as the characteristic's member is, by the view's columns (the
-    "! initial value too: '' by KEY_NAME). When the hierarchy shows the not-assigned node, REST_H follows the roots, its
+    "! or not (SSAS's parent-child form). A node is named by its node name (NODE_NAME, the key of a postable node) and
+    "! captioned by its text (node_rows_sql), a leaf named and captioned as the characteristic's member is, by the view's
+    "! columns (the initial value too: '' by KEY_NAME). When the hierarchy shows the not-assigned node, REST_H follows the roots, its
     "! values (the closure's rows under it) below it in their names' order. The levels of a member are read up its
     "! parents, one join each (an inner node's SID is its occurrence's), so depth is the number of levels.
     "! @parameter value_table | the characteristic's table that names the leaves (the dimension's view)
@@ -330,10 +334,21 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
       IMPORTING hierarchy     TYPE ty_hierarchy
       RETURNING VALUE(result) TYPE ty_t_external.
     "! The node rows of a copy as a derived table for levels_sql: NODE_NAME and NODE_CAPTION of an external
-    "! characteristic's node from its view.
-    CLASS-METHODS external_nodes_sql
-      IMPORTING hierarchy     TYPE ty_hierarchy
-      RETURNING VALUE(result) TYPE string.
+    "! characteristic's node from its view; NODE_CAPTION of a text node its text of RSTHIERNODE in c_language (the
+    "! medium, else the long, else the short one, as BW's MDX gives a node's text properties), of any other node or
+    "! one without text its node name; with a caption column NODE_CAPTION of a postable node (the characteristic's
+    "! own value) the caption of its value (VALUE_SID) in the dimension's view, as of its leaf.
+    CLASS-METHODS node_rows_sql
+      IMPORTING hierarchy      TYPE ty_hierarchy
+                value_table    TYPE string OPTIONAL
+                sid_column     TYPE string OPTIONAL
+                caption_column TYPE string OPTIONAL
+      RETURNING VALUE(result)  TYPE string.
+    "! The caption of the not-assigned node as BW's MDX gives it: Not Assigned, the characteristic's text (long, else
+    "! short, else its name) in c_language and (s).
+    CLASS-METHODS rest_caption
+      IMPORTING characteristic TYPE rsiobjnm
+      RETURNING VALUE(result)  TYPE string.
     CLASS-METHODS hierarchy_of
       IMPORTING directory     TYPE ty_directory
                 tables        TYPE ty_tables
@@ -676,6 +691,19 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
     result = hierarchy_of( directory = directory tables = tables ).
     result-refilled = refilled.
     result-externals = externals( result ).
+    IF result-rest_shown = abap_true.
+      result-rest_caption = rest_caption( characteristic ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD rest_caption.
+    SELECT SINGLE txtsh, txtlg FROM rsdiobjt
+      WHERE iobjnm = @characteristic AND langu = @c_language AND objvers = 'A'
+      INTO @DATA(text).
+    DATA(caption) = COND string( WHEN text-txtlg IS NOT INITIAL THEN text-txtlg
+                                 WHEN text-txtsh IS NOT INITIAL THEN text-txtsh
+                                 ELSE characteristic ).
+    result = |Not Assigned { caption } (s)|.
   ENDMETHOD.
 
   METHOD externals.
@@ -717,12 +745,21 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
-  METHOD external_nodes_sql.
+  METHOD node_rows_sql.
     " the node rows, an external characteristic's node named and captioned by its view (BW's node name where the
-    " view has no row of its SID)
-    DATA(joins) = ``.
+    " view has no row of its SID), a text node captioned by its text
+    DATA(joins) = | LEFT OUTER JOIN "RSTHIERNODE" AS t ON t."LANGU" = { zzxxmla1_cl_sql=>literal( c_language ) } | &&
+                  |AND t."HIEID" = { zzxxmla1_cl_sql=>literal( CONV string( hierarchy-hieid ) ) } | &&
+                  |AND t."OBJVERS" = 'A' AND k."NODE_IOBJ" = { zzxxmla1_cl_sql=>literal( CONV string( c_text_node ) ) } | &&
+                  |AND t."NODENAME" = k."NODE_NAME"|.
     DATA(names) = ``.
     DATA(captions) = ``.
+    IF caption_column IS NOT INITIAL.
+      joins = |{ joins } LEFT OUTER JOIN { quote( value_table ) } AS pv | &&
+              |ON k."NODE_IOBJ" = { zzxxmla1_cl_sql=>literal( CONV string( hierarchy-characteristic ) ) } | &&
+              |AND pv.{ quote( sid_column ) } = k."VALUE_SID"|.
+      captions = |TO_NVARCHAR( pv.{ quote( caption_column ) } ), |.
+    ENDIF.
     LOOP AT hierarchy-externals INTO DATA(external).
       DATA(alias) = |x{ sy-tabix }|.
       joins = |{ joins } LEFT OUTER JOIN { quote( external-view ) } AS { alias } | &&
@@ -732,8 +769,10 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
       captions = |{ captions }TO_NVARCHAR( { alias }.{ quote( external-caption_column ) } ), |.
     ENDLOOP.
     result = |( SELECT k."HIESID", k."SVER", k."PARENT_SID", k."SID", k."DEPTH", k."POS", k."NODE_IOBJ", | &&
-             |COALESCE( { names }TO_NVARCHAR( k."NODE_NAME" ) ) AS "NODE_NAME", | &&
-             |COALESCE( { captions }TO_NVARCHAR( k."NODE_NAME" ) ) AS "NODE_CAPTION" | &&
+             COND string( WHEN names IS INITIAL THEN |TO_NVARCHAR( k."NODE_NAME" ) AS "NODE_NAME", |
+                          ELSE |COALESCE( { names }TO_NVARCHAR( k."NODE_NAME" ) ) AS "NODE_NAME", | ) &&
+             |COALESCE( { captions }NULLIF( t."TXTMD", '' ), NULLIF( t."TXTLG", '' ), NULLIF( t."TXTSH", '' ), | &&
+             |TO_NVARCHAR( k."NODE_NAME" ) ) AS "NODE_CAPTION" | &&
              |FROM { quote( hierarchy-node_table ) } AS k{ joins } | &&
              |WHERE k."HIESID" = { hierarchy-hiesid } | &&
              |AND k."SVER" = { zzxxmla1_cl_sql=>literal( CONV string( hierarchy-sver ) ) } )|.
@@ -874,11 +913,16 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
   METHOD levels_sql.
     " a member of depth d is the row n, its member on level k the parent d - k steps up (p1, p2, ...): a level's
     " column is a CASE over n's depth. Parents are inner nodes (negative SIDs; the virtual root's parent 0 is none)
-    " an external characteristic's node is named and captioned by its view (external_nodes_sql), any other by its
-    " node name until the texts of the nodes come (RSTHIENODE)
-    DATA(node) = COND string( WHEN hierarchy-externals IS INITIAL THEN quote( hierarchy-node_table )
-                              ELSE external_nodes_sql( hierarchy ) ).
-    DATA(node_caption) = COND string( WHEN hierarchy-externals IS INITIAL THEN `"NODE_NAME"` ELSE `"NODE_CAPTION"` ).
+    " an external characteristic's node is named and captioned by its view, a text node captioned by its text
+    " (node_rows_sql); without either the node table is read as it is
+    DATA(node) = COND string( WHEN hierarchy-externals IS INITIAL AND caption_column IS INITIAL
+                              THEN quote( hierarchy-node_table )
+                              ELSE node_rows_sql( hierarchy      = hierarchy
+                                                  value_table    = value_table
+                                                  sid_column     = sid_column
+                                                  caption_column = caption_column ) ).
+    DATA(node_caption) = COND string( WHEN hierarchy-externals IS INITIAL AND caption_column IS INITIAL
+                                      THEN `"NODE_NAME"` ELSE `"NODE_CAPTION"` ).
     DATA(sver) = zzxxmla1_cl_sql=>literal( CONV string( hierarchy-sver ) ).
     " a leaf is named and captioned as the characteristic's member: by the view's columns, SID 0 too
     DATA(value_name) = |COALESCE( TO_NVARCHAR( v.{ quote( name_column ) } ), TO_NVARCHAR( n."SID" ) )|.
@@ -943,8 +987,11 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
     DO depth - 2 TIMES.
       below = |{ below }, { empty }|.
     ENDDO.
+    DATA(rest_caption) = COND string( WHEN hierarchy-rest_caption IS NOT INITIAL THEN hierarchy-rest_caption
+                                      ELSE c_rest_node_name ).
     DATA(rest) = |{ hierarchy-rest_top_sid }, '{ c_rest_node_name }', { c_rest_listno }| &&
-                 COND string( WHEN caption_column IS NOT INITIAL THEN |, '{ c_rest_node_name }'| ) &&
+                 COND string( WHEN caption_column IS NOT INITIAL
+                              THEN |, { zzxxmla1_cl_sql=>literal( rest_caption ) }| ) &&
                  |, '{ c_rest_iobj }'|.
     value_name = replace( val = value_name sub = `n."SID"` with = `r."SID"` occ = 0 ).
     value_caption = replace( val = value_caption sub = `n."SID"` with = `r."SID"` occ = 0 ).

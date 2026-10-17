@@ -9,10 +9,11 @@ nodes, intervals and the not-assigned node (docs/environment.md, The clinic in S
    scripts/build-bw-reference-db.py from the copy of ZZXXMLA1_CL_BW_HIERARCHY_COPY at BW's current version):
    - H_<h>: a row per occurrence of the copy's node table (the virtual root left out), keyed by POS (the depth-first
      number, unique also inside an expanded link), PARENT_POS (the enclosing inner occurrence, NULL for a root),
-     SID, DEPTH, NODE_NAME and LEAF; where the hierarchy shows the not-assigned node, REST_H after the roots
+     SID, DEPTH, NODE_NAME, CAPTION and LEAF; where the hierarchy shows the not-assigned node, REST_H after the roots
      (REST_TOP_SID) and below it every SID of the SID table under no leaf, ordered by name as olap4abap orders them;
    - HV_<h>: H_<h> with NAME and CAPTION: a leaf named and captioned as the characteristic's member (its view's
-     nameColumn and the key attribute's NameColumn), a node by its NODE_NAME (until the node texts come);
+     nameColumn and the key attribute's NameColumn), a node named by its NODE_NAME and captioned by its CAPTION (a
+     text node's text of RSTHIERNODE as build-bw-reference-db.py exports it, else its NODE_NAME);
    - B_<h>: the bridge, per occurrence POS the distinct SIDs of the leaf occurrences of its subtree (POS to END_POS;
      a leaf its own SID, a postable node its value through its first leaf), REST_H its values;
    - FACT_ZCLVISIT: the fact table under a name the data source view can hold, its key figures without /BIC/.
@@ -60,6 +61,7 @@ FACT_VIEW = "FACT_ZCLVISIT"
 MEASURE_GROUP = "Visits"
 LANGUAGE = 1033  # en-US, the language Excel sends
 REST_NODE_NAME = "REST_H"
+TEXT_NODE = "0HIER_NODE"  # NODE_IOBJ of a text node
 
 spec = importlib.util.spec_from_file_location("ssas_clinic", ROOT / "scripts" / "build-ssas-clinic.py")
 tabular = importlib.util.module_from_spec(spec)
@@ -84,14 +86,17 @@ def exported_hierarchies():
 
 
 def occurrences(data):
-    """The rows of H_<h> and B_<h>: (POS, PARENT_POS, SID, DEPTH, NODE_NAME, LEAF) and (POS, SID)."""
+    """The rows of H_<h> and B_<h>: (POS, PARENT_POS, SID, DEPTH, NODE_NAME, CAPTION, LEAF) and (POS, SID)."""
+    assert "texts" in data, f"{data['hierarchy']}: no node texts: run build-bw-reference-db.py again"
     fields = [f["name"] for f in data["nodes"]["fields"]]
     rows = []
     for raw in data["nodes"]["rows"]:
         row = {f: raw[i] for i, f in enumerate(fields)}
         rows.append(dict(sid=int(bw.number(row["SID"])), depth=int(bw.number(row["DEPTH"])),
                          pos=int(bw.number(row["POS"])), end=int(bw.number(row["END_POS"])),
-                         name=row["NODE_NAME"]))
+                         name=row["NODE_NAME"],
+                         caption=(data["texts"].get(row["NODE_NAME"]) if row["NODE_IOBJ"] == TEXT_NODE else None)
+                         or row["NODE_NAME"]))
     rows.sort(key=lambda r: r["pos"])
     assert len({r["pos"] for r in rows}) == len(rows), f"{data['hierarchy']}: POS not unique"
     root = int(data["root_sid"])
@@ -105,7 +110,8 @@ def occurrences(data):
         leaf = row["sid"] >= 0
         assert leaf == (row["end"] == row["pos"]) or not leaf, (data["hierarchy"], row)
         nodes.append(dict(pos=row["pos"], parent=None if parent is rows[0] else parent["pos"], sid=row["sid"],
-                          depth=row["depth"], name=row["name"].strip(), leaf=leaf, end=row["end"]))
+                          depth=row["depth"], name=row["name"].strip(), caption=row["caption"].strip(), leaf=leaf,
+                          end=row["end"]))
         if not leaf:
             stack.append(row)
     leaves = [n for n in nodes if n["leaf"]]
@@ -121,7 +127,7 @@ def occurrences(data):
         rest = sorted({int(bw.number(r[sid_index])) for r in sid_table["rows"]} - assigned)
         rest_pos = rows[-1]["end"] + 1
         nodes.append(dict(pos=rest_pos, parent=None, sid=int(data["rest_top_sid"]), depth=1, name=REST_NODE_NAME,
-                          leaf=False, end=rest_pos + len(rest)))
+                          caption=REST_NODE_NAME, leaf=False, end=rest_pos + len(rest)))
         # the values below it get their POS once their names are known (olap4abap orders them by name): rest_sids
         bridge += [(rest_pos, sid) for sid in rest]
         data["rest_sids"] = rest
@@ -171,8 +177,10 @@ def load_hierarchies(schema, hierarchies):
         nodes, bridge = occurrences(data)
         lines += ["GO"] + sql_rows(f"H_{h}", ['"POS" INT NOT NULL PRIMARY KEY', '"PARENT_POS" INT NULL',
                                              '"SID" INT NOT NULL', '"DEPTH" INT NOT NULL',
-                                             '"NODE_NAME" NVARCHAR(250) NOT NULL', '"LEAF" INT NOT NULL'],
-                                   [(n["pos"], n["parent"], n["sid"], n["depth"], n["name"], int(n["leaf"]))
+                                             '"NODE_NAME" NVARCHAR(250) NOT NULL', '"CAPTION" NVARCHAR(250) NOT NULL',
+                                             '"LEAF" INT NOT NULL'],
+                                   [(n["pos"], n["parent"], n["sid"], n["depth"], n["name"], n["caption"],
+                                     int(n["leaf"]))
                                     for n in nodes])
         lines += sql_rows(f"B_{h}", ['"POS" INT NOT NULL', '"SID" INT NOT NULL', 'PRIMARY KEY ("POS", "SID")'],
                           bridge)
@@ -180,13 +188,13 @@ def load_hierarchies(schema, hierarchies):
         if data["rest_shown"]:
             # REST_H's values: leaves under it, after every other occurrence, ordered by name (olap4abap's order)
             lines.append(f'INSERT INTO "H_{h}" SELECT {data["rest_pos"]} + ROW_NUMBER() OVER (ORDER BY '
-                         f'v."{name_column}", v."SID"), {data["rest_pos"]}, v."SID", 2, N\'\', 1 FROM "{view}" v '
+                         f'v."{name_column}", v."SID"), {data["rest_pos"]}, v."SID", 2, N\'\', N\'\', 1 FROM "{view}" v '
                          f'WHERE v."SID" IN (SELECT "SID" FROM "B_{h}" WHERE "POS" = {data["rest_pos"]});')
             lines.append(f'INSERT INTO "B_{h}" SELECT "POS", "SID" FROM "H_{h}" WHERE "PARENT_POS" = '
                          f'{data["rest_pos"]};')
         lines += ["GO", f'CREATE VIEW "HV_{h}" AS SELECT h."POS", h."PARENT_POS", h."SID", h."DEPTH", '
                         f'CAST(CASE WHEN h."LEAF" = 1 THEN v."{name_column}" ELSE h."NODE_NAME" END AS NVARCHAR(250)) '
-                        f'AS "NAME", CAST(CASE WHEN h."LEAF" = 1 THEN v."{caption_column}" ELSE h."NODE_NAME" END '
+                        f'AS "NAME", CAST(CASE WHEN h."LEAF" = 1 THEN v."{caption_column}" ELSE h."CAPTION" END '
                         f'AS NVARCHAR(250)) AS "CAPTION" FROM "H_{h}" h LEFT OUTER JOIN "{view}" v '
                         f'ON h."LEAF" = 1 AND v."SID" = h."SID";']
         print(f"{h}: {len(nodes)} occurrences, {len(bridge)} bridge rows"

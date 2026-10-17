@@ -38,6 +38,9 @@ CLASS ltc_bw_hierarchy_copy DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DUR
     "! a node of an external characteristic is named and captioned by its view, on the SID BW gives it (VALUE_SID);
     "! without external characteristics the node table is read as it is
     METHODS external_node_names FOR TESTING.
+    "! a text node is captioned by its text, the medium, else the long, else the short one, else its name; REST_H by
+    "! the hierarchy's caption of it; without a caption column the node table is read as it is
+    METHODS node_texts FOR TESTING.
     METHODS params
       IMPORTING statement     TYPE zzxxmla1_cl_bw_hierarchy_copy=>ty_statement
       RETURNING VALUE(result) TYPE string_table.
@@ -48,7 +51,8 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION LOCAL FRIENDS ltc_bw_hierarchy_co
 CLASS ltc_bw_hierarchy_copy IMPLEMENTATION.
 
   METHOD services.
-    result = VALUE #( characteristic = 'ZCLSERV'
+    result = VALUE #( hieid          = 'HIEID_OF_ZCLSERV_CAT'
+                      characteristic = 'ZCLSERV'
                       name           = 'COPY_OF_ZCLSERV_CAT'
                       node_table     = 'ZZXXMLA1H0000001'
                       closure_table  = 'ZZXXMLA1C0000001'
@@ -226,17 +230,49 @@ CLASS ltc_bw_hierarchy_copy IMPLEMENTATION.
       exp = `*COALESCE( TO_NVARCHAR( x1."ZCLSITE" ), TO_NVARCHAR( x2."COMPOUND_KEY" ), TO_NVARCHAR( k."NODE_NAME" ) ) AS "NODE_NAME"*` ).
     cl_abap_unit_assert=>assert_char_cp(
       act = sql
-      exp = `*COALESCE( TO_NVARCHAR( x1."TXTMD" ), TO_NVARCHAR( x2."TXTMD" ), TO_NVARCHAR( k."NODE_NAME" ) ) AS "NODE_CAPTION"*` ).
+      exp = `*COALESCE( TO_NVARCHAR( pv."TXTMD" ), TO_NVARCHAR( x1."TXTMD" ), TO_NVARCHAR( x2."TXTMD" ), NULLIF( t."TXTMD", '' ), ` &&
+            `NULLIF( t."TXTLG", '' ), NULLIF( t."TXTSH", '' ), TO_NVARCHAR( k."NODE_NAME" ) ) AS "NODE_CAPTION"*` ).
     cl_abap_unit_assert=>assert_char_cp( act = sql exp = `*TO_NVARCHAR( p1."NODE_CAPTION" )*` ).
 
-    DATA(plain) = zzxxmla1_cl_bw_hierarchy_copy=>levels_sql( hierarchy      = services( abap_false )
-                                                             depth          = 4
-                                                             value_table    = `ZZXXMLA1V0000180`
-                                                             sid_column     = `SID`
-                                                             name_column    = `KEY_NAME`
-                                                             caption_column = `TXTMD` ).
+    DATA(plain) = zzxxmla1_cl_bw_hierarchy_copy=>levels_sql( hierarchy   = services( abap_false )
+                                                             depth       = 4
+                                                             value_table = `ZZXXMLA1V0000180`
+                                                             sid_column  = `SID`
+                                                             name_column = `KEY_NAME` ).
     cl_abap_unit_assert=>assert_char_np( act = plain exp = `*NODE_CAPTION*` ).
+    cl_abap_unit_assert=>assert_char_np( act = plain exp = `*RSTHIERNODE*` ).
     cl_abap_unit_assert=>assert_char_cp( act = plain exp = `*FROM "ZZXXMLA1H0000001" AS n *` ).
+  ENDMETHOD.
+
+  METHOD node_texts.
+    DATA(hierarchy) = services( abap_true ).
+    hierarchy-rest_caption = `Not Assigned Service's (s)`.
+    DATA(sql) = zzxxmla1_cl_bw_hierarchy_copy=>levels_sql( hierarchy      = hierarchy
+                                                           depth          = 3
+                                                           value_table    = `ZZXXMLA1V0000001`
+                                                           sid_column     = `SID`
+                                                           name_column    = `KEY_NAME`
+                                                           caption_column = `TXTMD` ).
+    " a text node's text of its hierarchy in English, matched by its node name
+    cl_abap_unit_assert=>assert_char_cp(
+      act = sql
+      exp = `*AS k LEFT OUTER JOIN "RSTHIERNODE" AS t ON t."LANGU" = 'E' AND t."HIEID" = 'HIEID_OF_ZCLSERV_CAT' ` &&
+            `AND t."OBJVERS" = 'A' AND k."NODE_IOBJ" = '0HIER_NODE' AND t."NODENAME" = k."NODE_NAME"*` ).
+    cl_abap_unit_assert=>assert_char_cp(
+      act = sql
+      exp = `*COALESCE( TO_NVARCHAR( pv."TXTMD" ), NULLIF( t."TXTMD", '' ), NULLIF( t."TXTLG", '' ), ` &&
+            `NULLIF( t."TXTSH", '' ), TO_NVARCHAR( k."NODE_NAME" ) ) AS "NODE_CAPTION"*` ).
+    " a postable node captioned as its value in the dimension's view
+    cl_abap_unit_assert=>assert_char_cp(
+      act = sql
+      exp = `*LEFT OUTER JOIN "ZZXXMLA1V0000001" AS pv ON k."NODE_IOBJ" = 'ZCLSERV' AND pv."SID" = k."VALUE_SID"*` ).
+    cl_abap_unit_assert=>assert_char_cp(
+      act = sql
+      exp = `*WHEN 1 THEN CASE WHEN n."SID" < 0 THEN TO_NVARCHAR( n."NODE_CAPTION" )*` ).
+    " no COALESCE of one argument, which HANA refuses
+    cl_abap_unit_assert=>assert_char_cp( act = sql exp = `*k."NODE_IOBJ", TO_NVARCHAR( k."NODE_NAME" ) AS "NODE_NAME", *` ).
+    " the not-assigned node captioned as BW's MDX captions it, named REST_H
+    cl_abap_unit_assert=>assert_char_cp( act = sql exp = `*SELECT -35, 'REST_H', *, 'Not Assigned Service''s (s)', '1HIER_REST'*` ).
   ENDMETHOD.
 
 ENDCLASS.

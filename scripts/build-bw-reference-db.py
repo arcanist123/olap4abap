@@ -25,15 +25,16 @@ depth, is served by the reference as a balanced level hierarchy (Level 01 to Lev
    data/foodmart-bw/bw/<table>.json (git-ignored), listed in tables.json. Then per hierarchy of HIERARCHIES the copy
    of ZZXXMLA1_CL_BW_HIERARCHY_COPY at BW's current version (the row of RSRHIEDIR_OLAP without DELETETIMESTMP, as
    the copy finds it; run program ZZXXMLA1_HIERARCHY_COPY first if the copy is older): the rows of its node table
-   (ZZXXMLA1H...) for that HIESID and SVER, into hierarchy_<name>.json.
+   (ZZXXMLA1H...) for that HIESID and SVER and the texts of its text nodes (RSTHIERNODE), into
+   hierarchy_<name>.json.
 2. Build: adds the tables to data/foodmart-bw/hsqldb-foodmart.jar (the FoodMart data with the empty members, see
    scripts/add-empty-members.py): CREATE MEMORY TABLE after the last CREATE of foodmart.script, the rows at its end.
    Per hierarchy its flattened table (hierarchy_levels), computed from the copy: ZZXXMLA1_HL_<hierarchy>, a row per
    value SID (the fact's SID_<characteristic>, the key) with its member on each level, L01_SID, L01_NAME, L01_POS to
    the level of the values: the node's SID, its NAME (a text node's technical name, a value's key from the SID table,
-   '' for the initial value, as the characteristic's members are named), its CAPTION (a text node's technical name
-   until the node texts come, a value's medium text in English from the text table, '' without one, as the
-   characteristic's members are captioned) and its position among its siblings (BW's order). The virtual
+   '' for the initial value, as the characteristic's members are named), its CAPTION (a text node's text in English
+   from RSTHIERNODE, exported with the copy: medium, else long, else short, else its technical name; a value's
+   medium text in English from the text table, '' without one, as the characteristic's members are captioned) and its position among its siblings (BW's order). The virtual
    root is the All member. The build fails unless the tree is balanced, its leaves values at the same depth, every
    node once, no value with children and every value of the characteristic a leaf (docs/next-steps.md, Reference
    scenario: the reference serves BW hierarchies with a level form as level hierarchies, every value assigned and the
@@ -165,6 +166,11 @@ def export_hierarchy(hierarchy, characteristic):
         rows = sapcli(f"SELECT * FROM {table} WHERE hiesid = {hiesid} AND sver = '{sver}'", 1000000)
         data[part] = dict(table=table, fields=fields, rows=[[r[f["name"]] for f in fields] for r in rows])
         print(f"exported {table} of {hierarchy} (HIESID {hiesid}, SVER {sver}): {len(rows)} rows")
+    # the texts of its text nodes in English, as ZZXXMLA1_CL_BW_HIERARCHY_COPY reads them
+    texts = sapcli("SELECT nodename, txtsh, txtmd, txtlg FROM rsthiernode "
+                   f"WHERE hieid = '{copy['HIEID']}' AND objvers = 'A' AND langu = 'E'", 100000)
+    data["texts"] = {t["NODENAME"]: t["TXTMD"] or t["TXTLG"] or t["TXTSH"] for t in texts}
+    print(f"exported RSTHIERNODE of {hierarchy}: {len(texts)} texts")
     (EXPORT / f"hierarchy_{hierarchy}.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 
 
@@ -282,6 +288,9 @@ def hierarchy_levels(data):
     text_fields = [f["name"] for f in text_table["fields"]]
     texts = {row[text_fields.index(f"/BIC/{c}")]: row[text_fields.index("TXTMD")] for row in text_table["rows"]
              if row[text_fields.index("LANGU")] == "E"}
+    # a text node is captioned by its text (medium, else long, else short), else by its name
+    assert "texts" in data, f"{h}: hierarchy_{h}.json has no node texts: export again"
+    node_texts = data["texts"]
     nodes, children = {}, {}
     for row in data["nodes"]["rows"]:
         node = {f: row[i] for i, f in enumerate(fields)}
@@ -292,7 +301,7 @@ def hierarchy_levels(data):
         assert sid not in nodes, f"{h}: {sid} occurs twice, not a level hierarchy"
         text_node = bool(node["NODE_IOBJ"].strip())
         name = node["NODE_NAME"] if text_node else keys[sid]
-        caption = node["NODE_NAME"] if text_node else texts.get(keys[sid], "")
+        caption = (node_texts.get(node["NODE_NAME"]) or node["NODE_NAME"]) if text_node else texts.get(keys[sid], "")
         nodes[sid] = dict(parent=parent, depth=int(number(node["DEPTH"])), pos=int(number(node["POS"])), name=name,
                           caption=caption)
         children.setdefault(parent, []).append(sid)

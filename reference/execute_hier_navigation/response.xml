@@ -175,8 +175,8 @@
         <CubeInfo>
           <Cube>
             <CubeName>ZCLHIER</CubeName>
-            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T15:42:35</LastDataUpdate>
-            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-16T15:42:35</LastSchemaUpdate>
+            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-17T15:40:07</LastDataUpdate>
+            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-17T15:40:07</LastSchemaUpdate>
           </Cube>
         </CubeInfo>
         <AxesInfo>
@@ -269,7 +269,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</UName>
-                <Caption>DIAGNOSES</Caption>
+                <Caption>All Diagnoses</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 01]</LName>
                 <LNum>1</LNum>
                 <DisplayInfo>65546</DisplayInfo>
@@ -278,7 +278,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY]</UName>
-                <Caption>RESPIRATORY</Caption>
+                <Caption>Respiratory</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
                 <LNum>2</LNum>
                 <DisplayInfo>65540</DisplayInfo>
@@ -287,7 +287,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[UPPER_RESPIRATORY_INFECTIONS]</UName>
-                <Caption>UPPER_RESPIRATORY_INFECTIONS</Caption>
+                <Caption>Upper respiratory infections</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
                 <LNum>3</LNum>
                 <DisplayInfo>65539</DisplayInfo>
@@ -305,7 +305,7 @@
             <Tuple>
               <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
                 <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY]</UName>
-                <Caption>CIRCULATORY</Caption>
+                <Caption>Circulatory</Caption>
                 <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
                 <LNum>2</LNum>
                 <DisplayInfo>3</DisplayInfo>

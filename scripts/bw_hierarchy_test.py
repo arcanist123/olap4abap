@@ -21,8 +21,8 @@ characteristics ZCLSITE and ZCLROOM, compounded). What BW shows and the test exp
 Per member: level (relative to the first root, not under the not-assigned node; a member's DEPTH where it has one,
 as the members of a parent-child level all have the level's number), number of children, caption (BW's text: its
 medium text property, else the long, else the short one, which for a node of an external characteristic is not BW's
-caption, the short text; with --names a text node's technical name or a leaf's key is accepted too, as long as
-olap4abap has no texts) and the values. Members BW shows without value are left out by olap4abap's members-with-facts dimensions; --with-facts
+caption, the short text; '' for the initial value, which BW captions Not assigned; with --names a node's technical
+name or a leaf's key is accepted too) and the values. Members BW shows without value are left out by olap4abap's members-with-facts dimensions; --with-facts
 compares only the members with a value, in BW's order.
 
 --reference checks the reference server's copy of the hierarchies in which every node occurs once (docs/next-steps.md,
@@ -233,9 +233,9 @@ def compare(total, key, expected, actual, args, check):
         if not args.with_facts and bw["children"] != ours["children"]:
             problems.append(f"children {ours['children']} != {bw['children']}")
         captions = {bw["text"]} | ({bw["name"]} if args.names else set())
-        # the initial value (BW's MDX names it #, its key is all zeros or empty) olap4abap names '' as the
-        # characteristic's member
-        if args.names and (bw["name"] == "#" or not bw["name"].strip("0 ")):
+        # the initial value (BW's MDX names it #, its key is all zeros or empty, and captions it Not assigned)
+        # olap4abap names and captions '' as the characteristic's member (docs/next-steps.md, Now: texts and captions)
+        if bw["name"] == "#" or not bw["name"].strip("0 "):
             captions.add("")
         if ours["caption"] not in captions:
             problems.append(f"caption {ours['caption']!r} not in {sorted(captions)}")
