@@ -43,6 +43,8 @@ CLASS ltc_schema DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT
     "! the annotation olap4abap.bwHierarchy of a Hierarchy: refused with levels, on a table that is no characteristic's
     "! view and for a hierarchy BW does not have
     METHODS bw_hierarchy_refused FOR TESTING.
+    "! a catalog is loaded when asked for, once; one that fails to load leaves none of its cubes and fails again
+    METHODS load_on_demand FOR TESTING RAISING cx_static_check.
     METHODS read
       IMPORTING xml           TYPE string
       RETURNING VALUE(result) TYPE REF TO zzxxmla1_cl_schema
@@ -331,8 +333,14 @@ CLASS ltc_schema IMPLEMENTATION.
   METHOD foodmart_catalog.
     " the catalog as the server has it: datasources.xml and the schema file among the server's files
     DATA(schema) = zzxxmla1_cl_schema=>get( ).
+    " other catalogs (the clinic demo's) are listed but not loaded
+    DATA(catalogs) = schema->catalogs( ).
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( catalogs[ table_line = `ZFOODMART` ] ) ) ).
+    schema->load( VALUE #( ( `ZFOODMART` ) ) ).
     DATA(cubes) = schema->cubes( ).
-    " other catalogs (the clinic demo's) may come first
+    cl_abap_unit_assert=>assert_equals( act = VALUE string_table( FOR c IN cubes WHERE ( catalog_name <> `ZFOODMART` )
+                                                                  ( c-cube_name ) )
+                                        exp = VALUE string_table( ) ).
     cl_abap_unit_assert=>assert_true( xsdbool( line_exists( cubes[ cube_name = `ZFMSALES` catalog_name = `ZFOODMART` ] ) ) ).
     DATA(dims) = schema->dimensions( `ZFMSALES` ).
     cl_abap_unit_assert=>assert_equals( act = lines( dims ) exp = 5 ).
@@ -461,6 +469,43 @@ CLASS ltc_schema IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = cubes[ cube_name = `A` ]-calculated_members
                                         exp = VALUE string_table( ( `Double` ) ( `Half` ) ) ).
     cl_abap_unit_assert=>assert_initial( cubes[ cube_name = `B` ]-calculated_members ).
+  ENDMETHOD.
+
+  METHOD load_on_demand.
+    DATA(dimension) = `<Dimension name="D" table="T"><DimensionAttribute name="K" usage="Key">` &&
+                      `<KeyColumn dataType="Integer" columnName="SID"/></DimensionAttribute></Dimension>`.
+    DATA(content) = `<Table name="F"/><DimensionUsage name="D" source="D" foreignKey="X"/>` &&
+                    `<Measure name="M" column="M" aggregator="sum"/></Cube>`.
+    " BROKEN's second cube fails after its first is read
+    DATA(schema) = zzxxmla1_cl_schema=>of_catalogs(
+      loaded   = abap_false
+      catalogs = VALUE #(
+        ( name = `GOOD` schema = |<Schema name="S">{ dimension }<Cube name="A">{ content }</Schema>| )
+        ( name = `BROKEN` schema = |<Schema name="S">{ dimension }<Cube name="B">{ content }| &&
+                                   |<Cube name="E"><Table name="F"/><Measure name="M" aggregator="sum"/></Cube></Schema>| ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = schema->catalogs( ) exp = VALUE string_table( ( `BROKEN` ) ( `GOOD` ) ) ).
+    cl_abap_unit_assert=>assert_initial( schema->cubes( ) ).
+
+    schema->load( VALUE #( ( `GOOD` ) ( `NONE` ) ) ).
+    schema->load( VALUE #( ( `GOOD` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = VALUE string_table( FOR c IN schema->cubes( ) ( c-cube_name ) )
+                                        exp = VALUE string_table( ( `A` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = lines( schema->dimensions( `A` ) ) exp = 1 ).
+
+    DO 2 TIMES.
+      TRY.
+          schema->load( VALUE #( ( `BROKEN` ) ) ).
+          cl_abap_unit_assert=>fail( `no fault` ).
+        CATCH zzxxmla1_cx_xmla INTO DATA(fault).
+          cl_abap_unit_assert=>assert_equals(
+            act = fault->description
+            exp = `olap4abap Error:Measure 'M': only measures on a column are supported` ).
+      ENDTRY.
+      cl_abap_unit_assert=>assert_equals( act = VALUE string_table( FOR c IN schema->cubes( ) ( c-cube_name ) )
+                                          exp = VALUE string_table( ( `A` ) ) ).
+      cl_abap_unit_assert=>assert_initial( schema->dimensions( `B` ) ).
+      cl_abap_unit_assert=>assert_initial( schema->measures( `B` ) ).
+    ENDDO.
   ENDMETHOD.
 
   METHOD omit_empty_cells.

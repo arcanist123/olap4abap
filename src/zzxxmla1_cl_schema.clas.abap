@@ -40,6 +40,9 @@ CLASS zzxxmla1_cl_schema DEFINITION
         name       TYPE string,
         schema     TYPE string,      " the schema as XML
         updated_at TYPE timestampl,  " when the schema was last changed (MDSCHEMA_CUBES LAST_SCHEMA_UPDATE), UTC
+        "! the path of the schema file (the catalog's Definition), read with the schema and the time when the catalog
+        "! is loaded; initial: schema and updated_at are given
+        definition TYPE string,
       END OF ty_catalog,
       ty_t_catalog TYPE STANDARD TABLE OF ty_catalog WITH EMPTY KEY.
     TYPES:
@@ -173,20 +176,29 @@ CLASS zzxxmla1_cl_schema DEFINITION
     "! dimension is keyed by it, an aDSO's by the value, mapped to the SID on the view.
     CONSTANTS c_sid_column TYPE string VALUE `SID`.
 
-    "! The schemas of all catalogs of the server, read once per session.
+    "! The catalogs of the server, once per session, none of them loaded: a catalog's schema is read when a request
+    "! needs its cubes (load), as the reference loads a catalog's schema when a connection to it is made, so a request
+    "! reads no other catalog's schema file and no copy of a BW hierarchy of another catalog.
     CLASS-METHODS get
       RETURNING VALUE(result) TYPE REF TO zzxxmla1_cl_schema
       RAISING   zzxxmla1_cx_xmla.
-    "! The schemas of the given catalogs.
+    "! The schemas of the given catalogs, all loaded unless loaded is false.
     CLASS-METHODS of_catalogs
       IMPORTING catalogs      TYPE ty_t_catalog
+                loaded        TYPE abap_bool DEFAULT abap_true
       RETURNING VALUE(result) TYPE REF TO zzxxmla1_cl_schema
       RAISING   zzxxmla1_cx_xmla.
 
-    "! The names of the catalogs, sorted.
+    "! The names of the catalogs, loaded or not, sorted.
     METHODS catalogs
       RETURNING VALUE(result) TYPE string_table.
-    "! The cubes, sorted by catalog and name.
+    "! Loads the schemas of the given catalogs that are not loaded yet; names of no catalog are ignored. A catalog that
+    "! fails to load stays unloaded, and the next load fails again. Cube names are unique among the loaded catalogs
+    "! (the schema builder's check loads all of them, of_catalogs).
+    METHODS load
+      IMPORTING catalogs TYPE string_table
+      RAISING   zzxxmla1_cx_xmla.
+    "! The cubes of the loaded catalogs, sorted by catalog and name; the other methods know only these cubes.
     METHODS cubes
       RETURNING VALUE(result) TYPE ty_t_cube.
     "! The dimensions of a cube in the order of the cube.
@@ -218,6 +230,8 @@ CLASS zzxxmla1_cl_schema DEFINITION
   PRIVATE SECTION.
     CLASS-DATA instance TYPE REF TO zzxxmla1_cl_schema.
     DATA catalog_names TYPE string_table.
+    "! the catalogs not loaded yet
+    DATA unloaded      TYPE ty_t_catalog.
     DATA all_cubes     TYPE ty_t_cube.
     DATA all_dims      TYPE ty_t_dim.
     DATA all_hiers     TYPE ty_t_hier.
@@ -232,8 +246,8 @@ CLASS zzxxmla1_cl_schema DEFINITION
       END OF ty_cube_dimension,
       ty_t_cube_dimension TYPE STANDARD TABLE OF ty_cube_dimension WITH EMPTY KEY.
 
-    "! The catalogs of the server: those of every data source of the repository, with their schema files. A catalog
-    "! name is one catalog of the server: data sources may list it again with the same Definition.
+    "! The catalogs of the server: those of every data source of the repository, with the paths of their schema files.
+    "! A catalog name is one catalog of the server: data sources may list it again with the same Definition.
     CLASS-METHODS find_catalogs
       RETURNING VALUE(result) TYPE ty_t_catalog
       RAISING   zzxxmla1_cx_xmla.
@@ -241,9 +255,17 @@ CLASS zzxxmla1_cl_schema DEFINITION
     CLASS-METHODS fail
       IMPORTING !message TYPE string
       RAISING   zzxxmla1_cx_xmla.
+    "! A catalog with the schema and the time of its schema file, if it names one.
+    CLASS-METHODS read_schema_file
+      IMPORTING catalog       TYPE ty_catalog
+      RETURNING VALUE(result) TYPE ty_catalog
+      RAISING   zzxxmla1_cx_xmla.
     METHODS add_catalog
       IMPORTING catalog TYPE ty_catalog
       RAISING   zzxxmla1_cx_xmla.
+    "! Removes the cubes of a catalog and all that belongs to them (a catalog that failed to load).
+    METHODS remove_catalog
+      IMPORTING catalog TYPE string.
     METHODS add_cube
       IMPORTING !schema   TYPE zzxxmla1_cl_schema_def=>ty_schema
                 cube      TYPE zzxxmla1_cl_schema_def=>ty_cube
@@ -370,18 +392,66 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
 
   METHOD get.
     IF instance IS NOT BOUND.
-      instance = of_catalogs( find_catalogs( ) ).
+      DATA(catalogs) = find_catalogs( ).
+      instance = NEW #( ).
+      instance->unloaded = catalogs.
+      instance->catalog_names = VALUE #( FOR c IN catalogs ( c-name ) ).
+      SORT instance->catalog_names ASCENDING.
     ENDIF.
     result = instance.
   ENDMETHOD.
 
   METHOD of_catalogs.
     result = NEW #( ).
-    LOOP AT catalogs INTO DATA(catalog).
-      result->add_catalog( catalog ).
-    ENDLOOP.
+    result->unloaded = catalogs.
+    result->catalog_names = VALUE #( FOR c IN catalogs ( c-name ) ).
+    IF loaded = abap_true.
+      result->load( result->catalog_names ).
+    ENDIF.
     SORT result->catalog_names ASCENDING.
-    SORT result->all_cubes BY catalog_name ASCENDING cube_name ASCENDING.
+  ENDMETHOD.
+
+  METHOD load.
+    DATA wanted TYPE ty_t_catalog.
+    LOOP AT unloaded INTO DATA(candidate).
+      IF line_exists( catalogs[ table_line = candidate-name ] ).
+        APPEND candidate TO wanted.
+      ENDIF.
+    ENDLOOP.
+    LOOP AT wanted INTO DATA(catalog).
+      TRY.
+          DELETE unloaded WHERE name = catalog-name.
+          add_catalog( read_schema_file( catalog ) ).
+        CLEANUP.
+          remove_catalog( catalog-name ).
+          INSERT catalog INTO unloaded INDEX 1.
+      ENDTRY.
+    ENDLOOP.
+    SORT all_cubes BY catalog_name ASCENDING cube_name ASCENDING.
+  ENDMETHOD.
+
+  METHOD read_schema_file.
+    result = catalog.
+    IF catalog-definition IS INITIAL.
+      RETURN.
+    ENDIF.
+    DATA(file) = zzxxmla1_cl_files=>read( catalog-definition ).
+    IF file-path IS INITIAL.
+      fail( |Error while loading catalog '{ catalog-name }': the schema file { catalog-definition } does not exist| ).
+    ENDIF.
+    result-schema = file-content.
+    result-updated_at = file-changed_at.
+  ENDMETHOD.
+
+  METHOD remove_catalog.
+    LOOP AT all_cubes INTO DATA(cube) WHERE catalog_name = catalog.
+      DELETE all_dims WHERE cube_name = cube-cube_name.
+      DELETE all_hiers WHERE cube_name = cube-cube_name.
+      DELETE all_levels WHERE cube_name = cube-cube_name.
+      DELETE all_measures WHERE cube_name = cube-cube_name.
+      DELETE all_drill_columns WHERE cube_name = cube-cube_name.
+    ENDLOOP.
+    DELETE all_cubes WHERE catalog_name = catalog.
   ENDMETHOD.
 
   METHOD find_catalogs.
@@ -395,11 +465,7 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
           ENDIF.
           CONTINUE.
         ENDIF.
-        DATA(file) = zzxxmla1_cl_files=>read( catalog-definition ).
-        IF file-path IS INITIAL.
-          fail( |Error while loading catalog '{ catalog-name }': the schema file { catalog-definition } does not exist| ).
-        ENDIF.
-        APPEND VALUE #( name = catalog-name schema = file-content updated_at = file-changed_at ) TO result.
+        APPEND VALUE #( name = catalog-name definition = catalog-definition ) TO result.
         APPEND catalog-definition TO definitions.
       ENDLOOP.
     ENDLOOP.
@@ -423,7 +489,6 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
       fail( |Catalog '{ name }': virtual cubes, roles, user-defined functions, named sets and parameters | &&
             |are not supported| ).
     ENDIF.
-    APPEND name TO catalog_names.
     LOOP AT schema-cubes INTO DATA(cube) WHERE enabled <> abap_false.
       add_cube( schema = schema cube = cube catalog = name updated = catalog-updated_at ).
     ENDLOOP.

@@ -114,7 +114,9 @@ CLASS zzxxmla1_cl_dim_key_check IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD check_catalogs.
-    result = check_schema( zzxxmla1_cl_schema=>get( ) ).
+    DATA(schema) = zzxxmla1_cl_schema=>get( ).
+    schema->load( schema->catalogs( ) ).
+    result = check_schema( schema ).
   ENDMETHOD.
 
   METHOD check_schema.

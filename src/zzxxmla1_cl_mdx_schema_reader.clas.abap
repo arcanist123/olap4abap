@@ -478,7 +478,10 @@ ENDCLASS.
 CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
 
   METHOD for_cube.
-    LOOP AT zzxxmla1_cl_schema=>get( )->cubes( ) INTO DATA(candidate).
+    " only the cube's catalog is loaded; without one all are
+    DATA(schema) = zzxxmla1_cl_schema=>get( ).
+    schema->load( COND #( WHEN catalog IS INITIAL THEN schema->catalogs( ) ELSE VALUE #( ( catalog ) ) ) ).
+    LOOP AT schema->cubes( ) INTO DATA(candidate).
       IF ( catalog IS INITIAL OR candidate-catalog_name = catalog ) AND to_upper( candidate-cube_name ) = to_upper( name ).
         result = NEW #( ).
         result->cube = candidate.

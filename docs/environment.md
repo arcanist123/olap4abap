@@ -428,7 +428,9 @@ not part of it (`scripts/sap-files.py deploy`):
   `ZZXXMLA1_C_ZFMSTORE`, and `deploy` replaces it by the database view SAP has, `ZZXXMLA1V...`, generating the view
   if there is none; a view's number depends on the views of the system's other cubes, so no schema of the repository
   names one). `ZZXXMLA1_CL_SCHEMA`
-  reads the schema of every catalog once per session; `LAST_SCHEMA_UPDATE` is the time the file was written.
+  reads a catalog's schema file when a request needs its cubes (`load`: an Execute its catalog, a rowset of cubes the
+  catalogs its Catalog property and restrictions select), once per session; a broken catalog fails only the requests
+  that load it. `LAST_SCHEMA_UPDATE` is the time the file was written.
 
 `scripts/sap-files.py` writes and reads them through `sapcli abap run` as the user of `.env.sap`; the endpoint writes
 them only in the schema generator's `accept` (`ZZXXMLA1_CL_SCHEMA_API`: a schema file and its catalog); in Git Bash set `MSYS_NO_PATHCONV=1`, or it turns `/WEB-INF/...` into a Windows path.

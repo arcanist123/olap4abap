@@ -70,6 +70,11 @@ CLASS zzxxmla1_cl_xmla_handler DEFINITION
     "! The catalogs of the request's data source, ascending.
     METHODS catalogs
       RETURNING VALUE(result) TYPE string_table.
+    "! The catalogs of the request's data source a rowset can list: the Catalog property and the restrictions
+    "! CATALOG_NAME, SCHEMA_NAME (named like the catalog) and TABLE_CATALOG select them.
+    METHODS requested_catalogs
+      IMPORTING request       TYPE ty_request
+      RETURNING VALUE(result) TYPE string_table.
     "! The reference's rule: the requested catalog if it exists, else (none requested) the first one, else empty.
     METHODS default_catalog
       IMPORTING request       TYPE ty_request
@@ -473,6 +478,13 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
     ENDIF.
 
     check_discover( request ).
+    " a rowset of cubes loads only the catalogs it can list
+    CASE request-type.
+      WHEN 'MDSCHEMA_CUBES' OR 'MDSCHEMA_MEASURES' OR 'MDSCHEMA_DIMENSIONS' OR 'MDSCHEMA_HIERARCHIES'
+          OR 'MDSCHEMA_LEVELS' OR 'MDSCHEMA_MEMBERS' OR 'MDSCHEMA_PROPERTIES' OR 'DBSCHEMA_TABLES_INFO'
+          OR 'DBSCHEMA_TABLES' OR 'DBSCHEMA_COLUMNS' OR 'MDSCHEMA_MEASUREGROUPS' OR 'MDSCHEMA_MEASUREGROUP_DIMENSIONS'.
+        schema->load( requested_catalogs( request ) ).
+    ENDCASE.
     DATA rows TYPE string.
     CASE request-type.
       WHEN 'DISCOVER_DATASOURCES'.
@@ -627,6 +639,18 @@ CLASS zzxxmla1_cl_xmla_handler IMPLEMENTATION.
   METHOD catalogs.
     LOOP AT schema->catalogs( ) INTO DATA(catalog).
       IF line_exists( data_source-catalogs[ name = catalog ] ).
+        APPEND catalog TO result.
+      ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD requested_catalogs.
+    DATA(wanted) = VALUE string( request-properties[ name = 'Catalog' ]-value OPTIONAL ).
+    LOOP AT catalogs( ) INTO DATA(catalog).
+      IF ( wanted IS INITIAL OR catalog = wanted )
+          AND is_allowed( request = request restriction = `CATALOG_NAME` value = catalog ) = abap_true
+          AND is_allowed( request = request restriction = `SCHEMA_NAME` value = catalog ) = abap_true
+          AND is_allowed( request = request restriction = `TABLE_CATALOG` value = catalog ) = abap_true.
         APPEND catalog TO result.
       ENDIF.
     ENDLOOP.
