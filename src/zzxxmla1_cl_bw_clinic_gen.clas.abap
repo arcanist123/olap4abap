@@ -415,9 +415,9 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     "! added).
     METHODS deploy_schemas
       IMPORTING providers TYPE string_table.
-    "! Adds to the schema of an InfoCube every BW hierarchy BW has for the characteristic of one of its dimensions and
-    "! olap4abap serves (ZZXXMLA1_CL_BW_HIERARCHY_COPY=>offered), as the user ticks them in the schema builder: none on
-    "! an aDSO, whose facts hold the value, not the SID (ZCLDIAG_ICD, ZCLPAT_PRG and ZCLSERV_CAT on ZCLVISIT).
+    "! Adds to the schema of a provider every BW hierarchy BW has for the characteristic of one of its dimensions and
+    "! olap4abap serves (ZZXXMLA1_CL_BW_HIERARCHY_COPY=>offered), as the user ticks them in the schema builder
+    "! (ZCLDIAG_ICD, ZCLPAT_PRG and ZCLSERV_CAT on ZCLVISIT and ZCLVISITA).
     METHODS tick_hierarchies
       CHANGING !schema TYPE zzxxmla1_cl_schema_def=>ty_schema.
     "! The proposal for a provider.
@@ -2344,10 +2344,6 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
 
   METHOD tick_hierarchies.
     LOOP AT schema-dimensions ASSIGNING FIELD-SYMBOL(<dimension>).
-      READ TABLE <dimension>-attributes INTO DATA(key) WITH KEY usage = `Key`.
-      IF sy-subrc <> 0 OR key-key_column IS NOT BOUND OR key-key_column->column_name <> zzxxmla1_cl_schema=>c_sid_column.
-        CONTINUE.
-      ENDIF.
       DATA(characteristic) = CONV rsiobjnm( zzxxmla1_cl_bw_view_gen=>characteristic_of_view( <dimension>-table ) ).
       IF characteristic IS INITIAL.
         CONTINUE.

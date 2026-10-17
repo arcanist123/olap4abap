@@ -106,7 +106,7 @@ Read before designing anything:
   makes them in the UI), no BW hierarchies (offered per dimension as `bwHierarchies` of the API, the ones `RSHIEDIR`
   has for its characteristic, `ZZXXMLA1_CL_BW_HIERARCHY_COPY=>offered`; the dimension pane's "BW hierarchies" ticks
   them, a ticked one a `<Hierarchy>` annotated `olap4abap.bwHierarchy`, captioned by BW's text; time- or
-  version-dependent ones and any on an aDSO, whose facts hold the value, not the SID, cannot be ticked); a default drill-through action with each characteristic's value, which the UI's
+  version-dependent ones cannot be ticked; an aDSO's too); a default drill-through action with each characteristic's value, which the UI's
   "Double-click columns" adjusts; every dimension of the cube annotated
   `olap4abap.membersWithFacts`, which the UI's "Members with facts" switches per dimension (not on time ones); the cube
   annotated `olap4abap.omitEmptyCells`, which the cube pane's "Omit empty cells" switches. The views (`ZZXXMLA1_CL_BW_VIEW_GEN`, one per basic
@@ -403,13 +403,15 @@ Read before designing anything:
   members of the level it groups or filters by with the SIDs below each (`ZZXXMLA1_CL_MODEL=>fact_join_table` with
   the level: `levels_sql`'s rows of that level joined to the closure, the SID as the key column), so a member's value
   is the sum over its distinct values; a set in the subcube, a compound slicer or a drill-through is a semi-join on
-  the closure (`bw_member_condition`, `bw_members_condition` for label conditions). Never a parent from its children:
+  the closure (`bw_member_condition`, `bw_members_condition` for label conditions). On a dimension keyed by the value
+  (an aDSO's, whose facts hold it) these joins map the closure's SID to the value on the characteristic's view
+  (`bw_fact_value`: the view joined on `SID`, its key column the one the facts refer to). Never a parent from its children:
   no `roll_up` across a BW hierarchy's levels, no grouping set of other levels of it in one statement (`bw_pattern`),
   no defaults of it, no cells-first grid on it. Its levels are no drill-through columns (a `RETURN` of one is a
   fault). The schema API's check and accept create the copy tables of an InfoObject one of whose hierarchies the
-  schema names (`create_hierarchy_tables`); the schema reader refuses a BW hierarchy on a dimension not keyed by the
-  SID (an aDSO's). The clinic setup ticks every one BW serves (`tick_hierarchies`: `ZCLDIAG_ICD`, `ZCLPAT_PRG`,
-  `ZCLSERV_CAT` on `ZCLVISIT`).
+  schema names (`create_hierarchy_tables`). The clinic setup ticks every one BW serves (`tick_hierarchies`:
+  `ZCLDIAG_ICD`, `ZCLPAT_PRG`, `ZCLSERV_CAT` on `ZCLVISIT` and `ZCLVISITA`; `bw_hierarchy_test.py --catalog ZCLVISITA
+  --names` passes).
   The reference serves `ZCLDIAG_ICD` as a balanced level hierarchy (`Level 01`-`Level 04` on the flattened table
   `ZZXXMLA1_HL_ZCLDIAG_ICD`; catalog and cube `ZCLHIER`, `reference/schema/ClinicBW.xml`, built by
   `build-bw-reference-db.py` from an export of the InfoCube and the copy, checked against BW by

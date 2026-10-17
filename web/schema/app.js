@@ -1041,8 +1041,7 @@ function SelectionField({ doc, dim, characteristics, onFix }) {
 }
 
 // The BW hierarchies of the dimension's characteristic, ticked if the dimension has them; one the server does not
-// offer (time or version dependent, or no longer in BW) can only be unticked. Only an InfoCube's dimension, keyed by
-// the SID the copy holds, can have them.
+// offer (time or version dependent, or no longer in BW) can only be unticked.
 function BwHierarchySection({ doc, edit, dim, bwHierarchies }) {
   const offered = bwHierarchies.get(attr(dim, 'table'));
   const ticked = hierarchiesOf(dim).filter(bwNameOf);
@@ -1053,8 +1052,6 @@ function BwHierarchySection({ doc, edit, dim, bwHierarchies }) {
       rows.push({ name: bwNameOf(h), text: attr(h, 'caption'), supported: false, reason: 'BW has no such hierarchy of the characteristic' });
     }
   }
-  const key = keyAttributeOf(dim);
-  const bySid = !!key && keyColumn(key) === 'SID';
   return html`<section class="section">
     <header><h3>BW hierarchies</h3><span class="spacer"></span>
       <span class="muted small">a ticked hierarchy is served from its copy of BW's current version, its levels Level 01, … by depth</span></header>
@@ -1062,8 +1059,7 @@ function BwHierarchySection({ doc, edit, dim, bwHierarchies }) {
       <thead><tr><th></th><th>BW hierarchy</th><th>Text</th><th>Caption</th><th></th></tr></thead>
       <tbody>${rows.map((r) => {
         const h = ticked.find((t) => bwNameOf(t) === r.name);
-        const why = !bySid ? 'Not on an aDSO yet: its facts hold the value, not the SID the copy holds'
-          : !r.supported ? `Not offered: ${r.reason}` : '';
+        const why = !r.supported ? `Not offered: ${r.reason}` : '';
         return html`<tr key=${r.name}>
           <td><${Check} checked=${!!h} disabled=${!h && !!why} title=${why || 'A hierarchy of the dimension'}
             onChange=${(on) => edit(() => setBwHierarchy(doc, dim, r, on))} /></td>

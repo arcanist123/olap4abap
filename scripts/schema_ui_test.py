@@ -398,7 +398,7 @@ def main():
 
         # BW hierarchies (docs/next-steps.md, order step 3): the proposal names none, a dimension's pane offers the
         # ones BW has for its characteristic; a ticked one is a Hierarchy annotated olap4abap.bwHierarchy that the
-        # check loads; the time- and version-dependent ones and those of an aDSO cannot be ticked
+        # check loads, on an InfoCube and on an aDSO; the time- and version-dependent ones cannot be ticked
         bw = "section:has(h3:text-is('BW hierarchies'))"
 
         def bw_box(name):
@@ -431,7 +431,12 @@ def main():
         page.goto(f"{args.url}/?sap-client={args.client}#proposal/ZCLVISITA")
         status(page)
         open_dimension("ZCLSERV")
-        check("not on an aDSO", bw_box("ZCLSERV_CAT").is_disabled() and "Not on an aDSO" in page.inner_text(bw))
+        page.wait_for_selector(".status.ok", timeout=CHECK)
+        bw_box("ZCLSERV_CAT").check()
+        page.wait_for_selector(".status.busy", timeout=5000)
+        state = status(page)
+        check("ticked on an aDSO, keyed by the value: the check loads it",
+              ">ZCLSERV_CAT</Annotation>" in xml_of() and "Loads" in state, state)
         browser.close()
 
     check("no script errors", not errors, errors)

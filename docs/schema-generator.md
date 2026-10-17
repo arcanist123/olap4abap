@@ -357,7 +357,7 @@ Implemented (2026-10-06):
   member, levels from attributes with level type, unique members and order, member properties); BW hierarchies ("BW
   hierarchies": the ones the server offers for the dimension's table, ticked into a `<Hierarchy>` annotated
   `olap4abap.bwHierarchy` named by BW and captioned by its text, the caption editable; greyed out when time or version
-  dependent or on a dimension not keyed by `SID`, an aDSO's; one BW no longer offers can be unticked). The XML tab edits
+  dependent; one BW no longer offers can be unticked). An aDSO's dimension, keyed by the value, has them too. The XML tab edits
   everything else as text. Undo (Ctrl+Z) keeps the last 100 states.
 - Every change is sent to `check` (debounced, the last request wins); its refusal is shown in full under the top bar
   and keeps Accept disabled. Accept shows what `check` answered (the file, new or replaced catalog, the views to

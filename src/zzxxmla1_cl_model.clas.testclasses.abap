@@ -28,6 +28,9 @@ CLASS ltc_model DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
     METHODS ordinal_column FOR TESTING.
     "! a dimension that shows only its members with facts is read from the rows whose key is in the fact table
     METHODS member_table FOR TESTING.
+    "! the facts below a member of a BW hierarchy: the closure's SIDs where the dimension is keyed by the SID (an
+    "! InfoCube), their values from the view where it is keyed by the value (an aDSO)
+    METHODS bw_member_condition FOR TESTING.
     "! a measure of an aggregator other than sum and count is refused: its value would be a sum
     METHODS check_aggregator FOR TESTING RAISING cx_static_check.
     METHODS hierarchy
@@ -192,6 +195,24 @@ CLASS ltc_model IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals(
       act = zzxxmla1_cl_model=>member_table( rooms )
       exp = `( SELECT * FROM "V_ROOM" WHERE "SID" IN ( SELECT "SID_ROOM" FROM "/BIC/FCLINIC" ) ) AS mf` ).
+  ENDMETHOD.
+
+  METHOD bw_member_condition.
+    DATA(diagnoses) = VALUE zzxxmla1_cl_model=>ty_hierarchy( dim_table = `V_DIAG` key_column = `SID`
+                                                            fk_column = `SID_DIAG` ).
+    diagnoses-bw_hierarchy-closure = `ZZXXMLA1C0000001`.
+    diagnoses-bw_hierarchy-hiesid = 43.
+    DATA(version) = |c."SVER" = { zzxxmla1_cl_sql=>literal( CONV string( diagnoses-bw_hierarchy-sver ) ) }|.
+    cl_abap_unit_assert=>assert_equals(
+      act = zzxxmla1_cl_model=>bw_member_condition( hierarchy = diagnoses fact_column = `f."SID_DIAG"` key = `-7` )
+      exp = |f."SID_DIAG" IN ( SELECT c."SID" FROM "ZZXXMLA1C0000001" c | &&
+            |WHERE c."HIESID" = 43 AND { version } AND c."ANCESTOR_SID" = -7 )| ).
+    diagnoses-key_column = `DIAG`.
+    diagnoses-fk_column = `DIAG`.
+    cl_abap_unit_assert=>assert_equals(
+      act = zzxxmla1_cl_model=>bw_member_condition( hierarchy = diagnoses fact_column = `f."DIAG"` key = `-7` )
+      exp = |f."DIAG" IN ( SELECT v."DIAG" FROM "ZZXXMLA1C0000001" c INNER JOIN "V_DIAG" v ON v."SID" = c."SID" | &&
+            |WHERE c."HIESID" = 43 AND { version } AND c."ANCESTOR_SID" = -7 )| ).
   ENDMETHOD.
 
   METHOD check_aggregator.

@@ -258,10 +258,11 @@ their technical names (`[Measures].[ZCLVISNO]`, the default measure). The room, 
 are compounded: keyed by the SID on both providers, named by `COMPOUND_KEY` (`NORTH/R01`, `K4/2024001`). The cube has the date `ZCLDATE`, the aDSO BW's
 `0CALWEEK`, `0CALMONTH`, `0CALQUARTER` and `0CALYEAR` (`0CALDAY` has no SID table). The proposal makes no user
 hierarchies (Region > City > Patient and the like are for the UI to add) and marks no dimension as time.
-The run then ticks every BW hierarchy BW serves on the cube's dimensions, as the schema builder's "BW hierarchies"
-does (`tick_hierarchies`): `ZCLVISIT` has `[ZCLDIAG.ZCLDIAG_ICD]`, `[ZCLPAT.ZCLPAT_PRG]` and `[ZCLSERV.ZCLSERV_CAT]`,
-captioned by BW's texts; the physician's are time and version dependent, and the aDSO has none yet (its facts hold
-the value, not the SID the copies hold).
+The run then ticks every BW hierarchy BW serves on the providers' dimensions, as the schema builder's "BW hierarchies"
+does (`tick_hierarchies`): `ZCLVISIT` and `ZCLVISITA` have `[ZCLDIAG.ZCLDIAG_ICD]`, `[ZCLPAT.ZCLPAT_PRG]` and
+`[ZCLSERV.ZCLSERV_CAT]`, captioned by BW's texts; the physician's are time and version dependent. On the aDSO, whose
+facts hold the value, the closure's SIDs are mapped to the values on the characteristic's view
+(`ZZXXMLA1_CL_MODEL=>bw_fact_value`).
 
 Every dimension is annotated `olap4abap.membersWithFacts` on the cube's `DimensionUsage` (`mvp-scope.md`, Members with
 facts decision): its members are only those with visits, so the 300 registered patients are no members

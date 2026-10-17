@@ -250,7 +250,8 @@ def main():
     check("time/fill refuses an interval that ends before it starts", status == 400 and "starts after" in body.get("error", ""), body)
 
     # BW hierarchies (docs/next-steps.md, order step 3): the proposal names none and offers the ones BW has per table;
-    # a ticked one loads on an InfoCube (check creates its InfoObject's copy tables) and is refused on an aDSO
+    # a ticked one loads on an InfoCube, keyed by the SID (check creates its InfoObject's copy tables), and on an aDSO,
+    # keyed by the value
     status, body, _ = call(args.url, args.client, "GET", "proposal", {"provider": "ZCLVISIT"})
     offered = {h["name"]: h for e in body.get("bwHierarchies") or [] for h in e["hierarchies"]}
     check("proposal offers the clinic's hierarchies, names none",
@@ -260,12 +261,11 @@ def main():
           and "time or version dependent" in offered.get("ZCLDOC_ORG", {}).get("reason", ""), body.get("bwHierarchies"))
     ticked = ('<Hierarchy name="ZCLSERV_CAT" hasAll="true" caption="Service Catalog"><Annotations>'
               '<Annotation name="olap4abap.bwHierarchy">ZCLSERV_CAT</Annotation></Annotations></Hierarchy>')
-    for provider, loads in (("ZCLVISIT", True), ("ZCLVISITA", False)):
+    for provider in ("ZCLVISIT", "ZCLVISITA"):
         xml = proposals[provider]
         end = re.search(r'<Dimension [^>]*name="ZCLSERV"[^>]*>.*?(</Dimension>)', xml, re.S).start(1)
         status, body, _ = call(args.url, args.client, "POST", "check", {"catalog": provider}, xml[:end] + ticked + xml[end:])
-        check(f"a ticked BW hierarchy {'loads' if loads else 'is refused'} on {provider}",
-              status == 200 if loads else status == 400 and "aDSO" in body.get("error", ""), body)
+        check(f"a ticked BW hierarchy loads on {provider}", status == 200, body)
 
     print(f"{'all passed' if not failures else str(len(failures)) + ' failed'} ({args.url})")
     sys.exit(1 if failures else 0)

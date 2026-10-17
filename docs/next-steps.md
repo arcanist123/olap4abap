@@ -78,9 +78,14 @@ Next, in this order:
    levels from the copy (a change of check, which wrote nothing before: the tables stay when the hierarchy is
    unticked). The clinic setup ticks every one BW serves (`ZCLVISIT`: `ZCLDIAG_ICD`, `ZCLPAT_PRG`, `ZCLSERV_CAT`;
    accepted so on SAP, `bw_hierarchy_test.py --catalog ZCLVISIT --names` passes). Tests: `schema_api_test.py`,
-   `schema_ui_test.py`. Open: a BW hierarchy on an aDSO, whose fact column holds the value, not the SID the closure
-   has: the schema reader refuses a BW hierarchy on a dimension not keyed by `SID`, the UI greys them out there, so
-   `ZCLVISITA` has none yet.
+   `schema_ui_test.py`. Done (2026-10-17): a BW hierarchy on an aDSO, whose fact column holds the value, not the SID
+   the closure has: the closure joins of the facts (`ZZXXMLA1_CL_MODEL=>fact_join_table`, `bw_member_condition`,
+   `bw_members_condition`) map the SID to the value on the characteristic's view (`bw_fact_value`: the dimension
+   table joined on `SID`, its key column the one the facts refer to); the schema reader, the UI and the clinic setup
+   no longer leave aDSOs out. `ZCLVISITA` has the three hierarchies (`bw_hierarchy_test.py --catalog ZCLVISITA
+   --names` passes: 72, 2,914 and 92 members as BW's); a slicer, compound slicer, subselect, label filter and
+   drill-through of a node give the InfoCube's answers (the aDSO's drill-through has fewer rows of the same sum: it
+   aggregates visits with equal keys).
 4. Smaller: texts step 5 (the check against blank texts); the debt that keeps about 30 hierarchy cases red on SAP
    (measure captions, member names on `sourceAttribute` levels, `known-issues.md`).
 
@@ -566,7 +571,7 @@ Open:
    engine shows a member's name as its caption until the texts give it a caption column (`Now: texts and captions`).
 4. The engine: members of a parent-child level and the closure in the fact reads; the planner marks such members
    computed at first, so the evaluator answers them, native and grouped reads later.
-5. Done (2026-10-17, order step 3 above) but for aDSOs: the proposal and the UI offer the hierarchies a characteristic
+5. Done (2026-10-17, order step 3 above), aDSOs too: the proposal and the UI offer the hierarchies a characteristic
    has in `RSHIEDIR` (no not-assigned switch: the hierarchy's setting in BW holds).
 6. Measure HANA's plan cache (`M_SQL_PLAN_CACHE`: entries, `PREPARATION_COUNT`, `TOTAL_PREPARATION_TIME` against
    `TOTAL_EXECUTION_TIME`): a statement on a view with two literals and with a bound parameter, and the share of
@@ -810,8 +815,8 @@ Done (2026-10-15): the reference serves `ZCLDIAG_ICD`.
         `ZCLHIER`'s schema for the run (annotated as `ZCLDIAG_ICD`), all members' values BW's (72, 2,914 and 92
         members). The test read an empty cell's value from the next cell (fixed; it accepts `#` for the initial
         value with `--names` and has `--catalog`). Open: a test catalog on SAP with the three hierarchies, so the
-        BW check runs without editing the schema (done 2026-10-17, the order from here, step 1); the measure caption (30 cases); a BW hierarchy on an aDSO, whose
-        fact column holds the value, not the SID the closure has; Excel against olap4abap.
+        BW check runs without editing the schema (done 2026-10-17, the order from here, step 1); the measure caption (30 cases); a BW hierarchy on an aDSO (done
+        2026-10-17, the order from here, step 3); Excel against olap4abap.
         Done (2026-10-16): `Hierarchize(..., POST)` (`hierarchize` with `post`: each member's key ends with
         U+FFFF, so an ancestor sorts after its descendants), and a visual total's `CHILDREN_CARDINALITY` is the
         one of the member it stands for (`VisualTotalMember.getPropertyValue`; it was 0). Checked: `xmla_test.py`

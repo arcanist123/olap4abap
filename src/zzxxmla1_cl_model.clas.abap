@@ -110,8 +110,8 @@ CLASS zzxxmla1_cl_model DEFINITION
       RETURNING VALUE(result) TYPE string.
     "! The dimension table a fact read joins on the foreign key. Of a BW hierarchy, whose level columns are not columns
     "! of it, the members of a level (from 1) with the SIDs below each (docs/next-steps.md, step 7.3): a derived table
-    "! of a row per member on that level (member_table's columns) and SID of the closure below it, the SID as the key
-    "! column. A fact joins each member it is below once, so a member's value is the sum over its distinct values
+    "! of a row per member on that level (member_table's columns) and SID of the closure below it, the SID (on an
+    "! aDSO its value, bw_fact_value) as the key column. A fact joins each member it is below once, so a member's value is the sum over its distinct values
     "! (a value under two paths counts once); a statement joining it groups or filters by the level, never aggregates
     "! over it (no parent summed from its children).
     CLASS-METHODS fact_join_table
@@ -262,6 +262,14 @@ CLASS zzxxmla1_cl_model DEFINITION
     CLASS-METHODS bw_levels
       IMPORTING hierarchy     TYPE ty_hierarchy
       RETURNING VALUE(result) TYPE string.
+    "! Of a BW hierarchy: the column the facts' foreign key refers to, of a join on its closure (alias c). Where the
+    "! dimension is keyed by the SID (an InfoCube's) the closure's SID; where it is keyed by the value (an aDSO's, whose
+    "! facts hold the value) the key column of the dimension table (alias v), which join adds on the SID: a SID and its
+    "! value are one row of the characteristic's view.
+    CLASS-METHODS bw_fact_value
+      IMPORTING hierarchy TYPE ty_hierarchy
+      EXPORTING !column   TYPE string
+                !join     TYPE string.
     "! The columns of the levels: per level its key, its name if it has a name column of its own, its caption if it
     "! has a caption column, the columns of its member properties; and the key columns to order by.
     CLASS-METHODS level_columns
@@ -340,28 +348,42 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
                      COND string( WHEN level_no < lines( hierarchy-levels )
                                   THEN | AND m.{ zzxxmla1_cl_sql=>quote( hierarchy-levels[ level_no + 1 ]-key_column ) }| &&
                                        | IS NULL| ).
-    result = |( SELECT c."SID" AS { zzxxmla1_cl_sql=>quote( hierarchy-key_column ) }, m.* | &&
+    bw_fact_value( EXPORTING hierarchy = hierarchy IMPORTING column = DATA(value) join = DATA(value_join) ).
+    result = |( SELECT { value } AS { zzxxmla1_cl_sql=>quote( hierarchy-key_column ) }, m.* | &&
              |FROM { bw_levels( hierarchy ) } m | &&
              |INNER JOIN { zzxxmla1_cl_sql=>quote( hierarchy-bw_hierarchy-closure ) } c | &&
              |ON c."HIESID" = { hierarchy-bw_hierarchy-hiesid } | &&
              |AND c."SVER" = { zzxxmla1_cl_sql=>literal( CONV string( hierarchy-bw_hierarchy-sver ) ) } | &&
-             |AND c."ANCESTOR_SID" = { own } WHERE { on_level } )|.
+             |AND c."ANCESTOR_SID" = { own }{ value_join } WHERE { on_level } )|.
+  ENDMETHOD.
+
+  METHOD bw_fact_value.
+    IF hierarchy-key_column = zzxxmla1_cl_schema=>c_sid_column.
+      column = `c."SID"`.
+      CLEAR join.
+      RETURN.
+    ENDIF.
+    column = |v.{ zzxxmla1_cl_sql=>quote( hierarchy-key_column ) }|.
+    join = | INNER JOIN { zzxxmla1_cl_sql=>quote( hierarchy-dim_table ) } v | &&
+           |ON v.{ zzxxmla1_cl_sql=>quote( zzxxmla1_cl_schema=>c_sid_column ) } = c."SID"|.
   ENDMETHOD.
 
   METHOD bw_levels.
     result = |( { zzxxmla1_cl_bw_hierarchy_copy=>levels_sql( hierarchy   = hierarchy-bw_hierarchy
                                                               depth       = lines( hierarchy-levels )
                                                               value_table = hierarchy-dim_table
-                                                              sid_column  = hierarchy-key_column
+                                                              sid_column  = zzxxmla1_cl_schema=>c_sid_column
                                                               name_column = hierarchy-bw_value_name
                                                               caption_column = hierarchy-bw_value_caption ) } )|.
   ENDMETHOD.
 
   METHOD bw_member_condition.
-    result = |{ fact_column } IN ( SELECT "SID" FROM { zzxxmla1_cl_sql=>quote( hierarchy-bw_hierarchy-closure ) } | &&
-             |WHERE "HIESID" = { hierarchy-bw_hierarchy-hiesid } | &&
-             |AND "SVER" = { zzxxmla1_cl_sql=>literal( CONV string( hierarchy-bw_hierarchy-sver ) ) } | &&
-             |AND "ANCESTOR_SID" = { key } )|.
+    bw_fact_value( EXPORTING hierarchy = hierarchy IMPORTING column = DATA(value) join = DATA(value_join) ).
+    result = |{ fact_column } IN ( SELECT { value } | &&
+             |FROM { zzxxmla1_cl_sql=>quote( hierarchy-bw_hierarchy-closure ) } c{ value_join } | &&
+             |WHERE c."HIESID" = { hierarchy-bw_hierarchy-hiesid } | &&
+             |AND c."SVER" = { zzxxmla1_cl_sql=>literal( CONV string( hierarchy-bw_hierarchy-sver ) ) } | &&
+             |AND c."ANCESTOR_SID" = { key } )|.
   ENDMETHOD.
 
   METHOD bw_members_condition.
@@ -372,11 +394,12 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
     ENDLOOP.
     DATA(own) = COND string( WHEN lines( keys ) = 1 THEN keys[ 1 ]
                              ELSE |COALESCE( { concat_lines_of( table = keys sep = `, ` ) } )| ).
-    result = |{ fact_column } IN ( SELECT c."SID" FROM { bw_levels( hierarchy ) } m | &&
+    bw_fact_value( EXPORTING hierarchy = hierarchy IMPORTING column = DATA(value) join = DATA(value_join) ).
+    result = |{ fact_column } IN ( SELECT { value } FROM { bw_levels( hierarchy ) } m | &&
              |INNER JOIN { zzxxmla1_cl_sql=>quote( hierarchy-bw_hierarchy-closure ) } c | &&
              |ON c."HIESID" = { hierarchy-bw_hierarchy-hiesid } | &&
              |AND c."SVER" = { zzxxmla1_cl_sql=>literal( CONV string( hierarchy-bw_hierarchy-sver ) ) } | &&
-             |AND c."ANCESTOR_SID" = { own } WHERE { condition } )|.
+             |AND c."ANCESTOR_SID" = { own }{ value_join } WHERE { condition } )|.
   ENDMETHOD.
 
   METHOD check_aggregator.
