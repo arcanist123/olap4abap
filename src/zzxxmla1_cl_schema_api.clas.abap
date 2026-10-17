@@ -18,7 +18,9 @@
 "!   TXTMD, TXTLG, TXTSH), between which the UI switches a dimension's caption, and the cube's characteristics (below). Only
 "!   the defaults are restricted (ZZXXMLA1_CL_SCHEMA_DEFAULTS: with 0FISCYEAR or 0FISCPER the variant fixed to K4, the
 "!   periods restricted to the regular ones, both time dimensions; its notes join the proposal's); any other
-"!   selection is an edit (fix);
+"!   selection is an edit (fix); with it, as with fix, schema and accept, the BW hierarchies of the characteristics
+"!   of its tables (bwHierarchies, ZZXXMLA1_CL_BW_HIERARCHY_COPY=>offered), which the UI offers to be ticked: a ticked
+"!   one is a Hierarchy annotated olap4abap.bwHierarchy, none is in the proposal;
 "! - A selection (docs/bw-schema-design-guide.md, section 3.8) is given by parameters, one per characteristic:
 "!   filter.CHARACTERISTIC=rows (filter the cube), members.CHARACTERISTIC=rows (restrict members), the rows as the
 "!   annotations write them (I EQ 'K4';E CP '*013'), and fixed.CHARACTERISTIC=value, filter the cube with I EQ value;
@@ -41,7 +43,8 @@
 "! - POST check?catalog=X: the body is the edited schema XML. The checks of accept, nothing is changed: the schema
 "!   parses, and the server's catalogs with this one load in ZZXXMLA1_CL_SCHEMA as the XMLA endpoint will load them.
 "!   The schema file of an existing catalog is its Definition (it is replaced), of a new one
-"!   /WEB-INF/schema/<catalog>.xml. Answers the file, whether the catalog is new and the characteristics (and aDSOs,
+"!   /WEB-INF/schema/<catalog>.xml. The one change: an InfoObject one of whose hierarchies the schema names gets its
+"!   copy tables if it has none (the schema reader reads the hierarchy from its copy). Answers the file, whether the catalog is new and the characteristics (and aDSOs,
 "!   for their fact views) whose views accept generates. With probe=true (the check before accept, not the one run
 "!   while the user types) the cubes' facts are probed too, as accept probes them, and the answer has the probe;
 "!   Check also refuses views generated for another selection than the one of the cube that uses them (its
@@ -398,6 +401,22 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
     METHODS caption_columns_json
       IMPORTING caption_columns TYPE zzxxmla1_cl_schema_proposal=>ty_t_caption_column
       RETURNING VALUE(result)   TYPE string.
+    "! The hierarchies BW has for the characteristics whose views the tables are (a placeholder or a generated view;
+    "! ZZXXMLA1_CL_BW_HIERARCHY_COPY=>offered), which the UI lists on a dimension of such a table to be ticked:
+    "! [{table, characteristic, hierarchies: [{name, text, supported, reason}]}], no entry for a characteristic without.
+    METHODS bw_hierarchies_json
+      IMPORTING tables        TYPE string_table
+      RETURNING VALUE(result) TYPE string.
+    "! Creates the copy tables of each characteristic that a BW hierarchy of the schema names (the annotation
+    "! c_bw_hierarchy of ZZXXMLA1_CL_SCHEMA) and that has it as a hierarchy olap4abap serves, unless it has them: the
+    "! schema reader reads the hierarchy's levels from its copy, so check needs them before accept
+    "! (ZZXXMLA1_CL_BW_HIERARCHY_COPY=>create_tables; the tables stay if the hierarchy is unticked again).
+    METHODS create_hierarchy_tables
+      IMPORTING !schema TYPE zzxxmla1_cl_schema_def=>ty_schema
+      RAISING   zzxxmla1_cx_api_refused.
+    METHODS create_dimension_tables
+      IMPORTING dimension TYPE zzxxmla1_cl_schema_def=>ty_dimension
+      RAISING   zzxxmla1_cx_api_refused.
     "! The schema as the UI shows it: dimensions with attributes and hierarchies, cubes with dimensions and measures.
     METHODS outline
       IMPORTING !schema       TYPE zzxxmla1_cl_schema_def=>ty_schema
@@ -533,6 +552,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
              |"xml":{ json( proposal-xml ) },"outline":{ outline( proposal-schema ) },| &&
              |"notes":{ json_array( notes ) },"suggestions":{ json_array( suggestions ) },| &&
              |"captionColumns":{ caption_columns_json( proposal-caption_columns ) },| &&
+             |"bwHierarchies":{ bw_hierarchies_json( map_tables( CHANGING schema = proposal-schema ) ) },| &&
              |{ characteristics_json( schema = proposal-schema provider = provider ) }\}|.
   ENDMETHOD.
 
@@ -570,6 +590,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     result = |\{"xml":{ json( zzxxmla1_cl_schema_def=>to_xml( parsed ) ) },| &&
              |"outline":{ outline( parsed ) },"tables":{ json_array( tables ) },| &&
              |"captionColumns":{ caption_columns_json( changes-caption_columns ) },| &&
+             |"bwHierarchies":{ bw_hierarchies_json( map_tables( CHANGING schema = parsed ) ) },| &&
              |{ characteristics_json( schema = parsed provider = changes-provider ) }\}|.
   ENDMETHOD.
 
@@ -693,11 +714,13 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     ENDTRY.
     DATA(outline) = outline( parsed ).
     " the tables as the schema names them: without views, nothing is replaced
-    DATA(captions) = caption_columns( map_tables( CHANGING schema = parsed ) ).
+    DATA(tables) = map_tables( CHANGING schema = parsed ).
+    DATA(captions) = caption_columns( tables ).
     result = |\{"catalog":{ json( entry-name ) },"dataSource":{ json( entry-data_source ) },| &&
              |"file":{ json( entry-definition ) },"changedAt":{ json_timestamp( file-changed_at ) },| &&
              |"changedBy":{ json( file-changed_by ) },"xml":{ json( file-content ) },"outline":{ outline },| &&
-             |"captionColumns":{ caption_columns_json( captions ) },{ characteristics_json( parsed ) }\}|.
+             |"captionColumns":{ caption_columns_json( captions ) },| &&
+             |"bwHierarchies":{ bw_hierarchies_json( tables ) },{ characteristics_json( parsed ) }\}|.
   ENDMETHOD.
 
   METHOD check.
@@ -738,6 +761,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
       result-path = |{ c_schema_folder }{ result-catalog }.xml|.
     ENDIF.
     result-new_datasources = add_catalog( content = result-datasources catalog = result-catalog definition = result-path ).
+    create_hierarchy_tables( result-schema ).
     check_schema( datasources = result-new_datasources catalog = result-catalog schema_xml = request-body ).
     check_selections( result-schema ).
     IF probe = abap_true.
@@ -805,7 +829,8 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     result = |\{"catalog":{ json( catalog ) },"file":{ json( path ) },"views":{ json_array( view_list ) },| &&
              |"deletedViews":{ json_array( deleted_views ) },| &&
              |"xml":{ json( xml ) },| &&
-             |"captionColumns":{ caption_columns_json( caption_columns( accepted_tables ) ) }\}|.
+             |"captionColumns":{ caption_columns_json( caption_columns( accepted_tables ) ) },| &&
+             |"bwHierarchies":{ bw_hierarchies_json( accepted_tables ) }\}|.
   ENDMETHOD.
 
   METHOD remove.
@@ -1492,6 +1517,73 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
           APPEND VALUE #( table = table column = column ) TO result.
         ENDIF.
       ENDLOOP.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD bw_hierarchies_json.
+    DATA entries TYPE string_table.
+    LOOP AT tables INTO DATA(table).
+      DATA(characteristic) = zzxxmla1_cl_bw_view_gen=>characteristic_of_view( table ).
+      IF characteristic IS INITIAL.
+        CONTINUE.
+      ENDIF.
+      DATA(hierarchies) = VALUE string_table(
+        FOR h IN zzxxmla1_cl_bw_hierarchy_copy=>offered( CONV #( characteristic ) )
+        ( |\{"name":{ json( h-name ) },"text":{ json( h-text ) },"supported":{ json_bool( h-supported ) },| &&
+          |"reason":{ json( h-reason ) }\}| ) ).
+      IF hierarchies IS NOT INITIAL.
+        APPEND |\{"table":{ json( table ) },"characteristic":{ json( characteristic ) },| &&
+               |"hierarchies":{ json_array( hierarchies ) }\}| TO entries.
+      ENDIF.
+    ENDLOOP.
+    result = json_array( entries ).
+  ENDMETHOD.
+
+  METHOD create_hierarchy_tables.
+    LOOP AT schema-dimensions INTO DATA(dimension).
+      create_dimension_tables( dimension ).
+    ENDLOOP.
+    LOOP AT schema-cubes INTO DATA(cube).
+      LOOP AT cube-dimensions INTO DATA(node) WHERE name = `Dimension`.
+        DATA(own) = CAST zzxxmla1_cl_schema_def=>ty_dimension( node-def ).
+        create_dimension_tables( own->* ).
+      ENDLOOP.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD create_dimension_tables.
+    DATA names TYPE string_table.
+    LOOP AT dimension-hierarchies INTO DATA(hierarchy).
+      IF hierarchy-annotations IS NOT BOUND.
+        CONTINUE.
+      ENDIF.
+      READ TABLE hierarchy-annotations->array INTO DATA(annotation) WITH KEY name = zzxxmla1_cl_schema=>c_bw_hierarchy.
+      IF sy-subrc = 0.
+        DATA(bw_name) = condense( annotation-cdata ).
+        IF bw_name IS NOT INITIAL.
+          APPEND bw_name TO names.
+        ENDIF.
+      ENDIF.
+    ENDLOOP.
+    IF names IS INITIAL.
+      RETURN.
+    ENDIF.
+    DATA(characteristic) = CONV rsiobjnm( zzxxmla1_cl_bw_view_gen=>characteristic_of_view( dimension-table ) ).
+    IF characteristic IS INITIAL.
+      " the schema reader refuses it
+      RETURN.
+    ENDIF.
+    DATA(offered) = zzxxmla1_cl_bw_hierarchy_copy=>offered( characteristic ).
+    LOOP AT names INTO DATA(name).
+      IF line_exists( offered[ name = name supported = abap_true ] ).
+        TRY.
+            NEW zzxxmla1_cl_bw_hierarchy_copy( )->create_tables( characteristic ).
+          CATCH zzxxmla1_cx_bw_hierarchy INTO DATA(error).
+            RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 500
+              message = |Tables of the BW hierarchies of { characteristic } not created: { error->get_text( ) }|.
+        ENDTRY.
+        RETURN.
+      ENDIF.
     ENDLOOP.
   ENDMETHOD.
 

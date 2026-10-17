@@ -68,9 +68,19 @@ Next, in this order:
    members. Only member sets restrict (`{}`, CrossJoin, Union); a subselect on the hierarchy by `-`, Head, Filter or
    Members does not, nor do set functions under the subselect (SSAS's restriction of `Members`, `Count`, ... there
    waits for a case).
-3. Hierarchies in the schema builder (open 5 below): the proposal and the UI offer the hierarchies a characteristic
-   has in `RSHIEDIR`, accept creates their copies; then `ZCLVISIT` and `ZCLVISITA` have them in Excel. Before the
-   aDSO: a BW hierarchy on an aDSO, whose fact column holds the value, not the SID the closure has.
+3. Done (2026-10-17) for InfoCubes: hierarchies in the schema builder (open 5 below). Decided with the user: offered,
+   not proposed: the proposal names none, its answer (and those of fix, schema and accept) lists per table the
+   hierarchies `RSHIEDIR` has for the characteristic of its view (`bwHierarchies`,
+   `ZZXXMLA1_CL_BW_HIERARCHY_COPY=>offered`: name, text in the logon language, supported or why not), and the
+   dimension pane's "BW hierarchies" ticks them: a ticked one is a `<Hierarchy>` named by BW, captioned by its text,
+   annotated `olap4abap.bwHierarchy`. Time- or version-dependent ones cannot be ticked. The schema API's check (and
+   so accept) creates the copy tables of an InfoObject a ticked hierarchy names, since the schema reader reads the
+   levels from the copy (a change of check, which wrote nothing before: the tables stay when the hierarchy is
+   unticked). The clinic setup ticks every one BW serves (`ZCLVISIT`: `ZCLDIAG_ICD`, `ZCLPAT_PRG`, `ZCLSERV_CAT`;
+   accepted so on SAP, `bw_hierarchy_test.py --catalog ZCLVISIT --names` passes). Tests: `schema_api_test.py`,
+   `schema_ui_test.py`. Open: a BW hierarchy on an aDSO, whose fact column holds the value, not the SID the closure
+   has: the schema reader refuses a BW hierarchy on a dimension not keyed by `SID`, the UI greys them out there, so
+   `ZCLVISITA` has none yet.
 4. Smaller: texts step 5 (the check against blank texts); the debt that keeps about 30 hierarchy cases red on SAP
    (measure captions, member names on `sourceAttribute` levels, `known-issues.md`).
 
@@ -556,8 +566,8 @@ Open:
    engine shows a member's name as its caption until the texts give it a caption column (`Now: texts and captions`).
 4. The engine: members of a parent-child level and the closure in the fact reads; the planner marks such members
    computed at first, so the evaluator answers them, native and grouped reads later.
-5. The proposal and the UI: offer the hierarchies a characteristic has in `RSHIEDIR` (no not-assigned switch: the
-   hierarchy's setting in BW holds).
+5. Done (2026-10-17, order step 3 above) but for aDSOs: the proposal and the UI offer the hierarchies a characteristic
+   has in `RSHIEDIR` (no not-assigned switch: the hierarchy's setting in BW holds).
 6. Measure HANA's plan cache (`M_SQL_PLAN_CACHE`: entries, `PREPARATION_COUNT`, `TOTAL_PREPARATION_TIME` against
    `TOTAL_EXECUTION_TIME`): a statement on a view with two literals and with a bound parameter, and the share of
    preparation in a FoodMart run. It decides whether the engine's fact and member reads move to bound parameters and
@@ -826,7 +836,7 @@ Done (2026-10-15): the reference serves `ZCLDIAG_ICD`.
   annotation `olap4abap.bwHierarchy` naming the BW hierarchy and no `<Level>`; the schema reader makes `Level 01` to
   `Level nn` from the copy's depth. The 71 cases run on SAP against a test catalog, as `ZFMDRILL` is one: `ClinicBW.xml`
   with the hierarchy in that form and no olap4abap annotation (`membersWithFacts`, `omitEmptyCells`), deployed with
-  `sap-files.py deploy`; the demo's own `ZCLVISIT` follows when the proposal offers hierarchies (open 5).
+  `sap-files.py deploy`; the demo's own `ZCLVISIT` has them since the schema builder offers them (2026-10-17, open 5).
 - SAP's schema of `ZCLVISIT` is `ClinicBW.xml` but for the hierarchy and the annotations (compared 2026-10-16), yet
   olap4abap names members of a `sourceAttribute` level and shows measure captions differently from the reference:
   debt (`known-issues.md`), which the hierarchy cases on SAP will show until it is paid.

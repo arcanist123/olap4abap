@@ -72,6 +72,9 @@ catalogs `NWCOMPANY` and `NWPRODUCT` (`examples/bw-schema/`):
   (`[0D_NW_CODE.0D_NW_CODE__0D_NW_CNTRY]`), its level named by the attribute's key and captioned by its text;
 - no user hierarchies and no nesting: BW's metadata does not say which attributes nest in which order, and BW does not
   nest them. The UI builds user hierarchies from the attributes, after the flat ones;
+- no BW hierarchies (decided with the user 2026-10-17: offered, not proposed; a characteristic such as a cost centre
+  can have hundreds): the answer lists per table the hierarchies `RSHIEDIR` has for its characteristic
+  (`bwHierarchies`), which the UI's dimension pane ticks;
 - key figures with aggregation SUM, MIN or MAX become measures with that aggregator (`min` and `max` are not
   implemented yet: a query that reads such a measure fails), named by the key figure,
   captioned by its text, with a format string by the decimals of the fact column (`#,##0`, `#,##0.00`, at most 3
@@ -351,7 +354,10 @@ Implemented (2026-10-06):
   the attribute is a hierarchy of its own, `attributeHierarchyEnabled`, not offered off for a dimension's last
   hierarchy, remove if unused); the time switch (`type="TimeDimension"`, level types from the proposal's suggestions else
   `TimeUndefined`, removed again when switched off); user hierarchies (name, All member and its name, default
-  member, levels from attributes with level type, unique members and order, member properties). The XML tab edits
+  member, levels from attributes with level type, unique members and order, member properties); BW hierarchies ("BW
+  hierarchies": the ones the server offers for the dimension's table, ticked into a `<Hierarchy>` annotated
+  `olap4abap.bwHierarchy` named by BW and captioned by its text, the caption editable; greyed out when time or version
+  dependent or on a dimension not keyed by `SID`, an aDSO's; one BW no longer offers can be unticked). The XML tab edits
   everything else as text. Undo (Ctrl+Z) keeps the last 100 states.
 - Every change is sent to `check` (debounced, the last request wins); its refusal is shown in full under the top bar
   and keeps Accept disabled. Accept shows what `check` answered (the file, new or replaced catalog, the views to

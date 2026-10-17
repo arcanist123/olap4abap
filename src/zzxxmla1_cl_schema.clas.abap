@@ -165,6 +165,9 @@ CLASS zzxxmla1_cl_schema DEFINITION
     CONSTANTS c_bw_hierarchy TYPE string VALUE `olap4abap.bwHierarchy`.
     "! The names of a BW hierarchy's levels: Level 01, Level 02, ...
     CONSTANTS c_bw_level_prefix TYPE string VALUE `Level `.
+    "! The column of a characteristic's view that a BW hierarchy's dimension is keyed by: the SID, which the closure
+    "! of the copy holds.
+    CONSTANTS c_sid_column TYPE string VALUE `SID`.
 
     "! The schemas of all catalogs of the server, read once per session.
     CLASS-METHODS get
@@ -747,6 +750,11 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
             |not { dimension-table }| ).
     ENDIF.
     READ TABLE dimension-attributes INTO DATA(key) WITH KEY usage = `Key`.
+    " the closure holds SIDs: the facts must name the characteristic by its SID (an InfoCube's, not an aDSO's value)
+    IF key-key_column IS NOT BOUND OR key-key_column->column_name <> c_sid_column.
+      fail( |{ where }: the BW hierarchy { bw_name } needs the dimension keyed by the characteristic's { c_sid_column } | &&
+            |(an InfoCube); on an aDSO, whose facts hold the value, BW hierarchies are not supported yet| ).
+    ENDIF.
     DATA(row) = hier.
     TRY.
         row-bw_hierarchy = NEW zzxxmla1_cl_bw_hierarchy_copy( )->current( characteristic = CONV #( characteristic )

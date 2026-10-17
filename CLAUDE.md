@@ -103,7 +103,10 @@ Read before designing anything:
   dimension, greyed out while they differ, read from the XML, no annotation; the key as member property `Key`, the display attributes as member properties, key and text, no `Text`
   property of the characteristic itself) and a flat hierarchy `<char>__<attribute>` per navigation attribute the
   provider switches on, captioned by the attribute's text; no attribute hierarchies, no user hierarchies (the user
-  makes them in the UI); a default drill-through action with each characteristic's value, which the UI's
+  makes them in the UI), no BW hierarchies (offered per dimension as `bwHierarchies` of the API, the ones `RSHIEDIR`
+  has for its characteristic, `ZZXXMLA1_CL_BW_HIERARCHY_COPY=>offered`; the dimension pane's "BW hierarchies" ticks
+  them, a ticked one a `<Hierarchy>` annotated `olap4abap.bwHierarchy`, captioned by BW's text; time- or
+  version-dependent ones and any on an aDSO, whose facts hold the value, not the SID, cannot be ticked); a default drill-through action with each characteristic's value, which the UI's
   "Double-click columns" adjusts; every dimension of the cube annotated
   `olap4abap.membersWithFacts`, which the UI's "Members with facts" switches per dimension (not on time ones); the cube
   annotated `olap4abap.omitEmptyCells`, which the cube pane's "Omit empty cells" switches. The views (`ZZXXMLA1_CL_BW_VIEW_GEN`, one per basic
@@ -403,7 +406,10 @@ Read before designing anything:
   the closure (`bw_member_condition`, `bw_members_condition` for label conditions). Never a parent from its children:
   no `roll_up` across a BW hierarchy's levels, no grouping set of other levels of it in one statement (`bw_pattern`),
   no defaults of it, no cells-first grid on it. Its levels are no drill-through columns (a `RETURN` of one is a
-  fault). Not yet in accept.
+  fault). The schema API's check and accept create the copy tables of an InfoObject one of whose hierarchies the
+  schema names (`create_hierarchy_tables`); the schema reader refuses a BW hierarchy on a dimension not keyed by the
+  SID (an aDSO's). The clinic setup ticks every one BW serves (`tick_hierarchies`: `ZCLDIAG_ICD`, `ZCLPAT_PRG`,
+  `ZCLSERV_CAT` on `ZCLVISIT`).
   The reference serves `ZCLDIAG_ICD` as a balanced level hierarchy (`Level 01`-`Level 04` on the flattened table
   `ZZXXMLA1_HL_ZCLDIAG_ICD`; catalog and cube `ZCLHIER`, `reference/schema/ClinicBW.xml`, built by
   `build-bw-reference-db.py` from an export of the InfoCube and the copy, checked against BW by
@@ -415,7 +421,8 @@ Read before designing anything:
   olap4abap's form (annotation `olap4abap.bwHierarchy`, no levels) and `ZCLPAT_PRG` and `ZCLSERV_CAT` in the same
   form, which no case names (`bw_hierarchy_test.py --catalog ZCLHIER --names` checks all three against BW's MDX), no
   other annotation (`docs/next-steps.md`,
-  Reference scenario); the demo's own catalog `ZCLVISIT` stays as the setup made it. Decided 2026-10-16 after Excel failed on the parent-child form: the
+  Reference scenario); the demo's own catalog `ZCLVISIT` has the three hierarchies as the setup ticks them (`bw_hierarchy_test.py
+  --catalog ZCLVISIT --names` passes). Decided 2026-10-16 after Excel failed on the parent-child form: the
   reference is the oracle for everything but parent-child hierarchies and is not patched any more: its patches stay
   as they are, an answer it gets wrong (Expand Entire Field, Top 10 value filter, a label filter on an upper level)
   waits for SSAS (2016, the version olap4abap reports), the spec for hierarchies and Excel's behaviour; olap4abap puts each member of a BW hierarchy on the level of its depth, as SSAS does (Excel

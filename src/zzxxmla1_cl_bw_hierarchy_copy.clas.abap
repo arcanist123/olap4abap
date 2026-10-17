@@ -133,6 +133,16 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
         microseconds   TYPE i,
       END OF ty_run,
       ty_t_run TYPE STANDARD TABLE OF ty_run WITH EMPTY KEY.
+    TYPES:
+      "! a hierarchy BW has for a characteristic (offered): its name, its text, and whether olap4abap can serve it,
+      "! else why not
+      BEGIN OF ty_offered,
+        name      TYPE string,
+        text      TYPE string,
+        supported TYPE abap_bool,
+        reason    TYPE string,
+      END OF ty_offered,
+      ty_t_offered TYPE STANDARD TABLE OF ty_offered WITH EMPTY KEY.
 
     "! package: the package new tables are created in.
     METHODS constructor
@@ -211,6 +221,12 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
       IMPORTING characteristics TYPE ty_r_iobjnm
                 hierarchies     TYPE ty_r_hienm OPTIONAL
       RETURNING VALUE(result)   TYPE ty_t_run.
+    "! The active hierarchies BW has for a characteristic (the basic one, RSHIEDIR-IOBJNM), by name, which the schema
+    "! builder offers: each with its text in the logon language (medium, else long, else short, else the name), served
+    "! if it is neither time nor version dependent (one row of RSHIEDIR, as current asks).
+    CLASS-METHODS offered
+      IMPORTING characteristic TYPE rsiobjnm
+      RETURNING VALUE(result)  TYPE ty_t_offered.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -464,6 +480,40 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
           line-error = error->get_text( ).
       ENDTRY.
       APPEND line TO result.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD offered.
+    SELECT d~hienm, d~version, d~dateto, t~txtsh, t~txtmd, t~txtlg
+      FROM rshiedir AS d
+      LEFT OUTER JOIN rshiedirt AS t ON t~hieid = d~hieid AND t~objvers = d~objvers AND t~langu = @sy-langu
+      WHERE d~iobjnm = @characteristic AND d~objvers = 'A'
+      ORDER BY d~hienm ASCENDING, d~dateto DESCENDING, d~version ASCENDING
+      INTO TABLE @DATA(rows).
+    LOOP AT rows INTO DATA(row) GROUP BY row-hienm INTO DATA(group).
+      DATA(entry) = VALUE ty_offered( name = condense( group ) supported = abap_true ).
+      DATA(count) = 0.
+      LOOP AT GROUP group INTO DATA(member).
+        count = count + 1.
+        IF entry-text IS INITIAL.
+          entry-text = condense( COND string( WHEN member-txtmd IS NOT INITIAL THEN member-txtmd
+                                              WHEN member-txtlg IS NOT INITIAL THEN member-txtlg
+                                              ELSE member-txtsh ) ).
+        ENDIF.
+        IF member-version IS NOT INITIAL OR member-dateto <> '99991231'.
+          entry-supported = abap_false.
+        ENDIF.
+      ENDLOOP.
+      IF count > 1.
+        entry-supported = abap_false.
+      ENDIF.
+      IF entry-supported = abap_false.
+        entry-reason = `time or version dependent, which olap4abap does not support yet`.
+      ENDIF.
+      IF entry-text IS INITIAL.
+        entry-text = entry-name.
+      ENDIF.
+      APPEND entry TO result.
     ENDLOOP.
   ENDMETHOD.
 

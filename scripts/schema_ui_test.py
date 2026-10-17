@@ -395,6 +395,43 @@ def main():
         check("the preset restricts the periods again, K4 stays",
               "olap4abap.members.0FISCPER" in xml and xml.count("I CP") == 12 and "olap4abap.filter.0FISCVARNT" in xml
               and "Loads" in status(page), xml[:600])
+
+        # BW hierarchies (docs/next-steps.md, order step 3): the proposal names none, a dimension's pane offers the
+        # ones BW has for its characteristic; a ticked one is a Hierarchy annotated olap4abap.bwHierarchy that the
+        # check loads; the time- and version-dependent ones and those of an aDSO cannot be ticked
+        bw = "section:has(h3:text-is('BW hierarchies'))"
+
+        def bw_box(name):
+            return page.locator(f"{bw} tr:has-text('{name}') input[type=checkbox]")
+
+        page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(f"{args.url}/?sap-client={args.client}#proposal/ZCLVISIT")
+        status(page)
+        check("the proposal names no BW hierarchy", "olap4abap.bwHierarchy" not in xml_of())
+        open_dimension("ZCLSERV")
+        check("the service offers ZCLSERV_CAT, unticked", bw_box("ZCLSERV_CAT").count() == 1
+              and not bw_box("ZCLSERV_CAT").is_checked() and bw_box("ZCLSERV_CAT").is_enabled()
+              and "Service Catalog" in page.inner_text(bw))
+        page.wait_for_selector(".status.ok", timeout=CHECK)
+        bw_box("ZCLSERV_CAT").check()
+        page.wait_for_selector(".status.busy", timeout=5000)
+        state = status(page)
+        xml = xml_of()
+        check("ticked: a Hierarchy annotated with it, which the check loads",
+              ">ZCLSERV_CAT</Annotation>" in xml and 'caption="Service Catalog"' in xml and "Loads" in state, state)
+        bw_box("ZCLSERV_CAT").uncheck()
+        check("unticked: gone again", "olap4abap.bwHierarchy" not in xml_of())
+        open_dimension("ZCLDOC")
+        check("the physician's time-dependent hierarchies cannot be ticked", bw_box("ZCLDOC_ORG").count() == 1
+              and bw_box("ZCLDOC_ORG").is_disabled() and "time or version dependent" in page.inner_text(bw))
+
+        page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(f"{args.url}/?sap-client={args.client}#proposal/ZCLVISITA")
+        status(page)
+        open_dimension("ZCLSERV")
+        check("not on an aDSO", bw_box("ZCLSERV_CAT").is_disabled() and "Not on an aDSO" in page.inner_text(bw))
         browser.close()
 
     check("no script errors", not errors, errors)

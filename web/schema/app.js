@@ -137,6 +137,27 @@ function setAnnotation(el, name, value) {
   }
   annotations.appendChild(create(el.ownerDocument, 'Annotation', { name })).textContent = value;
 }
+// Our extension (ZZXXMLA1_CL_SCHEMA, c_bw_hierarchy): a Hierarchy without levels that names a BW hierarchy of the
+// dimension's characteristic, served from its copy at BW's current version; the server offers the hierarchies BW has
+// for the characteristic of each table (bwHierarchies of the API), the user ticks them.
+const BW_HIERARCHY = 'olap4abap.bwHierarchy';
+const bwNameOf = (h) => (annotationOf(h, BW_HIERARCHY)?.textContent || '').trim();
+const bwHierarchyKeys = (entries) => new Map((entries || []).map((e) => [e.table, e]));
+// adds the BW hierarchy to the dimension (named by BW, captioned by its text), or removes it
+function setBwHierarchy(doc, dim, offered, on) {
+  const existing = hierarchiesOf(dim).filter((h) => bwNameOf(h) === offered.name);
+  if (!on) {
+    existing.forEach((h) => h.remove());
+    return;
+  }
+  if (existing.length) return;
+  const names = [...attributesOf(dim), ...hierarchiesOf(dim)].map((e) => attr(e, 'name'));
+  let name = offered.name;
+  for (let n = 2; names.includes(name); n++) name = `${offered.name} ${n}`;
+  const h = create(doc, 'Hierarchy', { name, visible: 'true', hasAll: 'true', allMemberName: `All ${offered.text}`, caption: offered.text });
+  setAnnotation(h, BW_HIERARCHY, offered.name);
+  insertAfterLast(dim, h, ['Hierarchy', 'DimensionAttribute']);
+}
 // Our extension (ZZXXMLA1_CL_SCHEMA, c_omit_empty_cells): a cube leaves its empty cells but the first out of the answer.
 const OMIT_EMPTY_CELLS = 'olap4abap.omitEmptyCells';
 const annotatedTrue = (el, name = MEMBERS_WITH_FACTS) => {
@@ -1019,12 +1040,51 @@ function SelectionField({ doc, dim, characteristics, onFix }) {
     </span>`;
 }
 
-function DimensionPane({ doc, edit, dim, sel, select, suggestions, captions, characteristics, onFix }) {
+// The BW hierarchies of the dimension's characteristic, ticked if the dimension has them; one the server does not
+// offer (time or version dependent, or no longer in BW) can only be unticked. Only an InfoCube's dimension, keyed by
+// the SID the copy holds, can have them.
+function BwHierarchySection({ doc, edit, dim, bwHierarchies }) {
+  const offered = bwHierarchies.get(attr(dim, 'table'));
+  const ticked = hierarchiesOf(dim).filter(bwNameOf);
+  if (!offered && !ticked.length) return null;
+  const rows = [...(offered ? offered.hierarchies : [])];
+  for (const h of ticked) {
+    if (!rows.some((r) => r.name === bwNameOf(h))) {
+      rows.push({ name: bwNameOf(h), text: attr(h, 'caption'), supported: false, reason: 'BW has no such hierarchy of the characteristic' });
+    }
+  }
+  const key = keyAttributeOf(dim);
+  const bySid = !!key && keyColumn(key) === 'SID';
+  return html`<section class="section">
+    <header><h3>BW hierarchies</h3><span class="spacer"></span>
+      <span class="muted small">a ticked hierarchy is served from its copy of BW's current version, its levels Level 01, … by depth</span></header>
+    <div class="body scroll-x"><table>
+      <thead><tr><th></th><th>BW hierarchy</th><th>Text</th><th>Caption</th><th></th></tr></thead>
+      <tbody>${rows.map((r) => {
+        const h = ticked.find((t) => bwNameOf(t) === r.name);
+        const why = !bySid ? 'Not on an aDSO yet: its facts hold the value, not the SID the copy holds'
+          : !r.supported ? `Not offered: ${r.reason}` : '';
+        return html`<tr key=${r.name}>
+          <td><${Check} checked=${!!h} disabled=${!h && !!why} title=${why || 'A hierarchy of the dimension'}
+            onChange=${(on) => edit(() => setBwHierarchy(doc, dim, r, on))} /></td>
+          <td class="mono small">${r.name}</td>
+          <td>${r.text}</td>
+          <td>${h && html`<${TextField} value=${attr(h, 'caption')} placeholder=${attr(h, 'name')}
+            onCommit=${(v) => edit(() => setAttr(h, 'caption', v))} />`}</td>
+          <td class="muted small">${why}</td>
+        </tr>`;
+      })}</tbody>
+    </table></div>
+  </section>`;
+}
+
+function DimensionPane({ doc, edit, dim, sel, select, suggestions, captions, characteristics, onFix, bwHierarchies }) {
   const time = isTime(dim);
   const keyDisplay = keyDisplayOf(dim, captions);
   const characteristicPart = keyDisplayParts(dim, captions).find((p) => p.attribute === keyAttributeOf(dim));
   const attributes = attributesOf(dim);
   const hierarchies = hierarchiesOf(dim);
+  const userHierarchies = hierarchies.filter((h) => !bwNameOf(h));
   const usages = isShared(dim) ? usagesOf(doc, dim) : [];
   const attrNames = attributes.map((a) => attr(a, 'name'));
   const used = new Set(hierarchies.flatMap((h) => kids(h, 'Level').flatMap((l) =>
@@ -1122,14 +1182,16 @@ function DimensionPane({ doc, edit, dim, sel, select, suggestions, captions, cha
       </table></div>
     </section>
 
+    <${BwHierarchySection} doc=${doc} edit=${edit} dim=${dim} bwHierarchies=${bwHierarchies} />
+
     <section class="section">
       <header>
         <h3>Hierarchies</h3><span class="spacer"></span>
         <button onClick=${addHierarchy}>Add hierarchy</button>
       </header>
       <div class="body">
-        ${!hierarchies.length && html`<span class="muted">None. A hierarchy has attributes as levels, top level first; a user hierarchy nests several.</span>`}
-        ${hierarchies.map((h, i) => html`<${HierarchyEditor} key=${i} doc=${doc} edit=${edit} dim=${dim} h=${h}
+        ${!userHierarchies.length && html`<span class="muted">None. A hierarchy has attributes as levels, top level first; a user hierarchy nests several.</span>`}
+        ${userHierarchies.map((h, i) => html`<${HierarchyEditor} key=${i} doc=${doc} edit=${edit} dim=${dim} h=${h}
           others=${[...attrNames, ...hierarchies.filter((o) => o !== h).map((o) => attr(o, 'name'))]} />`)}
       </div>
     </section>
@@ -1320,6 +1382,8 @@ function Editor({ session, onClose, onAccepted }) {
   const [suggestions, setSuggestions] = useState(session.suggestions);
   // the characteristics of the cube's provider with their foreign keys, which fixing changes (POST fix answers them)
   const [characteristics, setCharacteristics] = useState(session.characteristics);
+  // the BW hierarchies offered per table, whose tables fixing and accept change
+  const [bwHierarchies, setBwHierarchies] = useState(session.bwHierarchies);
   const [dirty, setDirty] = useState(false);
   const [sel, setSel] = useState({ kind: 'schema' });
   const [tab, setTab] = useState('outline');
@@ -1347,6 +1411,7 @@ function Editor({ session, onClose, onAccepted }) {
     const next = parseXml(d.xml);
     setCharacteristics(d.characteristics);
     setCaptionKeys((old) => new Map([...old, ...captionKeys(d.captionColumns)]));
+    setBwHierarchies((old) => new Map([...old, ...bwHierarchyKeys(d.bwHierarchies)]));
     setSuggestions((old) => {
       const keys = new Map(old);
       for (const { from, to } of d.tables) {
@@ -1416,6 +1481,7 @@ function Editor({ session, onClose, onAccepted }) {
       undoStack.current = [];
       setDoc(parseXml(result.xml));
       setCaptionKeys(captionKeys(result.captionColumns));
+      setBwHierarchies(bwHierarchyKeys(result.bwHierarchies));
       setVersion((v) => v + 1);
       setDirty(false);
       const reopened = { kind: 'schema', name: result.catalog, file: result.file, changedAt: new Date().toISOString(), changedBy: '' };
@@ -1463,7 +1529,8 @@ function Editor({ session, onClose, onAccepted }) {
           : shownSel.kind === 'cube' ? html`<${CubePane} key=${JSON.stringify(shownSel)} doc=${doc} edit=${edit} cube=${target} select=${setSel}
               characteristics=${characteristics} captions=${captions} />`
             : shownSel.kind === 'dim' ? html`<${DimensionPane} key=${JSON.stringify(shownSel)} doc=${doc} edit=${edit} dim=${target} sel=${shownSel}
-                select=${setSel} suggestions=${suggestions} captions=${captions} characteristics=${characteristics} onFix=${fix} />`
+                select=${setSel} suggestions=${suggestions} captions=${captions} characteristics=${characteristics} onFix=${fix}
+                bwHierarchies=${bwHierarchies} />`
               : html`<${SchemaPane} doc=${doc} edit=${edit} source=${source} catalog=${catalog} notes=${session.notes} />`}
       </main>
     </div>
@@ -1537,6 +1604,7 @@ function App() {
           notes: d.notes || [],
           suggestions: suggestionKeys(doc, d.suggestions),
           captions: captionKeys(d.captionColumns),
+          bwHierarchies: bwHierarchyKeys(d.bwHierarchies),
         };
       } else {
         const d = await api('GET', 'schema', { catalog: what.name });
@@ -1548,6 +1616,7 @@ function App() {
           notes: [],
           suggestions: new Map(),
           captions: captionKeys(d.captionColumns),
+          bwHierarchies: bwHierarchyKeys(d.bwHierarchies),
         };
       }
       next.id = ++counter.current;
