@@ -108,8 +108,11 @@ CLASS ltc_bw_hierarchy_copy IMPLEMENTATION.
     DATA(bw) = VALUE zzxxmla1_cl_bw_hierarchy_copy=>ty_bw_state( hiesid = 246 sver = '3' timestmp = '20261015165533'
                                                                   norestnodes = abap_true ).
     DATA(directory) = VALUE zzxxmla1_hiedir( hiesid = 246 sver = '3' timestmp = '20261015165533'
-                                             norestnodes = abap_true ).
+                                             norestnodes = abap_true depth = 3 ).
     cl_abap_unit_assert=>assert_true( zzxxmla1_cl_bw_hierarchy_copy=>up_to_date( directory = directory bw = bw ) ).
+    " a row written before the shape was kept
+    DATA(without_shape) = VALUE zzxxmla1_hiedir( BASE directory depth = 0 ).
+    cl_abap_unit_assert=>assert_false( zzxxmla1_cl_bw_hierarchy_copy=>up_to_date( directory = without_shape bw = bw ) ).
     DATA(older) = VALUE zzxxmla1_hiedir( BASE directory sver = '2' timestmp = '20261015163621' ).
     cl_abap_unit_assert=>assert_false( zzxxmla1_cl_bw_hierarchy_copy=>up_to_date( directory = older bw = bw ) ).
     DATA(other) = VALUE zzxxmla1_hiedir( BASE directory hiesid = 237 ).
@@ -153,10 +156,18 @@ CLASS ltc_bw_hierarchy_copy IMPLEMENTATION.
 
   METHOD closure_read.
     DATA(tables) = zzxxmla1_cl_bw_hierarchy_copy=>tables_of_number( 1 ).
-    DATA(directory) = VALUE zzxxmla1_hiedir( hiesid = 246 sver = '3' root_sid = -19 rest_top_sid = -35 ).
+    DATA(directory) = VALUE zzxxmla1_hiedir( hiesid = 246 sver = '3' root_sid = -19 rest_top_sid = -35
+                                             depth = 4 repeated = `3 4` ).
     DATA(shown) = zzxxmla1_cl_bw_hierarchy_copy=>hierarchy_of( directory = directory tables = tables ).
     cl_abap_unit_assert=>assert_equals( act = shown-closure exp = 'ZZXXMLA1R0000001' ).
     cl_abap_unit_assert=>assert_true( shown-rest_shown ).
+    " the shape from the directory row
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_bw_hierarchy_copy=>depth( shown ) exp = 4 ).
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_bw_hierarchy_copy=>repeated_levels( shown )
+                                        exp = VALUE int4_table( ( 3 ) ( 4 ) ) ).
+    " at least 2 levels when the not-assigned node is shown
+    cl_abap_unit_assert=>assert_equals(
+      act = zzxxmla1_cl_bw_hierarchy_copy=>depth( VALUE #( BASE shown node_depth = 1 ) ) exp = 2 ).
     DATA(suppressed) = zzxxmla1_cl_bw_hierarchy_copy=>hierarchy_of(
       directory = VALUE #( BASE directory norestnodes = abap_true ) tables = tables ).
     cl_abap_unit_assert=>assert_equals( act = suppressed-closure exp = 'ZZXXMLA1C0000001' ).

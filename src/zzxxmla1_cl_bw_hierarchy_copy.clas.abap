@@ -118,8 +118,9 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
       "! a hierarchy's current copy, as a query reads it: its tables, the closure a query reads (the not-assigned view
       "! when the hierarchy shows that node, else the closure table), BW's HIESID and SVER it is a copy of (to bind
       "! in each statement), the SIDs of its All member and of its not-assigned node, whether it shows that node and
-      "! its caption (rest_caption), and the external characteristics of its nodes that have a view (the others are
-      "! named by BW's node name)
+      "! its caption (rest_caption), the external characteristics of its nodes that have a view (the others are
+      "! named by BW's node name), the depth of its deepest node row and the depths on which a SID repeats (its shape,
+      "! read once by refill and kept in its directory row: BW does not change a structure once its SVER is written)
       BEGIN OF ty_hierarchy,
         hieid          TYPE rshieid,
         characteristic TYPE rsiobjnm,
@@ -136,6 +137,8 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
         rest_caption   TYPE string,
         refilled       TYPE abap_bool,
         externals      TYPE ty_t_external,
+        node_depth     TYPE i,
+        repeated       TYPE int4_table,
       END OF ty_hierarchy.
     TYPES:
       "! a statement and the values of its parameters
@@ -365,7 +368,8 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
     METHODS tables_exist
       IMPORTING tables        TYPE ty_tables
       RETURNING VALUE(result) TYPE abap_bool.
-    "! Whether the directory row is a copy of BW's current state.
+    "! Whether the directory row is a copy of BW's current state with its shape (a row written before the shape was
+    "! kept has depth 0: it is refilled once).
     CLASS-METHODS up_to_date
       IMPORTING directory     TYPE ty_directory
                 bw            TYPE ty_bw_state
@@ -375,11 +379,20 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
       IMPORTING copies        TYPE ty_t_directory
                 versions      TYPE ty_t_version
       RETURNING VALUE(result) TYPE ty_t_directory.
-    "! The hierarchy as a query reads it from its directory row.
-    "! The external characteristics of a copy's nodes that have a view (ty_external).
+    "! The external characteristics of a copy's nodes that have a view (ty_external), of the InfoObjects its
+    "! directory row names (NODE_IOBJS).
     CLASS-METHODS externals
-      IMPORTING hierarchy     TYPE ty_hierarchy
+      IMPORTING node_iobjs    TYPE csequence
       RETURNING VALUE(result) TYPE ty_t_external.
+    "! The shape of a new copy, for its directory row: DEPTH the depth of its deepest node row, REPEATED the depths
+    "! (1: the roots) on which a SID occurs more than once and NODE_IOBJS the InfoObjects of its nodes other than
+    "! text nodes and the characteristic (BW's external characteristics), each separated by a space.
+    CLASS-METHODS shape
+      IMPORTING tables         TYPE ty_tables
+                hiesid         TYPE i
+                sver           TYPE rsrsver
+                characteristic TYPE rsiobjnm
+      RETURNING VALUE(result)  TYPE ty_directory.
     "! The node rows of a copy as a derived table for levels_sql: NODE_NAME and NODE_CAPTION of an external
     "! characteristic's node from its view; NODE_CAPTION of a text node its text of RSTHIERNODE in c_language (the
     "! medium, else the long, else the short one, as BW's MDX gives a node's text properties), of any other node or
@@ -396,6 +409,7 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
     CLASS-METHODS rest_caption
       IMPORTING characteristic TYPE rsiobjnm
       RETURNING VALUE(result)  TYPE string.
+    "! The hierarchy as a query reads it from its directory row.
     CLASS-METHODS hierarchy_of
       IMPORTING directory     TYPE ty_directory
                 tables        TYPE ty_tables
@@ -766,7 +780,7 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
     result = hierarchy_of( directory = directory tables = tables ).
     result-version = bw-version.
     result-refilled = refilled.
-    result-externals = externals( result ).
+    result-externals = externals( directory-node_iobjs ).
     IF result-rest_shown = abap_true.
       result-rest_caption = rest_caption( characteristic ).
     ENDIF.
@@ -783,19 +797,14 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD externals.
-    DATA(rows) = zzxxmla1_cl_sql=>query(
-      sql     = |SELECT DISTINCT "NODE_IOBJ" FROM { quote( hierarchy-node_table ) } | &&
-                |WHERE "HIESID" = ? AND "SVER" = ? AND "SID" < 0 AND "NODE_IOBJ" NOT IN ( ?, ?, '' ) | &&
-                |ORDER BY "NODE_IOBJ"|
-      columns = 1
-      params  = VALUE #( ( NEW i( hierarchy-hiesid ) ) ( NEW string( hierarchy-sver ) )
-                         ( NEW string( c_text_node ) ) ( NEW string( hierarchy-characteristic ) ) ) ).
-    IF rows IS INITIAL.
+    SPLIT condense( node_iobjs ) AT ` ` INTO TABLE DATA(names).
+    DELETE names WHERE table_line IS INITIAL.
+    IF names IS INITIAL.
       RETURN.
     ENDIF.
     DATA(views) = NEW zzxxmla1_cl_bw_view_gen( ).
-    LOOP AT rows INTO DATA(row).
-      DATA(iobjnm) = CONV rsiobjnm( condense( CONV string( row[ 1 ] ) ) ).
+    LOOP AT names INTO DATA(name_of_iobj).
+      DATA(iobjnm) = CONV rsiobjnm( name_of_iobj ).
       DATA(layout) = views->layout( iobjnm ).
       DATA(view) = views->existing_view( layout-tables-basic ).
       IF view IS INITIAL.
@@ -913,7 +922,8 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
     result = xsdbool( directory-sver IS NOT INITIAL
                       AND directory-hiesid = bw-hiesid
                       AND directory-sver = bw-sver
-                      AND directory-timestmp = bw-timestmp ).
+                      AND directory-timestmp = bw-timestmp
+                      AND directory-depth > 0 ).
   ENDMETHOD.
 
   METHOD delete_old_slices.
@@ -949,7 +959,38 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
                       sver           = directory-sver
                       root_sid       = directory-root_sid
                       rest_top_sid   = directory-rest_top_sid
-                      rest_shown     = shown ).
+                      rest_shown     = shown
+                      node_depth     = directory-depth ).
+    SPLIT condense( directory-repeated ) AT ` ` INTO TABLE DATA(repeated).
+    LOOP AT repeated INTO DATA(depth) WHERE table_line IS NOT INITIAL.
+      APPEND CONV i( depth ) TO result-repeated.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD shape.
+    DATA(key) = VALUE zzxxmla1_cl_sql=>ty_t_param( ( NEW i( hiesid ) ) ( NEW string( sver ) ) ).
+    DATA(node) = quote( tables-node ).
+    DATA(rows) = zzxxmla1_cl_sql=>query(
+      sql     = |SELECT COALESCE( MAX( "DEPTH" ), 0 ) FROM { node } WHERE "HIESID" = ? AND "SVER" = ?|
+      columns = 1
+      params  = key ).
+    result-depth = rows[ 1 ][ 1 ].
+    rows = zzxxmla1_cl_sql=>query(
+      sql     = |SELECT DISTINCT "DEPTH" FROM { node } | &&
+                |WHERE "HIESID" = ? AND "SVER" = ? AND "DEPTH" > 0 GROUP BY "DEPTH", "SID" HAVING COUNT( * ) > 1 | &&
+                |ORDER BY "DEPTH"|
+      columns = 1
+      params  = key ).
+    result-repeated = concat_lines_of(
+      table = VALUE string_table( FOR row IN rows ( condense( CONV string( row[ 1 ] ) ) ) ) sep = ` ` ).
+    rows = zzxxmla1_cl_sql=>query(
+      sql     = |SELECT DISTINCT "NODE_IOBJ" FROM { node } | &&
+                |WHERE "HIESID" = ? AND "SVER" = ? AND "SID" < 0 AND "NODE_IOBJ" NOT IN ( ?, ?, '' ) | &&
+                |ORDER BY "NODE_IOBJ"|
+      columns = 1
+      params  = VALUE #( BASE key ( NEW string( c_text_node ) ) ( NEW string( characteristic ) ) ) ).
+    result-node_iobjs = concat_lines_of(
+      table = VALUE string_table( FOR row IN rows ( condense( CONV string( row[ 1 ] ) ) ) ) sep = ` ` ).
   ENDMETHOD.
 
   METHOD values_of.
@@ -959,12 +1000,7 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD depth.
-    DATA(rows) = zzxxmla1_cl_sql=>query(
-      sql     = |SELECT COALESCE( MAX( "DEPTH" ), 0 ) FROM { quote( hierarchy-node_table ) } | &&
-                |WHERE "HIESID" = ? AND "SVER" = ?|
-      columns = 1
-      params  = VALUE #( ( NEW i( hierarchy-hiesid ) ) ( NEW string( hierarchy-sver ) ) ) ).
-    result = rows[ 1 ][ 1 ].
+    result = hierarchy-node_depth.
     IF hierarchy-rest_shown = abap_true AND result < 2.
       result = 2.
     ENDIF.
@@ -991,15 +1027,7 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD repeated_levels.
-    DATA(rows) = zzxxmla1_cl_sql=>query(
-      sql     = |SELECT DISTINCT "DEPTH" FROM { quote( hierarchy-node_table ) } | &&
-                |WHERE "HIESID" = ? AND "SVER" = ? AND "DEPTH" > 0 GROUP BY "DEPTH", "SID" HAVING COUNT( * ) > 1 | &&
-                |ORDER BY "DEPTH"|
-      columns = 1
-      params  = VALUE #( ( NEW i( hierarchy-hiesid ) ) ( NEW string( hierarchy-sver ) ) ) ).
-    LOOP AT rows INTO DATA(row).
-      APPEND CONV i( row[ 1 ] ) TO result.
-    ENDLOOP.
+    result = hierarchy-repeated.
   ENDMETHOD.
 
   METHOD level_column.
@@ -1155,10 +1183,12 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
         zzxxmla1_cl_sql=>execute( sql = end_pos_sql( tables ) params = key ).
         zzxxmla1_cl_sql=>execute( sql = closure_sql( tables ) params = VALUE #( BASE key ( LINES OF key ) ) ).
         check( bw = bw tables = tables bw_tables = bw_tables ).
+        DATA(shape) = shape( tables = tables hiesid = bw-hiesid sver = bw-sver characteristic = bw-iobjnm ).
       CLEANUP.
         ROLLBACK WORK.
     ENDTRY.
-    result = VALUE #( hiesid       = bw-hiesid
+    result = VALUE #( BASE shape
+                      hiesid       = bw-hiesid
                       sver         = bw-sver
                       hieid        = bw-hieid
                       iobjnm       = bw-iobjnm

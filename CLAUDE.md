@@ -391,7 +391,9 @@ Read before designing anything:
   (`RSHIEDIR-NORESTNODES`): REST_H, the All member and the identity row per SID under no leaf; a query reads the view
   for such a hierarchy, else the table (`ty_hierarchy-closure`). `current` looks for a copy of BW's current row of
   `RSRHIEDIR_OLAP` (`HIESID`, `SVER`, `TIMESTMP`) and refills a missing one in the database under `ENQUEUE_E_TABLE`,
-  cross-checked with BW's correction factors; a copy lives as long as BW keeps its version. The refusals are faults
+  cross-checked with BW's correction factors; a copy lives as long as BW keeps its version. The refill keeps the
+  copy's shape in its directory row (`DEPTH`, the levels where a SID repeats `REPEATED`, the external InfoObjects
+  `NODE_IOBJS`; a row without it is refilled once), so building a schema reads no copy table. The refusals are faults
   of the query (`ZZXXMLA1_CX_BW_HIERARCHY`). `values_of` gives a member's SIDs as a statement with bound parameters
   (`ZZXXMLA1_CL_SQL`'s `params`) (`scripts/hierarchy_copy_test.py`). Program `ZZXXMLA1_HIERARCHY_COPY` (SE38)
   creates the objects of the characteristics selected and copies their hierarchies (`run`), listing per hierarchy the
