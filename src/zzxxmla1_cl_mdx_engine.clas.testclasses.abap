@@ -9,6 +9,9 @@
 * olap4abap contains code derived from Mondrian (Eclipse Public License 1.0): Copyright (C) 1998-2005 Julian Hyde,
 * Copyright (C) 2005-2021 Hitachi Vantara and others, Copyright (C) 2021-2025 Sergei Semenkov. See the NOTICE file.
 *----------------------------------------------------------------------------------------------------------------------*
+CLASS ltc_subcube_restriction DEFINITION DEFERRED.
+CLASS zzxxmla1_cl_mdx_engine DEFINITION LOCAL FRIENDS ltc_subcube_restriction.
+
 "! Queries on ZFMSALES with the answers of the reference server: Order, Cast, Aggregate, the set functions, the aggregates, the
 "! operators IN, IS, MATCHES, Existing and evaluation errors as cell values.
 CLASS ltc_engine DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION LONG.
@@ -1085,6 +1088,57 @@ CLASS ltc_engine IMPLEMENTATION.
     names = tuples( result ).
     cl_abap_unit_assert=>assert_equals( act = lines( names ) exp = 99 ).
     cl_abap_unit_assert=>assert_equals( act = names[ 99 ] exp = `[Customers].[USA].[OR].[Salem].[Kevin Miller]` ).
+  ENDMETHOD.
+
+ENDCLASS.
+
+"! SSAS's subcube on a BW hierarchy: an axis keeps the members related to the subselect's (restrict_to_subcube).
+CLASS ltc_subcube_restriction DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+  PRIVATE SECTION.
+    METHODS related_members FOR TESTING.
+    METHODS member
+      IMPORTING hierarchy     TYPE i DEFAULT 5
+                !path         TYPE string
+                calculated    TYPE abap_bool DEFAULT abap_false
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_engine=>ty_member.
+ENDCLASS.
+
+CLASS ltc_subcube_restriction IMPLEMENTATION.
+
+  METHOD member.
+    SPLIT path AT zzxxmla1_cl_model=>c_separator INTO TABLE DATA(keys).
+    result = VALUE #( hier_id = hierarchy path = path key_level = lines( keys ) unique_name = path
+                      calculated = calculated ).
+  ENDMETHOD.
+
+  METHOD related_members.
+    DATA(tab) = CONV string( zzxxmla1_cl_model=>c_separator ).
+    DATA(engine) = NEW zzxxmla1_cl_mdx_engine( `` ).
+    " a subselect of the node -2/-3 and, from another subselect, of -2 (both apply)
+    engine->subcube_members = VALUE #( ( hierarchy = 5 paths = VALUE #( ( |-2{ tab }-3| ) ) )
+                                       ( hierarchy = 5 paths = VALUE #( ( `-2` ) ) ) ).
+    DATA(all) = VALUE zzxxmla1_cl_mdx_engine=>ty_member( hier_id = 5 key_level = 0 unique_name = `All` ).
+    DATA(tuples) = VALUE zzxxmla1_cl_mdx_engine=>ty_t_tuple(
+      ( VALUE #( ( all ) ) )                                          " the All member: an ancestor
+      ( VALUE #( ( member( `-2` ) ) ) )                               " an ancestor
+      ( VALUE #( ( member( |-2{ tab }-3| ) ) ) )                      " the member itself
+      ( VALUE #( ( member( |-2{ tab }-3{ tab }36| ) ) ) )             " a descendant
+      ( VALUE #( ( member( |-2{ tab }-4| ) ) ) )                      " a sibling sharing facts: dropped
+      ( VALUE #( ( member( |-2{ tab }-33| ) ) ) )                     " its key starts with -3: dropped
+      ( VALUE #( ( member( `-5` ) ) ) )                               " another root: dropped
+      ( VALUE #( ( member( path = `-5` calculated = abap_true ) ) ) ) " a calculated member stays
+      ( VALUE #( ( member( hierarchy = 6 path = `-5` ) )              " another hierarchy is not restricted
+                 ( member( |-2{ tab }-3{ tab }37| ) ) ) )
+      ( VALUE #( ( member( hierarchy = 6 path = `-5` ) )              " a tuple goes with its restricted member
+                 ( member( |-2{ tab }-4| ) ) ) ) ).
+    DATA(kept) = VALUE string_table( FOR tuple IN engine->restrict_to_subcube( tuples )
+                                     ( concat_lines_of( table = VALUE string_table( FOR m IN tuple
+                                                                                    ( |{ m-hier_id }:{ m-unique_name }| ) )
+                                                        sep = `,` ) ) ).
+    REPLACE ALL OCCURRENCES OF tab IN TABLE kept WITH `/`.
+    cl_abap_unit_assert=>assert_equals( act = kept exp = VALUE string_table( ( `5:All` ) ( `5:-2` ) ( `5:-2/-3` )
+                                                                             ( `5:-2/-3/36` ) ( `5:-5` )
+                                                                             ( `6:-5,5:-2/-3/37` ) ) ).
   ENDMETHOD.
 
 ENDCLASS.

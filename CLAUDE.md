@@ -305,7 +305,9 @@ Read before designing anything:
   Excel's label filters: `<`, `<=`, `>`, `>=` (between, not between), `Left`/`Right(..., Len("s")) = "s"` (begins, ends
   with) and `InStr(1, ..., "s") > 0`/`= 0` (contains), as comparisons and `LIKE` on the level's column (our extension of
   eMondrian, `scripts/patches/subcube-filter-label.patch`, `ZZXXMLA1_CL_MDX_ENGINE=>label_predicate`); any other
-  function or condition fails the query as in eMondrian.
+  function or condition fails the query as in eMondrian. On a BW hierarchy a NON EMPTY axis also keeps only the
+  members related to those a subselect names as a member set (them, their ancestors and descendants), as SSAS does
+  where values are shared (`restrict_to_subcube`, `scripts/ssas_compare.py`).
   `DRILLTHROUGH` (Excel's double click on a cell, `MAXROWS`, `FIRSTROWSET`, `RETURN`) gives the fact rows of the
   query's first cell as a tabular rowset (`ZZXXMLA1_CL_MDX_ENGINE=>drill_through`, `RolapCell.drillThroughInternal`;
   `ZZXXMLA1_CL_MDX_FACTS=>drill_through`, `DrillThroughQuerySpec`; `ZZXXMLA1_CL_XMLA_TABULAR`, `TabularRowSet`): every

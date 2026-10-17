@@ -60,9 +60,14 @@ Next, in this order:
    #1201, #1204, #1221). `xmla_test.py` skips them (`ssas.txt`). The comparison is `scripts/ssas_compare.py`
    (2026-10-17, `test-strategy.md`): 24 of 36 pass, every drill-through, expand, slicer list and fiscal year
    slicer and the subselects on another hierarchy; every value of a tuple both answers have is SSAS's. The 12 others
-   are a subselect on the axis' own BW hierarchy: olap4abap shows the members outside the subselect that share
-   facts with it (`known-issues.md`, Debt), none is missing. Next: the subselect restricts its own hierarchy's
-   members, then all 36 pass.
+   were a subselect on the axis' own BW hierarchy: olap4abap showed the members outside the subselect that share
+   facts with it. Fixed the same day (`ZZXXMLA1_CL_MDX_ENGINE=>restrict_to_subcube`): a NON EMPTY axis keeps a BW
+   hierarchy's members related to the members a subselect names (one of them, an ancestor or a descendant), as SSAS
+   does; all 36 pass, the 372 other cases too. Only NON EMPTY axes: without, the reference keeps the others as empty
+   positions on `ZCLDIAG_ICD` (`execute_hier_subselect_rows`), and where no value is shared NON EMPTY drops the same
+   members. Only member sets restrict (`{}`, CrossJoin, Union); a subselect on the hierarchy by `-`, Head, Filter or
+   Members does not, nor do set functions under the subselect (SSAS's restriction of `Members`, `Count`, ... there
+   waits for a case).
 3. Hierarchies in the schema builder (open 5 below): the proposal and the UI offer the hierarchies a characteristic
    has in `RSHIEDIR`, accept creates their copies; then `ZCLVISIT` and `ZCLVISITA` have them in Excel. Before the
    aDSO: a BW hierarchy on an aDSO, whose fact column holds the value, not the SID the closure has.

@@ -22,13 +22,6 @@ it is fixed. Read this before comparing answers with the reference or with BW.
   (`getCurrentMemberComparisonLevel`, as the reference does): the subcube is wrong there. Excel's label filters work
   on flat hierarchies (the schema builder's) and on the lowest level. The reference answers the same filter on a BW
   hierarchy's `Level 02` with every cell empty (below).
-- **A subselect on a BW hierarchy with shared values keeps the members outside it on that hierarchy's NON EMPTY
-  axis** (found 2026-10-17 by `scripts/ssas_compare.py`, 12 of the 36 `execute_ssasmd_*` cases): the subcube is a
-  predicate on the facts only (the reference's), so a program or service group that shares patients or codes with
-  the selected one has facts in the subcube and stays (`SELECT ({CHRONIC}) ON 0 FROM [ZCLHIER]` shows SENIOR and
-  PREVENTION with the visits of their chronic patients). SSAS shows only the selected members, their ancestors and
-  descendants; on a hierarchy without shared values the two are the same. The values of the members both show are
-  SSAS's.
 
 ## Performance
 

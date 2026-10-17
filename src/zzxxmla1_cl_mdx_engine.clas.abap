@@ -560,6 +560,33 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
     "! need no statement of their own (Excel's filter and member lists). With more axes the cells need a statement
     "! for their crossed patterns anyway, and the defaults' join would only slow the reads down.
     DATA read_defaults TYPE abap_bool.
+    TYPES:
+      "! The members of a BW hierarchy one subselect names (their paths): SSAS's subcube, which restricts the
+      "! hierarchy itself to them, their ancestors and their descendants, also where a member outside them shares
+      "! facts with them (a shared node; the reference's subcube is a predicate on the facts only)
+      BEGIN OF ty_subcube_members,
+        hierarchy TYPE i,
+        paths     TYPE string_table,
+      END OF ty_subcube_members,
+      ty_t_subcube_members TYPE STANDARD TABLE OF ty_subcube_members WITH EMPTY KEY.
+    "! The subselects' members of BW hierarchies, one entry per subselect and hierarchy; a NON EMPTY axis keeps the
+    "! members of such a hierarchy related to each entry of it (restrict_to_subcube)
+    DATA subcube_members TYPE ty_t_subcube_members.
+    "! The members of BW hierarchies the subselects name as member sets ({}, in parentheses, CrossJoin, Union); a
+    "! hierarchy a subselect sets otherwise too (-, Head, Filter, Members, its All member) is not restricted by it.
+    METHODS subcube_restrictions
+      IMPORTING query         TYPE zzxxmla1_cl_mdx_parser=>ty_query
+      RETURNING VALUE(result) TYPE ty_t_subcube_members.
+    "! The members of a subselect's set expression, per BW hierarchy; free: the hierarchies it does not restrict.
+    METHODS add_subcube_restriction
+      IMPORTING node    TYPE ty_node
+      CHANGING  members TYPE ty_t_subcube_members
+                free    TYPE zzxxmla1_cl_mdx_facts=>ty_t_index.
+    "! The tuples whose members of a BW hierarchy a subselect names are each related to the subselect's members: one
+    "! of them, an ancestor (the All member too) or a descendant of one; calculated members stay.
+    METHODS restrict_to_subcube
+      IMPORTING tuples        TYPE ty_t_tuple
+      RETURNING VALUE(result) TYPE ty_t_tuple.
     "! The cell of the evaluator's context as text: the value as XMLA writes it (XmlaHandler.ValueInfo), formatted with
     "! the format string of the context.
     METHODS compute_cell
@@ -1866,6 +1893,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     read_defaults = xsdbool( relational = abap_true AND lines( resolved-axes ) = 1 ).
     " the subcube of a subselect restricts every read of facts
     fact_reader->set_subcube( subcube_predicate( resolved ) ).
+    subcube_members = subcube_restrictions( resolved ).
     root_evaluator = zzxxmla1_cl_mdx_evaluator=>create( schema_reader = schema_reader facts = fact_reader calc = me ).
     DATA(evaluator) = CAST zzxxmla1_if_mdx_evaluator( root_evaluator ).
     CLEAR: named_set_values, cell_slicer, final_cells.
@@ -2000,6 +2028,11 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
                 ENDIF.
               ENDLOOP.
             ENDLOOP.
+          ENDIF.
+          " a NON EMPTY axis only: where a hierarchy shares no values the facts drop the same members, and the
+          " reference keeps the others as empty positions (execute_hier_subselect_rows)
+          IF subcube_members IS NOT INITIAL AND query_axis-non_empty = abap_true.
+            tuples = restrict_to_subcube( tuples ).
           ENDIF.
           APPEND VALUE #( name = |Axis{ query_axis-ordinal }| tuples = tuples
                           hierarchies = type_hierarchies( query_axis-expression->get_type( ) ) ) TO result-axes.
@@ -2314,6 +2347,104 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       RETURN.
     ENDIF.
     result[ 1 ]-children = sets.
+  ENDMETHOD.
+
+  METHOD subcube_restrictions.
+    LOOP AT query-subcubes INTO DATA(subcube).
+      DATA(members) = VALUE ty_t_subcube_members( ).
+      DATA(free) = VALUE zzxxmla1_cl_mdx_facts=>ty_t_index( ).
+      LOOP AT subcube-axes INTO DATA(axis).
+        add_subcube_restriction( EXPORTING node = axis-expression CHANGING members = members free = free ).
+      ENDLOOP.
+      LOOP AT members INTO DATA(entry).
+        IF NOT line_exists( free[ table_line = entry-hierarchy ] ).
+          APPEND entry TO result.
+        ENDIF.
+      ENDLOOP.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD add_subcube_restriction.
+    DATA(name) = COND string( WHEN node->kind = zzxxmla1_cl_mdx_node=>c_kind-resolved_call
+                              THEN to_upper( node->fun_def-name ) ).
+    CASE name.
+      WHEN `()` OR `CROSSJOIN` OR `NONEMPTYCROSSJOIN` OR `UNION`.
+        LOOP AT node->args INTO DATA(arg).
+          add_subcube_restriction( EXPORTING node = arg CHANGING members = members free = free ).
+        ENDLOOP.
+      WHEN `{}`.
+        " a member set (add_subcube_members takes members only)
+        LOOP AT node->args INTO arg.
+          IF arg->kind <> zzxxmla1_cl_mdx_node=>c_kind-member.
+            CONTINUE.
+          ENDIF.
+          DATA(member) = arg->element-member.
+          IF member-calculated = abap_true OR member-is_null = abap_true
+              OR member-hier_id = zzxxmla1_cl_mdx_schema_reader=>c_measures.
+            CONTINUE.
+          ENDIF.
+          IF schema_reader->get_hierarchy( member-hier_id )-model-bw_hierarchy IS INITIAL.
+            CONTINUE.
+          ENDIF.
+          IF member-key_level = 0.
+            " the All member: all of the hierarchy
+            APPEND member-hier_id TO free.
+            CONTINUE.
+          ENDIF.
+          READ TABLE members ASSIGNING FIELD-SYMBOL(<entry>) WITH KEY hierarchy = member-hier_id.
+          IF sy-subrc <> 0.
+            APPEND VALUE #( hierarchy = member-hier_id ) TO members ASSIGNING <entry>.
+          ENDIF.
+          APPEND member-path TO <entry>-paths.
+        ENDLOOP.
+      WHEN OTHERS.
+        " any other form: the hierarchies of its type are not restricted by this subselect
+        DATA(element) = node->get_type( )->strip_set_type( ).
+        IF element IS NOT BOUND.
+          RETURN.
+        ENDIF.
+        DATA(types) = COND zzxxmla1_cl_mdx_type=>ty_t_type( WHEN element->kind = zzxxmla1_cl_mdx_type=>c_kind-tuple
+                                                             THEN element->element_types ELSE VALUE #( ( element ) ) ).
+        LOOP AT types INTO DATA(member_type).
+          IF member_type->get_hierarchy( ) <> zzxxmla1_cl_mdx_type=>c_none.
+            APPEND member_type->get_hierarchy( ) TO free.
+          ENDIF.
+        ENDLOOP.
+    ENDCASE.
+  ENDMETHOD.
+
+  METHOD restrict_to_subcube.
+    DATA(separator) = CONV string( zzxxmla1_cl_model=>c_separator ).
+    LOOP AT tuples INTO DATA(tuple).
+      DATA(keep) = abap_true.
+      LOOP AT tuple INTO DATA(member) WHERE calculated = abap_false AND key_level > 0.
+        DATA(below) = member-path && separator.
+        LOOP AT subcube_members INTO DATA(entry) WHERE hierarchy = member-hier_id.
+          DATA(related) = abap_false.
+          LOOP AT entry-paths INTO DATA(path).
+            " the same member, an ancestor of a named one or a descendant of one
+            DATA(above) = path && separator.
+            IF member-path = path
+                OR ( strlen( path ) > strlen( below ) AND substring( val = path len = strlen( below ) ) = below )
+                OR ( strlen( member-path ) > strlen( above )
+                     AND substring( val = member-path len = strlen( above ) ) = above ).
+              related = abap_true.
+              EXIT.
+            ENDIF.
+          ENDLOOP.
+          IF related = abap_false.
+            keep = abap_false.
+            EXIT.
+          ENDIF.
+        ENDLOOP.
+        IF keep = abap_false.
+          EXIT.
+        ENDIF.
+      ENDLOOP.
+      IF keep = abap_true.
+        APPEND tuple TO result.
+      ENDIF.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD add_subcube_set.
