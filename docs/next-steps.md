@@ -244,6 +244,54 @@ three key dates are in `reference/auth/` (`scripts/auth_probe.py`), BW's rules r
   logged on (the logged-on answer is kept in the files and wins). The tests log on as `SAP_USER`, who keeps
   `0BI_ALL`, so the existing tests are unchanged; end to end as each user (step 6) logs on as the test user.
 
+### Decisions of 2026-10-24: the check pushed down to HANA
+
+Decided with the user 2026-10-24, after an evaluation of the user's proposal: step 5 checks in HANA, not in ABAP.
+
+- **The SQL engine is the priority.** The check of a query's selection (5a) and the restriction of a hierarchy's
+  members (5b) are statements over the copies of the hierarchies and the user's profile; no hierarchy is expanded in
+  ABAP. BW's own check can run for hundreds of seconds when it refuses (the user's examples): tuples times sub-cubes
+  times hierarchy expansions, which HANA does as set operations. Whether the ABAP check (`ZZXXMLA1_CL_BW_AUTH`, steps
+  3 and 4) stays as a second engine or the SQL one replaces it is open; the oracle (`reference/auth/`) tests the SQL
+  one.
+- **The profile is per node, not per SID:** per authorisation and characteristic its hierarchy lines (hierarchy name
+  and version, node name and InfoObject, node type and level) and its flat lines (`EQ`, `BT`, `CP`, `:`, `#`). The
+  statement expands it by joins, so it stays valid across refills of the copies (a node SID belongs to an occurrence
+  and an `SVER`) and master data loads. Whether and how it is persisted is discussed later.
+- **The path table is the closure of the check, the closure table the one of the fact reads.** The closure maps a
+  node to its leaves only, but a node can be authorised without any leaf (H0's `GP`, H2's `SPECIAL`), so the check
+  needs node to node. The path table (`ZZXXMLA1P`) has per occurrence a row per level of its path, so the subtree of
+  a node is the rows whose level member has its name, with no join:
+
+  ```sql
+  SELECT DISTINCT p."POS", p."OWN_SID", p."DEPTH" FROM "ZZXXMLA1Pnnnnnnn" AS p
+   WHERE p."HIESID" = ? AND p."SVER" = ? AND p."NODE_IOBJ" = ? AND p."NODE_NAME" = ?
+  ```
+
+  Type 0 adds `p."TLEVEL" = p."DEPTH"`, type 2 `p."DEPTH" <= <level>`, type 3 has no node condition (`REST_H` from
+  the not-assigned view); the leaves under the node (`p."OWN_SID" >= 0`) are the line's flat values. A leaf has no
+  node name in the copy (`/BIC/K` has rows for nodes only): the refill is to write the characteristic and the key into
+  a leaf's `NODE_IOBJ` and `NODE_NAME`, so that a line on a leaf (HLEAF) matches by name too.
+- **Request and profile both carry base nodes, of two kinds:** nodes, matched by name and InfoObject on the path
+  table, and values (leaves, flat ranges, `:`, `#`), matched by SID. A node the query names is checked as a node,
+  never as the set of its leaves (H2's `SPECIAL` has no authorised leaf and is allowed). Links need nothing: a leaf
+  under two parents is one SID, and the occurrences of a linked subtree share their node name.
+- **One statement per query (static):** the request's tuples (per characteristic a node or a value), the profile and
+  the path table as derived tables; a tuple is allowed where `GROUP BY tuple, auth HAVING COUNT( DISTINCT
+  characteristic )` reaches the number of authorisation-relevant characteristics; the offending member and its reason
+  (unknown value, node, no values, combination, in `check`'s order) come from `NOT EXISTS` branches, with BW's
+  message. `0BI_ALL`, variables and the special characteristics stay checks in ABAP before the statement.
+- **The check asks for the copies it needs**, independent of the schemas: a copy of every hierarchy a line of the
+  user names, ticked by a schema or not, and of any slice (the key date's, and the line's date `TCTHIEDATE` for its
+  flat values), not only the one valid to 9999-12-31. This changes two rules of the copy: a refill does not delete a
+  slice that is not valid to 9999-12-31 while the check uses it (each slice has its own `HIEID` and `HIESID`, so
+  slices sit side by side in the directory), and the tables of an InfoObject (`create_tables`, a DDIC activation that
+  commits) are created when the profile is built, outside queries; a query only refills a copy into existing tables,
+  as now.
+- **Flat ranges** are pushed down as BW's rules have them (`mvp-scope.md`): `EQ` and `BT` on the key, `CP` as `LIKE`
+  (`*` as `%`, `+` as `_`, both escaped) and, on a NUMC key, the pattern's leading digits as a number too; `#` is
+  SID 0.
+
 ### Steps
 
 1. **Scenarios and test users** (done 2026-10-24; `ZZXXMLA1_CL_BW_AUTH_GEN`, called by the clinic generator, the
@@ -318,8 +366,10 @@ three key dates are in `reference/auth/` (`scripts/auth_probe.py`), BW's rules r
 5. **Enforcement in the engine at 9999-12-31**: the region resolved once per request for the user of
    `RSEC_GET_USERNAME` (kept with the request as the `MemberCache` is); a user whose region is `*` and `:` everywhere
    (`0BI_ALL`) gets no condition and no cost. As step 2 decided (`mvp-scope.md`, BW's rules):
+   The check and the restriction are SQL (Decisions of 2026-10-24, above), tested against `reference/auth/` at the
+   three key dates as step 4 tests `check`.
    - a. Refusal: after `resolve_query` and the axes, the query's selection per authorisation-relevant characteristic
-     (the members of the axes, slicer and subcube, the characteristics aggregated) goes through `check`; outside
+     (the members of the axes, slicer and subcube, the characteristics aggregated) goes through the check statement; outside
      the region the query is a fault with BW's message in olap4abap's words (a rule in
      `scripts/reference_texts.py` if the reference has a text), before any cell is read: a value outside every
      authorisation as BW's unknown value, a flat set that is not all allowed (`[ZCLDOC].Members` without `*`), an
@@ -329,7 +379,7 @@ three key dates are in `reference/auth/` (`scripts/auth_probe.py`), BW's rules r
    - b. Restriction of a hierarchy's members: on a hierarchy the user has a line on, the members are the authorised
      subtree, re-rooted (its top node on the first level, no parent), and a node that may not be expanded (type 0, a
      level limit) has no children: the member reads of the hierarchy restricted through `levels_sql` and the
-     closure (`ZZXXMLA1_CL_MODEL=>member_table`, also `get_members_by_paths`, `children_count`, the native label
+     path table joined to the profile (`ZZXXMLA1_CL_MODEL=>member_table`, also `get_members_by_paths`, `children_count`, the native label
      filter and `MDSCHEMA_MEMBERS`), and the levels renumbered from the user's top node. `.Members` of the hierarchy
      with a node that may not be expanded is a refusal (a.), `Level.Members` the visible nodes of the level.
    - A user with an applying authorisation with a variable: every query a fault (no authorisation).
