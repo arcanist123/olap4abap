@@ -228,11 +228,16 @@ selection BW does not allow is refused or unknown, never filtered silently; wher
   analysis authorization for any char. values of char. ZCLDOC").
 - **Flat members are refused, not filtered.** `[ZCLDOC].Members` (with or without NON EMPTY) is refused for every
   user who may not see every value, `:` or not; it is answered only with `*` (FULL). So are crossjoins with it. The
-  values a user may see (EQ, BT, CP, a hierarchy line's leaves) work as slicer, each alone.
+  values a user may see (EQ, BT, CP, a hierarchy line's leaves) work as slicer, each alone. The flat hierarchy holds
+  the not-assigned value too (`000`, `#`, shown last), so H3, which has every leaf, is refused `LEVEL01` of it.
+- **`CP` on a NUMC characteristic** also takes the pattern's leading digits as a number of the key's length: `01*`
+  admits `001` as well as `010`-`019` (CP).
 - **`#`** authorises the not-assigned value only: NA sees no physician; NA_AGG has the aggregate. (The probe asks
   no slicer on `#` itself: every visit has a physician.)
-- **Hierarchy lines give flat values** too: the leaves the node covers in the slice valid at the key date (H1:
-  `001`-`005` and, from 2025, `008`; HV2, version `002`: `001`-`005`; H3: all; HLEAF: `008`); type 0 (H0) and type 2
+- **Hierarchy lines give flat values** too: the leaves the node covers in the slice valid at the line's date
+  (`TCTHIEDATE`, 9999-12-31 for every scenario), whatever the key date (H1: `001`-`005` and `008`, also in 2024 when
+  `008` is not below GP in the slice the query shows; HV2, version `002`: `001`-`005`; H3: all; HLEAF: `008`). Today's
+  slice or the line's date: the scenarios cannot tell them apart (step 4 takes the line's date); type 0 (H0) and type 2
   (H2, to a level above the leaves) give no leaf, so no value. Several lines of one authorisation add up (2HIE: the
   leaves of `CARD` and of `RIVER`).
 - **A hierarchy is restricted, not refused, where the user has a line on it**: its members are the authorised
@@ -240,16 +245,18 @@ selection BW does not allow is refused or unknown, never filtered silently; wher
   physicians; GP has no parent: `.Parent` is empty), its ancestors refused as slicer or on rows, a visible node's
   value the full aggregate of its subtree (H2's SPECIAL 10,044 as for FULL). A node the user may see but not expand
   (type 0, or at the level limit of type 2) has no children (`.Children` empty) and makes `.Members` of the hierarchy
-  refused (H0, H2), while `Level.Members` answers the visible nodes of the level. Node types 1 and 3 have every
-  member of the subtree. BW's metadata lists the hierarchies a user has a line on (and every hierarchy of a
+  refused (H0, H2), while `Level.Members` answers the visible nodes of the level. Node type 1 has every member of
+  the subtree; type 3 shows the complete hierarchy as it is, its node of the values not assigned (`REST_H`) with
+  them (`000`) too (H3). BW's metadata lists the hierarchies a user has a line on (and every hierarchy of a
   characteristic with `*`); a hierarchy without a line is refused as a whole (members, nodes, crossjoins), only
   `Level.Members` of it answers, empty.
 - **Within one authorisation the characteristics combine as AND, several authorisations as OR** (a union of
   sub-cubes, not per characteristic): CROSS (`009` with `I10`, `012` with `J45`) answers `(009, I10)` and
   `(012, J45)` and refuses `(009, J45)` and `(012, I10)` (EYE 007), each value alone (it aggregates the other) too;
   COMB answers PULM's subtree with a slicer in RESPIRATORY and refuses the rest.
-- **Key date:** BW resolves a line to the slice of its hierarchy name and version valid at the key date; the slices
-  of `ZCLDOC` make the values differ by key date (H1 without `008` in 2024, where `008` is refused).
+- **Key date:** BW shows a hierarchy in its slice valid at the key date, and a line's nodes there: the slices of
+  `ZCLDOC` make the members differ by key date (H1's GP without `008` in 2024, where `008` is refused as a node of
+  `ZCLDOC_ORG 001`). The flat values of a line do not follow the key date (above: `008` is a value of H1 in 2024).
 - **Drill-through** cannot be probed: BW's MDX has no `DRILLTHROUGH`. olap4abap checks the cell's selection, as for
   a slicer.
 - **Empty against refused:** BW answers EMPTY only where the selection is allowed and has no members (children of a

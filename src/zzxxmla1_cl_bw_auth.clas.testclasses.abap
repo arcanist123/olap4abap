@@ -42,6 +42,8 @@ CLASS ltc_bw_auth DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHOR
     METHODS variable FOR TESTING.
     METHODS links_and_intervals FOR TESTING.
     METHODS ranges FOR TESTING.
+    METHODS members_only FOR TESTING.
+    METHODS values_of_the_line_date FOR TESTING.
 
     "! the region of authorizations ZA, ZB, ... of the user: the special lines added to each
     METHODS region
@@ -409,6 +411,7 @@ CLASS ltc_bw_auth IMPLEMENTATION.
                            hierarchies = VALUE #( ( hierarchy_line( node = `CLINIC` type = '3' ) ) ) ).
     DATA(access) = region->hierarchy_access( iobjnm = c_doc hienm = c_org version = '001' ).
     cl_abap_unit_assert=>assert_equals( act = lines( access-nodes ) exp = 32 ).
+    cl_abap_unit_assert=>assert_true( access-complete ).
     cl_abap_unit_assert=>assert_true( access-nodes[ name = `CLINIC` ]-top ).
     cl_abap_unit_assert=>assert_equals( act = lines( FILTER #( access-nodes USING KEY primary_key
                                                                WHERE iobjnm = zzxxmla1_cl_bw_auth=>c_text_node ) )
@@ -529,6 +532,57 @@ CLASS ltc_bw_auth IMPLEMENTATION.
     cl_abap_unit_assert=>assert_false( zzxxmla1_cl_bw_auth=>in_ranges( value = `abc` ranges = r ) ).
     cl_abap_unit_assert=>assert_false( zzxxmla1_cl_bw_auth=>in_ranges( value = `AXD` ranges = VALUE #(
                                                                            ( sign = 'I' option = 'CP' low = `A.D` ) ) ) ).
+    " a number: the pattern's leading digits as a number of the value's length too (BW's CP 01*: 001 and 010-019)
+    DATA(numbers) = VALUE zzxxmla1_cl_bw_auth=>ty_ranges( ( sign = 'I' option = 'CP' low = `01*` ) ).
+    LOOP AT VALUE string_table( ( `001` ) ( `010` ) ( `019` ) ) INTO DATA(admitted).
+      cl_abap_unit_assert=>assert_true( act = zzxxmla1_cl_bw_auth=>in_ranges( value = admitted ranges = numbers )
+                                        msg = admitted ).
+    ENDLOOP.
+    LOOP AT VALUE string_table( ( `002` ) ( `020` ) ( `A01` ) ) INTO DATA(refused).
+      cl_abap_unit_assert=>assert_false( act = zzxxmla1_cl_bw_auth=>in_ranges( value = refused ranges = numbers )
+                                         msg = refused ).
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD values_of_the_line_date.
+    " the key date's slice has no 008 below GP, the slice of the line's date has: 008 is a value, not a node
+    DATA(key_slice) = VALUE zzxxmla1_cl_bw_auth=>ty_slice( BASE org_slice( ) date = '20240615' ).
+    DELETE key_slice-nodes WHERE name = `008`.
+    DATA(lines) = VALUE zzxxmla1_cl_bw_auth=>ty_lines(
+      provider        = `ZCLVISITA`
+      today           = '20261024'
+      characteristics = VALUE #( ( c_diag ) ( c_doc ) )
+      auths           = VALUE #( ( 'ZA' ) )
+      values          = VALUE #( ( all_diagnoses( ) ) )
+      hierarchies     = VALUE #( ( VALUE #( BASE hierarchy_line( node = `GP` ) date = '99991231' ) ) )
+      slices          = VALUE #( ( key_slice ) )
+      value_slices    = VALUE #( ( VALUE #( BASE org_slice( ) date = '99991231' ) ) ) ).
+    DATA(region) = zzxxmla1_cl_bw_auth=>create( lines ).
+    assert_check( region = region selection = VALUE #( ( VALUE #( ( doc( `008` ) ) ( diag( `I10` ) ) ) ) )
+                  status = zzxxmla1_cl_bw_auth=>c_status-allowed msg = `008 as a value` ).
+    assert_check( region = region selection = VALUE #( ( VALUE #( ( org( name = `008` iobjnm = c_doc ) )
+                                                                  ( diag( `I10` ) ) ) ) )
+                  status = zzxxmla1_cl_bw_auth=>c_status-no_auth reason = zzxxmla1_cl_bw_auth=>c_reason-node
+                  msg = `008 as a node` ).
+  ENDMETHOD.
+
+  METHOD members_only.
+    " the children of GP, which may not be expanded: GP is checked, no tuple, so the aggregate needs no :
+    DATA(region) = region( values      = VALUE #( ( value_line( iobjnm = c_diag low = `I10` ) ) )
+                           hierarchies = VALUE #( ( hierarchy_line( node = `GP` type = '0' ) ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = region->check_members( VALUE #( ( org( `GP` ) ) ) )-status
+                                        exp = zzxxmla1_cl_bw_auth=>c_status-allowed msg = `GP` ).
+    assert_check( region = region selection = VALUE #( ( VALUE #( ( org( `GP` ) ) ) ) )
+                  status = zzxxmla1_cl_bw_auth=>c_status-no_auth msg = `GP, the diagnosis aggregated` ).
+    cl_abap_unit_assert=>assert_equals( act = region->check_members( VALUE #( ( org( `CLINIC` ) ) ) )-reason
+                                        exp = zzxxmla1_cl_bw_auth=>c_reason-node msg = `CLINIC` ).
+    DATA(access) = region->hierarchy_access( iobjnm = c_doc hienm = c_org version = '001' ).
+    cl_abap_unit_assert=>assert_true( access-lines ).
+    access = region->hierarchy_access( iobjnm = c_doc hienm = c_org version = '002' ).
+    cl_abap_unit_assert=>assert_false( access-lines ).
+    " no authorization on the provider: refused also without members
+    cl_abap_unit_assert=>assert_equals( act = region( )->check_members( VALUE #( ) )-reason
+                                        exp = zzxxmla1_cl_bw_auth=>c_reason-provider msg = `none` ).
   ENDMETHOD.
 
 ENDCLASS.

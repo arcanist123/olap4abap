@@ -43,7 +43,8 @@ CLASS zzxxmla1_cl_bw_auth DEFINITION
            END OF ty_value_line.
     TYPES ty_value_lines TYPE STANDARD TABLE OF ty_value_line WITH EMPTY KEY.
     "! a hierarchy line (RSECHIE_STRING): a node by name and InfoObject (0HIER_NODE for a text node) of the hierarchy
-    "! of the name and version, its node type (0 to 4) and level (type 2)
+    "! of the name and version, its node type (0 to 4), level (type 2) and date (TCTHIEDATE, the slice its values come
+    "! from)
     TYPES: BEGIN OF ty_hierarchy_line,
              auth        TYPE rsauth,
              iobjnm      TYPE rsiobjnm,
@@ -53,6 +54,7 @@ CLASS zzxxmla1_cl_bw_auth DEFINITION
              node        TYPE string,
              type        TYPE c LENGTH 1,
              level       TYPE i,
+             date        TYPE d,
            END OF ty_hierarchy_line.
     TYPES ty_hierarchy_lines TYPE STANDARD TABLE OF ty_hierarchy_line WITH EMPTY KEY.
     "! a node of a hierarchy slice (/BIC/H of the characteristic): a leaf has the characteristic as InfoObject, an
@@ -69,16 +71,19 @@ CLASS zzxxmla1_cl_bw_auth DEFINITION
              high     TYPE string,
            END OF ty_node.
     TYPES ty_nodes TYPE STANDARD TABLE OF ty_node WITH EMPTY KEY.
-    "! the slice of a hierarchy (name and version) valid at the key date; no nodes if it has none then
+    "! the slice of a hierarchy (name and version) valid at a date; no nodes if it has none then
     TYPES: BEGIN OF ty_slice,
              iobjnm  TYPE rsiobjnm,
              hienm   TYPE rshienm,
              version TYPE rsversion,
+             date    TYPE d,
              nodes   TYPE ty_nodes,
            END OF ty_slice.
     TYPES ty_slices TYPE STANDARD TABLE OF ty_slice WITH EMPTY KEY.
     "! what the region is made of: the provider's authorization-relevant characteristics, the special ones that are
-    "! authorization relevant, the user's authorizations with their lines and the slices their hierarchy lines name
+    "! authorization relevant, the user's authorizations with their lines and the slices their hierarchy lines name: at
+    "! the key date (the nodes the user sees) and at each line's date (value_slices: the values a line authorizes, as
+    "! BW takes them whatever the key date; the key date's slice where there is none)
     TYPES: BEGIN OF ty_lines,
              provider        TYPE string,
              today           TYPE d,
@@ -88,6 +93,7 @@ CLASS zzxxmla1_cl_bw_auth DEFINITION
              values          TYPE ty_value_lines,
              hierarchies     TYPE ty_hierarchy_lines,
              slices          TYPE ty_slices,
+             value_slices    TYPE ty_slices,
            END OF ty_lines.
     "! a node of a hierarchy the user may see: whether it may be expanded (its children are shown), whether it is a top
     "! node (its parent is not shown: the user's hierarchy is re-rooted there), its parent in the hierarchy
@@ -101,10 +107,14 @@ CLASS zzxxmla1_cl_bw_auth DEFINITION
              parent_name   TYPE string,
            END OF ty_visible_node.
     TYPES ty_visible_nodes TYPE SORTED TABLE OF ty_visible_node WITH UNIQUE KEY iobjnm name.
-    "! what the user may see of a hierarchy: all of it, or the nodes (none: the hierarchy is refused)
+    "! what the user may see of a hierarchy: all of it, or the nodes (none: the hierarchy is refused); lines: the user
+    "! has a line on the hierarchy (BW lists it to the user), also if the slice has none of its nodes; complete: a line
+    "! of type 3 shows the complete hierarchy, its node of the values not assigned (REST_H) too
     TYPES: BEGIN OF ty_access,
-             all   TYPE abap_bool,
-             nodes TYPE ty_visible_nodes,
+             all      TYPE abap_bool,
+             lines    TYPE abap_bool,
+             complete TYPE abap_bool,
+             nodes    TYPE ty_visible_nodes,
            END OF ty_access.
     "! the member of a characteristic in a tuple of a query's selection: a value (its key, '' or # the not-assigned
     "! one), a node of a hierarchy (a leaf is a node whose InfoObject is the characteristic) or the aggregate (the All
@@ -167,12 +177,25 @@ CLASS zzxxmla1_cl_bw_auth DEFINITION
     "! The user whose analysis authorizations BW checks: sy-uname, or the one of BW's "Execute as Other User".
     CLASS-METHODS current_user
       RETURNING VALUE(result) TYPE xubname.
+    "! The slice of the hierarchy valid at the key date, from RSHIEDIR and the hierarchy tables; no nodes if there is
+    "! none.
+    CLASS-METHODS read_slice
+      IMPORTING iobjnm        TYPE rsiobjnm
+                hienm         TYPE rshienm
+                version       TYPE rsversion
+                key_date      TYPE d
+      RETURNING VALUE(result) TYPE ty_slice.
 
     "! Whether the query's selection is in the region: first the members the query names (a value outside every
     "! authorization is unknown, a hierarchy or node outside the lines refused), then every member, then each tuple
     "! in one sub-cube (a characteristic not in the tuple is aggregated, which needs :).
     METHODS check
       IMPORTING selection     TYPE ty_selection
+      RETURNING VALUE(result) TYPE ty_check.
+    "! The check of members without their tuples, for a query that shows no tuple (the children of a node that may
+    "! not be expanded): the provider, then the members the query names, then the others.
+    METHODS check_members
+      IMPORTING members       TYPE ty_tuple
       RETURNING VALUE(result) TYPE ty_check.
     "! Whether one sub-cube allows everything (0BI_ALL, CP * on every characteristic): no check is needed.
     METHODS unrestricted
@@ -199,8 +222,9 @@ CLASS zzxxmla1_cl_bw_auth DEFINITION
     "! the nodes one authorization shows of a hierarchy
     TYPES: BEGIN OF ty_hierarchy_part,
              hienm   TYPE rshienm,
-             version TYPE rsversion,
-             nodes   TYPE ty_visible_nodes,
+             version  TYPE rsversion,
+             complete TYPE abap_bool,
+             nodes    TYPE ty_visible_nodes,
            END OF ty_hierarchy_part.
     TYPES ty_hierarchy_parts TYPE SORTED TABLE OF ty_hierarchy_part WITH UNIQUE KEY hienm version.
     "! what one authorization allows of one characteristic
@@ -235,19 +259,13 @@ CLASS zzxxmla1_cl_bw_auth DEFINITION
     DATA subcubes TYPE ty_subcubes.
     DATA variable TYPE abap_bool.
 
-    "! the slice of the hierarchy valid at the key date, from RSHIEDIR and the hierarchy tables
-    CLASS-METHODS read_slice
-      IMPORTING iobjnm        TYPE rsiobjnm
-                hienm         TYPE rshienm
-                version       TYPE rsversion
-                key_date      TYPE d
-      RETURNING VALUE(result) TYPE ty_slice.
     "! the part of one characteristic in an authorization; not present: the authorization has no line for it
     CLASS-METHODS part
       IMPORTING iobjnm        TYPE rsiobjnm
                 !values       TYPE ty_value_lines
                 hierarchies   TYPE ty_hierarchy_lines
                 slices        TYPE ty_slices
+                value_slices  TYPE ty_slices
       EXPORTING present       TYPE abap_bool
       RETURNING VALUE(result) TYPE ty_part.
     "! the nodes a hierarchy line shows in the slice and the values below them
@@ -264,6 +282,12 @@ CLASS zzxxmla1_cl_bw_auth DEFINITION
     CLASS-METHODS in_range
       IMPORTING !value        TYPE csequence
                 !range        TYPE ty_range
+      RETURNING VALUE(result) TYPE abap_bool.
+    "! whether the value matches BW's pattern: * any characters, + one, case matters; a value of digits (NUMC) also
+    "! matches with the pattern's leading digits as a number of its length, as BW does (01* admits 001 and 010)
+    CLASS-METHODS pattern_matches
+      IMPORTING !value        TYPE csequence
+                pattern       TYPE csequence
       RETURNING VALUE(result) TYPE abap_bool.
     "! the not-assigned value as '' (# in BW's authorizations and captions)
     CLASS-METHODS normalized
@@ -359,13 +383,15 @@ CLASS zzxxmla1_cl_bw_auth IMPLEMENTATION.
                       high   = value-tcthigh ) TO lines-values.
     ENDLOOP.
 
-    SELECT tctauth, tctiobjnm, tcthienm, tcthievers, tctniobjnm, tctnode, tctatype, tcttlevel
+    SELECT tctauth, tctiobjnm, tcthienm, tcthievers, tcthiedate, tctniobjnm, tctnode, tctatype, tcttlevel
       FROM rsechie_string
       WHERE objvers = 'A'
         AND tctauth IN @auths
       ORDER BY tctauth ASCENDING, tctiobjnm ASCENDING, tcthienm ASCENDING, tctnode ASCENDING
       INTO TABLE @DATA(hierarchies).
     LOOP AT hierarchies INTO DATA(hierarchy).
+      " the values of a line come from the slice valid at its date (today without one)
+      DATA(date) = COND d( WHEN hierarchy-tcthiedate IS INITIAL THEN today ELSE hierarchy-tcthiedate ).
       APPEND VALUE #( auth        = hierarchy-tctauth
                       iobjnm      = hierarchy-tctiobjnm
                       hienm       = hierarchy-tcthienm
@@ -373,15 +399,27 @@ CLASS zzxxmla1_cl_bw_auth IMPLEMENTATION.
                       node_iobjnm = hierarchy-tctniobjnm
                       node        = hierarchy-tctnode
                       type        = hierarchy-tctatype
-                      level       = hierarchy-tcttlevel ) TO lines-hierarchies.
-      IF line_exists( lines-characteristics[ table_line = hierarchy-tctiobjnm ] )
-         AND NOT line_exists( lines-slices[ iobjnm  = hierarchy-tctiobjnm
-                                            hienm   = hierarchy-tcthienm
-                                            version = hierarchy-tcthievers ] ).
+                      level       = hierarchy-tcttlevel
+                      date        = date ) TO lines-hierarchies.
+      IF NOT line_exists( lines-characteristics[ table_line = hierarchy-tctiobjnm ] ).
+        CONTINUE.
+      ENDIF.
+      IF NOT line_exists( lines-slices[ iobjnm  = hierarchy-tctiobjnm
+                                        hienm   = hierarchy-tcthienm
+                                        version = hierarchy-tcthievers ] ).
         APPEND read_slice( iobjnm   = hierarchy-tctiobjnm
                            hienm    = hierarchy-tcthienm
                            version  = hierarchy-tcthievers
                            key_date = key_date ) TO lines-slices.
+      ENDIF.
+      IF NOT line_exists( lines-value_slices[ iobjnm  = hierarchy-tctiobjnm
+                                              hienm   = hierarchy-tcthienm
+                                              version = hierarchy-tcthievers
+                                              date    = date ] ).
+        APPEND read_slice( iobjnm   = hierarchy-tctiobjnm
+                           hienm    = hierarchy-tcthienm
+                           version  = hierarchy-tcthievers
+                           key_date = date ) TO lines-value_slices.
       ENDIF.
     ENDLOOP.
     result = create( lines ).
@@ -405,7 +443,7 @@ CLASS zzxxmla1_cl_bw_auth IMPLEMENTATION.
     DATA intervals TYPE SORTED TABLE OF ty_interval WITH UNIQUE KEY nodeid.
     DATA hietab TYPE rshietab.
     DATA hintab TYPE rshintab.
-    result = VALUE #( iobjnm = iobjnm hienm = hienm version = version ).
+    result = VALUE #( iobjnm = iobjnm hienm = hienm version = version date = key_date ).
 
     SELECT SINGLE hieid FROM rshiedir
       WHERE objvers = 'A'
@@ -514,9 +552,10 @@ CLASS zzxxmla1_cl_bw_auth IMPLEMENTATION.
       LOOP AT lines-characteristics INTO DATA(characteristic).
         DATA(part) = part( EXPORTING iobjnm      = characteristic
                                      values      = values
-                                     hierarchies = hierarchies
-                                     slices      = lines-slices
-                           IMPORTING present     = present ).
+                                     hierarchies  = hierarchies
+                                     slices       = lines-slices
+                                     value_slices = lines-value_slices
+                           IMPORTING present      = present ).
         IF present = abap_false.
           applies = abap_false.
           EXIT.
@@ -565,12 +604,22 @@ CLASS zzxxmla1_cl_bw_auth IMPLEMENTATION.
       DATA(slice) = VALUE ty_slice( slices[ iobjnm = characteristic hienm = line-hienm version = line-version ]
                                     DEFAULT VALUE #( iobjnm = characteristic hienm = line-hienm version = line-version ) ).
       DATA(cover) = cover( line = line slice = slice ).
-      APPEND LINES OF cover-ranges TO result-ranges.
+      " the values the line authorizes are those of its own date's slice, whatever the key date
+      READ TABLE value_slices INTO DATA(value_slice)
+           WITH KEY iobjnm = characteristic hienm = line-hienm version = line-version date = line-date.
+      IF sy-subrc = 0.
+        APPEND LINES OF cover( line = line slice = value_slice )-ranges TO result-ranges.
+      ELSE.
+        APPEND LINES OF cover-ranges TO result-ranges.
+      ENDIF.
       READ TABLE result-hierarchies ASSIGNING FIELD-SYMBOL(<hierarchy>)
            WITH TABLE KEY hienm = line-hienm version = line-version.
       IF sy-subrc <> 0.
         INSERT VALUE #( hienm = line-hienm version = line-version ) INTO TABLE result-hierarchies
                ASSIGNING <hierarchy>.
+      ENDIF.
+      IF line-type = '3' OR line-type = '4'.
+        <hierarchy>-complete = abap_true.
       ENDIF.
       LOOP AT cover-nodes INTO DATA(node).
         READ TABLE <hierarchy>-nodes ASSIGNING FIELD-SYMBOL(<node>)
@@ -691,14 +740,30 @@ CLASS zzxxmla1_cl_bw_auth IMPLEMENTATION.
       WHEN 'BT'.
         result = xsdbool( key >= range-low AND key <= range-high ).
       WHEN 'CP'.
-        " BW's pattern: * any characters, + one; case matters
-        DATA(regex) = escape( val = range-low format = cl_abap_format=>e_regex ).
-        regex = replace( val = regex sub = `\*` with = `.*` occ = 0 ).
-        regex = replace( val = regex sub = `\+` with = `.` occ = 0 ).
-        result = xsdbool( matches( val = key regex = regex ) ).
+        result = pattern_matches( value = key pattern = range-low ).
       WHEN OTHERS.
         result = abap_false.
     ENDCASE.
+  ENDMETHOD.
+
+  METHOD pattern_matches.
+    DATA(regex) = escape( val = pattern format = cl_abap_format=>e_regex ).
+    regex = replace( val = regex sub = `\*` with = `.*` occ = 0 ).
+    regex = replace( val = regex sub = `\+` with = `.` occ = 0 ).
+    result = xsdbool( matches( val = value regex = regex ) ).
+    IF result = abap_true OR value IS INITIAL OR value CN `0123456789`.
+      RETURN.
+    ENDIF.
+    " the leading digits as a number of the value's length (NUMC): 01* is 001*
+    DATA(digits) = find( val = pattern regex = `[^0-9]` ).
+    DATA(width) = strlen( value ).
+    IF digits <= 0 OR digits >= width.
+      RETURN.
+    ENDIF.
+    DATA(number) = substring( val = pattern len = digits ).
+    result = pattern_matches( value   = value
+                              pattern = |{ number WIDTH = width ALIGN = RIGHT PAD = '0' }{
+                                         substring( val = pattern off = digits ) }| ).
   ENDMETHOD.
 
   METHOD normalized.
@@ -716,6 +781,19 @@ CLASS zzxxmla1_cl_bw_auth IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD check.
+    result = check_members( VALUE #( FOR t IN selection FOR m IN t ( m ) ) ).
+    IF result-status <> c_status-allowed OR unrestricted( ) = abap_true.
+      RETURN.
+    ENDIF.
+    LOOP AT selection INTO DATA(tuple).
+      IF tuple_allowed( tuple ) = abap_false.
+        result = refused( reason = c_reason-combination message = `You do not have sufficient authorization` ).
+        RETURN.
+      ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD check_members.
     IF variable = abap_true.
       result = refused( reason  = c_reason-variable
                         message = |You do not have sufficient authorization: an analysis authorization with a | &&
@@ -735,22 +813,13 @@ CLASS zzxxmla1_cl_bw_auth IMPLEMENTATION.
     " the members the query names first, as BW resolves them before it reads, then every other one
     DO 2 TIMES.
       DATA(naming) = xsdbool( sy-index = 1 ).
-      LOOP AT selection INTO DATA(tuple).
-        LOOP AT tuple INTO DATA(member) WHERE named = naming.
-          result = member_refusal( member ).
-          IF result IS NOT INITIAL.
-            RETURN.
-          ENDIF.
-        ENDLOOP.
+      LOOP AT members INTO DATA(member) WHERE named = naming.
+        result = member_refusal( member ).
+        IF result IS NOT INITIAL.
+          RETURN.
+        ENDIF.
       ENDLOOP.
     ENDDO.
-
-    LOOP AT selection INTO tuple.
-      IF tuple_allowed( tuple ) = abap_false.
-        result = refused( reason = c_reason-combination message = `You do not have sufficient authorization` ).
-        RETURN.
-      ENDIF.
-    ENDLOOP.
     result-status = c_status-allowed.
   ENDMETHOD.
 
@@ -872,6 +941,10 @@ CLASS zzxxmla1_cl_bw_auth IMPLEMENTATION.
       READ TABLE part-hierarchies INTO DATA(hierarchy) WITH TABLE KEY hienm = hienm version = version.
       IF sy-subrc <> 0.
         CONTINUE.
+      ENDIF.
+      result-lines = abap_true.
+      IF hierarchy-complete = abap_true.
+        result-complete = abap_true.
       ENDIF.
       LOOP AT hierarchy-nodes INTO DATA(node).
         READ TABLE result-nodes ASSIGNING FIELD-SYMBOL(<node>) WITH TABLE KEY iobjnm = node-iobjnm name = node-name.

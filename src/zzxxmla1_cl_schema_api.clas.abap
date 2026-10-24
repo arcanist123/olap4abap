@@ -100,6 +100,11 @@
 "!   9999-12-31; tests are the components of the probe's ty_tests, without tests all but combine_leaves. Nothing is
 "!   written;
 "! - GET auth/scenarios: the analysis authorization scenarios and their test users (ZZXXMLA1_CL_BW_AUTH_GEN).
+"! - GET auth/check[?user=U][&keyDate=YYYY-MM-DD][&pairs=v1:w1,...]: the probe's queries answered by olap4abap's
+"!   authorization check for U at the key date (ZZXXMLA1_CL_BW_AUTH_QUERIES; U as for auth/probe, without keyDate
+"!   9999-12-31): the authorizations that apply to the clinic demo's aDSO and per query its fields as auth/probe names
+"!   them, the check's status (ALLOWED, EMPTY, NO AUTH, UNKNOWN), reason and message, the members a restricted
+"!   hierarchy shows (null if not restricted) and the hierarchies listed (test HIERARCHIES). Nothing is written;
 "! It runs as the XMLA endpoint does (the anonymous logon of the node), accept included, for now.
 CLASS zzxxmla1_cl_schema_api DEFINITION
   PUBLIC
@@ -293,6 +298,12 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
     "! GET auth/scenarios: the scenarios with their users and analysis authorizations.
     METHODS auth_scenarios
       RETURNING VALUE(result) TYPE string.
+    "! GET auth/check: the probe's queries answered by the check; refused (403) as auth/probe for another user.
+    METHODS auth_check
+      IMPORTING request       TYPE ty_request
+      RETURNING VALUE(result) TYPE string
+      RAISING   zzxxmla1_cx_api_refused
+                zzxxmla1_cx_bw_provider.
     "! A parameter that is a list separated by commas: its items in upper case, without blanks and empty ones.
     METHODS list_parameter
       IMPORTING request       TYPE ty_request
@@ -556,7 +567,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
                                   THEN substring( val = request-path off = strlen( c_path ) ) ).
     DATA(allow) = SWITCH string( resource WHEN `providers` OR `proposal` OR `values` OR `schemas` OR `schema` OR `time`
                                             OR `time/missing` OR `trace` OR `trace/entry` OR `trace/response`
-                                            OR `auth/probe` OR `auth/scenarios`
+                                            OR `auth/probe` OR `auth/scenarios` OR `auth/check`
                                           THEN `GET`
                                           WHEN `check` OR `accept` OR `remove` OR `fix` OR `probe` OR `time/fill`
                                             OR `trace/on` OR `trace/off` OR `trace/clear`
@@ -588,6 +599,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
                                          WHEN `trace/response` THEN trace_response( request )
                                          WHEN `auth/probe` THEN auth_probe( request )
                                          WHEN `auth/scenarios` THEN auth_scenarios( )
+                                         WHEN `auth/check` THEN auth_check( request )
                                          WHEN `trace/on` OR `trace/off` OR `trace/clear`
                                                           THEN switch_trace( request = request resource = resource )
                                          ELSE                  remove( request ) ).
@@ -1326,6 +1338,47 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
              |"scenario":{ COND string( WHEN is_scenario = abap_true THEN json( scenario-name ) ELSE `null` ) },| &&
              |"keyDates":{ json_array( VALUE #( FOR date IN key_dates ( json_date( date ) ) ) ) },| &&
              |"authorizations":{ json_array( authorizations ) },"results":{ json_array( results ) }\}|.
+  ENDMETHOD.
+
+  METHOD auth_check.
+    DATA(key_date) = CONV d( '99991231' ).
+    DATA(date_text) = parameter( request = request name = `keydate` ).
+    IF date_text IS NOT INITIAL.
+      key_date = date_of( text = date_text name = `keyDate` ).
+    ENDIF.
+    DATA(user) = user_parameter( request = request name = `user` fallback = sy-uname ).
+    DATA(scenarios) = zzxxmla1_cl_bw_auth_gen=>scenarios( ).
+    IF user <> sy-uname AND NOT line_exists( scenarios[ user = user ] ).
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused
+        EXPORTING status  = 403
+                  message = |The check runs for a test user of the scenarios only, not for { user }|.
+    ENDIF.
+    DATA pairs TYPE zzxxmla1_cl_bw_auth_queries=>ty_pairs.
+    LOOP AT list_parameter( request = request name = `pairs` ) INTO DATA(pair_text).
+      SPLIT pair_text AT `:` INTO DATA(first) DATA(second).
+      IF first IS INITIAL OR second IS INITIAL.
+        RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused
+          EXPORTING status  = 400
+                    message = |A pair is two values with a colon between them: { pair_text }|.
+      ENDIF.
+      APPEND VALUE #( first = first second = second ) TO pairs.
+    ENDLOOP.
+
+    DATA(queries) = zzxxmla1_cl_bw_auth_queries=>read( user = user key_date = key_date ).
+    DATA results TYPE string_table.
+    LOOP AT queries->run( pairs ) INTO DATA(row).
+      APPEND |\{"characteristic":{ json( |{ row-characteristic }| ) },"hierarchy":{ json( row-hierarchy ) },| &&
+             |"test":{ json( row-test ) },"node":{ json( row-node ) },| &&
+             |"filterChar":{ json( |{ row-filter_char }| ) },"filterHierarchy":{ json( row-filter_hierarchy ) },| &&
+             |"filterNode":{ json( row-filter_node ) },"status":{ json( condense( row-status ) ) },| &&
+             |"reason":{ json( condense( row-reason ) ) },"message":{ json( row-message ) },| &&
+             |"members":{ COND string( WHEN row-restricted = abap_false THEN `null`
+                                       ELSE json_array( VALUE #( FOR m IN row-members ( json( m ) ) ) ) ) },| &&
+             |"answer":{ json( row-answer ) }\}| TO results.
+    ENDLOOP.
+    result = |\{"user":{ json( |{ user }| ) },"keyDate":{ json_date( key_date ) },| &&
+             |"authorizations":{ json_array( VALUE #( FOR a IN queries->applying( ) ( json( |{ a }| ) ) ) ) },| &&
+             |"results":{ json_array( results ) }\}|.
   ENDMETHOD.
 
   METHOD auth_scenarios.

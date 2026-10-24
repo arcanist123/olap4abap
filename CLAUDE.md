@@ -511,5 +511,8 @@ After changing ABAP in SAP, run `pull` before committing so `src/` is current.
   user and key date are recorded in `reference/auth/` (`python scripts/auth_probe.py [--verify 1]`; the probe,
   `GET auth/probe?user=...`, runs as BW's "Execute as Other User", `RSEC_SET_USERNAME`, verified against a logon of
   the user through BW's XMLA service) (`docs/next-steps.md`, steps 1 and 2). The region of a user and the check of a
-  selection exist (`ZZXXMLA1_CL_BW_AUTH`, step 3); not yet compared with the oracle (step 4), nothing is enforced.
+  selection exist (`ZZXXMLA1_CL_BW_AUTH`, step 3) and agree with the oracle at every key date (step 4:
+  `python scripts/auth_check_test.py`, `GET auth/check?user=...&keyDate=...`, `ZZXXMLA1_CL_BW_AUTH_QUERIES` asks the
+  probe's queries as selections; a line's flat values from the slice of its date, a type 3 line the complete
+  hierarchy); nothing is enforced yet (step 5).
 - Third-party reference code (`mondrian/`, `eMondrian/`) is fetched by `scripts/setup-reference.sh`, not committed.

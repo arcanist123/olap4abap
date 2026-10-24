@@ -222,8 +222,8 @@ test users `ZZXXMLA1_A01` to `A21` (`clinic-demo.md`, Authorization scenarios), 
 three key dates are in `reference/auth/` (`scripts/auth_probe.py`), BW's rules read from them in `mvp-scope.md`
 (Authorisation decision, BW's rules). BW keeps the values in `RSECVAL_STRING` and `RSECHIE_STRING` (`RSECVAL` and
 `RSECHIE` hold only `0BI_ALL`). `RSDCHA-AUTHRELFL` is set on `ZCLDOC` and `ZCLDIAG`. Step 3 is built
-(`ZZXXMLA1_CL_BW_AUTH`, 20 unit tests on made-up lines); it is not yet compared with the oracle (step 4) and nothing is
-enforced (step 5).
+(`ZZXXMLA1_CL_BW_AUTH`, unit tests on made-up lines); step 4 is done: the check agrees with BW at every key date
+(`scripts/auth_check_test.py`); nothing is enforced yet (step 5).
 
 ### Decisions answered by step 2
 
@@ -303,6 +303,18 @@ enforced (step 5).
    BW's, the logged-on answer (`loggedOn`) where there is one. All three key dates must agree before step 5; at the
    other key dates a hierarchy without a line of the user is EMPTY in the files (the switch's answer) and counts as
    refused.
+   Done 2026-10-24: `GET auth/check?user=...&keyDate=...` (`ZZXXMLA1_CL_BW_AUTH_QUERIES`; the schema API reads no JSON
+   bodies, so the check lists the probe's queries itself, named by the fields of the probe's rows, and the script
+   joins them by `auth_probe.statement_key`: a query asked on one side only fails). Each query is the selection BW
+   makes (named: the slicer and the node a query starts from; a set's members unnamed; a hierarchy's members its
+   visible nodes and the children of a node that may not be expanded, or all its nodes without a line or with `*`),
+   answered by `check`, or by the new `check_members` where the query shows nothing (EMPTY when allowed). All 63
+   runs agree (80,577 queries; 9,018 of them BW's EMPTY through the switch at 2024 and 2025). What the oracle
+   corrected (`mvp-scope.md`, BW's rules): a line's flat values come from the slice of its own date
+   (`TCTHIEDATE`), not the key date's (H1's `008` in 2024: a value, not a node); a line of type 3 shows the complete
+   hierarchy, `REST_H` included (`ty_access-complete`); `CP` on a NUMC key also reads the pattern's digits as a number
+   (`01*` admits `001`); the flat hierarchy holds the not-assigned value. `hierarchy_access` also tells whether the user
+   has a line on a hierarchy (`lines`: BW lists it). Messages are not compared (the switch words them otherwise).
 5. **Enforcement in the engine at 9999-12-31**: the region resolved once per request for the user of
    `RSEC_GET_USERNAME` (kept with the request as the `MemberCache` is); a user whose region is `*` and `:` everywhere
    (`0BI_ALL`) gets no condition and no cost. As step 2 decided (`mvp-scope.md`, BW's rules):
