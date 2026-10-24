@@ -510,5 +510,6 @@ After changing ABAP in SAP, run `pull` before committing so `src/` is current.
   subtree, AND within and OR over authorisations). The scenarios and test users exist, and BW's answers per test
   user and key date are recorded in `reference/auth/` (`python scripts/auth_probe.py [--verify 1]`; the probe,
   `GET auth/probe?user=...`, runs as BW's "Execute as Other User", `RSEC_SET_USERNAME`, verified against a logon of
-  the user through BW's XMLA service) (`docs/next-steps.md`, steps 1 and 2); nothing is checked or enforced yet.
+  the user through BW's XMLA service) (`docs/next-steps.md`, steps 1 and 2). The region of a user and the check of a
+  selection exist (`ZZXXMLA1_CL_BW_AUTH`, step 3); not yet compared with the oracle (step 4), nothing is enforced.
 - Third-party reference code (`mondrian/`, `eMondrian/`) is fetched by `scripts/setup-reference.sh`, not committed.

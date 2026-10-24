@@ -221,8 +221,9 @@ State on 2026-10-24: steps 1 and 2 are done: the 21 scenarios exist as analysis 
 test users `ZZXXMLA1_A01` to `A21` (`clinic-demo.md`, Authorization scenarios), and BW's answers for each user at the
 three key dates are in `reference/auth/` (`scripts/auth_probe.py`), BW's rules read from them in `mvp-scope.md`
 (Authorisation decision, BW's rules). BW keeps the values in `RSECVAL_STRING` and `RSECHIE_STRING` (`RSECVAL` and
-`RSECHIE` hold only `0BI_ALL`). `RSDCHA-AUTHRELFL` is set on `ZCLDOC` and `ZCLDIAG`. Nothing of the check or the
-enforcement is built (step 3).
+`RSECHIE` hold only `0BI_ALL`). `RSDCHA-AUTHRELFL` is set on `ZCLDOC` and `ZCLDIAG`. Step 3 is built
+(`ZZXXMLA1_CL_BW_AUTH`, 20 unit tests on made-up lines); it is not yet compared with the oracle (step 4) and nothing is
+enforced (step 5).
 
 ### Decisions answered by step 2
 
@@ -282,6 +283,20 @@ enforcement is built (step 3).
    An applying authorisation with a `$` value makes the region not authorised (variables are not supported).
    `check( user, key_date, selection )` answers allowed, no authorisation or fault for a query's selection (per
    characteristic the values it shows or filters, or aggregated).
+   Built 2026-10-24: `ZZXXMLA1_CL_BW_AUTH=>read( user, provider, key_date )` (the provider's characteristics from
+   `ZZXXMLA1_CL_BW_PROVIDER`, the user's authorisations by `AUTHORITY-CHECK ... FOR USER` on `S_RS_AUTH` and by
+   `RSECUSERAUTH`, the slices from `RSHIEDIR` and the tables `RSD_HIETAB_GET_FOR_CHA_BAS` names; BW also names an
+   interval table `/BIC/J...` that does not exist, so it is read only if `DD02L` has it), `create( lines )` for the
+   tests. An authorisation applies when the special characteristics that are authorisation relevant admit the
+   provider, `03` and today, and it has a line for every authorisation-relevant characteristic of the provider; node
+   type 4 is read as 3. A selection is tuples of members per characteristic (a value, a hierarchy node, a leaf as a
+   node, or the aggregate; a characteristic not in the tuple is aggregated), each marked named when the query names it
+   by an identifier: named members are checked first (a value in no authorisation UNKNOWN, a characteristic without
+   any value, a hierarchy without a line, a node the lines do not show NO AUTH), then the others, then each tuple in
+   one sub-cube (NO AUTH). The messages are BW's (logged-on wording). `hierarchy_access` gives what step 5b needs: per
+   hierarchy all, or the visible nodes with expandable, top and parent. Checked once live (a temporary class run, not
+   kept): the applying authorisations, the total, a value and the visible nodes of `ZCLDOC_ORG 001` of 12 users at
+   2024-06-15 and 9999-12-31 agree with `reference/auth/` (H1 without `008` in 2024, H2's departments per slice).
 4. **The check against the oracle at every key date** (`GET auth/check` of the schema API with user and key date,
    computed by any caller since the user is a parameter; `scripts/auth_check_test.py`): each probe row of
    `reference/auth/` translated into a selection, the check's answer (allowed, empty, refused, unknown) compared with
