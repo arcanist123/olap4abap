@@ -235,13 +235,13 @@ enforcement is built (step 3).
   answered with all its facts (a node's value is its full aggregate).
 - **Combining authorisations:** AND of the characteristics within one authorisation, OR over the authorisations
   (CROSS, pairs).
-- **Logons:** `/zzxxmla1` runs every call as the node's user, also with basic authentication of another user. The
+- **Logons:** when step 2 was done `/zzxxmla1` ran every call as the node's user, also with basic authentication of
+  another user; since 2026-10-24 the node has no logon data and takes basic authentication (`environment.md`). The
   probe needs no logon: it runs as BW's "Execute as Other User" (`RSEC_SET_USERNAME`; `RSUDO`, pointed out by the
   user), verified against a real logon of each user through BW's XMLA service at 9999-12-31: same values; other
   wording of the refusals; and a hierarchy without a line of the user is empty through the switch but refused
-  logged on (the logged-on answer is kept in the files and wins). The service user keeps `0BI_ALL`, so the existing
-  tests are unchanged. End to end as each user (step 6) still needs a personal logon on olap4abap's endpoint: a second
-  ICF node without logon data (the handler reads `~path_info`), or the check driven by the switch in the tests.
+  logged on (the logged-on answer is kept in the files and wins). The tests log on as `SAP_USER`, who keeps
+  `0BI_ALL`, so the existing tests are unchanged; end to end as each user (step 6) logs on as the test user.
 
 ### Steps
 
@@ -310,8 +310,7 @@ enforcement is built (step 3).
      rowsets that show members.
 6. **End to end** (`scripts/auth_test.py`): the probe's 9999-12-31 queries in olap4abap's names (as
    `bw_hierarchy_test.py` names them, `scripts/bw_names.py`; `ZCLDOC_ORG_001`) through the XMLA endpoint as each test
-   user on `ZCLVISITA` and `ZCLVISIT` (a personal logon: `/zzxxmla1` takes none, so a second ICF node without logon
-   data, to be created by hand in SICF, or the endpoint run under the switch for the tests; decided in step 6), status
+   user on `ZCLVISITA` and `ZCLVISIT` (logged on as the user with `SAP_TEST_PASSWORD`), status
    and values compared with `reference/auth/`; `xmla_test.py`,
    `ssas_compare.py` and `bw_hierarchy_test.py` as the service user unchanged.
 7. **Docs**: `mvp-scope.md` (the rules), `clinic-demo.md` (scenarios, users), `environment.md` (the service user needs

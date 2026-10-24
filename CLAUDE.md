@@ -199,7 +199,7 @@ Read before designing anything:
   the header `X-olap4abap-Trace: true` (the MDX console's) is traced while the user's trace is off too. A trace is
   on for 2 hours after it is switched on (`c_active_hours`); switching one on deletes the calls older than 7 days
   (`c_retention_days`) and the expired users' rows. "Delete all" on the page deletes every traced call. The list is the newest calls, filtered on the server by user,
-  by toggles Discover/Execute (`method`) and limited by "Show N newest" (`max`, 200 by default, at most 10,000). The user is sy-uname: while the node logs on anonymously every caller is its service user. API: `GET trace`,
+  by toggles Discover/Execute (`method`) and limited by "Show N newest" (`max`, 200 by default, at most 10,000). The user is sy-uname, the user of the call's basic authentication (the node has no logon data since 2026-10-24). API: `GET trace`,
   `trace/entry`, `trace/response`, `POST trace/on`, `trace/off`, `trace/clear` (`scripts/trace_test.py`).
 - Discover cache: `ZZXXMLA1_CL_XMLA_HANDLER` answers a Discover request it answered before from table
   `ZZXXMLA1_DSCACHE` (`ZZXXMLA1_CL_DISCOVER_CACHE`, gzipped, valid 12 hours, keyed by `discover_key`: type, URL,

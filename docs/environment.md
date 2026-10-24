@@ -4,12 +4,13 @@
 
 - ABAP FS connection id `a4h_http`, client 001. Docker container `a4h` (image `sapse/abap-cloud-developer-trial:2025`)
   publishing 50000-50001, 8443, 3200, 3300, 8002, 30213, 30215 and others.
-- ICF service `/zzxxmla1` -> `ZZXXMLA1_MAIN_ENDPOINT`, URL `http://vhcala4hci:50000/zzxxmla1?sap-client=001`. Anonymous
-  access is enabled through logon data on the ICF node (dev system only). The earlier 401 happened before that was set.
-  With logon data on the node every call runs as its user (`DEVELOPER`), also one that sends basic authentication of
-  another user (observed 2026-10-24 with a test user: `GET trace` answers `DEVELOPER`), so the node takes no personal
-  logon. The handler reads its paths from `~path_info`, so a second node without logon data could serve the same
-  handler to personal logons (not created; the authorisation probe does without one, below).
+- ICF service `/zzxxmla1` -> `ZZXXMLA1_MAIN_ENDPOINT`, URL `http://vhcala4hci:50000/zzxxmla1?sap-client=001`. Since
+  2026-10-24 the node has no logon data: it takes basic authentication, and every call runs as its user (a request
+  without logon is answered 401). The test scripts log on as `SAP_USER` with `SAP_PASSWORD` of `.env.sap`
+  (environment variables of the same names win) through `scripts/sap_auth.py`: `install()` adds the header to the
+  urllib requests to SAP's host and port only (not to the reference or SSAS), keeps one cookie session per script and
+  logs it off at exit; the Playwright tests pass `http_credentials()`; `xmla-proxy.py` adds the logon to a request to
+  the `sap` backend that carries none.
 - Analysis authorisations of another user without a logon: BW's "Execute as Other User" (`RSUDO`, the released
   `RSEC_GET_USERNAME` reads the user it checks; `RSEC_SET_USERNAME` sets it, `sy-uname` stays the caller), which the
   probe uses (`clinic-demo.md`, Probing BW's authorizations). To compare with a real logon, BW's own XMLA service

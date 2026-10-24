@@ -15,6 +15,8 @@ import sys
 
 from playwright.sync_api import sync_playwright
 
+import sap_auth
+
 RUN = 120000  # ms
 
 
@@ -46,7 +48,7 @@ def main():
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
-        page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page = browser.new_page(viewport={"width": 1400, "height": 900}, http_credentials=sap_auth.http_credentials())
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(f"{args.url}?sap-client={args.client}")
         page.wait_for_selector(".topbar select option[value=ZFOODMART]", state="attached", timeout=60000)

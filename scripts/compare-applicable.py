@@ -29,6 +29,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from reference_texts import as_olap4abap
+import sap_auth
 
 ROOT = Path(__file__).resolve().parent.parent
 TEMPLATE = """<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/"><SOAP-ENV:Body>
@@ -78,6 +79,7 @@ def main():
     parser.add_argument("--details", help="file for both answers of every statement")
     parser.add_argument("--workers", type=int, default=3, help="statements run at once (default 3)")
     args = parser.parse_args()
+    sap_auth.install()
 
     statements = json.loads((ROOT / "tests" / "mdx" / "applicable.json").read_text(encoding="utf-8"))
     indexes = args.indexes or range(len(statements))

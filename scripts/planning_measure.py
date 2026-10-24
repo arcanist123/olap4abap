@@ -26,6 +26,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+import sap_auth
+
 AGENT = "olap4abap planning_measure"
 SOAP = ('<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/"><SOAP-ENV:Body>'
         '<Execute xmlns="urn:schemas-microsoft-com:xml-analysis"><Command><Statement>{}</Statement></Command>'
@@ -127,6 +129,7 @@ def main():
     parser.add_argument("--case", nargs="*", choices=sorted(CASES), help="the statements (default: all)")
     parser.add_argument("--runs", type=int, default=3)
     args = parser.parse_args()
+    sap_auth.install()
 
     def api(http_method, resource, **params):
         query = urllib.parse.urlencode({"sap-client": args.client, **params})

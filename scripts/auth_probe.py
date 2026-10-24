@@ -261,7 +261,7 @@ def main():
     if args.verify and not env.get("SAP_TEST_PASSWORD"):
         sys.exit("--verify needs SAP_TEST_PASSWORD in .env.sap")
 
-    api = Session(f"{host}/zzxxmla1", client)
+    api = Session(f"{host}/zzxxmla1", client, env["SAP_USER"], env["SAP_PASSWORD"])
     status, body = api.get_json("/schema/api/auth/scenarios")
     if status != 200:
         sys.exit(f"auth/scenarios: {status} {body}")

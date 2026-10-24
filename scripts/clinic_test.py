@@ -23,6 +23,8 @@ import sys
 import urllib.error
 import urllib.request
 
+import sap_auth
+
 EXECUTE = """<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/"><SOAP-ENV:Body>
 <Execute xmlns="urn:schemas-microsoft-com:xml-analysis"><Command><Statement>{statement}</Statement></Command>
 <Properties><PropertyList><DataSourceInfo>ABAP BW</DataSourceInfo><Catalog>{catalog}</Catalog>
@@ -90,6 +92,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--url", default="http://localhost:50000/zzxxmla1?sap-client=001")
     args = parser.parse_args()
+    sap_auth.install()
     failures = []
 
     def check(name, condition, detail=""):

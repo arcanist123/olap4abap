@@ -18,6 +18,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+import sap_auth
+
 SOAP = ('<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/"><SOAP-ENV:Body>'
         '{}</SOAP-ENV:Body></SOAP-ENV:Envelope>')
 DISCOVER = SOAP.format('<Discover xmlns="urn:schemas-microsoft-com:xml-analysis"><RequestType>DBSCHEMA_CATALOGS'
@@ -46,6 +48,7 @@ def main():
     parser.add_argument("--client", default="001")
     parser.add_argument("--catalog", default="ZFOODMART")
     args = parser.parse_args()
+    sap_auth.install()
     failures = []
 
     def check(name, condition, detail=""):

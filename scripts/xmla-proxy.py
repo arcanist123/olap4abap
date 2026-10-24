@@ -13,7 +13,8 @@ MDX statement, status, time, size, rows/cells or the fault) and saved in full un
 
 By default:
     http://localhost:8081/  mondrian  container emondrian (8080): the reference, catalog ZFOODMART (our BW FoodMart)
-    http://localhost:8082/  sap       the SAP implementation
+    http://localhost:8082/  sap       the SAP implementation; a request without Authorization gets the logon
+                                      SAP_USER and SAP_PASSWORD of .env.sap
     http://localhost:8083/  git       container emondrian-git (8091): the same build, catalog FoodMart (the sample)
     http://localhost:8084/  release   container emondrian-release (8090): the released eMondrian
     http://localhost:8086/  ssas      SSAS (Tabular, instance SSAS_TAB) through IIS's msmdpump.dll (8087), which
@@ -60,6 +61,8 @@ import sys
 import threading
 import time
 import urllib.parse
+
+import sap_auth
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 HOP_BY_HOP = {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer",
@@ -167,7 +170,7 @@ def self_signed_certificate(bind):
     return cert, key
 
 
-def make_handler(backend, target, log_dir, insecure=False):
+def make_handler(backend, target, log_dir, insecure=False, authorization=None):
     url = urllib.parse.urlsplit(target)
     path = url.path + ("?" + url.query if url.query else "")
     if url.scheme == "https":
@@ -216,6 +219,9 @@ def make_handler(backend, target, log_dir, insecure=False):
                 upstream.putheader("Host", url.netloc)
                 for k, v in headers:
                     upstream.putheader(k, v)
+                if authorization and not any(k.lower() == "authorization" for k, _ in headers):
+                    # SAP's logon of .env.sap for a client that sends none (not saved in the log)
+                    upstream.putheader("Authorization", authorization)
                 upstream.putheader("Content-Length", str(len(body)))
                 upstream.endheaders(body)
                 response = upstream.getresponse()
@@ -245,6 +251,14 @@ def make_handler(backend, target, log_dir, insecure=False):
         do_GET = do_POST = do_PUT = do_DELETE = do_HEAD = do_OPTIONS = forward
 
     return Handler
+
+
+def sap_logon(target):
+    """The Authorization header of SAP_USER and SAP_PASSWORD of .env.sap for a backend on SAP's host and port."""
+    if not sap_auth.is_sap(target):
+        return None
+    user, password = sap_auth.credentials()
+    return "Basic " + base64.b64encode(f"{user}:{password}".encode("utf-8")).decode("ascii")
 
 
 def jwt_claims(token):
@@ -351,7 +365,7 @@ def main():
     for extra in args.backend:
         name, port, target = extra.split("=", 2)
         backends.append((name, int(port), target))
-    handlers = [(backend, port, target, make_handler(backend, target, log_dir, args.insecure))
+    handlers = [(backend, port, target, make_handler(backend, target, log_dir, args.insecure, sap_logon(target)))
                 for backend, port, target in backends]
     if args.auth_probe:
         challenges = args.challenge or [DEFAULT_CHALLENGE]

@@ -35,6 +35,7 @@ from decimal import Decimal, InvalidOperation
 
 from bw_names import as_name_paths
 from xmla_test import DEFAULT_URL, local, post
+import sap_auth
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 PREFIX = "execute_ssasmd_"
@@ -342,6 +343,7 @@ def main():
     parser.add_argument("--url", default=DEFAULT_URL)
     parser.add_argument("--show", action="store_true", help="print the rewritten statements")
     args = parser.parse_args()
+    sap_auth.install()
     model = Model()
     cases = sorted(p for p in (ROOT / "reference").glob(PREFIX + "*") if (p / "ssas.txt").exists())
     if args.cases:

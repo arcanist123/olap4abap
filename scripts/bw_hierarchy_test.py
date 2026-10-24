@@ -51,6 +51,8 @@ import re
 import subprocess
 import sys
 
+import sap_auth
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 PROBE = "ZZXXMLA1_CL_BW_HIERARCHY_PROBE"
 CATALOG = "ZCLVISITA"
@@ -285,6 +287,7 @@ def main():
     parser.add_argument("--show", type=int, default=10, help="differences shown per hierarchy")
     parser.add_argument("--catalog", help=f"olap4abap's catalog and cube (default {CATALOG})")
     args = parser.parse_args()
+    sap_auth.install()
     hierarchies_checked = HIERARCHIES
     if args.catalog:
         CATALOG = args.catalog

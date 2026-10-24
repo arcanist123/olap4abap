@@ -256,7 +256,7 @@ Then the views of the tables named by a placeholder (`ZZXXMLA1_C_<characteristic
 (`ZZXXMLA1_CL_BW_VIEW_GEN->generate`, numbered: `ZZXXMLA1_C0000026` / `ZZXXMLA1V0000026`), and the placeholders
 in the schema (dimension tables, hierarchy `Table`s) are replaced by their database views; the schema is written as sent if no name changed, else as Mondrian's toXML. Last
 the schema file and, for a new catalog, the data sources file are written and the work is committed.
-The next XMLA request reads the new catalog. View generation runs as the anonymous user of the node, too (checked).
+The next XMLA request reads the new catalog. View generation runs as the caller's user, too (checked while the node logged on anonymously).
 
 Each cube is served from its own catalog for now (`mvp-scope.md`, Catalog decision): a proposal is one schema with one
 cube, accepted as one catalog; a cube is moved to another catalog by removing its catalog and accepting it again.
@@ -325,8 +325,9 @@ Removing `ZFOODMART` breaks the reference tests until `python scripts/sap-files.
 The UI edits the schema XML in the browser (DOMParser/XMLSerializer) and shows the outline; the server never parses
 JSON.
 
-Identity (decided 2026-10-06): the API runs with the same identity as the XMLA endpoint, i.e. the anonymous logon of
-the `/zzxxmla1` node, `accept` included. Identity is not olap4abap's: the logon is configured on the SICF node, and
+Identity (decided 2026-10-06): the API runs with the same identity as the XMLA endpoint, i.e. the logon of
+the `/zzxxmla1` node (basic authentication of the caller since 2026-10-24, before that the node's
+anonymous logon), `accept` included. Identity is not olap4abap's: the logon is configured on the SICF node, and
 olap4abap takes `sy-uname` as given, also for the BW analysis authorisations (`mvp-scope.md`, Authorisation
 decision).
 

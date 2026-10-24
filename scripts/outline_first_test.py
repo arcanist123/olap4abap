@@ -19,6 +19,8 @@ import re
 import sys
 import urllib.request
 
+import sap_auth
+
 SOAP = ('<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/"><SOAP-ENV:Body>'
         '<Execute xmlns="urn:schemas-microsoft-com:xml-analysis"><Command><Statement>{}</Statement></Command>'
         '<Properties><PropertyList><Catalog>{}</Catalog><Format>Multidimensional</Format></PropertyList></Properties>'
@@ -99,6 +101,7 @@ def main():
     parser.add_argument("--show", action="store_true", help="print each statement")
     parser.add_argument("cases", nargs="*", help="the cases (default: all)")
     args = parser.parse_args()
+    sap_auth.install()
 
     def execute(catalog, mdx):
         body = SOAP.format(mdx.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"), catalog)

@@ -32,7 +32,7 @@ Decisions taken by the project owner on 2026-10-02, with reasons.
   shown to be a problem (then: cache the parsed schema). Stored, since 2026-10-05, as Mondrian stores it: a **file** of
   the server, named by a catalog of the data sources file `/WEB-INF/datasources.xml` (rows of table `ZZXXMLA1_FILE`,
   `docs/environment.md`, Catalogs), so a schema or a catalog is added without a new ABAP object. Until then a catalog
-  was a generated class; the reason against a table, that the anonymous endpoint cannot take uploads, holds still:
+  was a generated class; the reason against a table, that the endpoint takes no uploads (it was anonymous then), holds still:
   the files are written by `scripts/sap-files.py` as a logged-on developer, never through the endpoint.
 - Everything the meta-model allows is parsed; what the engine does not support is rejected when the schema loads, with
   an error, never silently ignored.

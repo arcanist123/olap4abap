@@ -14,6 +14,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+import sap_auth
+
 
 def call(base, client, method, resource, params=None, body=None):
     query = urllib.parse.urlencode({"sap-client": client, **(params or {})})
@@ -32,6 +34,7 @@ def main():
     parser.add_argument("--url", default="http://localhost:50000/zzxxmla1/schema/api")
     parser.add_argument("--client", default="001")
     args = parser.parse_args()
+    sap_auth.install()
     failures = []
 
     def check(name, condition, detail=""):

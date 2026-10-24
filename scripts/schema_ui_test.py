@@ -14,6 +14,8 @@ import sys
 
 from playwright.sync_api import sync_playwright
 
+import sap_auth
+
 CHECK = 90000  # ms: a check loads all catalogs in ZZXXMLA1_CL_SCHEMA
 
 
@@ -42,7 +44,7 @@ def main():
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
-        page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page = browser.new_page(viewport={"width": 1400, "height": 900}, http_credentials=sap_auth.http_credentials())
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(url)
         page.wait_for_selector("text=ZFMSALESA", timeout=60000)
@@ -114,7 +116,7 @@ def main():
             r'<DimensionAttribute name="ZFMSTYPE"[^>]*attributeHierarchyEnabled="false"', xml) is not None)
 
         # the aDSO: a time characteristic marked as time gets its suggested level type
-        page = browser.new_page(viewport={"width": 1400, "height": 900}, color_scheme="dark")
+        page = browser.new_page(viewport={"width": 1400, "height": 900}, http_credentials=sap_auth.http_credentials(), color_scheme="dark")
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(f"{args.url}/?sap-client={args.client}#proposal/ZFMSALESA")
         status(page)
@@ -276,7 +278,7 @@ def main():
         # dimension's pane (POST fix): the period waits for the variant it is compounded with; the variant fixed to K4
         # keeps its dimension, the cube is annotated and shows it; undo takes it back; a value without SID is refused
         # and the K4 stays; unfixing the variant gives the plain schema
-        page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page = browser.new_page(viewport={"width": 1400, "height": 900}, http_credentials=sap_auth.http_credentials())
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(f"{args.url}/?sap-client={args.client}#proposal/ZCLVISITA")
         status(page)
@@ -375,7 +377,7 @@ def main():
 
         # the fiscal defaults of a proposal (0TSC0T001): the period's twelve regular periods in restrict members, shown
         # as rows; removed, the preset brings them back
-        page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page = browser.new_page(viewport={"width": 1400, "height": 900}, http_credentials=sap_auth.http_credentials())
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(f"{args.url}/?sap-client={args.client}#proposal/0TSC0T001")
         status(page)
@@ -404,7 +406,7 @@ def main():
         def bw_box(name):
             return page.locator(f"{bw} tr:has-text('{name}') input[type=checkbox]")
 
-        page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page = browser.new_page(viewport={"width": 1400, "height": 900}, http_credentials=sap_auth.http_credentials())
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(f"{args.url}/?sap-client={args.client}#proposal/ZCLVISIT")
         status(page)
@@ -450,7 +452,7 @@ def main():
         plan.uncheck()
         check("unticked: gone again", "olap4abap.bwHierarchy" not in xml_of())
 
-        page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page = browser.new_page(viewport={"width": 1400, "height": 900}, http_credentials=sap_auth.http_credentials())
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(f"{args.url}/?sap-client={args.client}#proposal/ZCLVISITA")
         status(page)

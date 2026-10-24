@@ -26,6 +26,7 @@ import xml.etree.ElementTree as ET
 
 from bw_names import as_name_paths
 from reference_texts import as_olap4abap
+import sap_auth
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DEFAULT_URL = "http://localhost:50000/zzxxmla1?sap-client=001"
@@ -130,6 +131,7 @@ def main():
     parser.add_argument("cases", nargs="*", help="case names (directories under reference/); default all")
     parser.add_argument("--url", default=DEFAULT_URL)
     args = parser.parse_args()
+    sap_auth.install()
 
     cases = sorted(p.parent for p in (ROOT / "reference").glob("*/request.xml")
                    if (p.parent / "response.xml").exists() or (p.parent / "rows.txt").exists())
