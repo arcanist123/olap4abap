@@ -49,6 +49,11 @@ questions are for counsel):
   licenses for every user who reaches BW through it (indirect use), and olap4abap is a reporting front end, not a
   replacement of BW as the data's system of record.
 - Names (section 19): SAP's names describe SAP's software; olap4abap is not advertised with them.
+- Checked on every commit: `scripts/license-scan.py` (hooks in `.githooks`, enabled per clone with
+  `git config core.hooksPath .githooks`) refuses timings, the SAP-internal names of the git-ignored
+  `.local/sap-internal-names.txt` and Mondrian or eMondrian in our code (`src/`, `web/`), in the staged files and in
+  the commit message; an exception is a line of `scripts/license-scan-allow.txt` with its reason. Without arguments it
+  checks every tracked file.
 
 ## Syncing code between SAP and git (vsp, sapcli)
 
@@ -443,7 +448,6 @@ templates of these sources contain. The pulled files equal the generator's outpu
 Rules of Mondrian's reading worth knowing (all covered by a case): children are read in the order of the definition
 and whatever is out of place is dropped silently (a `<Dimension>` after the `<Measure>`s); an empty attribute is no
 attribute; a Boolean is true only for `true` in any case; a required child is only checked if there is a next child.
-Reading eMondrian's `Foodmart.xml` (54 KB) takes about 40 ms.
 
 ## Catalogs (the schemas the server serves)
 

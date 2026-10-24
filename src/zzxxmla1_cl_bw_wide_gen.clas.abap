@@ -12,7 +12,7 @@
 "! The wide demo (docs/wide-demo.md): a provider with many characteristics, for trying the schema builder and the
 "! engine on a wide model. It creates InfoArea ZXMLWIDE with
 "! - the characteristics ZXMLAD00 to ZXMLAD99 (with master data and no attributes): ZXMLAD00 (NUMC 6) with 100,000
-"!   members, for a level larger than eMondrian's bound on a native crossjoin operand, the others (NUMC 4) with 1,000,
+"!   members, for a level larger than the reference's bound on a native crossjoin operand, the others (NUMC 4) with 1,000,
 "! - the key figure ZXMLAKF,
 "! - the InfoCube ZXMLWIDE (ten BW dimensions of ten characteristics) and the cube-type aDSO ZXMLWIDEA, each loaded
 "!   with the same records, 1,000,000 unless another number is given,

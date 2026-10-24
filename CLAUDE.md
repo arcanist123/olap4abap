@@ -494,6 +494,7 @@ After changing ABAP in SAP, run `pull` before committing so `src/` is current.
   commits, docs, issues or PRs (measurements go in the git-ignored `.local/`); tracked files name SAP's tables and
   documented interfaces and say what we observed, never how SAP's code works inside (unless a public source shows it,
   cited); do not read SAP's standard source unless the user asks for a named question, and copy none of it.
+  `scripts/license-scan.py` checks this and the naming rule on every commit (`git config core.hooksPath .githooks`).
 - BW analysis authorisations are in scope since 2026-10-22, as the probe `ZZXXMLA1_BW_AUTH_PROBE` defines them: flat
   and hierarchy values, hierarchies matched by name and version (node by name and node type, never `HIEID`), a node's
   values from the slice valid at the key date (queries use 9999-12-31, the tests compare the check with the probe at

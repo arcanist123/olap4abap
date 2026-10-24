@@ -1,0 +1,5 @@
+# Exceptions of scripts/license-scan.py: rule | path glob | regex of the allowed line | reason (why it is no breach)
+timing | docs/environment.md | mvn -B -o install -DskipTests\)\s+# about 30 s | build time of the reference on the developer's machine, not of SAP
+timing | scripts/deploy-reference-schema.sh | give it ~30 s to start | start-up of the eMondrian container, not of SAP
+timing | web/schema/trace.js | Refresh every 5 s | a refresh interval the trace page offers, no measurement
+timing | src/zzxxmla1_cl_web_app_files.clas.abap | Refresh every 5 s | trace.js generated into the class, a refresh interval, no measurement

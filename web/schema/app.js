@@ -1,4 +1,4 @@
-// The schema builder (docs/schema-generator.md, UI): proposes a Mondrian schema for a BW InfoProvider or reopens an
+// The schema builder (docs/schema-generator.md, UI): proposes a schema for a BW InfoProvider or reopens an
 // accepted one, lets the user edit it and accepts it through the API below this folder (ZZXXMLA1_CL_SCHEMA_API).
 // The schema XML is the model: it is edited as a DOM (DOMParser) and sent back as text, the server never parses JSON.
 // No build step: Preact with htm, vendored as one ES module; this file is what the server serves.
@@ -387,7 +387,7 @@ function setTimeDimension(dim, on, suggestions) {
     // the server refuses members with facts on a time dimension (not supported yet)
     setAnnotation(dim, MEMBERS_WITH_FACTS, null);
     if (isShared(dim)) usagesOf(dim.ownerDocument, dim).forEach(({ usage }) => setAnnotation(usage, MEMBERS_WITH_FACTS, null));
-    // Mondrian requires a time level type on every level of a time dimension, the attribute hierarchies' too
+    // The reference requires a time level type on every level of a time dimension, the attribute hierarchies' too
     for (const a of attributes) {
       if (!TIME_TYPES.includes(attr(a, 'levelType'))) a.setAttribute('levelType', suggestionFor(suggestions, dim, a) || 'TimeUndefined');
     }
@@ -570,7 +570,7 @@ function Start({ onOpen, opening, error }) {
     words.every((w) => `${p.name} ${p.text} ${p.infoarea} ${p.kind}`.toLowerCase().includes(w)));
 
   return html`
-    <div class="topbar"><h1>Schema Builder</h1><span class="muted">Mondrian schemas for BW InfoProviders</span>
+    <div class="topbar"><h1>Schema Builder</h1><span class="muted">Schemas for BW InfoProviders</span>
       <span class="spacer"></span><a href=${`console.html${location.search}`}>MDX Console</a><a href=${`time.html${location.search}`}>Time Master Data</a><a href=${`trace.html${location.search}`}>Trace</a></div>
     <div class="page">
     ${(error || loadError) && html`<div style="padding: 16px 16px 0"><div class="notice err">${error || loadError}</div></div>`}

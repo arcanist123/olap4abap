@@ -6,7 +6,7 @@ third-party data and is under the project's license. FoodMart (`ZFMSALES`) stays
 the reference server's expected answers exist only for FoodMart.
 
 Run program `ZZXXMLA1_SETUP` with the checkbox "Also generate the clinic demo", or
-`sapcli class execute ZZXXMLA1_CL_BW_CLINIC_GEN`. A run takes about two minutes and **deletes and creates** InfoArea
+`sapcli class execute ZZXXMLA1_CL_BW_CLINIC_GEN`. A run **deletes and creates** InfoArea
 `ZCLINIC`'s objects (the demo's catalogs, the aDSO, the cube, the views of its characteristics and the InfoObjects
 `ZCL*`); the views of the time characteristics `0CAL*` are shared with other providers and only generated again.
 

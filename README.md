@@ -47,5 +47,9 @@ tests compare against.
 olap4abap is licensed under the [Eclipse Public License 2.0](LICENSE). It contains code derived from Mondrian
 (Eclipse Public License 1.0); see [NOTICE](NOTICE) for the copyright notices and the third-party components.
 
+olap4abap runs on your SAP system and gives its users access to BW data. It brings no SAP license: every user who
+reaches BW through it, Excel users included, needs to be licensed for that by SAP (indirect use); check your SAP
+contract before rolling it out.
+
 SAP, SAP BW, ABAP and SAP NetWeaver are trademarks of SAP SE; Mondrian is a trademark of Hitachi Vantara. olap4abap is
 not affiliated with or endorsed by either.

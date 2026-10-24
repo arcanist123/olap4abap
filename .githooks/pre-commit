@@ -1,0 +1,3 @@
+#!/bin/sh
+# License rules on the staged files (scripts/license-scan.py; docs/environment.md, SAP license)
+exec python scripts/license-scan.py --staged
