@@ -14,9 +14,10 @@
 * current user, once per key date, since the hierarchies of ZCLDOC are version dependent and entirely time dependent
 * (docs/clinic-demo.md). Per characteristic flat selections, every hierarchy of the key date and every node of it as
 * slicer, on the rows, its children and its parent; combined, the members of the one characteristic with a value or a
-* node of the other as slicer. The list shows per query whether BW answered (OK, EMPTY) or refused (NO AUTH, ERROR),
+* node of the other as slicer; NON EMPTY members and children, the crossjoin of the characteristics, the members of
+* each level. The list shows per query whether BW answered (OK, EMPTY) or refused (NO AUTH, ERROR),
 * with BW's message; above it the analysis authorizations that restrict the characteristics and whether the user has
-* them. Log on as (or assign the authorization to) the user whose authorization is to be probed.
+* them. As the user p_user (default: the current one), as BW's "Execute as Other User" (RSUDO) runs it.
 REPORT zzxxmla1_bw_auth_probe.
 
 DATA key_date TYPE d.
@@ -28,6 +29,7 @@ SELECTION-SCREEN BEGIN OF BLOCK provider WITH FRAME TITLE t_prov.
 PARAMETERS p_cube TYPE c LENGTH 30 DEFAULT '$ZCLVISITA' LOWER CASE.
 SELECT-OPTIONS s_char FOR characteristic NO INTERVALS.
 PARAMETERS p_meas TYPE c LENGTH 30 DEFAULT 'ZCLVISNO'.
+PARAMETERS p_user TYPE xubname DEFAULT sy-uname.
 SELECT-OPTIONS s_date FOR key_date NO INTERVALS.
 SELECT-OPTIONS s_hienm FOR hienm.
 SELECT-OPTIONS s_vers FOR version.
@@ -42,6 +44,9 @@ PARAMETERS p_child AS CHECKBOX DEFAULT 'X'.
 PARAMETERS p_parent AS CHECKBOX DEFAULT 'X'.
 PARAMETERS p_comb AS CHECKBOX DEFAULT 'X'.
 PARAMETERS p_cleaf AS CHECKBOX.
+PARAMETERS p_nempty AS CHECKBOX DEFAULT 'X'.
+PARAMETERS p_cross AS CHECKBOX DEFAULT 'X'.
+PARAMETERS p_levels AS CHECKBOX DEFAULT 'X'.
 SELECTION-SCREEN END OF BLOCK tests.
 
 INITIALIZATION.
@@ -54,7 +59,8 @@ START-OF-SELECTION.
   DATA(probe) = NEW zzxxmla1_cl_bw_auth_probe(
     cube            = |{ p_cube }|
     characteristics = VALUE #( FOR c IN s_char WHERE ( sign = 'I' ) ( c-low ) )
-    measure         = |{ p_meas }| ).
+    measure         = |{ p_meas }|
+    user            = p_user ).
   DATA(authorizations) = probe->authorizations( ).
   DATA(results) = probe->run( key_dates   = VALUE #( FOR date IN s_date WHERE ( sign = 'I' ) ( date-low ) )
                               hierarchies = s_hienm[]
@@ -66,14 +72,19 @@ START-OF-SELECTION.
                                                      children       = p_child
                                                      parent         = p_parent
                                                      combined       = p_comb
-                                                     combine_leaves = p_cleaf ) ).
+                                                     combine_leaves = p_cleaf
+                                                     non_empty      = p_nempty
+                                                     crossjoin      = p_cross
+                                                     levels         = p_levels ) ).
+  " the list without the cells, which the answer shows as text
+  DATA(lines) = CORRESPONDING zzxxmla1_cl_bw_auth_probe=>ty_result_lines( results ).
   TRY.
       cl_salv_table=>factory( IMPORTING r_salv_table = DATA(alv)
-                              CHANGING  t_table      = results ).
+                              CHANGING  t_table      = lines ).
       alv->get_functions( )->set_all( abap_true ).
       alv->get_columns( )->set_optimize( abap_true ).
       DATA(top) = NEW cl_salv_form_layout_grid( ).
-      top->create_label( row = 1 column = 1 text = |User { sy-uname }: analysis authorizations| ).
+      top->create_label( row = 1 column = 1 text = |User { p_user }: analysis authorizations| ).
       LOOP AT authorizations INTO DATA(authorization).
         DATA(row) = sy-tabix + 1.
         top->create_text( row = row column = 1 text = authorization-auth ).

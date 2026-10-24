@@ -252,6 +252,19 @@ by its key, a BW hierarchy's by its unique name, olap4abap's key of the path com
 1e-9; Excel's `__XLPath` strings with their names rewritten), the slicer not; a drill-through as distinct rows over
 the default action's columns, by dimension.
 
+## Clinic demo: analysis authorisations
+
+The oracle of the authorisation check is BW itself, per test user of the scenarios (`clinic-demo.md`, Authorization
+scenarios): `python scripts/auth_probe.py [--scenario S] [--key-date D] [--verify N]` runs the probe
+(`ZZXXMLA1_CL_BW_AUTH_PROBE`, `GET auth/probe?user=...`) with each user's authorizations at 2024-06-15, 2025-06-15
+and 9999-12-31 and writes `reference/auth/<scenario>.json`: per query its status (OK, EMPTY, NO AUTH, UNKNOWN,
+ERROR), BW's message and the cells (members of the row, value). The probe runs as BW's "Execute as Other User"
+(no logon of the user); `--verify N` sends every N-th statement of 9999-12-31 to BW's own XMLA service logged on as
+the user and keeps the logged-on answer where it refuses or differs (`loggedOn`), which wins: the switch answers a
+hierarchy the user has no node of empty where the logon refuses, and words refusals differently. Recorded
+2026-10-24 with `--verify 1`. Step 4 compares olap4abap's check with these files at every key date, step 6 the
+endpoint's answers at 9999-12-31 (`next-steps.md`, Now: analysis authorisations).
+
 ## Mondrian's own tests against our schema
 
 The eMondrian container serves only our reference catalog `ZFOODMART` (`scripts/deploy-reference-schema.sh`, installs

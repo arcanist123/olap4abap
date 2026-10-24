@@ -109,9 +109,14 @@ the master data (it is not time dependent), so in 2025 it differs from the hiera
 ### Probing BW's authorizations on them
 
 Program `ZZXXMLA1_BW_AUTH_PROBE` (`ZZXXMLA1_CL_BW_AUTH_PROBE`) runs queries through BW's own MDX engine
-(`BAPI_MDDATASET_*`) on `$ZCLVISITA` as the current user and lists per query OK, EMPTY, NO AUTH or ERROR with BW's
-answer (with the cell status where BW gives one) or message; above the list the analysis authorizations that restrict
-`ZCLDOC` or `ZCLDIAG`, with all their lines, and whether the user has them. BW's MDX shows per hierarchy name and
+(`BAPI_MDDATASET_*`) on `$ZCLVISITA` with the analysis authorizations of a user (the current one, or another as BW's
+"Execute as Other User", `RSUDO`, runs: `RSEC_SET_USERNAME`, read back with `RSEC_GET_USERNAME`; `sy-uname` stays the
+caller) and lists per query OK, EMPTY, NO AUTH (BW's authorization messages: EYE 007 "You do not have sufficient
+authorization", "Hierarchy node not authorized"), UNKNOWN (a value the user may not see, which BW does not know:
+BRAINOLAPAPI 510 "Value 002 for characteristic ZCLDOC unknown") or ERROR with BW's answer (per row the members of its
+tuple, captions and value, with the cell status where BW gives one; read with `BAPI_MDDATASET_GET_AXIS_DATA` and
+`_GET_CELL_DATA`) or message, a warning BW answers with too; above the list the analysis authorizations that
+restrict `ZCLDOC` or `ZCLDIAG`, with all their lines, and whether the user has them. BW's MDX shows per hierarchy name and
 version only the slice valid at the key date (unique name `[ZCLDOC<pad 30>ZCLDOC_ORG<pad 30>001]`, no date in it;
 `[ZCLDIAG<pad 30>ZCLDIAG_ICD]` without version), so the probe sets the key date (`RRT_SET_KEY_DATE`) and runs everything
 once per key date (default 2024-06-15, 2025-06-15 and 9999-12-31, the key date olap4abap works with):
@@ -121,9 +126,17 @@ once per key date (default 2024-06-15, 2025-06-15 and 9999-12-31, the key date o
 - per hierarchy its members, and per node (text node `[<hierarchy>].[<name pad 32>0HIER_NODE]`, leaf
   `[<hierarchy>].[008]`) the node as slicer, on the rows, its children and its parent;
 - combined: the members of one characteristic (flat and per hierarchy) with each value and each text node of the
-  other as slicer (its leaves too with "combine with leaves").
+  other as slicer (its leaves too with "combine with leaves");
+- NON EMPTY: the members of each row set and the children of each text node;
+- crossjoin: the members of the one characteristic crossed with those of the other, one side flat, with and without
+  NON EMPTY;
+- levels: the members of each level of each row set (`BAPI_MDPROVIDER_GET_LEVELS`);
+- pairs: a value of each characteristic together as slicer, for the pairs given (`(009, I10)`);
+- per characteristic the hierarchies BW's metadata lists to the user (`HIERARCHIES`): it lists fewer to a restricted
+  user, so the probe reads them as the caller and asks all of them.
 
-With `0BI_ALL` all 2,244 queries answer. The statement goes to BW in lines of 75 characters that BW
+BW's MDX has no `DRILLTHROUGH` (BRAINOLAPAPI 153, Statement Not Supported), so there is no drill-through to probe.
+With `0BI_ALL` every query answers. The statement goes to BW in lines of 75 characters that BW
 joins respecting blanks. BW keeps the authorizations' values in `RSECVAL_STRING` and `RSECHIE_STRING` (with the
 header `RSECBIAU` and the texts `RSECTXT`); `RSECVAL` and `RSECHIE` hold only `0BI_ALL` on the 2025 system, so the
 probe reads the string tables.
@@ -145,7 +158,24 @@ authorisations). It writes them with BW's API (`RSEC_CREATE_AUTHORIZATION_API`, 
 - The users are service users (type `S`: the password never has to be changed, HTTP basic logons work) with the profile
   `ZZXXMLA1_REP` (`S_RS_COMP` and `S_RS_COMP1` display and execute of every query component, `S_RFC` of every function
   group), written with `SUSR_INTERFACE_PROF`. With the setup's password field empty they get a generated password
-  nobody knows: they cannot log on, BW's checks can still run for them. The password is not stored anywhere.
+  nobody knows: they cannot log on, BW's checks can still run for them (the probe runs as them without a logon). The
+  password is not stored on the system; `scripts/auth_probe.py --verify` logs on as them with `SAP_TEST_PASSWORD` of
+  `.env.sap`, so give the setup that password (or set it with `BAPI_USER_CHANGE`).
+
+### BW's answers per scenario (the oracle)
+
+`scripts/auth_probe.py` runs the probe for each test user (`GET auth/probe?user=...` of the schema API) at the three
+key dates and writes `reference/auth/<scenario>.json` (`next-steps.md`, Now: analysis authorisations, step 2;
+`mvp-scope.md`, Authorisation decision, for the rules read from them). With `--verify 1` every statement of
+9999-12-31 also goes to BW's own XMLA service (`/sap/bw/xml/soap/xmla`) logged on as the user, and the logged-on
+answer is kept with the statement where it is a refusal or differs (`loggedOn`), since the switch is not a logon.
+Observed on every scenario: the values are the same; the switch words BW's refusals differently ("Hierarchy node not
+authorized" against "No authority for the node from characteristic ZCLDOC, hierarchy ZCLDOC_ORG (00000000,001)", a
+generic BRAINOLAPAPI 012 for a user without any authorization on the provider against "You do not have sufficient
+authorization for the InfoProvider ZCLVISITA"); and a statement on a hierarchy the user has no node of is EMPTY
+through the switch but refused logged on. Where they differ, the logged-on answer is BW's. BW's XMLA service has no
+key date of its own (it uses today, in the slices valid to 9999-12-31), so the other key dates are the switch's
+only.
 
 | User | Scenario | Authorizations | Restriction (`ZCLDIAG` `*` unless named) |
 |---|---|---|---|

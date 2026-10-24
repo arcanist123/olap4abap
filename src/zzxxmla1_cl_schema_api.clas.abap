@@ -90,6 +90,16 @@
 "! - POST trace/on?user=U (for ZZXXMLA1_CL_TRACE=>C_ACTIVE_HOURS from now, deleting the calls older than its
 "!   C_RETENTION_DAYS), trace/off?user=U (without user the current one), trace/clear[?user=U] (without user everyone's
 "!   calls): committed, answered as GET trace.
+"! - GET auth/probe[?user=U][&keyDates=YYYY-MM-DD,...][&tests=flat,members,...][&hierarchies=H,...][&versions=V,...]
+"!   [&pairs=v1:w1,...] (the value pairs of the test pairs, a ZCLDOC value and a ZCLDIAG value):
+"!   BW's own MDX on the clinic demo's aDSO (ZZXXMLA1_CL_BW_AUTH_PROBE, docs/clinic-demo.md) with the analysis
+"!   authorizations of U, a test user of the scenarios (ZZXXMLA1_CL_BW_AUTH_GEN; refused, 403, for any other user),
+"!   as BW's "Execute as Other User" runs it; without user of the current user. Answers the user, its scenario (null
+"!   if none), the analysis authorizations that restrict ZCLDOC or ZCLDIAG with whether the user has them, and per
+"!   query its status (OK, EMPTY, NO AUTH, UNKNOWN, ERROR), rows, answer, cells and BW's message. Without keyDates
+"!   9999-12-31; tests are the components of the probe's ty_tests, without tests all but combine_leaves. Nothing is
+"!   written;
+"! - GET auth/scenarios: the analysis authorization scenarios and their test users (ZZXXMLA1_CL_BW_AUTH_GEN).
 "! It runs as the XMLA endpoint does (the anonymous logon of the node), accept included, for now.
 CLASS zzxxmla1_cl_schema_api DEFINITION
   PUBLIC
@@ -275,6 +285,19 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
       IMPORTING request       TYPE ty_request
       RETURNING VALUE(result) TYPE string
       RAISING   zzxxmla1_cx_api_refused.
+    "! GET auth/probe: BW's own MDX as the logged-on user; refused (400) for a date or a test that is none.
+    METHODS auth_probe
+      IMPORTING request       TYPE ty_request
+      RETURNING VALUE(result) TYPE string
+      RAISING   zzxxmla1_cx_api_refused.
+    "! GET auth/scenarios: the scenarios with their users and analysis authorizations.
+    METHODS auth_scenarios
+      RETURNING VALUE(result) TYPE string.
+    "! A parameter that is a list separated by commas: its items in upper case, without blanks and empty ones.
+    METHODS list_parameter
+      IMPORTING request       TYPE ty_request
+                !name         TYPE string
+      RETURNING VALUE(result) TYPE string_table.
     "! The first c_missing_max values as a JSON array.
     METHODS missing_values_json
       IMPORTING !values       TYPE string_table
@@ -329,6 +352,12 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
     "! A date parameter as a date, initial if it is not given.
     METHODS date_parameter
       IMPORTING request       TYPE ty_request
+                !name         TYPE string
+      RETURNING VALUE(result) TYPE d
+      RAISING   zzxxmla1_cx_api_refused.
+    "! A text YYYY-MM-DD or YYYYMMDD as a date; refused (400) if it is none, named as the parameter name.
+    METHODS date_of
+      IMPORTING !text         TYPE string
                 !name         TYPE string
       RETURNING VALUE(result) TYPE d
       RAISING   zzxxmla1_cx_api_refused.
@@ -527,6 +556,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
                                   THEN substring( val = request-path off = strlen( c_path ) ) ).
     DATA(allow) = SWITCH string( resource WHEN `providers` OR `proposal` OR `values` OR `schemas` OR `schema` OR `time`
                                             OR `time/missing` OR `trace` OR `trace/entry` OR `trace/response`
+                                            OR `auth/probe` OR `auth/scenarios`
                                           THEN `GET`
                                           WHEN `check` OR `accept` OR `remove` OR `fix` OR `probe` OR `time/fill`
                                             OR `trace/on` OR `trace/off` OR `trace/clear`
@@ -556,6 +586,8 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
                                          WHEN `trace`     THEN trace_status( request )
                                          WHEN `trace/entry` THEN trace_entry( request )
                                          WHEN `trace/response` THEN trace_response( request )
+                                         WHEN `auth/probe` THEN auth_probe( request )
+                                         WHEN `auth/scenarios` THEN auth_scenarios( )
                                          WHEN `trace/on` OR `trace/off` OR `trace/clear`
                                                           THEN switch_trace( request = request resource = resource )
                                          ELSE                  remove( request ) ).
@@ -1180,19 +1212,130 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD date_parameter.
-    DATA(text) = replace( val = parameter( request = request name = name ) sub = `-` with = `` occ = 0 ).
-    IF text IS INITIAL.
-      RETURN.
+    DATA(text) = parameter( request = request name = name ).
+    IF text IS NOT INITIAL.
+      result = date_of( text = text name = name ).
     ENDIF.
-    IF strlen( text ) = 8 AND text CO `0123456789`.
-      result = text.
+  ENDMETHOD.
+
+  METHOD date_of.
+    DATA(digits) = replace( val = text sub = `-` with = `` occ = 0 ).
+    IF strlen( digits ) = 8 AND digits CO `0123456789`.
+      result = digits.
     ENDIF.
     " an impossible date (20260231) is 0 as a number
     IF result IS INITIAL OR result(4) < `1000` OR CONV d( CONV i( result ) ) <> result.
       RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused
         EXPORTING status  = 400
-                  message = |{ name } is not a date (YYYY-MM-DD): { parameter( request = request name = name ) }|.
+                  message = |{ name } is not a date (YYYY-MM-DD): { text }|.
     ENDIF.
+  ENDMETHOD.
+
+  METHOD list_parameter.
+    SPLIT parameter( request = request name = name ) AT `,` INTO TABLE DATA(items).
+    LOOP AT items INTO DATA(item).
+      item = to_upper( condense( item ) ).
+      IF item IS NOT INITIAL.
+        APPEND item TO result.
+      ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD auth_probe.
+    DATA key_dates TYPE zzxxmla1_cl_bw_auth_probe=>ty_dates.
+    LOOP AT list_parameter( request = request name = `keydates` ) INTO DATA(text).
+      APPEND date_of( text = text name = `keyDates` ) TO key_dates.
+    ENDLOOP.
+    IF key_dates IS INITIAL.
+      key_dates = VALUE #( ( CONV d( '99991231' ) ) ).
+    ENDIF.
+
+    DATA tests TYPE zzxxmla1_cl_bw_auth_probe=>ty_tests.
+    DATA(names) = list_parameter( request = request name = `tests` ).
+    IF names IS INITIAL.
+      tests = VALUE #( flat = abap_true members = abap_true slicer = abap_true rows = abap_true
+                       children = abap_true parent = abap_true combined = abap_true non_empty = abap_true
+                       crossjoin = abap_true levels = abap_true ).
+    ENDIF.
+    LOOP AT names INTO DATA(name).
+      ASSIGN COMPONENT name OF STRUCTURE tests TO FIELD-SYMBOL(<test>).
+      IF sy-subrc <> 0.
+        RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused
+          EXPORTING status  = 400
+                    message = |No test { to_lower( name ) }: flat, members, slicer, rows, children, parent, | &&
+                              |combined, combine_leaves, non_empty, crossjoin, levels, pairs|.
+      ENDIF.
+      <test> = abap_true.
+    ENDLOOP.
+    DATA(hierarchies) = VALUE zzxxmla1_cl_bw_auth_probe=>ty_hienm_range(
+      FOR h IN list_parameter( request = request name = `hierarchies` ) ( sign = 'I' option = 'EQ' low = h ) ).
+    DATA(versions) = VALUE zzxxmla1_cl_bw_auth_probe=>ty_version_range(
+      FOR v IN list_parameter( request = request name = `versions` ) ( sign = 'I' option = 'EQ' low = v ) ).
+
+    DATA(scenarios) = zzxxmla1_cl_bw_auth_gen=>scenarios( ).
+    DATA(user) = user_parameter( request = request name = `user` fallback = sy-uname ).
+    READ TABLE scenarios INTO DATA(scenario) WITH KEY user = user.
+    DATA(is_scenario) = xsdbool( sy-subrc = 0 ).
+    IF user <> sy-uname AND is_scenario = abap_false.
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused
+        EXPORTING status  = 403
+                  message = |The probe runs as a test user of the scenarios only, not as { user }|.
+    ENDIF.
+
+    DATA pairs TYPE zzxxmla1_cl_bw_auth_probe=>ty_pairs.
+    LOOP AT list_parameter( request = request name = `pairs` ) INTO DATA(pair_text).
+      SPLIT pair_text AT `:` INTO DATA(first) DATA(second).
+      IF first IS INITIAL OR second IS INITIAL.
+        RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused
+          EXPORTING status  = 400
+                    message = |A pair is two values with a colon between them: { pair_text }|.
+      ENDIF.
+      APPEND VALUE #( first = first second = second ) TO pairs.
+    ENDLOOP.
+
+    DATA(probe) = NEW zzxxmla1_cl_bw_auth_probe( user = user ).
+    DATA authorizations TYPE string_table.
+    LOOP AT probe->authorizations( ) INTO DATA(authorization).
+      APPEND |\{"auth":{ json( |{ authorization-auth }| ) },"assigned":{ json_bool( authorization-assigned ) },| &&
+             |"kind":{ json( |{ authorization-kind }| ) },"details":{ json( authorization-details ) }\}|
+        TO authorizations.
+    ENDLOOP.
+    DATA results TYPE string_table.
+    LOOP AT probe->run( key_dates   = key_dates
+                        hierarchies = hierarchies
+                        versions    = versions
+                        tests       = tests
+                        pairs       = pairs ) INTO DATA(row).
+      DATA(cells) = VALUE string_table(
+        FOR cell IN row-cells
+        ( |\{"members":{ json_array( VALUE #( FOR m IN cell-members ( json( m ) ) ) ) },| &&
+          |"captions":{ json_array( VALUE #( FOR c IN cell-captions ( json( c ) ) ) ) },| &&
+          |"value":{ json( cell-value ) },"status":{ json( cell-status ) }\}| ) ).
+      APPEND |\{"keyDate":{ json_date( row-key_date ) },"characteristic":{ json( |{ row-characteristic }| ) },| &&
+             |"hierarchy":{ json( |{ row-hierarchy }| ) },| &&
+             |"validTo":{ COND string( WHEN row-valid_to IS INITIAL THEN `null` ELSE json_date( row-valid_to ) ) },| &&
+             |"test":{ json( |{ row-test }| ) },"node":{ json( |{ row-node }| ) },| &&
+             |"nodeType":{ json( |{ row-node_type }| ) },"level":{ row-level },| &&
+             |"filterChar":{ json( |{ row-filter_char }| ) },"filterHierarchy":{ json( |{ row-filter_hierarchy }| ) },| &&
+             |"filterNode":{ json( |{ row-filter_node }| ) },"status":{ json( |{ row-status }| ) },| &&
+             |"rows":{ row-rows },"answer":{ json( row-answer ) },"message":{ json( row-message ) },| &&
+             |"mdx":{ json( row-mdx ) },"cells":{ json_array( cells ) }\}| TO results.
+    ENDLOOP.
+
+    result = |\{"user":{ json( |{ user }| ) },"executedBy":{ json( |{ sy-uname }| ) },| &&
+             |"scenario":{ COND string( WHEN is_scenario = abap_true THEN json( scenario-name ) ELSE `null` ) },| &&
+             |"keyDates":{ json_array( VALUE #( FOR date IN key_dates ( json_date( date ) ) ) ) },| &&
+             |"authorizations":{ json_array( authorizations ) },"results":{ json_array( results ) }\}|.
+  ENDMETHOD.
+
+  METHOD auth_scenarios.
+    DATA entries TYPE string_table.
+    LOOP AT zzxxmla1_cl_bw_auth_gen=>scenarios( ) INTO DATA(scenario).
+      APPEND |\{"name":{ json( scenario-name ) },"user":{ json( |{ scenario-user }| ) },| &&
+             |"auths":{ json_array( VALUE #( FOR auth IN scenario-auths ( json( |{ auth }| ) ) ) ) },| &&
+             |"description":{ json( scenario-description ) }\}| TO entries.
+    ENDLOOP.
+    result = |\{"scenarios":{ json_array( entries ) }\}|.
   ENDMETHOD.
 
   METHOD time_status_json.

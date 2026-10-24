@@ -204,7 +204,57 @@ Decisions taken by the project owner on 2026-10-02, with reasons.
     filled by a customer exit at query time). A user with an authorisation with a variable that applies to the
     query's provider is not authorised: the query is a fault (no authorisation), whatever else the user has.
 - **Identity is not olap4abap's:** the user is managed on the SICF node; olap4abap takes `sy-uname` as given and
-  checks the authorisations of that user.
+  checks the authorisations of that user. It reads the user with BW's released `RSEC_GET_USERNAME` (the user of
+  `sy-uname`, or under BW's "Execute as Other User" the user being tested, as BW's own checks do), so that a check run
+  as another user, as the probe runs, checks that user.
+
+### BW's rules (observed 2026-10-24, step 2)
+
+What BW's MDX does with the scenarios of `clinic-demo.md` (Authorization scenarios), recorded per test user and key
+date in `reference/auth/` (`scripts/auth_probe.py`; at 9999-12-31 each statement also checked logged on as the user,
+whose answer wins where they differ). These are the rules olap4abap follows (`next-steps.md`, steps 3 to 5). A
+selection BW does not allow is refused or unknown, never filtered silently; where BW filters, it says so below.
+
+- **Refusals are of three kinds**, kept apart by the check: a value the user has no authorisation for at all does
+  not exist for the user (a slicer on it is BW's "Value 002 for characteristic ZCLDOC unknown"); a selection of
+  values the user may see that the user may not see together, or aggregated, is "You do not have sufficient
+  authorization" (EYE 007); a hierarchy or node outside the user's hierarchy authorisations is "No authority for the
+  node from characteristic ZCLDOC, hierarchy ZCLDOC_ORG (...)". A user with no authorisation on the provider is "You
+  do not have sufficient authorization for the InfoProvider ZCLVISITA" on every query.
+- **Aggregation needs `:`.** A query that does not name an authorisation-relevant characteristic (the total, a slicer
+  on the other characteristic only) aggregates it and is refused without `:` on it (EQ: total refused; EQ_AGG:
+  allowed). The aggregate is over all values, not over the visible ones (the total is 33,956 for every user with
+  `:`, as for FULL). `:` alone (AGG) allows the aggregate and no value: every value is refused ("You do not have
+  analysis authorization for any char. values of char. ZCLDOC").
+- **Flat members are refused, not filtered.** `[ZCLDOC].Members` (with or without NON EMPTY) is refused for every
+  user who may not see every value, `:` or not; it is answered only with `*` (FULL). So are crossjoins with it. The
+  values a user may see (EQ, BT, CP, a hierarchy line's leaves) work as slicer, each alone.
+- **`#`** authorises the not-assigned value only: NA sees no physician; NA_AGG has the aggregate. (The probe asks
+  no slicer on `#` itself: every visit has a physician.)
+- **Hierarchy lines give flat values** too: the leaves the node covers in the slice valid at the key date (H1:
+  `001`-`005` and, from 2025, `008`; HV2, version `002`: `001`-`005`; H3: all; HLEAF: `008`); type 0 (H0) and type 2
+  (H2, to a level above the leaves) give no leaf, so no value. Several lines of one authorisation add up (2HIE: the
+  leaves of `CARD` and of `RIVER`).
+- **A hierarchy is restricted, not refused, where the user has a line on it**: its members are the authorised
+  subtree only, re-rooted (H1: `[ZCLDOC_ORG 001].Members` is GP and its six physicians, `LEVEL00` is GP, `LEVEL01` the
+  physicians; GP has no parent: `.Parent` is empty), its ancestors refused as slicer or on rows, a visible node's
+  value the full aggregate of its subtree (H2's SPECIAL 10,044 as for FULL). A node the user may see but not expand
+  (type 0, or at the level limit of type 2) has no children (`.Children` empty) and makes `.Members` of the hierarchy
+  refused (H0, H2), while `Level.Members` answers the visible nodes of the level. Node types 1 and 3 have every
+  member of the subtree. BW's metadata lists the hierarchies a user has a line on (and every hierarchy of a
+  characteristic with `*`); a hierarchy without a line is refused as a whole (members, nodes, crossjoins), only
+  `Level.Members` of it answers, empty.
+- **Within one authorisation the characteristics combine as AND, several authorisations as OR** (a union of
+  sub-cubes, not per characteristic): CROSS (`009` with `I10`, `012` with `J45`) answers `(009, I10)` and
+  `(012, J45)` and refuses `(009, J45)` and `(012, I10)` (EYE 007), each value alone (it aggregates the other) too;
+  COMB answers PULM's subtree with a slicer in RESPIRATORY and refuses the rest.
+- **Key date:** BW resolves a line to the slice of its hierarchy name and version valid at the key date; the slices
+  of `ZCLDOC` make the values differ by key date (H1 without `008` in 2024, where `008` is refused).
+- **Drill-through** cannot be probed: BW's MDX has no `DRILLTHROUGH`. olap4abap checks the cell's selection, as for
+  a slicer.
+- **Empty against refused:** BW answers EMPTY only where the selection is allowed and has no members (children of a
+  node that may not be expanded, the parent of the top node, a level with no visible member); every other selection
+  outside the region is refused (above).
 
 ## Out of scope (MVP)
 

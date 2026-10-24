@@ -6,6 +6,15 @@
   publishing 50000-50001, 8443, 3200, 3300, 8002, 30213, 30215 and others.
 - ICF service `/zzxxmla1` -> `ZZXXMLA1_MAIN_ENDPOINT`, URL `http://vhcala4hci:50000/zzxxmla1?sap-client=001`. Anonymous
   access is enabled through logon data on the ICF node (dev system only). The earlier 401 happened before that was set.
+  With logon data on the node every call runs as its user (`DEVELOPER`), also one that sends basic authentication of
+  another user (observed 2026-10-24 with a test user: `GET trace` answers `DEVELOPER`), so the node takes no personal
+  logon. The handler reads its paths from `~path_info`, so a second node without logon data could serve the same
+  handler to personal logons (not created; the authorisation probe does without one, below).
+- Analysis authorisations of another user without a logon: BW's "Execute as Other User" (`RSUDO`, the released
+  `RSEC_GET_USERNAME` reads the user it checks; `RSEC_SET_USERNAME` sets it, `sy-uname` stays the caller), which the
+  probe uses (`clinic-demo.md`, Probing BW's authorizations). To compare with a real logon, BW's own XMLA service
+  `/sap/bw/xml/soap/xmla` takes basic authentication (data source `default`, catalog `$INFOCUBE`); the test users'
+  password is `SAP_TEST_PASSWORD` in `.env.sap` (`scripts/auth_probe.py --verify`).
 - Package `$ZZXXMLA1` is created by hand (ADT or SE80); the ABAP FS tool cannot create packages
   ("Parameter recordChanges could not be found. Your client is out of date.").
 - Connect Claude Code via `.mcp.json` (git-ignored, it holds credentials): the MCP servers, among them vsp

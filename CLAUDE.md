@@ -69,7 +69,8 @@ Read before designing anything:
   `python scripts/compare-applicable.py` runs Mondrian's test statements on eMondrian and SAP and groups the gaps.
   BW hierarchies: `python scripts/bw_hierarchy_test.py` compares with BW's own MDX, asked live
   (`ZZXXMLA1_CL_BW_HIERARCHY_PROBE`). Shared nodes: `python scripts/ssas_compare.py` asks SAP's `ZCLHIER` the
-  `execute_ssasmd_*` statements in olap4abap's names and compares the values with SSAS's.
+  `execute_ssasmd_*` statements in olap4abap's names and compares the values with SSAS's. Analysis authorisations:
+  `python scripts/auth_probe.py` records BW's answers per test user in `reference/auth/` (the oracle of the check).
 - The model is the catalogs' Mondrian schemas, configured as in Mondrian: the server has files (table `ZZXXMLA1_FILE`,
   `ZZXXMLA1_CL_FILES`), `/WEB-INF/datasources.xml` (`reference/schema/datasources-sap.xml`) lists the data sources and
   their catalogs, read by `ZZXXMLA1_CL_REPOSITORY` (Mondrian's `FileRepository`/`DataSourcesConfig`), and each catalog's
@@ -504,6 +505,10 @@ After changing ABAP in SAP, run `pull` before committing so `src/` is current.
   and hierarchy values, hierarchies matched by name and version (node by name and node type, never `HIEID`), a node's
   values from the slice valid at the key date (queries use 9999-12-31, the tests compare the check with the probe at
   several key dates), variables not supported (a user with one is not authorised: a fault of the query), for the user `sy-uname` (identity is the
-  SICF node's, not olap4abap's) (`docs/mvp-scope.md`, Authorisation decision). The scenarios and test users exist
-  (`docs/next-steps.md`, step 1); nothing is checked or enforced yet.
+  SICF node's, not olap4abap's; read with `RSEC_GET_USERNAME`) (`docs/mvp-scope.md`, Authorisation decision, with
+  BW's rules: flat sets refused, values outside unknown, `:` for aggregates, hierarchies restricted to the user's
+  subtree, AND within and OR over authorisations). The scenarios and test users exist, and BW's answers per test
+  user and key date are recorded in `reference/auth/` (`python scripts/auth_probe.py [--verify 1]`; the probe,
+  `GET auth/probe?user=...`, runs as BW's "Execute as Other User", `RSEC_SET_USERNAME`, verified against a logon of
+  the user through BW's XMLA service) (`docs/next-steps.md`, steps 1 and 2); nothing is checked or enforced yet.
 - Third-party reference code (`mondrian/`, `eMondrian/`) is fetched by `scripts/setup-reference.sh`, not committed.

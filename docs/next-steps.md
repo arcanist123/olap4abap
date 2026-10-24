@@ -217,26 +217,31 @@ probe's key dates and compare its result (allowed, empty, no authorisation, faul
 date. Queries keep using 9999-12-31 only; the other key dates prove that the check is right for every slice, so key
 dates in queries can come later without changing it.
 
-State on 2026-10-24: the probe is done and has run with `0BI_ALL` only (2,244 queries, all OK); step 1 is done: the 21
-scenarios exist as analysis authorisations `ZCLA_*` with their test users `ZZXXMLA1_A01` to `A21` (`clinic-demo.md`,
-Authorization scenarios). BW keeps the values in `RSECVAL_STRING` and `RSECHIE_STRING` (`RSECVAL` and `RSECHIE` hold
-only `0BI_ALL`); the probe reads those now. `RSDCHA-AUTHRELFL` is set on `ZCLDOC` and `ZCLDIAG`. Nothing of the check or
-the enforcement is built; the probe has not yet run for a test user (step 2).
+State on 2026-10-24: steps 1 and 2 are done: the 21 scenarios exist as analysis authorisations `ZCLA_*` with their
+test users `ZZXXMLA1_A01` to `A21` (`clinic-demo.md`, Authorization scenarios), and BW's answers for each user at the
+three key dates are in `reference/auth/` (`scripts/auth_probe.py`), BW's rules read from them in `mvp-scope.md`
+(Authorisation decision, BW's rules). BW keeps the values in `RSECVAL_STRING` and `RSECHIE_STRING` (`RSECVAL` and
+`RSECHIE` hold only `0BI_ALL`). `RSDCHA-AUTHRELFL` is set on `ZCLDOC` and `ZCLDIAG`. Nothing of the check or the
+enforcement is built (step 3).
 
-### Open decisions (answered by step 2, not guessed)
+### Decisions answered by step 2
 
-- **Refuse or restrict.** BW's reporting refuses a query whose selection is not inside the user's authorisations
-  (it does not filter silently): a characteristic drilled down without a filter needs `*`, aggregating it needs `:`.
-  Whether BW's MDX does the same for `[ZCLDOC].Members`, a hierarchy's members, a node's children, or shows only the
-  authorised members, and how it shows a node the user may see but not expand (type 0, a level limit), is what
-  step 2 records. The engine follows the recorded answers: a refusal is a check of the query's selection before the
-  cells (step 5a), a restriction an authorisation predicate on every read (step 5b); probably both, per case.
-- **Combining authorisations.** Within one authorisation the characteristics' lines combine as AND (a sub-cube),
-  several authorisations of a user as OR of those sub-cubes, not per characteristic. A scenario of step 1 checks it.
-- **The ICF node logs on anonymously** (`environment.md`): every caller is its service user, so authorisations only
-  mean something with a personal logon. The tests log on as test users (step 2); whether ICF takes a caller's basic
-  authentication before the node's logon data, or a second node without logon data is needed, is found out there.
-  The service user keeps `0BI_ALL`, so the existing tests are unchanged.
+- **Refuse or restrict: both, per case** (`mvp-scope.md`, BW's rules). BW refuses a flat selection that is not
+  inside the region (`[ZCLDOC].Members` without `*`, an aggregate without `:`, a pair outside every sub-cube) and
+  does not know a value outside every authorisation (a fault naming the value); it restricts a hierarchy the user has
+  a line on to the authorised subtree, re-rooted, with empty children below a node that may not be expanded. So step
+  5a (refusal) is the check of the query's selection; step 5b (restriction) applies only to the members of a
+  hierarchy, through `levels_sql` and the closure, not as a predicate on every fact read: an allowed selection is
+  answered with all its facts (a node's value is its full aggregate).
+- **Combining authorisations:** AND of the characteristics within one authorisation, OR over the authorisations
+  (CROSS, pairs).
+- **Logons:** `/zzxxmla1` runs every call as the node's user, also with basic authentication of another user. The
+  probe needs no logon: it runs as BW's "Execute as Other User" (`RSEC_SET_USERNAME`; `RSUDO`, pointed out by the
+  user), verified against a real logon of each user through BW's XMLA service at 9999-12-31: same values; other
+  wording of the refusals; and a hierarchy without a line of the user is empty through the switch but refused
+  logged on (the logged-on answer is kept in the files and wins). The service user keeps `0BI_ALL`, so the existing
+  tests are unchanged. End to end as each user (step 6) still needs a personal logon on olap4abap's endpoint: a second
+  ICF node without logon data (the handler reads `~path_info`), or the check driven by the switch in the tests.
 
 ### Steps
 
@@ -257,15 +262,16 @@ the enforcement is built; the probe has not yet run for a test user (step 2).
    refusal is postponed (decided with the user 2026-10-24): the generator creates no variable scenario; it would need
    a customer exit variable on `ZCLDOC` created in BW by hand (no documented API). Step 3 tests the refusal on
    made-up lines.
-2. **The oracle**: the probe as each test user at the three key dates, kept as `reference/auth/<scenario>.json`
-   (`scripts/auth_probe.py`; the probe answers JSON through the schema API, `GET auth/probe`, logged on as the user, or
-   through a session as the user; first check whether BW's `RSUDO` mechanism lets one session probe as another user:
-   then the users need no password; else the setup gives them one, and `.env.sap` holds it for the scripts). The probe's
-   `authorizations( )` reads the direct assignment and `S_RS_AUTH` of the current user: probing as another user needs it
-   for that user. From the answers write BW's rules into `mvp-scope.md` (Authorisation decision): the open decisions
-   above, what `:` and `#` do, what a node type shows on rows, as slicer, children and parent, and EMPTY against NO
-   AUTH. The probe gets the queries the rules need that it lacks (NON EMPTY, a crossjoin of both characteristics, a
-   drill-through, `Members` of a level).
+2. **The oracle** (done 2026-10-24): the probe as each test user at the three key dates, kept as
+   `reference/auth/<scenario>.json` with the statements once in `reference/auth/statements.json`
+   (`scripts/auth_probe.py`, `GET auth/probe?user=...` and `GET auth/scenarios` of the schema API). The probe runs as
+   BW's "Execute as Other User" (`RSEC_SET_USERNAME`, `RSEC_GET_USERNAME`; `authorizations( )` of that user, `S_RS_AUTH`
+   by `AUTHORITY-CHECK ... FOR USER`), `--verify 1` compares every statement of 9999-12-31 with a logon of the user
+   through BW's XMLA service (the users' password `SAP_TEST_PASSWORD` in `.env.sap`; set with `BAPI_USER_CHANGE`, as
+   the setup's password field would). New queries: NON EMPTY members and children, crossjoins (one side flat),
+   `Level.Members`, value pairs as slicer, the hierarchies BW lists to the user; per row the tuple's members and value
+   (`BAPI_MDDATASET_GET_AXIS_DATA`, `_GET_CELL_DATA`); a status UNKNOWN for a value BW does not know for the user.
+   BW's MDX has no `DRILLTHROUGH`. The rules are in `mvp-scope.md` (Authorisation decision, BW's rules).
 3. **The authorisations of a user** (`ZZXXMLA1_CL_BW_AUTH`, BW's `RSEC` logic, unit tests on made-up lines): for a user,
    key date and provider, the authorisation-relevant characteristics of the provider (`RSDCHA-AUTHRELFL`) and the user's
    authorisations (`S_RS_AUTH` values of the user, `SUSR_USER_AUTH_FOR_OBJ_GET` or the like, patterns included, and
@@ -278,29 +284,35 @@ the enforcement is built; the probe has not yet run for a test user (step 2).
    characteristic the values it shows or filters, or aggregated).
 4. **The check against the oracle at every key date** (`GET auth/check` of the schema API with user and key date,
    computed by any caller since the user is a parameter; `scripts/auth_check_test.py`): each probe row of
-   `reference/auth/` translated into a selection, the check's answer compared with BW's. All three key dates must
-   agree before step 5.
-5. **Enforcement in the engine at 9999-12-31**: the region resolved once per request for `sy-uname` (kept with the
-   request as the `MemberCache` is); a user whose region is `*` and `:` everywhere (`0BI_ALL`) gets no condition and
-   no cost. As step 2 decides:
+   `reference/auth/` translated into a selection, the check's answer (allowed, empty, refused, unknown) compared with
+   BW's, the logged-on answer (`loggedOn`) where there is one. All three key dates must agree before step 5; at the
+   other key dates a hierarchy without a line of the user is EMPTY in the files (the switch's answer) and counts as
+   refused.
+5. **Enforcement in the engine at 9999-12-31**: the region resolved once per request for the user of
+   `RSEC_GET_USERNAME` (kept with the request as the `MemberCache` is); a user whose region is `*` and `:` everywhere
+   (`0BI_ALL`) gets no condition and no cost. As step 2 decided (`mvp-scope.md`, BW's rules):
    - a. Refusal: after `resolve_query` and the axes, the query's selection per authorisation-relevant characteristic
      (the members of the axes, slicer and subcube, the characteristics aggregated) goes through `check`; outside
      the region the query is a fault with BW's message in olap4abap's words (a rule in
-     `scripts/reference_texts.py` if the reference has a text), before any cell is read.
-   - b. Restriction: the region as SQL on the fact table, OR of AND of conditions on the facts' columns (an
-     InfoCube's SID, an aDSO's value, `bw_fact_value`), hierarchy lines as semi-joins on the copy's closure
-     (`bw_member_condition`; the copy made by `current` if the schema does not name the hierarchy) or a value list,
-     added to every fact read as the subcube is (`ZZXXMLA1_CL_MDX_FACTS=>set_subcube`): `load_aggregations`,
-     `cross_values`, `grid`, `outline`, `non_empty_paths`, `non_empty_groups`, `top_count`, `ordered_paths`,
-     `drill_through`; and the member reads restricted through `ZZXXMLA1_CL_MODEL=>member_table` (as
-     `membersWithFacts`) and `levels_sql`, also `get_members_by_paths`, `children_count`, the native label filter
-     and `MDSCHEMA_MEMBERS`.
+     `scripts/reference_texts.py` if the reference has a text), before any cell is read: a value outside every
+     authorisation as BW's unknown value, a flat set that is not all allowed (`[ZCLDOC].Members` without `*`), an
+     aggregate without `:` or a tuple outside every sub-cube as no authorisation, a hierarchy or node without a line
+     as no authority for the node. An allowed selection reads all its facts: BW does not filter the facts (a node's
+     value and a `:` aggregate are full), so no predicate is added to the fact reads.
+   - b. Restriction of a hierarchy's members: on a hierarchy the user has a line on, the members are the authorised
+     subtree, re-rooted (its top node on the first level, no parent), and a node that may not be expanded (type 0, a
+     level limit) has no children: the member reads of the hierarchy restricted through `levels_sql` and the
+     closure (`ZZXXMLA1_CL_MODEL=>member_table`, also `get_members_by_paths`, `children_count`, the native label
+     filter and `MDSCHEMA_MEMBERS`), and the levels renumbered from the user's top node. `.Members` of the hierarchy
+     with a node that may not be expanded is a refusal (a.), `Level.Members` the visible nodes of the level.
    - A user with an applying authorisation with a variable: every query a fault (no authorisation).
    - The Discover cache (`ZZXXMLA1_CL_DISCOVER_CACHE`) is keyed by the user too (`discover_key`), at least for the
      rowsets that show members.
 6. **End to end** (`scripts/auth_test.py`): the probe's 9999-12-31 queries in olap4abap's names (as
    `bw_hierarchy_test.py` names them, `scripts/bw_names.py`; `ZCLDOC_ORG_001`) through the XMLA endpoint as each test
-   user on `ZCLVISITA` and `ZCLVISIT`, status and values compared with `reference/auth/`; `xmla_test.py`,
+   user on `ZCLVISITA` and `ZCLVISIT` (a personal logon: `/zzxxmla1` takes none, so a second ICF node without logon
+   data, to be created by hand in SICF, or the endpoint run under the switch for the tests; decided in step 6), status
+   and values compared with `reference/auth/`; `xmla_test.py`,
    `ssas_compare.py` and `bw_hierarchy_test.py` as the service user unchanged.
 7. **Docs**: `mvp-scope.md` (the rules), `clinic-demo.md` (scenarios, users), `environment.md` (the service user needs
    `0BI_ALL` or what its callers may see; authorisations need a personal logon), `known-issues.md` (what differs),
