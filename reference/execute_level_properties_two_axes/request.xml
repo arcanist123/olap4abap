@@ -1,0 +1,6 @@
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<SOAP-ENV:Body>
+<Execute xmlns="urn:schemas-microsoft-com:xml-analysis" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<Command><Statement>SELECT {[Customers].[USA].[WA].[Spokane].Children} DIMENSION PROPERTIES [Customers].[Name].[Gender], [Customers].[Name].[Yearly Income] ON 0, {[Store].[USA].[CA].[San Francisco].[Store 14], [Store].[USA].[OR].[Salem].[Store 13]} DIMENSION PROPERTIES [Store Name].[Store Manager], [Store].[Store Name].[Meat Sqft] ON 1 FROM [ZFMSALES]</Statement></Command>
+<Properties><PropertyList><DataSourceInfo>ABAP BW</DataSourceInfo><Catalog>ZFOODMART</Catalog><Format>Multidimensional</Format><AxisFormat>TupleFormat</AxisFormat><Content>SchemaData</Content></PropertyList></Properties>
+</Execute></SOAP-ENV:Body></SOAP-ENV:Envelope>

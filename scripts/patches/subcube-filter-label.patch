@@ -1,0 +1,323 @@
+diff --git a/mondrian/src/main/java/mondrian/olap/Query.java b/mondrian/src/main/java/mondrian/olap/Query.java
+--- a/mondrian/src/main/java/mondrian/olap/Query.java
++++ b/mondrian/src/main/java/mondrian/olap/Query.java
+@@ -2794,6 +2794,11 @@
+                     fc.getArg(1));
+ 
+             if (predicate == null) {
++                // = only: the predicate of <> is negated below
++                predicate = createLabelFilterSubcubePredicate(
++                    baseCube, "=", fc.getArg(0), fc.getArg(1));
++            }
++            if (predicate == null) {
+                 predicate = createBooleanComparisonSubcubePredicate(
+                     baseCube,
+                     fc.getArg(0),
+@@ -2806,9 +2811,307 @@
+             return predicate;
+         }
+ 
++        if ((name.equals("<") || name.equals("<=") || name.equals(">")
++            || name.equals(">="))
++            && fc.getArgCount() == 2)
++        {
++            return createLabelFilterSubcubePredicate(
++                baseCube, name, fc.getArg(0), fc.getArg(1));
++        }
++
++        return null;
++    }
++
++    /**
++     * The predicate of one of Excel's label filters other than equals: a
++     * property of the current member compared to a literal (&lt;, &lt;=, &gt;,
++     * &gt;=; between and not between are AND and OR of these), Left or Right
++     * of it equal to a string (begins with, ends with) and InStr of it
++     * compared to 0 (contains); null for any other comparison. The operator
++     * is =, &lt;, &lt;=, &gt; or &gt;=; &lt;&gt; is the negation of =.
++     */
++    private StarPredicate createLabelFilterSubcubePredicate(
++        RolapCube baseCube,
++        String operator,
++        Exp leftExp,
++        Exp rightExp)
++    {
++        Object value = getLiteralComparisonValue(rightExp);
++        Exp exp = leftExp;
++        if (value == NO_LITERAL_COMPARISON_VALUE) {
++            value = getLiteralComparisonValue(leftExp);
++            exp = rightExp;
++            if (value == NO_LITERAL_COMPARISON_VALUE) {
++                return null;
++            }
++            // the literal on the left: the operator seen from the right
++            if (operator.startsWith("<")) {
++                operator = ">" + operator.substring(1);
++            } else if (operator.startsWith(">")) {
++                operator = "<" + operator.substring(1);
++            }
++        }
++        if (value == null) {
++            return null;
++        }
++        final boolean equality = operator.equals("=");
++
++        if (!equality) {
++            CurrentMemberPropertyReference reference =
++                getCurrentMemberPropertyReference(baseCube, exp);
++            if (reference != null) {
++                return new LabelColumnPredicate(
++                    reference.column,
++                    operator,
++                    reference.forceStringLiteral || value instanceof String
++                        ? String.valueOf(value)
++                        : value,
++                    reference.forceStringLiteral || value instanceof String);
++            }
++        }
++
++        if (!(exp instanceof FunCall)) {
++            return null;
++        }
++        FunCall funCall = (FunCall) exp;
++        String funName = funCall.getFunName();
++
++        // begins with, ends with: Left(<property>, Len("s")) = "s"
++        if ((funName.equalsIgnoreCase("Left")
++            || funName.equalsIgnoreCase("Right"))
++            && funCall.getArgCount() == 2
++            && equality
++            && value instanceof String)
++        {
++            CurrentMemberPropertyReference reference =
++                getCurrentMemberPropertyReference(baseCube, funCall.getArg(0));
++            Integer length = getLiteralLength(funCall.getArg(1));
++            String string = (String) value;
++            // a part shorter than the string is never equal to it
++            if (reference == null || length == null
++                || length < string.length())
++            {
++                return null;
++            }
++            if (length > string.length()) {
++                // the whole value is shorter than the length: the string
++                return new LabelColumnPredicate(
++                    reference.column, "=", string, true);
++            }
++            return new LabelColumnPredicate(
++                reference.column,
++                funName.equalsIgnoreCase("Left") ? "BEGINS" : "ENDS",
++                string,
++                true);
++        }
++
++        // contains, does not contain: InStr(1, <property>, "s") > 0, = 0
++        if (funName.equalsIgnoreCase("InStr")
++            && (funCall.getArgCount() == 2 || funCall.getArgCount() == 3)
++            && value instanceof Number)
++        {
++            int first = funCall.getArgCount() - 2;
++            if (first == 1) {
++                Object start = getLiteralValue(funCall.getArg(0));
++                if (!(start instanceof Number)
++                    || ((Number) start).doubleValue() != 1D)
++                {
++                    return null;
++                }
++            }
++            CurrentMemberPropertyReference reference =
++                getCurrentMemberPropertyReference(
++                    baseCube, funCall.getArg(first));
++            Object search = getLiteralValue(funCall.getArg(first + 1));
++            if (reference == null || !(search instanceof String)) {
++                return null;
++            }
++            // InStr is 0 if the string does not contain the search, a
++            // position from 1 on if it does: the comparison must hold for all
++            // positions or for none
++            double number = ((Number) value).doubleValue();
++            Boolean contains = null;
++            if ((operator.equals(">") && number == 0D)
++                || (operator.equals(">=") && number == 1D))
++            {
++                contains = true;
++            } else if ((operator.equals("=") && number == 0D)
++                || (operator.equals("<") && number == 1D)
++                || (operator.equals("<=") && number == 0D))
++            {
++                contains = false;
++            }
++            if (contains == null) {
++                return null;
++            }
++            StarPredicate predicate = new LabelColumnPredicate(
++                reference.column, "CONTAINS", search, true);
++            return contains ? predicate : new NotPredicate(predicate);
++        }
++
++        return null;
++    }
++
++    /**
++     * The length argument of Left or Right: a numeric literal or Len of a
++     * string literal; null for any other expression.
++     */
++    private Integer getLiteralLength(Exp exp) {
++        Object value = getLiteralValue(exp);
++        if (value instanceof Number) {
++            double number = ((Number) value).doubleValue();
++            return number == Math.floor(number) ? (int) number : null;
++        }
++        if (exp instanceof FunCall) {
++            FunCall funCall = (FunCall) exp;
++            if (funCall.getFunName().equalsIgnoreCase("Len")
++                && funCall.getArgCount() == 1
++                && getLiteralValue(funCall.getArg(0)) instanceof String)
++            {
++                return ((String) getLiteralValue(funCall.getArg(0))).length();
++            }
++        }
+         return null;
+     }
+ 
++    /**
++     * A column compared to a value: &lt;, &lt;=, &gt;, &gt;= or = (as strings,
++     * the column cast to a string if it is no string column, or as the
++     * column's type), or a string column that begins with, ends with or
++     * contains a string (BEGINS, ENDS, CONTAINS, SQL's LIKE). The subcube
++     * predicate of Excel's label filters.
++     */
++    private static class LabelColumnPredicate
++        extends mondrian.rolap.agg.AbstractColumnPredicate
++    {
++        private final String operator;
++        private final Object value;
++        private final boolean asString;
++
++        LabelColumnPredicate(
++            RolapStar.Column column,
++            String operator,
++            Object value,
++            boolean asString)
++        {
++            super(column);
++            this.operator = operator;
++            this.value = value;
++            this.asString = asString;
++        }
++
++        public void values(Collection<Object> collection) {
++            throw new UnsupportedOperationException();
++        }
++
++        public boolean evaluate(Object columnValue) {
++            if (columnValue == null || columnValue == RolapUtil.sqlNullValue) {
++                return false;
++            }
++            if (operator.equals("BEGINS")) {
++                return String.valueOf(columnValue).startsWith((String) value);
++            }
++            if (operator.equals("ENDS")) {
++                return String.valueOf(columnValue).endsWith((String) value);
++            }
++            if (operator.equals("CONTAINS")) {
++                return String.valueOf(columnValue).contains((String) value);
++            }
++            int comparison;
++            if (asString) {
++                comparison =
++                    String.valueOf(columnValue).compareTo((String) value);
++            } else if (columnValue instanceof Number
++                && value instanceof Number)
++            {
++                comparison = Double.compare(
++                    ((Number) columnValue).doubleValue(),
++                    ((Number) value).doubleValue());
++            } else {
++                return true;
++            }
++            return operator.equals("<") ? comparison < 0
++                : operator.equals("<=") ? comparison <= 0
++                : operator.equals(">") ? comparison > 0
++                : operator.equals(">=") ? comparison >= 0
++                : comparison == 0;
++        }
++
++        public void describe(StringBuilder buf) {
++            buf.append(' ').append(operator).append(' ').append(value);
++        }
++
++        public Overlap intersect(StarColumnPredicate predicate) {
++            throw new UnsupportedOperationException();
++        }
++
++        public boolean mightIntersect(StarPredicate other) {
++            if (other instanceof ValueColumnPredicate) {
++                return evaluate(((ValueColumnPredicate) other).getValue());
++            }
++            return true;
++        }
++
++        public StarColumnPredicate minus(StarPredicate predicate) {
++            return new mondrian.rolap.agg.MinusStarPredicate(
++                this, (StarColumnPredicate) predicate);
++        }
++
++        public StarColumnPredicate cloneWithColumn(RolapStar.Column column) {
++            return new LabelColumnPredicate(column, operator, value, asString);
++        }
++
++        public void toSql(SqlQuery sqlQuery, StringBuilder buf) {
++            final RolapStar.Column column = getConstrainedColumn();
++            String expr = column.generateExprString(sqlQuery);
++            if (asString && column.getDatatype() != Dialect.Datatype.String) {
++                expr = "CAST(" + expr + " AS VARCHAR(255))";
++            }
++            buf.append(expr);
++            if (!asString) {
++                buf.append(' ').append(operator).append(' ');
++                sqlQuery.getDialect().quote(buf, value, column.getDatatype());
++                return;
++            }
++            String string = value.toString();
++            if (operator.equals("BEGINS") || operator.equals("ENDS")
++                || operator.equals("CONTAINS"))
++            {
++                // LIKE with \ as escape character for \, % and _
++                String escaped = string.replace("\\", "\\\\")
++                    .replace("%", "\\%").replace("_", "\\_");
++                buf.append(" LIKE ");
++                Dialect.Datatype.String.quoteValue(
++                    buf,
++                    sqlQuery.getDialect(),
++                    (operator.equals("BEGINS") ? "" : "%") + escaped
++                        + (operator.equals("ENDS") ? "" : "%"));
++                buf.append(" ESCAPE '\\'");
++            } else {
++                buf.append(' ').append(operator).append(' ');
++                Dialect.Datatype.String.quoteValue(
++                    buf, sqlQuery.getDialect(), string);
++            }
++        }
++
++        public boolean equals(Object obj) {
++            if (!(obj instanceof LabelColumnPredicate)) {
++                return false;
++            }
++            LabelColumnPredicate that = (LabelColumnPredicate) obj;
++            return getConstrainedColumnBitKey().equals(
++                    that.getConstrainedColumnBitKey())
++                && operator.equals(that.operator)
++                && value.equals(that.value)
++                && asString == that.asString;
++        }
++
++        public int hashCode() {
++            return getConstrainedColumnBitKey().hashCode()
++                ^ operator.hashCode() ^ value.hashCode();
++        }
++    }
++
+     private StarPredicate createComparisonSubcubePredicate(
+         RolapCube baseCube,
+         Exp leftExp,

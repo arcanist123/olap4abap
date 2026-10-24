@@ -1,0 +1,328 @@
+#!/usr/bin/env python3
+"""Compares olap4abap's BW hierarchies with BW's own MDX on the clinic demo (docs/next-steps.md, time-independent BW
+hierarchies). The reference server knows no BW hierarchy, so the oracle is BW itself, asked live on the same system:
+ZZXXMLA1_CL_BW_HIERARCHY_PROBE (run with sapcli class execute) gives per plain hierarchy every member BW's MDX shows,
+in BW's order, with its level, number of children, caption and the values of the measures; the script asks olap4abap
+for the same members through XMLA and compares them position by position.
+
+The hierarchies (docs/clinic-demo.md): ZCLDIAG_ICD (a plain tree), ZCLPAT_PRG (link nodes, recursively, duplicate and
+link leaves, postable nodes), ZCLSERV_CAT (intervals, overlapping and linked) and ZCLSERV_LOC (nodes of the external
+characteristics ZCLSITE and ZCLROOM, compounded). What BW shows and the test expects:
+- a member per occurrence (a node under two parents is two members, its subtree under each); BW's unique names repeat
+  for the occurrences of a node, so members are compared by position, not by unique name;
+- a node's value is the sum over the distinct values below it (a value reached by two paths counts once);
+- an interval is no member: its values are the leaves, directly under its parent;
+- a postable node is a node whose first child is its own value;
+- the not-assigned node (REST_H), unless the hierarchy suppresses it, is a root after the hierarchy, its values below
+  it; BW gives them its deepest level;
+- no All member: olap4abap's All member (MEMBER_TYPE 2), if it has one, is checked against the provider's total and
+  left out.
+
+Per member: level (relative to the first root, not under the not-assigned node; a member's DEPTH where it has one,
+as the members of a parent-child level all have the level's number), number of children, caption (BW's text: its
+medium text property, else the long, else the short one, which for a node of an external characteristic is not BW's
+caption, the short text; '' for the initial value, which BW captions Not assigned; with --names a node's technical
+name or a leaf's key is accepted too) and the values. Members BW shows without value are left out by olap4abap's members-with-facts dimensions; --with-facts
+compares only the members with a value, in BW's order.
+
+--reference checks the reference server's copy of the hierarchies in which every node occurs once (docs/next-steps.md,
+Reference scenario; catalog ZCLVISIT, reference/schema/ClinicBW.xml, built by scripts/build-bw-reference-db.py) against
+BW's MDX instead, names as captions: so the export is known to be BW's hierarchy before cases are captured from it.
+BW is asked on the aDSO ZCLVISITA, the reference serves the InfoCube ZCLVISIT: both hold the same visits. The
+reference serves them as level hierarchies (Level 01 to Level 04); they assign every value and suppress REST_H.
+
+--ssas checks the clinic's model in SSAS Multidimensional (database and cube ZCLHIER on localhost\\SSAS_MULT, built by
+scripts/build-ssas-clinic-md.py: a parent-child dimension per hierarchy, related to the facts many-to-many through
+its closure) against BW's MDX, names as captions, before answers of it are trusted; the statement goes to SSAS with
+Invoke-ASCmd (Windows authentication), the hierarchies are named as SSAS names them ([ZCLPAT_PRG].[ZCLPAT_PRG]).
+
+    python scripts/bw_hierarchy_test.py
+    python scripts/bw_hierarchy_test.py --names --with-facts --url http://localhost:50000/zzxxmla1?sap-client=001
+    python scripts/bw_hierarchy_test.py --bw-only           # BW's answer and its own checks
+    python scripts/bw_hierarchy_test.py --reference         # the reference server's ZCLDIAG_ICD
+    python scripts/bw_hierarchy_test.py --catalog ZCLHIER   # another catalog of olap4abap (its cube of that name)
+    python scripts/bw_hierarchy_test.py --ssas              # the SSAS Multidimensional model
+"""
+import argparse
+import html
+import os
+import pathlib
+import re
+import subprocess
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+PROBE = "ZZXXMLA1_CL_BW_HIERARCHY_PROBE"
+CATALOG = "ZCLVISITA"
+MEASURES = ["[Measures].[ZCLVISNO]", "[Measures].[ZCLCHRG]"]
+# BW's hierarchy (characteristic and hierarchy name) -> olap4abap's hierarchy unique name
+HIERARCHIES = {
+    ("ZCLDIAG", "ZCLDIAG_ICD"): "[ZCLDIAG.ZCLDIAG_ICD]",
+    ("ZCLPAT", "ZCLPAT_PRG"): "[ZCLPAT.ZCLPAT_PRG]",
+    ("ZCLSERV", "ZCLSERV_CAT"): "[ZCLSERV.ZCLSERV_CAT]",
+    ("ZCLSERV", "ZCLSERV_LOC"): "[ZCLSERV.ZCLSERV_LOC]",
+    # version dependent and entirely time dependent: per version the slice valid to 9999-12-31, the key date the probe
+    # sets; BW's name is the hierarchy's and the version's, olap4abap's Hierarchy is named by both
+    ("ZCLDOC", "ZCLDOC_ORG_001"): "[ZCLDOC.ZCLDOC_ORG_001]",
+    ("ZCLDOC", "ZCLDOC_ORG_002"): "[ZCLDOC.ZCLDOC_ORG_002]",
+    ("ZCLDOC", "ZCLDOC_SITE_001"): "[ZCLDOC.ZCLDOC_SITE_001]",
+    ("ZCLDOC", "ZCLDOC_SITE_002"): "[ZCLDOC.ZCLDOC_SITE_002]",
+}
+NOT_ASSIGNED = "1HIER_REST"
+# --reference: the reference server, its catalog and the hierarchies it serves
+REFERENCE_URL = "http://localhost:8080/emondrian/xmla"
+REFERENCE_CATALOG = "ZCLHIER"
+REFERENCE_HIERARCHIES = [("ZCLDIAG", "ZCLDIAG_ICD")]
+# --ssas: the SSAS Multidimensional instance and its database and cube
+SSAS_INSTANCE = r"localhost\SSAS_MULT"
+SSAS_CATALOG = "ZCLHIER"
+
+EXECUTE = """<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/"><SOAP-ENV:Body>
+<Execute xmlns="urn:schemas-microsoft-com:xml-analysis"><Command><Statement>{statement}</Statement></Command>
+<Properties><PropertyList><DataSourceInfo>ABAP BW</DataSourceInfo><Catalog>{catalog}</Catalog>
+<Format>Multidimensional</Format><AxisFormat>TupleFormat</AxisFormat><Content>Data</Content></PropertyList></Properties>
+</Execute></SOAP-ENV:Body></SOAP-ENV:Envelope>"""
+
+
+def env():
+    values = {}
+    for line in (ROOT / ".env.sap").read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip().strip('"').strip("'")
+    return values
+
+
+def bw_number(text):
+    """BW's formatted value (33.956,000) as a float, None for an empty cell."""
+    text = text.strip()
+    if not text:
+        return None
+    return float(text.replace(".", "").replace(",", "."))
+
+
+def bw_members():
+    """Runs the probe; returns the provider's total and per hierarchy (characteristic, name) its members."""
+    e = env()
+    command = ["sapcli", "--ashost", e["SAP_ASHOST"], "--client", e["SAP_CLIENT"], "--user", e["SAP_USER"]]
+    if e.get("SAP_PORT"):
+        command += ["--port", e["SAP_PORT"]]
+    if e.get("SAP_USE_SSL", "false") != "true":
+        command += ["--no-ssl"]
+    command += ["class", "execute", PROBE]
+    output = subprocess.run(command, capture_output=True, text=True, encoding="utf-8",
+                            env={**os.environ, "SAP_PASSWORD": e["SAP_PASSWORD"]})
+    if output.returncode != 0 or "\t" not in output.stdout:
+        sys.exit(f"{PROBE} failed: {output.stdout[-2000:]}{output.stderr[-2000:]}")
+    total, hierarchies = None, {}
+    for line in output.stdout.splitlines():
+        fields = line.split("\t")
+        if len(fields) < 9:
+            continue
+        hierarchy, ordinal, level, children, unique, caption, short, medium, long, *values = fields
+        if caption.startswith("ERROR"):
+            sys.exit(f"{PROBE}: {hierarchy} {caption}")
+        values = [bw_number(v) for v in values]
+        if hierarchy == "TOTAL":
+            total = values
+            continue
+        # [characteristic<blanks>name] or, version dependent, [characteristic<blanks>name<blanks>version]
+        found = re.fullmatch(r"\[(\S+)\s+(\S+)(?:\s+(\S+))?\]", hierarchy)
+        node = re.fullmatch(r".*\]\.\[(.*)\]", unique).group(1)
+        # a node is its name padded to 32 characters and its InfoObject: a name of 32 leaves no blank between them
+        if " " in node:
+            name, _, kind = node.rpartition(" ")
+        else:
+            name, kind = node[:32], node[32:]
+        name_version = found.group(2) + (f"_{found.group(3)}" if found.group(3) else "")
+        hierarchies.setdefault((found.group(1), name_version), []).append({
+            "level": int(level), "children": int(children), "caption": caption, "values": values,
+            # the text olap4abap captions the member by: the characteristic's medium, else long, else short text
+            # (BW's caption of a node of an external characteristic is its short text)
+            "text": medium or long or short or caption,
+            "name": name.strip(), "kind": kind})
+    return total, hierarchies
+
+
+def post(url, statement):
+    if url == "ssas":
+        return ssas_execute(statement)
+    import urllib.error
+    import urllib.request
+    body = EXECUTE.format(statement=html.escape(statement, quote=False), catalog=CATALOG)
+    request = urllib.request.Request(url, data=body.encode("utf-8"), headers={
+        "Content-Type": "text/xml; charset=utf-8", "SOAPAction": '"urn:schemas-microsoft-com:xml-analysis:Execute"'})
+    try:
+        with urllib.request.urlopen(request, timeout=600) as response:
+            return response.read().decode("utf-8")
+    except urllib.error.HTTPError as error:
+        return error.read().decode("utf-8", "replace")
+
+
+def ssas_execute(statement):
+    """The answer of SSAS Multidimensional to a statement (Invoke-ASCmd, the mddataset of an Execute)."""
+    script = (f"Import-Module SqlServer; Invoke-ASCmd -Server '{SSAS_INSTANCE}' -Database '{SSAS_CATALOG}' "
+              "-Query $input | Out-String -Width 1000000")
+    result = subprocess.run(["powershell", "-NoProfile", "-Command", script], input=statement, capture_output=True,
+                            text=True, encoding="utf-8")
+    error = re.search(r'<Error [^>]*Description="([^"]*)"', result.stdout)
+    if result.returncode or error:
+        detail = html.unescape(error.group(1)) if error else result.stdout + result.stderr
+        return f"<faultstring>{html.escape(detail)}</faultstring>"
+    return result.stdout
+
+
+def olap4abap_members(url, hierarchy):
+    """olap4abap's members of the hierarchy with level, children, caption and values; or the fault."""
+    # SSAS has no DEPTH: its level number LNum is the depth of a parent-child member
+    depth = "" if url == "ssas" else "DEPTH, "
+    text = post(url, f"SELECT {{{', '.join(MEASURES)}}} ON 0, {{{hierarchy}.Members}} "
+                     f"DIMENSION PROPERTIES {depth}CHILDREN_CARDINALITY, MEMBER_TYPE ON 1 FROM [{CATALOG}]")
+    fault = re.search(r"<faultstring>(.*?)</faultstring>", text, re.S)
+    if fault:
+        return None, html.unescape(fault.group(1))
+    axis = re.search(r'<Axis name="Axis1">(.*?)</Axis>', text, re.S)
+    tuples = re.findall(r"<Tuple>(.*?)</Tuple>", axis.group(1), re.S) if axis else []
+    # each cell's own Value: an empty cell has none (a pattern across cells would take the next cell's)
+    cells = {}
+    for ordinal, cell in re.findall(r'<Cell CellOrdinal="(\d+)">(.*?)</Cell>', text, re.S):
+        value = re.search(r"<Value[^>]*>([^<]*)</Value>", cell)
+        if value:
+            cells[int(ordinal)] = float(value.group(1))
+
+    def field(member, tag):
+        found = re.search(rf"<{tag}>([^<]*)</{tag}>", member)
+        return html.unescape(found.group(1)) if found else ""
+
+    members = []
+    for row, member in enumerate(tuples):
+        members.append({
+            "unique": field(member, "UName"), "caption": field(member, "Caption"),
+            "level": int(field(member, "DEPTH") or field(member, "LNum") or 0),
+            "children": int(field(member, "CHILDREN_CARDINALITY") or 0),
+            "all": field(member, "MEMBER_TYPE") == "2",
+            "values": [cells.get(row * len(MEASURES) + column) for column in range(len(MEASURES))]})
+    return members, None
+
+
+def same_values(a, b):
+    return all((x is None and y is None) or (x is not None and y is not None and abs(x - y) < 0.005)
+               for x, y in zip(a, b))
+
+
+def bw_checks(total, key, members, check):
+    """BW's answer itself: the roots and the not-assigned node add up to the total, at most one not-assigned node."""
+    roots = [m for m in members if m["level"] == 0]
+    sums = [sum(m["values"][i] or 0 for m in roots) for i in range(len(MEASURES))]
+    check(f"BW {key[1]}: roots and not assigned add up to the total", same_values(sums, total), f"{sums} != {total}")
+    check(f"BW {key[1]}: at most one not-assigned root", sum(m["kind"] == NOT_ASSIGNED for m in roots) <= 1, roots)
+
+
+def compare(total, key, expected, actual, args, check):
+    if actual and actual[0]["all"]:
+        # olap4abap's All member: the provider's total
+        check(f"{key[1]}: All member is the total", same_values(actual[0]["values"], total),
+              f"{actual[0]['values']} != {total}")
+        actual = [{**m, "level": m["level"] - 1} for m in actual[1:]]
+    if args.with_facts:
+        expected = [m for m in expected if any(v is not None for v in m["values"])]
+        actual = [m for m in actual if any(v is not None for v in m["values"])]
+    check(f"{key[1]}: {len(expected)} members", len(actual) == len(expected), f"olap4abap has {len(actual)}")
+
+    differences = []
+    under_rest = False
+    for position, (bw, ours) in enumerate(zip(expected, actual)):
+        if bw["level"] == 0:
+            under_rest = bw["kind"] == NOT_ASSIGNED
+        problems = []
+        if not under_rest and bw["level"] != ours["level"]:
+            problems.append(f"level {ours['level']} != {bw['level']}")
+        if not args.with_facts and bw["children"] != ours["children"]:
+            problems.append(f"children {ours['children']} != {bw['children']}")
+        captions = {bw["text"]} | ({bw["name"]} if args.names else set())
+        # the initial value (BW's MDX names it #, its key is all zeros or empty, and captions it Not assigned)
+        # olap4abap names and captions '' as the characteristic's member (docs/next-steps.md, Now: texts and captions)
+        if bw["name"] == "#" or not bw["name"].strip("0 "):
+            captions.add("")
+        if ours["caption"] not in captions:
+            problems.append(f"caption {ours['caption']!r} not in {sorted(captions)}")
+        if not same_values(bw["values"], ours["values"]):
+            problems.append(f"values {ours['values']} != {bw['values']}")
+        if problems:
+            differences.append(f"#{position} {bw['caption']} ({ours['unique']}): {', '.join(problems)}")
+    check(f"{key[1]}: members the same as BW's, in BW's order", not differences,
+          f"{len(differences)} differ; " + "; ".join(differences[:args.show]))
+    if args.url in ("ssas", REFERENCE_URL):
+        return
+    # olap4abap names a member by the key of its path, InfoObject and name per level, as SSAS names it
+    # ([ZCLSERV.ZCLSERV_LOC].[Level 02].&[0HIER_NODE]&[LOCATIONS]&[ZCLSITE]&[NORTH]): unique, and a member's own
+    # InfoObject is BW's (a node's from BW's unique name, a leaf's the characteristic)
+    uniques = [m["unique"] for m in actual]
+    check(f"{key[1]}: unique names unique", len(set(uniques)) == len(uniques),
+          sorted({u for u in uniques if uniques.count(u) > 1})[:args.show])
+    wrong = []
+    for position, (bw, ours) in enumerate(zip(expected, actual)):
+        keys = [k.replace("]]", "]") for k in re.findall(r"&\[((?:[^\]]|\]\])*)\]", ours["unique"])]
+        own = keys[-2] if len(keys) >= 2 and len(keys) % 2 == 0 else None
+        if own != (bw["kind"] or key[0]):
+            wrong.append(f"#{position} {ours['unique']}: InfoObject {own}, BW's {bw['kind'] or key[0]}")
+    check(f"{key[1]}: members keyed by BW's InfoObject and name", not wrong,
+          f"{len(wrong)} differ; " + "; ".join(wrong[:args.show]))
+
+
+def main():
+    global CATALOG
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--url", help="the XMLA endpoint (default SAP's, with --reference the reference server)")
+    parser.add_argument("--names", action="store_true", help="accept a node's name or key as its caption")
+    parser.add_argument("--with-facts", action="store_true", help="compare only the members with a value")
+    parser.add_argument("--bw-only", action="store_true", help="only BW's answer and its own checks")
+    parser.add_argument("--reference", action="store_true",
+                        help="check the reference server's hierarchies (catalog ZCLHIER) against BW's")
+    parser.add_argument("--ssas", action="store_true",
+                        help="check the SSAS Multidimensional model (database ZCLHIER) against BW's")
+    parser.add_argument("--show", type=int, default=10, help="differences shown per hierarchy")
+    parser.add_argument("--catalog", help=f"olap4abap's catalog and cube (default {CATALOG})")
+    args = parser.parse_args()
+    hierarchies_checked = HIERARCHIES
+    if args.catalog:
+        CATALOG = args.catalog
+    if args.reference:
+        CATALOG = REFERENCE_CATALOG
+        hierarchies_checked = {key: HIERARCHIES[key] for key in REFERENCE_HIERARCHIES}
+        args.names = True
+    if args.ssas:
+        CATALOG = SSAS_CATALOG
+        hierarchies_checked = {key: f"[{key[1]}].[{key[1]}]" for key in HIERARCHIES}
+        args.names = True
+        args.url = "ssas"
+    args.url = args.url or (REFERENCE_URL if args.reference else "http://localhost:50000/zzxxmla1?sap-client=001")
+    failures = []
+
+    def check(name, condition, detail=""):
+        print(f"{'ok  ' if condition else 'FAIL'} {name}{'' if condition else ': ' + str(detail)[:2000]}")
+        if not condition:
+            failures.append(name)
+
+    total, hierarchies = bw_members()
+    for key, hierarchy in hierarchies_checked.items():
+        expected = hierarchies.get(key)
+        if not expected:
+            check(f"BW {key[1]}: shown by BW's MDX", False, "not in the probe's answer")
+            continue
+        bw_checks(total, key, expected, check)
+        if args.bw_only:
+            continue
+        actual, fault = olap4abap_members(args.url, hierarchy)
+        if fault:
+            check(f"{key[1]}: {hierarchy}.Members", False, fault)
+            continue
+        compare(total, key, expected, actual, args, check)
+
+    print(f"\n{len(failures)} failure(s)")
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

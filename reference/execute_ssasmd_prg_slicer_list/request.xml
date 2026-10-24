@@ -1,0 +1,33 @@
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<SOAP-ENV:Body>
+<Execute xmlns="urn:schemas-microsoft-com:xml-analysis" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<Command><Statement>with
+ set __XLSlice0 as { [Measures].[ZCLVISNO] }
+ set __XLExistingMembers as 
+NonEmpty(
+[ZCLPAT_PRG].[ZCLPAT_PRG].[Level 02].allmembers,
+__XLSlice0)
+
+
+ set __XLExistingRangeMembers as SubSet(__XLExistingMembers, 0, 1000)
+ set __XLNonExistingRangeMembers as 
+Iif(__XLExistingRangeMembers.Count = 1000, 
+	{},  
+	SubSet( Except([ZCLPAT_PRG].[ZCLPAT_PRG].[Level 02].allmembers, __XLExistingMembers),  
+			iif (0 - __XLExistingMembers.Count &lt; 0, 0, 0 - __XLExistingMembers.Count), 
+			1000 ) 
+	)
+member [Measures].__XLRelated as Intersect( [ZCLPAT_PRG].[ZCLPAT_PRG].currentmember, __XLExistingRangeMembers ).Count
+ set __XLTargetSet as SubSet(Union(__XLExistingRangeMembers, __XLNonExistingRangeMembers), 0, 1000)
+member [Measures].__XLPath as 
+Generate( 
+	Ascendants([ZCLPAT_PRG].[ZCLPAT_PRG].currentmember), 
+				[ZCLPAT_PRG].[ZCLPAT_PRG].currentmember.unique_name, 
+				"__XLPSEP") 
+
+select { [Measures].__XLPath, [Measures].__XLRelated } on 0, 
+__XLTargetSet on 1 
+from [ZCLHIER] 
+cell properties value</Statement></Command>
+<Properties><PropertyList><DataSourceInfo>ABAP BW</DataSourceInfo><Catalog>ZCLHIER</Catalog><Format>Multidimensional</Format><AxisFormat>TupleFormat</AxisFormat><Content>SchemaData</Content></PropertyList></Properties>
+</Execute></SOAP-ENV:Body></SOAP-ENV:Envelope>

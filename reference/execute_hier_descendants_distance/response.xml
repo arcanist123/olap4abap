@@ -1,0 +1,725 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<ExecuteResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:mddataset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:schemas-microsoft-com:xml-analysis:mddataset" xmlns="urn:schemas-microsoft-com:xml-analysis:mddataset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:sql="urn:schemas-microsoft-com:xml-sql" elementFormDefault="qualified">
+        <xsd:complexType name="MemberType">
+          <xsd:sequence>
+            <xsd:element name="UName" type="xsd:string"/>
+            <xsd:element name="Caption" type="xsd:string"/>
+            <xsd:element name="LName" type="xsd:string"/>
+            <xsd:element name="LNum" type="xsd:unsignedInt"/>
+            <xsd:element name="DisplayInfo" type="xsd:unsignedInt"/>
+            <xsd:sequence maxOccurs="unbounded" minOccurs="0">
+              <xsd:any processContents="lax" maxOccurs="unbounded"/>
+            </xsd:sequence>
+          </xsd:sequence>
+          <xsd:attribute name="Hierarchy" type="xsd:string"/>
+        </xsd:complexType>
+        <xsd:complexType name="PropType">
+          <xsd:attribute name="name" type="xsd:string"/>
+        </xsd:complexType>
+        <xsd:complexType name="TupleType">
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:element name="Member" type="MemberType"/>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:complexType name="MembersType">
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:element name="Member" type="MemberType"/>
+          </xsd:sequence>
+          <xsd:attribute name="Hierarchy" type="xsd:string"/>
+        </xsd:complexType>
+        <xsd:complexType name="TuplesType">
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:element name="Tuple" type="TupleType"/>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:complexType name="CrossProductType">
+          <xsd:sequence>
+            <xsd:choice minOccurs="0" maxOccurs="unbounded">
+              <xsd:element name="Members" type="MembersType"/>
+              <xsd:element name="Tuples" type="TuplesType"/>
+            </xsd:choice>
+          </xsd:sequence>
+          <xsd:attribute name="Size" type="xsd:unsignedInt"/>
+        </xsd:complexType>
+        <xsd:complexType name="OlapInfo">
+          <xsd:sequence>
+            <xsd:element name="CubeInfo">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element name="Cube" maxOccurs="unbounded">
+                    <xsd:complexType>
+                      <xsd:sequence>
+                        <xsd:element name="CubeName" type="xsd:string"/>
+                      </xsd:sequence>
+                    </xsd:complexType>
+                  </xsd:element>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="AxesInfo">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element name="AxisInfo" maxOccurs="unbounded">
+                    <xsd:complexType>
+                      <xsd:sequence>
+                        <xsd:element name="HierarchyInfo" minOccurs="0" maxOccurs="unbounded">
+                          <xsd:complexType>
+                            <xsd:sequence>
+                              <xsd:sequence maxOccurs="unbounded">
+                                <xsd:element name="UName" type="PropType"/>
+                                <xsd:element name="Caption" type="PropType"/>
+                                <xsd:element name="LName" type="PropType"/>
+                                <xsd:element name="LNum" type="PropType"/>
+                                <xsd:element name="DisplayInfo" type="PropType" minOccurs="0" maxOccurs="unbounded"/>
+                              </xsd:sequence>
+                              <xsd:sequence>
+                                <xsd:any processContents="lax" minOccurs="0" maxOccurs="unbounded"/>
+                              </xsd:sequence>
+                            </xsd:sequence>
+                            <xsd:attribute name="name" type="xsd:string" use="required"/>
+                          </xsd:complexType>
+                        </xsd:element>
+                      </xsd:sequence>
+                      <xsd:attribute name="name" type="xsd:string"/>
+                    </xsd:complexType>
+                  </xsd:element>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="CellInfo">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:sequence minOccurs="0" maxOccurs="unbounded">
+                    <xsd:choice>
+                      <xsd:element name="Value" type="PropType"/>
+                      <xsd:element name="FmtValue" type="PropType"/>
+                      <xsd:element name="BackColor" type="PropType"/>
+                      <xsd:element name="ForeColor" type="PropType"/>
+                      <xsd:element name="FontName" type="PropType"/>
+                      <xsd:element name="FontSize" type="PropType"/>
+                      <xsd:element name="FontFlags" type="PropType"/>
+                      <xsd:element name="FormatString" type="PropType"/>
+                      <xsd:element name="NonEmptyBehavior" type="PropType"/>
+                      <xsd:element name="SolveOrder" type="PropType"/>
+                      <xsd:element name="Updateable" type="PropType"/>
+                      <xsd:element name="Visible" type="PropType"/>
+                      <xsd:element name="Expression" type="PropType"/>
+                    </xsd:choice>
+                  </xsd:sequence>
+                  <xsd:sequence maxOccurs="unbounded" minOccurs="0">
+                    <xsd:any processContents="lax" maxOccurs="unbounded"/>
+                  </xsd:sequence>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:complexType name="Axes">
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:element name="Axis">
+              <xsd:complexType>
+                <xsd:choice minOccurs="0" maxOccurs="unbounded">
+                  <xsd:element name="CrossProduct" type="CrossProductType"/>
+                  <xsd:element name="Tuples" type="TuplesType"/>
+                  <xsd:element name="Members" type="MembersType"/>
+                </xsd:choice>
+                <xsd:attribute name="name" type="xsd:string"/>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:complexType name="CellData">
+          <xsd:sequence>
+            <xsd:element name="Cell" minOccurs="0" maxOccurs="unbounded">
+              <xsd:complexType>
+                <xsd:sequence maxOccurs="unbounded">
+                  <xsd:choice>
+                    <xsd:element name="Value"/>
+                    <xsd:element name="FmtValue" type="xsd:string"/>
+                    <xsd:element name="BackColor" type="xsd:unsignedInt"/>
+                    <xsd:element name="ForeColor" type="xsd:unsignedInt"/>
+                    <xsd:element name="FontName" type="xsd:string"/>
+                    <xsd:element name="FontSize" type="xsd:unsignedShort"/>
+                    <xsd:element name="FontFlags" type="xsd:unsignedInt"/>
+                    <xsd:element name="FormatString" type="xsd:string"/>
+                    <xsd:element name="NonEmptyBehavior" type="xsd:unsignedShort"/>
+                    <xsd:element name="SolveOrder" type="xsd:unsignedInt"/>
+                    <xsd:element name="Updateable" type="xsd:unsignedInt"/>
+                    <xsd:element name="Visible" type="xsd:unsignedInt"/>
+                    <xsd:element name="Expression" type="xsd:string"/>
+                  </xsd:choice>
+                </xsd:sequence>
+                <xsd:attribute name="CellOrdinal" type="xsd:unsignedInt" use="required"/>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:element name="root">
+          <xsd:complexType>
+            <xsd:sequence maxOccurs="unbounded">
+              <xsd:element name="OlapInfo" type="OlapInfo"/>
+              <xsd:element name="Axes" type="Axes"/>
+              <xsd:element name="CellData" type="CellData"/>
+            </xsd:sequence>
+          </xsd:complexType>
+        </xsd:element>
+      </xsd:schema>
+      <OlapInfo>
+        <CubeInfo>
+          <Cube>
+            <CubeName>ZCLHIER</CubeName>
+            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-17T15:40:07</LastDataUpdate>
+            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-17T15:40:07</LastSchemaUpdate>
+          </Cube>
+        </CubeInfo>
+        <AxesInfo>
+          <AxisInfo name="Axis0">
+            <HierarchyInfo name="[Measures]">
+              <UName name="[Measures].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
+              <Caption name="[Measures].[MEMBER_CAPTION]" type="xsd:string"/>
+              <LName name="[Measures].[LEVEL_UNIQUE_NAME]" type="xsd:string"/>
+              <LNum name="[Measures].[LEVEL_NUMBER]" type="xsd:unsignedInt"/>
+              <DisplayInfo name="[Measures].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
+            </HierarchyInfo>
+          </AxisInfo>
+          <AxisInfo name="Axis1">
+            <HierarchyInfo name="[ZCLDIAG.ZCLDIAG_ICD]">
+              <UName name="[ZCLDIAG.ZCLDIAG_ICD].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
+              <Caption name="[ZCLDIAG.ZCLDIAG_ICD].[MEMBER_CAPTION]" type="xsd:string"/>
+              <LName name="[ZCLDIAG.ZCLDIAG_ICD].[LEVEL_UNIQUE_NAME]" type="xsd:string"/>
+              <LNum name="[ZCLDIAG.ZCLDIAG_ICD].[LEVEL_NUMBER]" type="xsd:unsignedInt"/>
+              <DisplayInfo name="[ZCLDIAG.ZCLDIAG_ICD].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
+              <PARENT_UNIQUE_NAME name="[ZCLDIAG.ZCLDIAG_ICD].[PARENT_UNIQUE_NAME]" type="xsd:string"/>
+              <DEPTH name="[ZCLDIAG.ZCLDIAG_ICD].[DEPTH]" type="xsd:unsignedInt"/>
+              <CHILDREN_CARDINALITY name="[ZCLDIAG.ZCLDIAG_ICD].[CHILDREN_CARDINALITY]" type="xsd:unsignedInt"/>
+            </HierarchyInfo>
+          </AxisInfo>
+          <AxisInfo name="SlicerAxis"/>
+        </AxesInfo>
+        <CellInfo>
+          <Value name="VALUE"/>
+          <FmtValue name="FORMATTED_VALUE" type="xsd:string"/>
+        </CellInfo>
+      </OlapInfo>
+      <Axes>
+        <Axis name="Axis0">
+          <Tuples>
+            <Tuple>
+              <Member Hierarchy="[Measures]">
+                <UName>[Measures].[ZCLVISNO]</UName>
+                <Caption>Visits</Caption>
+                <LName>[Measures].[MeasuresLevel]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Measures]">
+                <UName>[Measures].[ZCLCHRG]</UName>
+                <Caption>Charges</Caption>
+                <LName>[Measures].[MeasuresLevel]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+          </Tuples>
+        </Axis>
+        <Axis name="Axis1">
+          <Tuples>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[UPPER_RESPIRATORY_INFECTIONS]</UName>
+                <Caption>Upper respiratory infections</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>3</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>3</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[INFLUENZA]</UName>
+                <Caption>Influenza</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>1</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[LOWER_RESPIRATORY_DISEASES]</UName>
+                <Caption>Lower respiratory diseases</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>2</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[CHRONIC_LOWER_RESPIRATORY_DISEAS]</UName>
+                <Caption>Chronic lower respiratory diseases</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>2</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY].[HYPERTENSIVE_DISEASES]</UName>
+                <Caption>Hypertensive diseases</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>1</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>1</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY].[ISCHAEMIC_HEART_DISEASES]</UName>
+                <Caption>Ischaemic heart diseases</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>2</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY].[OTHER_HEART_DISEASES]</UName>
+                <Caption>Other heart diseases</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>2</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[ENDOCRINE_AND_METABOLIC].[DIABETES]</UName>
+                <Caption>Diabetes</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>1</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[ENDOCRINE_AND_METABOLIC]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>1</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[ENDOCRINE_AND_METABOLIC].[METABOLIC_DISORDERS]</UName>
+                <Caption>Metabolic disorders</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[ENDOCRINE_AND_METABOLIC]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>1</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[ENDOCRINE_AND_METABOLIC].[THYROID_DISORDERS]</UName>
+                <Caption>Thyroid disorders</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[ENDOCRINE_AND_METABOLIC]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>1</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MUSCULOSKELETAL].[BACK_PROBLEMS]</UName>
+                <Caption>Back problems</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>1</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MUSCULOSKELETAL]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>1</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MUSCULOSKELETAL].[JOINT_DISORDERS]</UName>
+                <Caption>Joint disorders</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MUSCULOSKELETAL]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>2</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MUSCULOSKELETAL].[SOFT_TISSUE_DISORDERS]</UName>
+                <Caption>Soft tissue disorders</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MUSCULOSKELETAL]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>1</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[SKIN].[DERMATITIS]</UName>
+                <Caption>Dermatitis</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>2</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[SKIN]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>2</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[SKIN].[OTHER_SKIN_DISEASES]</UName>
+                <Caption>Other skin diseases</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[SKIN]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>2</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INFECTIONS].[INTESTINAL_INFECTIONS]</UName>
+                <Caption>Intestinal infections</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>1</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INFECTIONS]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>1</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INFECTIONS].[VIRAL_INFECTIONS]</UName>
+                <Caption>Viral infections</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INFECTIONS]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>2</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INJURIES].[INJURIES_OF_LIMBS]</UName>
+                <Caption>Injuries of limbs</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>3</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INJURIES]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>3</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INJURIES].[HEAD_INJURIES]</UName>
+                <Caption>Head injuries</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INJURIES]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>1</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MENTAL_HEALTH].[MOOD_DISORDERS]</UName>
+                <Caption>Mood disorders</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>1</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MENTAL_HEALTH]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>1</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MENTAL_HEALTH].[ANXIETY_DISORDERS]</UName>
+                <Caption>Anxiety disorders</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MENTAL_HEALTH]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>1</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CHECK_UPS].[EXAMINATIONS]</UName>
+                <Caption>Examinations</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>2</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CHECK_UPS]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>2</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CHECK_UPS].[FOLLOW_UP_CARE]</UName>
+                <Caption>Follow-up care</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CHECK_UPS]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>1</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED].[NO_DIAGNOSIS]</UName>
+                <Caption>No diagnosis</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 03]</LName>
+                <LNum>3</LNum>
+                <DisplayInfo>1</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</PARENT_UNIQUE_NAME>
+                <DEPTH>3</DEPTH>
+                <CHILDREN_CARDINALITY>1</CHILDREN_CARDINALITY>
+              </Member>
+            </Tuple>
+          </Tuples>
+        </Axis>
+      </Axes>
+      <CellData>
+        <Cell CellOrdinal="0">
+          <Value xsi:type="xsd:double">4425</Value>
+          <FmtValue>4,425.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="1">
+          <Value xsi:type="xsd:double">489932.3</Value>
+          <FmtValue>489,932.300</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="2">
+          <Value xsi:type="xsd:double">842</Value>
+          <FmtValue>842.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="3">
+          <Value xsi:type="xsd:double">93535.4</Value>
+          <FmtValue>93,535.400</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="4">
+          <Value xsi:type="xsd:double">2415</Value>
+          <FmtValue>2,415.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="5">
+          <Value xsi:type="xsd:double">522760.9</Value>
+          <FmtValue>522,760.900</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="6">
+          <Value xsi:type="xsd:double">2218</Value>
+          <FmtValue>2,218.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="7">
+          <Value xsi:type="xsd:double">412234.9</Value>
+          <FmtValue>412,234.900</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="8">
+          <Value xsi:type="xsd:double">2281</Value>
+          <FmtValue>2,281.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="9">
+          <Value xsi:type="xsd:double">372959.9</Value>
+          <FmtValue>372,959.900</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="10">
+          <Value xsi:type="xsd:double">1623</Value>
+          <FmtValue>1,623.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="11">
+          <Value xsi:type="xsd:double">421280.5</Value>
+          <FmtValue>421,280.500</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="12">
+          <Value xsi:type="xsd:double">1470</Value>
+          <FmtValue>1,470.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="13">
+          <Value xsi:type="xsd:double">327021.2</Value>
+          <FmtValue>327,021.200</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="14">
+          <Value xsi:type="xsd:double">825</Value>
+          <FmtValue>825.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="15">
+          <Value xsi:type="xsd:double">133486.9</Value>
+          <FmtValue>133,486.900</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="16">
+          <Value xsi:type="xsd:double">935</Value>
+          <FmtValue>935.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="17">
+          <Value xsi:type="xsd:double">150526.1</Value>
+          <FmtValue>150,526.100</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="18">
+          <Value xsi:type="xsd:double">375</Value>
+          <FmtValue>375.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="19">
+          <Value xsi:type="xsd:double">62443.9</Value>
+          <FmtValue>62,443.900</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="20">
+          <Value xsi:type="xsd:double">1748</Value>
+          <FmtValue>1,748.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="21">
+          <Value xsi:type="xsd:double">184814.2</Value>
+          <FmtValue>184,814.200</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="22">
+          <Value xsi:type="xsd:double">1479</Value>
+          <FmtValue>1,479.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="23">
+          <Value xsi:type="xsd:double">158416.8</Value>
+          <FmtValue>158,416.800</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="24">
+          <Value xsi:type="xsd:double">480</Value>
+          <FmtValue>480.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="25">
+          <Value xsi:type="xsd:double">52438.8</Value>
+          <FmtValue>52,438.800</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="26">
+          <Value xsi:type="xsd:double">1258</Value>
+          <FmtValue>1,258.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="27">
+          <Value xsi:type="xsd:double">125688.8</Value>
+          <FmtValue>125,688.800</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="28">
+          <Value xsi:type="xsd:double">843</Value>
+          <FmtValue>843.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="29">
+          <Value xsi:type="xsd:double">84054.5</Value>
+          <FmtValue>84,054.500</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="30">
+          <Value xsi:type="xsd:double">1087</Value>
+          <FmtValue>1,087.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="31">
+          <Value xsi:type="xsd:double">297343</Value>
+          <FmtValue>297,343.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="32">
+          <Value xsi:type="xsd:double">1109</Value>
+          <FmtValue>1,109.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="33">
+          <Value xsi:type="xsd:double">111010.9</Value>
+          <FmtValue>111,010.900</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="34">
+          <Value xsi:type="xsd:double">2922</Value>
+          <FmtValue>2,922.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="35">
+          <Value xsi:type="xsd:double">1194264.4</Value>
+          <FmtValue>1,194,264.400</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="36">
+          <Value xsi:type="xsd:double">508</Value>
+          <FmtValue>508.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="37">
+          <Value xsi:type="xsd:double">310410.1</Value>
+          <FmtValue>310,410.100</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="38">
+          <Value xsi:type="xsd:double">439</Value>
+          <FmtValue>439.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="39">
+          <Value xsi:type="xsd:double">43733.7</Value>
+          <FmtValue>43,733.700</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="40">
+          <Value xsi:type="xsd:double">615</Value>
+          <FmtValue>615.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="41">
+          <Value xsi:type="xsd:double">123449.9</Value>
+          <FmtValue>123,449.900</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="42">
+          <Value xsi:type="xsd:double">1860</Value>
+          <FmtValue>1,860.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="43">
+          <Value xsi:type="xsd:double">184296.6</Value>
+          <FmtValue>184,296.600</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="44">
+          <Value xsi:type="xsd:double">1862</Value>
+          <FmtValue>1,862.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="45">
+          <Value xsi:type="xsd:double">190440.5</Value>
+          <FmtValue>190,440.500</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="46">
+          <Value xsi:type="xsd:double">337</Value>
+          <FmtValue>337.000</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="47">
+          <Value xsi:type="xsd:double">51073</Value>
+          <FmtValue>51,073.000</FmtValue>
+        </Cell>
+      </CellData>
+    </root>
+  </return>
+</ExecuteResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

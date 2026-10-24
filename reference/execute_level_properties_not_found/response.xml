@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<SOAP-ENV:Fault>
+  <faultcode>SOAP-ENV:Client.00HSBD01</faultcode>
+  <faultstring>XMLA MDX parse failed Mondrian Error:MDX object &#39;[Store].[Store City].[Store Sqft]&#39; not found in cube &#39;ZFMSALES&#39;</faultstring>
+  <faultactor>Mondrian</faultactor>
+  <detail>
+    <Error ErrorCode="3238658121" Description="The Mondrian XML: Mondrian Error:MDX object &#39;[Store].[Store City].[Store Sqft]&#39; not found in cube &#39;ZFMSALES&#39;"/>
+  </detail>
+</SOAP-ENV:Fault>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

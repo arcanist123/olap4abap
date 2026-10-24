@@ -1,0 +1,6 @@
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<SOAP-ENV:Body>
+<Execute xmlns="urn:schemas-microsoft-com:xml-analysis" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<Command><Statement>SELECT NON EMPTY CrossJoin(Hierarchize(DrilldownMember({{DrilldownLevel({[Product].[All Products]},,,INCLUDE_CALC_MEMBERS)}}, {[Product].[Drink]},,,INCLUDE_CALC_MEMBERS)), Hierarchize({DrilldownLevel({[Customers].[All Customers]},,,INCLUDE_CALC_MEMBERS)})) DIMENSION PROPERTIES PARENT_UNIQUE_NAME ON COLUMNS  FROM [ZFMSALES] WHERE ([Measures].[Store Cost]) CELL PROPERTIES VALUE</Statement></Command>
+<Properties><PropertyList><DataSourceInfo>ABAP BW</DataSourceInfo><Catalog>ZFOODMART</Catalog><Format>Multidimensional</Format><AxisFormat>TupleFormat</AxisFormat><Content>SchemaData</Content></PropertyList></Properties>
+</Execute></SOAP-ENV:Body></SOAP-ENV:Envelope>

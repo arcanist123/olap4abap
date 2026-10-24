@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<Schema name="Err">
+  <Dimension name="Store" table="store">
+    <DimensionAttribute name="Id" usage="Key"><KeyColumn dataType="Integer" columnName="id" dataSize="ten"/></DimensionAttribute>
+  </Dimension>
+</Schema>

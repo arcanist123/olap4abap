@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<DiscoverResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <row>
+        <TYPE_NAME>INTEGER</TYPE_NAME>
+        <DATA_TYPE>3</DATA_TYPE>
+        <COLUMN_SIZE>8</COLUMN_SIZE>
+        <IS_NULLABLE>true</IS_NULLABLE>
+        <UNSIGNED_ATTRIBUTE>false</UNSIGNED_ATTRIBUTE>
+        <FIXED_PREC_SCALE>false</FIXED_PREC_SCALE>
+        <AUTO_UNIQUE_VALUE>false</AUTO_UNIQUE_VALUE>
+        <IS_LONG>false</IS_LONG>
+        <BEST_MATCH>true</BEST_MATCH>
+      </row>
+      <row>
+        <TYPE_NAME>DOUBLE</TYPE_NAME>
+        <DATA_TYPE>5</DATA_TYPE>
+        <COLUMN_SIZE>16</COLUMN_SIZE>
+        <IS_NULLABLE>true</IS_NULLABLE>
+        <UNSIGNED_ATTRIBUTE>false</UNSIGNED_ATTRIBUTE>
+        <FIXED_PREC_SCALE>false</FIXED_PREC_SCALE>
+        <AUTO_UNIQUE_VALUE>false</AUTO_UNIQUE_VALUE>
+        <IS_LONG>false</IS_LONG>
+        <BEST_MATCH>true</BEST_MATCH>
+      </row>
+      <row>
+        <TYPE_NAME>CURRENCY</TYPE_NAME>
+        <DATA_TYPE>6</DATA_TYPE>
+        <COLUMN_SIZE>8</COLUMN_SIZE>
+        <IS_NULLABLE>true</IS_NULLABLE>
+        <UNSIGNED_ATTRIBUTE>false</UNSIGNED_ATTRIBUTE>
+        <FIXED_PREC_SCALE>false</FIXED_PREC_SCALE>
+        <AUTO_UNIQUE_VALUE>false</AUTO_UNIQUE_VALUE>
+        <IS_LONG>false</IS_LONG>
+        <BEST_MATCH>true</BEST_MATCH>
+      </row>
+      <row>
+        <TYPE_NAME>BOOLEAN</TYPE_NAME>
+        <DATA_TYPE>11</DATA_TYPE>
+        <COLUMN_SIZE>1</COLUMN_SIZE>
+        <IS_NULLABLE>true</IS_NULLABLE>
+        <UNSIGNED_ATTRIBUTE>false</UNSIGNED_ATTRIBUTE>
+        <FIXED_PREC_SCALE>false</FIXED_PREC_SCALE>
+        <AUTO_UNIQUE_VALUE>false</AUTO_UNIQUE_VALUE>
+        <IS_LONG>false</IS_LONG>
+        <BEST_MATCH>true</BEST_MATCH>
+      </row>
+      <row>
+        <TYPE_NAME>LARGE_INTEGER</TYPE_NAME>
+        <DATA_TYPE>20</DATA_TYPE>
+        <COLUMN_SIZE>16</COLUMN_SIZE>
+        <IS_NULLABLE>true</IS_NULLABLE>
+        <UNSIGNED_ATTRIBUTE>false</UNSIGNED_ATTRIBUTE>
+        <FIXED_PREC_SCALE>false</FIXED_PREC_SCALE>
+        <AUTO_UNIQUE_VALUE>false</AUTO_UNIQUE_VALUE>
+        <IS_LONG>false</IS_LONG>
+        <BEST_MATCH>true</BEST_MATCH>
+      </row>
+      <row>
+        <TYPE_NAME>STRING</TYPE_NAME>
+        <DATA_TYPE>130</DATA_TYPE>
+        <COLUMN_SIZE>255</COLUMN_SIZE>
+        <LITERAL_PREFIX>&#34;</LITERAL_PREFIX>
+        <LITERAL_SUFFIX>&#34;</LITERAL_SUFFIX>
+        <IS_NULLABLE>true</IS_NULLABLE>
+        <CASE_SENSITIVE>false</CASE_SENSITIVE>
+        <FIXED_PREC_SCALE>false</FIXED_PREC_SCALE>
+        <AUTO_UNIQUE_VALUE>false</AUTO_UNIQUE_VALUE>
+        <IS_LONG>false</IS_LONG>
+        <BEST_MATCH>true</BEST_MATCH>
+      </row>
+    </root>
+  </return>
+</DiscoverResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

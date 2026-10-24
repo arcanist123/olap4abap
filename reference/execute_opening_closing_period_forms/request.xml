@@ -1,0 +1,6 @@
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<SOAP-ENV:Body>
+<Execute xmlns="urn:schemas-microsoft-com:xml-analysis" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<Command><Statement>WITH MEMBER [Measures].[Forms] AS SetToStr({OpeningPeriod(), ClosingPeriod([Time].[Month], [Time].[1997]), OpeningPeriod([Time].[Year], [Time].[1997].[Q2]), ClosingPeriod([Time].[Quarter], [Time].[1997].[Q2]), ClosingPeriod([Time].[1997])}) MEMBER [Measures].[Weekly] AS ClosingPeriod([Time.Weekly].[Week], [Time].[1997]).UniqueName SELECT {[Measures].[Forms], [Measures].[Weekly]} ON 0 FROM [ZFMSALES] WHERE [Time].[1997].[Q3]</Statement></Command>
+<Properties><PropertyList><DataSourceInfo>ABAP BW</DataSourceInfo><Catalog>ZFOODMART</Catalog><Format>Multidimensional</Format><AxisFormat>TupleFormat</AxisFormat><Content>SchemaData</Content></PropertyList></Properties>
+</Execute></SOAP-ENV:Body></SOAP-ENV:Envelope>

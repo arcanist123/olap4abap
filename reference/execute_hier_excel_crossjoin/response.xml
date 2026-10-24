@@ -1,0 +1,1650 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<ExecuteResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:mddataset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:schemas-microsoft-com:xml-analysis:mddataset" xmlns="urn:schemas-microsoft-com:xml-analysis:mddataset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:sql="urn:schemas-microsoft-com:xml-sql" elementFormDefault="qualified">
+        <xsd:complexType name="MemberType">
+          <xsd:sequence>
+            <xsd:element name="UName" type="xsd:string"/>
+            <xsd:element name="Caption" type="xsd:string"/>
+            <xsd:element name="LName" type="xsd:string"/>
+            <xsd:element name="LNum" type="xsd:unsignedInt"/>
+            <xsd:element name="DisplayInfo" type="xsd:unsignedInt"/>
+            <xsd:sequence maxOccurs="unbounded" minOccurs="0">
+              <xsd:any processContents="lax" maxOccurs="unbounded"/>
+            </xsd:sequence>
+          </xsd:sequence>
+          <xsd:attribute name="Hierarchy" type="xsd:string"/>
+        </xsd:complexType>
+        <xsd:complexType name="PropType">
+          <xsd:attribute name="name" type="xsd:string"/>
+        </xsd:complexType>
+        <xsd:complexType name="TupleType">
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:element name="Member" type="MemberType"/>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:complexType name="MembersType">
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:element name="Member" type="MemberType"/>
+          </xsd:sequence>
+          <xsd:attribute name="Hierarchy" type="xsd:string"/>
+        </xsd:complexType>
+        <xsd:complexType name="TuplesType">
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:element name="Tuple" type="TupleType"/>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:complexType name="CrossProductType">
+          <xsd:sequence>
+            <xsd:choice minOccurs="0" maxOccurs="unbounded">
+              <xsd:element name="Members" type="MembersType"/>
+              <xsd:element name="Tuples" type="TuplesType"/>
+            </xsd:choice>
+          </xsd:sequence>
+          <xsd:attribute name="Size" type="xsd:unsignedInt"/>
+        </xsd:complexType>
+        <xsd:complexType name="OlapInfo">
+          <xsd:sequence>
+            <xsd:element name="CubeInfo">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element name="Cube" maxOccurs="unbounded">
+                    <xsd:complexType>
+                      <xsd:sequence>
+                        <xsd:element name="CubeName" type="xsd:string"/>
+                      </xsd:sequence>
+                    </xsd:complexType>
+                  </xsd:element>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="AxesInfo">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element name="AxisInfo" maxOccurs="unbounded">
+                    <xsd:complexType>
+                      <xsd:sequence>
+                        <xsd:element name="HierarchyInfo" minOccurs="0" maxOccurs="unbounded">
+                          <xsd:complexType>
+                            <xsd:sequence>
+                              <xsd:sequence maxOccurs="unbounded">
+                                <xsd:element name="UName" type="PropType"/>
+                                <xsd:element name="Caption" type="PropType"/>
+                                <xsd:element name="LName" type="PropType"/>
+                                <xsd:element name="LNum" type="PropType"/>
+                                <xsd:element name="DisplayInfo" type="PropType" minOccurs="0" maxOccurs="unbounded"/>
+                              </xsd:sequence>
+                              <xsd:sequence>
+                                <xsd:any processContents="lax" minOccurs="0" maxOccurs="unbounded"/>
+                              </xsd:sequence>
+                            </xsd:sequence>
+                            <xsd:attribute name="name" type="xsd:string" use="required"/>
+                          </xsd:complexType>
+                        </xsd:element>
+                      </xsd:sequence>
+                      <xsd:attribute name="name" type="xsd:string"/>
+                    </xsd:complexType>
+                  </xsd:element>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="CellInfo">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:sequence minOccurs="0" maxOccurs="unbounded">
+                    <xsd:choice>
+                      <xsd:element name="Value" type="PropType"/>
+                      <xsd:element name="FmtValue" type="PropType"/>
+                      <xsd:element name="BackColor" type="PropType"/>
+                      <xsd:element name="ForeColor" type="PropType"/>
+                      <xsd:element name="FontName" type="PropType"/>
+                      <xsd:element name="FontSize" type="PropType"/>
+                      <xsd:element name="FontFlags" type="PropType"/>
+                      <xsd:element name="FormatString" type="PropType"/>
+                      <xsd:element name="NonEmptyBehavior" type="PropType"/>
+                      <xsd:element name="SolveOrder" type="PropType"/>
+                      <xsd:element name="Updateable" type="PropType"/>
+                      <xsd:element name="Visible" type="PropType"/>
+                      <xsd:element name="Expression" type="PropType"/>
+                    </xsd:choice>
+                  </xsd:sequence>
+                  <xsd:sequence maxOccurs="unbounded" minOccurs="0">
+                    <xsd:any processContents="lax" maxOccurs="unbounded"/>
+                  </xsd:sequence>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:complexType name="Axes">
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:element name="Axis">
+              <xsd:complexType>
+                <xsd:choice minOccurs="0" maxOccurs="unbounded">
+                  <xsd:element name="CrossProduct" type="CrossProductType"/>
+                  <xsd:element name="Tuples" type="TuplesType"/>
+                  <xsd:element name="Members" type="MembersType"/>
+                </xsd:choice>
+                <xsd:attribute name="name" type="xsd:string"/>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:complexType name="CellData">
+          <xsd:sequence>
+            <xsd:element name="Cell" minOccurs="0" maxOccurs="unbounded">
+              <xsd:complexType>
+                <xsd:sequence maxOccurs="unbounded">
+                  <xsd:choice>
+                    <xsd:element name="Value"/>
+                    <xsd:element name="FmtValue" type="xsd:string"/>
+                    <xsd:element name="BackColor" type="xsd:unsignedInt"/>
+                    <xsd:element name="ForeColor" type="xsd:unsignedInt"/>
+                    <xsd:element name="FontName" type="xsd:string"/>
+                    <xsd:element name="FontSize" type="xsd:unsignedShort"/>
+                    <xsd:element name="FontFlags" type="xsd:unsignedInt"/>
+                    <xsd:element name="FormatString" type="xsd:string"/>
+                    <xsd:element name="NonEmptyBehavior" type="xsd:unsignedShort"/>
+                    <xsd:element name="SolveOrder" type="xsd:unsignedInt"/>
+                    <xsd:element name="Updateable" type="xsd:unsignedInt"/>
+                    <xsd:element name="Visible" type="xsd:unsignedInt"/>
+                    <xsd:element name="Expression" type="xsd:string"/>
+                  </xsd:choice>
+                </xsd:sequence>
+                <xsd:attribute name="CellOrdinal" type="xsd:unsignedInt" use="required"/>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:element name="root">
+          <xsd:complexType>
+            <xsd:sequence maxOccurs="unbounded">
+              <xsd:element name="OlapInfo" type="OlapInfo"/>
+              <xsd:element name="Axes" type="Axes"/>
+              <xsd:element name="CellData" type="CellData"/>
+            </xsd:sequence>
+          </xsd:complexType>
+        </xsd:element>
+      </xsd:schema>
+      <OlapInfo>
+        <CubeInfo>
+          <Cube>
+            <CubeName>ZCLHIER</CubeName>
+            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-17T15:40:07</LastDataUpdate>
+            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-17T15:40:07</LastSchemaUpdate>
+          </Cube>
+        </CubeInfo>
+        <AxesInfo>
+          <AxisInfo name="Axis0">
+            <HierarchyInfo name="[ZCLDIAG.ZCLDIAG_ICD]">
+              <UName name="[ZCLDIAG.ZCLDIAG_ICD].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
+              <Caption name="[ZCLDIAG.ZCLDIAG_ICD].[MEMBER_CAPTION]" type="xsd:string"/>
+              <LName name="[ZCLDIAG.ZCLDIAG_ICD].[LEVEL_UNIQUE_NAME]" type="xsd:string"/>
+              <LNum name="[ZCLDIAG.ZCLDIAG_ICD].[LEVEL_NUMBER]" type="xsd:unsignedInt"/>
+              <DisplayInfo name="[ZCLDIAG.ZCLDIAG_ICD].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
+              <PARENT_UNIQUE_NAME name="[ZCLDIAG.ZCLDIAG_ICD].[PARENT_UNIQUE_NAME]" type="xsd:string"/>
+            </HierarchyInfo>
+            <HierarchyInfo name="[ZCLVTYPE]">
+              <UName name="[ZCLVTYPE].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
+              <Caption name="[ZCLVTYPE].[MEMBER_CAPTION]" type="xsd:string"/>
+              <LName name="[ZCLVTYPE].[LEVEL_UNIQUE_NAME]" type="xsd:string"/>
+              <LNum name="[ZCLVTYPE].[LEVEL_NUMBER]" type="xsd:unsignedInt"/>
+              <DisplayInfo name="[ZCLVTYPE].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
+              <PARENT_UNIQUE_NAME name="[ZCLVTYPE].[PARENT_UNIQUE_NAME]" type="xsd:string"/>
+            </HierarchyInfo>
+          </AxisInfo>
+          <AxisInfo name="SlicerAxis">
+            <HierarchyInfo name="[Measures]">
+              <UName name="[Measures].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
+              <Caption name="[Measures].[MEMBER_CAPTION]" type="xsd:string"/>
+              <LName name="[Measures].[LEVEL_UNIQUE_NAME]" type="xsd:string"/>
+              <LNum name="[Measures].[LEVEL_NUMBER]" type="xsd:unsignedInt"/>
+              <DisplayInfo name="[Measures].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
+            </HierarchyInfo>
+          </AxisInfo>
+        </AxesInfo>
+        <CellInfo>
+          <Value name="VALUE"/>
+        </CellInfo>
+      </OlapInfo>
+      <Axes>
+        <Axis name="Axis0">
+          <Tuples>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</UName>
+                <Caption>All Diagnoses by ICD-10 Chapter</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[(All)]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>1</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[All Visit Type]</UName>
+                <Caption>All Visit Type</Caption>
+                <LName>[ZCLVTYPE].[(All)]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>65541</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</UName>
+                <Caption>All Diagnoses by ICD-10 Chapter</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[(All)]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>1</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[]</UName>
+                <Caption/>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>0</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</UName>
+                <Caption>All Diagnoses by ICD-10 Chapter</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[(All)]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>1</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Emergency]</UName>
+                <Caption>Emergency Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</UName>
+                <Caption>All Diagnoses by ICD-10 Chapter</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[(All)]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>1</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Follow-up]</UName>
+                <Caption>Follow-up Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</UName>
+                <Caption>All Diagnoses by ICD-10 Chapter</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[(All)]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>1</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Outpatient]</UName>
+                <Caption>Outpatient Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</UName>
+                <Caption>All Diagnoses by ICD-10 Chapter</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[(All)]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>65537</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Telehealth]</UName>
+                <Caption>Telehealth Consultation</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</UName>
+                <Caption>All Diagnoses</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 01]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>10</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[All Visit Type]</UName>
+                <Caption>All Visit Type</Caption>
+                <LName>[ZCLVTYPE].[(All)]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>65541</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</UName>
+                <Caption>All Diagnoses</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 01]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131082</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[]</UName>
+                <Caption/>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>0</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</UName>
+                <Caption>All Diagnoses</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 01]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131082</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Emergency]</UName>
+                <Caption>Emergency Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</UName>
+                <Caption>All Diagnoses</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 01]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131082</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Follow-up]</UName>
+                <Caption>Follow-up Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</UName>
+                <Caption>All Diagnoses</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 01]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131082</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Outpatient]</UName>
+                <Caption>Outpatient Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</UName>
+                <Caption>All Diagnoses</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 01]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>196618</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Telehealth]</UName>
+                <Caption>Telehealth Consultation</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY]</UName>
+                <Caption>Respiratory</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>4</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[All Visit Type]</UName>
+                <Caption>All Visit Type</Caption>
+                <LName>[ZCLVTYPE].[(All)]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>65541</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY]</UName>
+                <Caption>Respiratory</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131076</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[]</UName>
+                <Caption/>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>0</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY]</UName>
+                <Caption>Respiratory</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131076</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Emergency]</UName>
+                <Caption>Emergency Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY]</UName>
+                <Caption>Respiratory</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131076</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Follow-up]</UName>
+                <Caption>Follow-up Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY]</UName>
+                <Caption>Respiratory</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131076</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Outpatient]</UName>
+                <Caption>Outpatient Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY]</UName>
+                <Caption>Respiratory</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131076</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Telehealth]</UName>
+                <Caption>Telehealth Consultation</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY]</UName>
+                <Caption>Circulatory</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131075</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[All Visit Type]</UName>
+                <Caption>All Visit Type</Caption>
+                <LName>[ZCLVTYPE].[(All)]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>65541</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY]</UName>
+                <Caption>Circulatory</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131075</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[]</UName>
+                <Caption/>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>0</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY]</UName>
+                <Caption>Circulatory</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131075</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Emergency]</UName>
+                <Caption>Emergency Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY]</UName>
+                <Caption>Circulatory</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131075</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Follow-up]</UName>
+                <Caption>Follow-up Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY]</UName>
+                <Caption>Circulatory</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131075</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Outpatient]</UName>
+                <Caption>Outpatient Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CIRCULATORY]</UName>
+                <Caption>Circulatory</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131075</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Telehealth]</UName>
+                <Caption>Telehealth Consultation</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[ENDOCRINE_AND_METABOLIC]</UName>
+                <Caption>Endocrine and metabolic</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131075</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[All Visit Type]</UName>
+                <Caption>All Visit Type</Caption>
+                <LName>[ZCLVTYPE].[(All)]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>65541</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[ENDOCRINE_AND_METABOLIC]</UName>
+                <Caption>Endocrine and metabolic</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131075</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[]</UName>
+                <Caption/>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>0</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[ENDOCRINE_AND_METABOLIC]</UName>
+                <Caption>Endocrine and metabolic</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131075</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Follow-up]</UName>
+                <Caption>Follow-up Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[ENDOCRINE_AND_METABOLIC]</UName>
+                <Caption>Endocrine and metabolic</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131075</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Outpatient]</UName>
+                <Caption>Outpatient Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[ENDOCRINE_AND_METABOLIC]</UName>
+                <Caption>Endocrine and metabolic</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131075</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Telehealth]</UName>
+                <Caption>Telehealth Consultation</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MUSCULOSKELETAL]</UName>
+                <Caption>Musculoskeletal</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131075</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[All Visit Type]</UName>
+                <Caption>All Visit Type</Caption>
+                <LName>[ZCLVTYPE].[(All)]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>65541</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MUSCULOSKELETAL]</UName>
+                <Caption>Musculoskeletal</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131075</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[]</UName>
+                <Caption/>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>0</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MUSCULOSKELETAL]</UName>
+                <Caption>Musculoskeletal</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131075</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Follow-up]</UName>
+                <Caption>Follow-up Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MUSCULOSKELETAL]</UName>
+                <Caption>Musculoskeletal</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131075</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Outpatient]</UName>
+                <Caption>Outpatient Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MUSCULOSKELETAL]</UName>
+                <Caption>Musculoskeletal</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131075</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Telehealth]</UName>
+                <Caption>Telehealth Consultation</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[SKIN]</UName>
+                <Caption>Skin</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[All Visit Type]</UName>
+                <Caption>All Visit Type</Caption>
+                <LName>[ZCLVTYPE].[(All)]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>65541</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[SKIN]</UName>
+                <Caption>Skin</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[]</UName>
+                <Caption/>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>0</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[SKIN]</UName>
+                <Caption>Skin</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Follow-up]</UName>
+                <Caption>Follow-up Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[SKIN]</UName>
+                <Caption>Skin</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Outpatient]</UName>
+                <Caption>Outpatient Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[SKIN]</UName>
+                <Caption>Skin</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Telehealth]</UName>
+                <Caption>Telehealth Consultation</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INFECTIONS]</UName>
+                <Caption>Infections</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[All Visit Type]</UName>
+                <Caption>All Visit Type</Caption>
+                <LName>[ZCLVTYPE].[(All)]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>65541</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INFECTIONS]</UName>
+                <Caption>Infections</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[]</UName>
+                <Caption/>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>0</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INFECTIONS]</UName>
+                <Caption>Infections</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Emergency]</UName>
+                <Caption>Emergency Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INFECTIONS]</UName>
+                <Caption>Infections</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Follow-up]</UName>
+                <Caption>Follow-up Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INFECTIONS]</UName>
+                <Caption>Infections</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Outpatient]</UName>
+                <Caption>Outpatient Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INFECTIONS]</UName>
+                <Caption>Infections</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Telehealth]</UName>
+                <Caption>Telehealth Consultation</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INJURIES]</UName>
+                <Caption>Injuries</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[All Visit Type]</UName>
+                <Caption>All Visit Type</Caption>
+                <LName>[ZCLVTYPE].[(All)]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>65541</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INJURIES]</UName>
+                <Caption>Injuries</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[]</UName>
+                <Caption/>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>0</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INJURIES]</UName>
+                <Caption>Injuries</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Emergency]</UName>
+                <Caption>Emergency Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INJURIES]</UName>
+                <Caption>Injuries</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Follow-up]</UName>
+                <Caption>Follow-up Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INJURIES]</UName>
+                <Caption>Injuries</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Outpatient]</UName>
+                <Caption>Outpatient Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[INJURIES]</UName>
+                <Caption>Injuries</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Telehealth]</UName>
+                <Caption>Telehealth Consultation</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MENTAL_HEALTH]</UName>
+                <Caption>Mental health</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[All Visit Type]</UName>
+                <Caption>All Visit Type</Caption>
+                <LName>[ZCLVTYPE].[(All)]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>65541</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MENTAL_HEALTH]</UName>
+                <Caption>Mental health</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[]</UName>
+                <Caption/>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>0</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MENTAL_HEALTH]</UName>
+                <Caption>Mental health</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Emergency]</UName>
+                <Caption>Emergency Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MENTAL_HEALTH]</UName>
+                <Caption>Mental health</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Follow-up]</UName>
+                <Caption>Follow-up Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MENTAL_HEALTH]</UName>
+                <Caption>Mental health</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Outpatient]</UName>
+                <Caption>Outpatient Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[MENTAL_HEALTH]</UName>
+                <Caption>Mental health</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Telehealth]</UName>
+                <Caption>Telehealth Consultation</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CHECK_UPS]</UName>
+                <Caption>Check-ups</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[All Visit Type]</UName>
+                <Caption>All Visit Type</Caption>
+                <LName>[ZCLVTYPE].[(All)]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>65541</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CHECK_UPS]</UName>
+                <Caption>Check-ups</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[]</UName>
+                <Caption/>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>0</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CHECK_UPS]</UName>
+                <Caption>Check-ups</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Follow-up]</UName>
+                <Caption>Follow-up Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CHECK_UPS]</UName>
+                <Caption>Check-ups</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Outpatient]</UName>
+                <Caption>Outpatient Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[CHECK_UPS]</UName>
+                <Caption>Check-ups</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131074</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Telehealth]</UName>
+                <Caption>Telehealth Consultation</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>Not recorded</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[All Visit Type]</UName>
+                <Caption>All Visit Type</Caption>
+                <LName>[ZCLVTYPE].[(All)]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>65541</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>Not recorded</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[]</UName>
+                <Caption/>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>0</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>Not recorded</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Emergency]</UName>
+                <Caption>Emergency Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>Not recorded</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Follow-up]</UName>
+                <Caption>Follow-up Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>Not recorded</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Outpatient]</UName>
+                <Caption>Outpatient Visit</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[ZCLDIAG.ZCLDIAG_ICD]">
+                <UName>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[NOT_RECORDED]</UName>
+                <Caption>Not recorded</Caption>
+                <LName>[ZCLDIAG.ZCLDIAG_ICD].[Level 02]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>131073</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES]</PARENT_UNIQUE_NAME>
+              </Member>
+              <Member Hierarchy="[ZCLVTYPE]">
+                <UName>[ZCLVTYPE].[Telehealth]</UName>
+                <Caption>Telehealth Consultation</Caption>
+                <LName>[ZCLVTYPE].[ZCLVTYPE]</LName>
+                <LNum>1</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+                <PARENT_UNIQUE_NAME>[ZCLVTYPE].[All Visit Type]</PARENT_UNIQUE_NAME>
+              </Member>
+            </Tuple>
+          </Tuples>
+        </Axis>
+        <Axis name="SlicerAxis">
+          <Tuples>
+            <Tuple>
+              <Member Hierarchy="[Measures]">
+                <UName>[Measures].[ZCLVISNO]</UName>
+                <Caption>Visits</Caption>
+                <LName>[Measures].[MeasuresLevel]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+          </Tuples>
+        </Axis>
+      </Axes>
+      <CellData>
+        <Cell CellOrdinal="0">
+          <Value xsi:type="xsd:double">33956</Value>
+        </Cell>
+        <Cell CellOrdinal="1">
+          <Value xsi:type="xsd:double">152</Value>
+        </Cell>
+        <Cell CellOrdinal="2">
+          <Value xsi:type="xsd:double">4149</Value>
+        </Cell>
+        <Cell CellOrdinal="3">
+          <Value xsi:type="xsd:double">7427</Value>
+        </Cell>
+        <Cell CellOrdinal="4">
+          <Value xsi:type="xsd:double">18294</Value>
+        </Cell>
+        <Cell CellOrdinal="5">
+          <Value xsi:type="xsd:double">3934</Value>
+        </Cell>
+        <Cell CellOrdinal="6">
+          <Value xsi:type="xsd:double">33956</Value>
+        </Cell>
+        <Cell CellOrdinal="7">
+          <Value xsi:type="xsd:double">152</Value>
+        </Cell>
+        <Cell CellOrdinal="8">
+          <Value xsi:type="xsd:double">4149</Value>
+        </Cell>
+        <Cell CellOrdinal="9">
+          <Value xsi:type="xsd:double">7427</Value>
+        </Cell>
+        <Cell CellOrdinal="10">
+          <Value xsi:type="xsd:double">18294</Value>
+        </Cell>
+        <Cell CellOrdinal="11">
+          <Value xsi:type="xsd:double">3934</Value>
+        </Cell>
+        <Cell CellOrdinal="12">
+          <Value xsi:type="xsd:double">9900</Value>
+        </Cell>
+        <Cell CellOrdinal="13">
+          <Value xsi:type="xsd:double">53</Value>
+        </Cell>
+        <Cell CellOrdinal="14">
+          <Value xsi:type="xsd:double">834</Value>
+        </Cell>
+        <Cell CellOrdinal="15">
+          <Value xsi:type="xsd:double">2232</Value>
+        </Cell>
+        <Cell CellOrdinal="16">
+          <Value xsi:type="xsd:double">5440</Value>
+        </Cell>
+        <Cell CellOrdinal="17">
+          <Value xsi:type="xsd:double">1341</Value>
+        </Cell>
+        <Cell CellOrdinal="18">
+          <Value xsi:type="xsd:double">5374</Value>
+        </Cell>
+        <Cell CellOrdinal="19">
+          <Value xsi:type="xsd:double">26</Value>
+        </Cell>
+        <Cell CellOrdinal="20">
+          <Value xsi:type="xsd:double">559</Value>
+        </Cell>
+        <Cell CellOrdinal="21">
+          <Value xsi:type="xsd:double">1184</Value>
+        </Cell>
+        <Cell CellOrdinal="22">
+          <Value xsi:type="xsd:double">2884</Value>
+        </Cell>
+        <Cell CellOrdinal="23">
+          <Value xsi:type="xsd:double">721</Value>
+        </Cell>
+        <Cell CellOrdinal="24">
+          <Value xsi:type="xsd:double">2135</Value>
+        </Cell>
+        <Cell CellOrdinal="25">
+          <Value xsi:type="xsd:double">9</Value>
+        </Cell>
+        <Cell CellOrdinal="26">
+          <Value xsi:type="xsd:double">528</Value>
+        </Cell>
+        <Cell CellOrdinal="27">
+          <Value xsi:type="xsd:double">1266</Value>
+        </Cell>
+        <Cell CellOrdinal="28">
+          <Value xsi:type="xsd:double">332</Value>
+        </Cell>
+        <Cell CellOrdinal="29">
+          <Value xsi:type="xsd:double">3707</Value>
+        </Cell>
+        <Cell CellOrdinal="30">
+          <Value xsi:type="xsd:double">15</Value>
+        </Cell>
+        <Cell CellOrdinal="31">
+          <Value xsi:type="xsd:double">897</Value>
+        </Cell>
+        <Cell CellOrdinal="32">
+          <Value xsi:type="xsd:double">2595</Value>
+        </Cell>
+        <Cell CellOrdinal="33">
+          <Value xsi:type="xsd:double">200</Value>
+        </Cell>
+        <Cell CellOrdinal="34">
+          <Value xsi:type="xsd:double">2101</Value>
+        </Cell>
+        <Cell CellOrdinal="35">
+          <Value xsi:type="xsd:double">4</Value>
+        </Cell>
+        <Cell CellOrdinal="36">
+          <Value xsi:type="xsd:double">556</Value>
+        </Cell>
+        <Cell CellOrdinal="37">
+          <Value xsi:type="xsd:double">1222</Value>
+        </Cell>
+        <Cell CellOrdinal="38">
+          <Value xsi:type="xsd:double">319</Value>
+        </Cell>
+        <Cell CellOrdinal="39">
+          <Value xsi:type="xsd:double">2196</Value>
+        </Cell>
+        <Cell CellOrdinal="40">
+          <Value xsi:type="xsd:double">7</Value>
+        </Cell>
+        <Cell CellOrdinal="41">
+          <Value xsi:type="xsd:double">360</Value>
+        </Cell>
+        <Cell CellOrdinal="42">
+          <Value xsi:type="xsd:double">453</Value>
+        </Cell>
+        <Cell CellOrdinal="43">
+          <Value xsi:type="xsd:double">1101</Value>
+        </Cell>
+        <Cell CellOrdinal="44">
+          <Value xsi:type="xsd:double">275</Value>
+        </Cell>
+        <Cell CellOrdinal="45">
+          <Value xsi:type="xsd:double">3430</Value>
+        </Cell>
+        <Cell CellOrdinal="46">
+          <Value xsi:type="xsd:double">12</Value>
+        </Cell>
+        <Cell CellOrdinal="47">
+          <Value xsi:type="xsd:double">2250</Value>
+        </Cell>
+        <Cell CellOrdinal="48">
+          <Value xsi:type="xsd:double">320</Value>
+        </Cell>
+        <Cell CellOrdinal="49">
+          <Value xsi:type="xsd:double">835</Value>
+        </Cell>
+        <Cell CellOrdinal="50">
+          <Value xsi:type="xsd:double">13</Value>
+        </Cell>
+        <Cell CellOrdinal="51">
+          <Value xsi:type="xsd:double">1054</Value>
+        </Cell>
+        <Cell CellOrdinal="52">
+          <Value xsi:type="xsd:double">2</Value>
+        </Cell>
+        <Cell CellOrdinal="53">
+          <Value xsi:type="xsd:double">121</Value>
+        </Cell>
+        <Cell CellOrdinal="54">
+          <Value xsi:type="xsd:double">239</Value>
+        </Cell>
+        <Cell CellOrdinal="55">
+          <Value xsi:type="xsd:double">547</Value>
+        </Cell>
+        <Cell CellOrdinal="56">
+          <Value xsi:type="xsd:double">145</Value>
+        </Cell>
+        <Cell CellOrdinal="57">
+          <Value xsi:type="xsd:double">3722</Value>
+        </Cell>
+        <Cell CellOrdinal="58">
+          <Value xsi:type="xsd:double">18</Value>
+        </Cell>
+        <Cell CellOrdinal="59">
+          <Value xsi:type="xsd:double">941</Value>
+        </Cell>
+        <Cell CellOrdinal="60">
+          <Value xsi:type="xsd:double">2217</Value>
+        </Cell>
+        <Cell CellOrdinal="61">
+          <Value xsi:type="xsd:double">546</Value>
+        </Cell>
+        <Cell CellOrdinal="62">
+          <Value xsi:type="xsd:double">337</Value>
+        </Cell>
+        <Cell CellOrdinal="63">
+          <Value xsi:type="xsd:double">6</Value>
+        </Cell>
+        <Cell CellOrdinal="64">
+          <Value xsi:type="xsd:double">25</Value>
+        </Cell>
+        <Cell CellOrdinal="65">
+          <Value xsi:type="xsd:double">77</Value>
+        </Cell>
+        <Cell CellOrdinal="66">
+          <Value xsi:type="xsd:double">187</Value>
+        </Cell>
+        <Cell CellOrdinal="67">
+          <Value xsi:type="xsd:double">42</Value>
+        </Cell>
+      </CellData>
+    </root>
+  </return>
+</ExecuteResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

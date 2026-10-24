@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<!-- A required attribute without a default; each constructor adds "In <element>: " to the message. -->
+<Schema name="Err">
+  <Cube name="Sales">
+    <Table name="sales_fact"/>
+    <Dimension name="Store" foreignKey="store_id">
+      <Hierarchy hasAll="true"><Level column="country"/></Hierarchy>
+    </Dimension>
+  </Cube>
+</Schema>

@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<ExecuteResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:sql="urn:schemas-microsoft-com:xml-sql" elementFormDefault="qualified">
+        <xsd:element name="root">
+          <xsd:complexType>
+            <xsd:sequence>
+              <xsd:element maxOccurs="unbounded" minOccurs="0" name="row" type="row"/>
+            </xsd:sequence>
+          </xsd:complexType>
+        </xsd:element>
+        <xsd:simpleType name="uuid">
+          <xsd:restriction base="xsd:string">
+            <xsd:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+          </xsd:restriction>
+        </xsd:simpleType>
+        <xsd:complexType name="row">
+          <xsd:sequence>
+            <xsd:element minOccurs="0" name="Product_x0020_Family" sql:field="Product Family" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Product_x0020_Department" sql:field="Product Department" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Product_x0020_Category" sql:field="Product Category" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Product_x0020_Subcategory" sql:field="Product Subcategory" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Brand_x0020_Name" sql:field="Brand Name" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Product_x0020_Name" sql:field="Product Name" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Product_x0020_Id" sql:field="Product Id" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Country" sql:field="Country" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="State_x0020_Province" sql:field="State Province" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="City" sql:field="City" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Name" sql:field="Name" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Name_x0020__x0028_Key_x0029_" sql:field="Name (Key)" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Gender" sql:field="Gender" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Marital_x0020_Status" sql:field="Marital Status" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Education" sql:field="Education" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Yearly_x0020_Income" sql:field="Yearly Income" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Store_x0020_Country" sql:field="Store Country" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Store_x0020_State" sql:field="Store State" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Store_x0020_City" sql:field="Store City" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Store_x0020_Name" sql:field="Store Name" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Store_x0020_Id" sql:field="Store Id" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Store_x0020_Type" sql:field="Store Type" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Store_x0020_Manager" sql:field="Store Manager" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Store_x0020_Sqft" sql:field="Store Sqft" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Grocery_x0020_Sqft" sql:field="Grocery Sqft" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Frozen_x0020_Sqft" sql:field="Frozen Sqft" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Meat_x0020_Sqft" sql:field="Meat Sqft" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Has_x0020_Coffee_x0020_Bar" sql:field="Has Coffee Bar" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Street_x0020_Address" sql:field="Street Address" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Promotion_x0020_Name" sql:field="Promotion Name" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Promotion_x0020_Id" sql:field="Promotion Id" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Media_x0020_Type" sql:field="Media Type" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Year" sql:field="Year" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Quarter" sql:field="Quarter" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Month" sql:field="Month" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Week" sql:field="Week" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Day" sql:field="Day" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Time_x0020_Id" sql:field="Time Id" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="The_x0020_Date" sql:field="The Date" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Day_x0020_Name" sql:field="Day Name" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Month_x0020_Name" sql:field="Month Name" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Fiscal_x0020_Period" sql:field="Fiscal Period" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Unit_x0020_Sales" sql:field="Unit Sales" type="xsd:decimal"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:schema>
+      <row>
+        <Product_x0020_Family xsi:type="xsd:string">Drink</Product_x0020_Family>
+        <Product_x0020_Department xsi:type="xsd:string">Dairy</Product_x0020_Department>
+        <Product_x0020_Category xsi:type="xsd:string">Dairy</Product_x0020_Category>
+        <Product_x0020_Subcategory xsi:type="xsd:string">Milk</Product_x0020_Subcategory>
+        <Brand_x0020_Name xsi:type="xsd:string">Club</Brand_x0020_Name>
+        <Product_x0020_Name xsi:type="xsd:string">Club 1% Milk</Product_x0020_Name>
+        <Product_x0020_Id xsi:type="xsd:integer">59</Product_x0020_Id>
+        <Country xsi:type="xsd:string">USA</Country>
+        <State_x0020_Province xsi:type="xsd:string">CA</State_x0020_Province>
+        <City xsi:type="xsd:string">Daly City</City>
+        <Name xsi:type="xsd:string">Don Brooks</Name>
+        <Name_x0020__x0028_Key_x0029_ xsi:type="xsd:integer">10090</Name_x0020__x0028_Key_x0029_>
+        <Gender xsi:type="xsd:string">M</Gender>
+        <Marital_x0020_Status xsi:type="xsd:string">M</Marital_x0020_Status>
+        <Education xsi:type="xsd:string">Partial High School</Education>
+        <Yearly_x0020_Income xsi:type="xsd:string">$30K - $50K</Yearly_x0020_Income>
+        <Store_x0020_Country xsi:type="xsd:string">USA</Store_x0020_Country>
+        <Store_x0020_State xsi:type="xsd:string">CA</Store_x0020_State>
+        <Store_x0020_City xsi:type="xsd:string">San Francisco</Store_x0020_City>
+        <Store_x0020_Name xsi:type="xsd:string">Store 14</Store_x0020_Name>
+        <Store_x0020_Id xsi:type="xsd:integer">14</Store_x0020_Id>
+        <Store_x0020_Type xsi:type="xsd:string">Small Grocery</Store_x0020_Type>
+        <Store_x0020_Manager xsi:type="xsd:string">Strehlo</Store_x0020_Manager>
+        <Store_x0020_Sqft xsi:type="xsd:integer">22478</Store_x0020_Sqft>
+        <Grocery_x0020_Sqft xsi:type="xsd:integer">15321</Grocery_x0020_Sqft>
+        <Frozen_x0020_Sqft xsi:type="xsd:integer">4294</Frozen_x0020_Sqft>
+        <Meat_x0020_Sqft xsi:type="xsd:integer">2863</Meat_x0020_Sqft>
+        <Has_x0020_Coffee_x0020_Bar xsi:type="xsd:string">true</Has_x0020_Coffee_x0020_Bar>
+        <Street_x0020_Address xsi:type="xsd:string">4365 Indigo Ct</Street_x0020_Address>
+        <Promotion_x0020_Name xsi:type="xsd:string">No Promotion</Promotion_x0020_Name>
+        <Promotion_x0020_Id xsi:type="xsd:integer">0</Promotion_x0020_Id>
+        <Media_x0020_Type xsi:type="xsd:string">No Media</Media_x0020_Type>
+        <Year xsi:type="xsd:integer">1997</Year>
+        <Quarter xsi:type="xsd:string">Q1</Quarter>
+        <Month xsi:type="xsd:integer">2</Month>
+        <Week xsi:type="xsd:integer">10</Week>
+        <Day xsi:type="xsd:integer">25</Day>
+        <Time_x0020_Id xsi:type="xsd:integer">422</Time_x0020_Id>
+        <The_x0020_Date xsi:type="xsd:string">1997-02-25</The_x0020_Date>
+        <Day_x0020_Name xsi:type="xsd:string">Tuesday</Day_x0020_Name>
+        <Month_x0020_Name xsi:type="xsd:string">February</Month_x0020_Name>
+        <Fiscal_x0020_Period xsi:type="xsd:string"/>
+        <Unit_x0020_Sales xsi:type="xsd:decimal">3</Unit_x0020_Sales>
+      </row>
+      <row>
+        <Product_x0020_Family xsi:type="xsd:string">Drink</Product_x0020_Family>
+        <Product_x0020_Department xsi:type="xsd:string">Dairy</Product_x0020_Department>
+        <Product_x0020_Category xsi:type="xsd:string">Dairy</Product_x0020_Category>
+        <Product_x0020_Subcategory xsi:type="xsd:string">Milk</Product_x0020_Subcategory>
+        <Brand_x0020_Name xsi:type="xsd:string">Club</Brand_x0020_Name>
+        <Product_x0020_Name xsi:type="xsd:string">Club 1% Milk</Product_x0020_Name>
+        <Product_x0020_Id xsi:type="xsd:integer">59</Product_x0020_Id>
+        <Country xsi:type="xsd:string">USA</Country>
+        <State_x0020_Province xsi:type="xsd:string">CA</State_x0020_Province>
+        <City xsi:type="xsd:string">Daly City</City>
+        <Name xsi:type="xsd:string">Mary Mallory</Name>
+        <Name_x0020__x0028_Key_x0029_ xsi:type="xsd:integer">4031</Name_x0020__x0028_Key_x0029_>
+        <Gender xsi:type="xsd:string">F</Gender>
+        <Marital_x0020_Status xsi:type="xsd:string">M</Marital_x0020_Status>
+        <Education xsi:type="xsd:string">Bachelors Degree</Education>
+        <Yearly_x0020_Income xsi:type="xsd:string">$70K - $90K</Yearly_x0020_Income>
+        <Store_x0020_Country xsi:type="xsd:string">USA</Store_x0020_Country>
+        <Store_x0020_State xsi:type="xsd:string">CA</Store_x0020_State>
+        <Store_x0020_City xsi:type="xsd:string">San Francisco</Store_x0020_City>
+        <Store_x0020_Name xsi:type="xsd:string">Store 14</Store_x0020_Name>
+        <Store_x0020_Id xsi:type="xsd:integer">14</Store_x0020_Id>
+        <Store_x0020_Type xsi:type="xsd:string">Small Grocery</Store_x0020_Type>
+        <Store_x0020_Manager xsi:type="xsd:string">Strehlo</Store_x0020_Manager>
+        <Store_x0020_Sqft xsi:type="xsd:integer">22478</Store_x0020_Sqft>
+        <Grocery_x0020_Sqft xsi:type="xsd:integer">15321</Grocery_x0020_Sqft>
+        <Frozen_x0020_Sqft xsi:type="xsd:integer">4294</Frozen_x0020_Sqft>
+        <Meat_x0020_Sqft xsi:type="xsd:integer">2863</Meat_x0020_Sqft>
+        <Has_x0020_Coffee_x0020_Bar xsi:type="xsd:string">true</Has_x0020_Coffee_x0020_Bar>
+        <Street_x0020_Address xsi:type="xsd:string">4365 Indigo Ct</Street_x0020_Address>
+        <Promotion_x0020_Name xsi:type="xsd:string">No Promotion</Promotion_x0020_Name>
+        <Promotion_x0020_Id xsi:type="xsd:integer">0</Promotion_x0020_Id>
+        <Media_x0020_Type xsi:type="xsd:string">No Media</Media_x0020_Type>
+        <Year xsi:type="xsd:integer">1997</Year>
+        <Quarter xsi:type="xsd:string">Q2</Quarter>
+        <Month xsi:type="xsd:integer">4</Month>
+        <Week xsi:type="xsd:integer">18</Week>
+        <Day xsi:type="xsd:integer">23</Day>
+        <Time_x0020_Id xsi:type="xsd:integer">479</Time_x0020_Id>
+        <The_x0020_Date xsi:type="xsd:string">1997-04-23</The_x0020_Date>
+        <Day_x0020_Name xsi:type="xsd:string">Wednesday</Day_x0020_Name>
+        <Month_x0020_Name xsi:type="xsd:string">April</Month_x0020_Name>
+        <Fiscal_x0020_Period xsi:type="xsd:string"/>
+        <Unit_x0020_Sales xsi:type="xsd:decimal">1</Unit_x0020_Sales>
+      </row>
+      <row>
+        <Product_x0020_Family xsi:type="xsd:string">Drink</Product_x0020_Family>
+        <Product_x0020_Department xsi:type="xsd:string">Dairy</Product_x0020_Department>
+        <Product_x0020_Category xsi:type="xsd:string">Dairy</Product_x0020_Category>
+        <Product_x0020_Subcategory xsi:type="xsd:string">Milk</Product_x0020_Subcategory>
+        <Brand_x0020_Name xsi:type="xsd:string">Club</Brand_x0020_Name>
+        <Product_x0020_Name xsi:type="xsd:string">Club Whole Milk</Product_x0020_Name>
+        <Product_x0020_Id xsi:type="xsd:integer">60</Product_x0020_Id>
+        <Country xsi:type="xsd:string">USA</Country>
+        <State_x0020_Province xsi:type="xsd:string">CA</State_x0020_Province>
+        <City xsi:type="xsd:string">Burlingame</City>
+        <Name xsi:type="xsd:string">Dora Horton</Name>
+        <Name_x0020__x0028_Key_x0029_ xsi:type="xsd:integer">7278</Name_x0020__x0028_Key_x0029_>
+        <Gender xsi:type="xsd:string">M</Gender>
+        <Marital_x0020_Status xsi:type="xsd:string">S</Marital_x0020_Status>
+        <Education xsi:type="xsd:string">Bachelors Degree</Education>
+        <Yearly_x0020_Income xsi:type="xsd:string">$50K - $70K</Yearly_x0020_Income>
+        <Store_x0020_Country xsi:type="xsd:string">USA</Store_x0020_Country>
+        <Store_x0020_State xsi:type="xsd:string">CA</Store_x0020_State>
+        <Store_x0020_City xsi:type="xsd:string">San Francisco</Store_x0020_City>
+        <Store_x0020_Name xsi:type="xsd:string">Store 14</Store_x0020_Name>
+        <Store_x0020_Id xsi:type="xsd:integer">14</Store_x0020_Id>
+        <Store_x0020_Type xsi:type="xsd:string">Small Grocery</Store_x0020_Type>
+        <Store_x0020_Manager xsi:type="xsd:string">Strehlo</Store_x0020_Manager>
+        <Store_x0020_Sqft xsi:type="xsd:integer">22478</Store_x0020_Sqft>
+        <Grocery_x0020_Sqft xsi:type="xsd:integer">15321</Grocery_x0020_Sqft>
+        <Frozen_x0020_Sqft xsi:type="xsd:integer">4294</Frozen_x0020_Sqft>
+        <Meat_x0020_Sqft xsi:type="xsd:integer">2863</Meat_x0020_Sqft>
+        <Has_x0020_Coffee_x0020_Bar xsi:type="xsd:string">true</Has_x0020_Coffee_x0020_Bar>
+        <Street_x0020_Address xsi:type="xsd:string">4365 Indigo Ct</Street_x0020_Address>
+        <Promotion_x0020_Name xsi:type="xsd:string">Price Cutters</Promotion_x0020_Name>
+        <Promotion_x0020_Id xsi:type="xsd:integer">1061</Promotion_x0020_Id>
+        <Media_x0020_Type xsi:type="xsd:string">Radio</Media_x0020_Type>
+        <Year xsi:type="xsd:integer">1997</Year>
+        <Quarter xsi:type="xsd:string">Q2</Quarter>
+        <Month xsi:type="xsd:integer">4</Month>
+        <Week xsi:type="xsd:integer">16</Week>
+        <Day xsi:type="xsd:integer">10</Day>
+        <Time_x0020_Id xsi:type="xsd:integer">466</Time_x0020_Id>
+        <The_x0020_Date xsi:type="xsd:string">1997-04-10</The_x0020_Date>
+        <Day_x0020_Name xsi:type="xsd:string">Thursday</Day_x0020_Name>
+        <Month_x0020_Name xsi:type="xsd:string">April</Month_x0020_Name>
+        <Fiscal_x0020_Period xsi:type="xsd:string"/>
+        <Unit_x0020_Sales xsi:type="xsd:decimal">2</Unit_x0020_Sales>
+      </row>
+      <row>
+        <Product_x0020_Family xsi:type="xsd:string">Drink</Product_x0020_Family>
+        <Product_x0020_Department xsi:type="xsd:string">Dairy</Product_x0020_Department>
+        <Product_x0020_Category xsi:type="xsd:string">Dairy</Product_x0020_Category>
+        <Product_x0020_Subcategory xsi:type="xsd:string">Milk</Product_x0020_Subcategory>
+        <Brand_x0020_Name xsi:type="xsd:string">Club</Brand_x0020_Name>
+        <Product_x0020_Name xsi:type="xsd:string">Club Whole Milk</Product_x0020_Name>
+        <Product_x0020_Id xsi:type="xsd:integer">60</Product_x0020_Id>
+        <Country xsi:type="xsd:string">USA</Country>
+        <State_x0020_Province xsi:type="xsd:string">CA</State_x0020_Province>
+        <City xsi:type="xsd:string">Novato</City>
+        <Name xsi:type="xsd:string">Deborah Diack</Name>
+        <Name_x0020__x0028_Key_x0029_ xsi:type="xsd:integer">2308</Name_x0020__x0028_Key_x0029_>
+        <Gender xsi:type="xsd:string">M</Gender>
+        <Marital_x0020_Status xsi:type="xsd:string">M</Marital_x0020_Status>
+        <Education xsi:type="xsd:string">High School Degree</Education>
+        <Yearly_x0020_Income xsi:type="xsd:string">$130K - $150K</Yearly_x0020_Income>
+        <Store_x0020_Country xsi:type="xsd:string">USA</Store_x0020_Country>
+        <Store_x0020_State xsi:type="xsd:string">CA</Store_x0020_State>
+        <Store_x0020_City xsi:type="xsd:string">San Francisco</Store_x0020_City>
+        <Store_x0020_Name xsi:type="xsd:string">Store 14</Store_x0020_Name>
+        <Store_x0020_Id xsi:type="xsd:integer">14</Store_x0020_Id>
+        <Store_x0020_Type xsi:type="xsd:string">Small Grocery</Store_x0020_Type>
+        <Store_x0020_Manager xsi:type="xsd:string">Strehlo</Store_x0020_Manager>
+        <Store_x0020_Sqft xsi:type="xsd:integer">22478</Store_x0020_Sqft>
+        <Grocery_x0020_Sqft xsi:type="xsd:integer">15321</Grocery_x0020_Sqft>
+        <Frozen_x0020_Sqft xsi:type="xsd:integer">4294</Frozen_x0020_Sqft>
+        <Meat_x0020_Sqft xsi:type="xsd:integer">2863</Meat_x0020_Sqft>
+        <Has_x0020_Coffee_x0020_Bar xsi:type="xsd:string">true</Has_x0020_Coffee_x0020_Bar>
+        <Street_x0020_Address xsi:type="xsd:string">4365 Indigo Ct</Street_x0020_Address>
+        <Promotion_x0020_Name xsi:type="xsd:string">No Promotion</Promotion_x0020_Name>
+        <Promotion_x0020_Id xsi:type="xsd:integer">0</Promotion_x0020_Id>
+        <Media_x0020_Type xsi:type="xsd:string">No Media</Media_x0020_Type>
+        <Year xsi:type="xsd:integer">1997</Year>
+        <Quarter xsi:type="xsd:string">Q3</Quarter>
+        <Month xsi:type="xsd:integer">7</Month>
+        <Week xsi:type="xsd:integer">29</Week>
+        <Day xsi:type="xsd:integer">6</Day>
+        <Time_x0020_Id xsi:type="xsd:integer">553</Time_x0020_Id>
+        <The_x0020_Date xsi:type="xsd:string">1997-07-06</The_x0020_Date>
+        <Day_x0020_Name xsi:type="xsd:string">Sunday</Day_x0020_Name>
+        <Month_x0020_Name xsi:type="xsd:string">July</Month_x0020_Name>
+        <Fiscal_x0020_Period xsi:type="xsd:string"/>
+        <Unit_x0020_Sales xsi:type="xsd:decimal">2</Unit_x0020_Sales>
+      </row>
+    </root>
+  </return>
+</ExecuteResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

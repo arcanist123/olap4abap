@@ -1,0 +1,6 @@
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<SOAP-ENV:Body>
+<Execute xmlns="urn:schemas-microsoft-com:xml-analysis" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<Command><Statement>WITH SET [#DataSet#] AS 'Filter(Crossjoin({[Store].[All Stores]}, {[Customers].[All Customers]}), [Measures].[Unit Sales] &gt; 5)' MEMBER [Customers].[#GT#] as 'Aggregate({[#DataSet#]})' MEMBER [Store].[#GT#] as 'Aggregate({[#DataSet#]})' SET [#GrandTotalSet#] as 'Crossjoin({[Store].[#GT#]}, {[Customers].[#GT#]})' SELECT {[Measures].[Unit Sales]} on columns, Union([#GrandTotalSet#], Hierarchize({[#DataSet#]})) on rows from [ZFMSALES]</Statement></Command>
+<Properties><PropertyList><DataSourceInfo>ABAP BW</DataSourceInfo><Catalog>ZFOODMART</Catalog><Format>Multidimensional</Format><AxisFormat>TupleFormat</AxisFormat><Content>SchemaData</Content></PropertyList></Properties>
+</Execute></SOAP-ENV:Body></SOAP-ENV:Envelope>

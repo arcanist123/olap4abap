@@ -1,0 +1,19 @@
+@AbapCatalog.sqlViewName: 'ZZXXMLA1VNWCUST'
+@AbapCatalog.compiler.compareFilter: true
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Demo: customer 0D_NW_CUST with EN texts'
+define view ZZXXMLA1_C_NW_CUST
+  as select from /bi0/sd_nw_cust as s
+    left outer join /bi0/pd_nw_cust  as p  on  p.d_nw_cust = s.d_nw_cust and p.objvers = 'A'
+    left outer join /bi0/td_nw_cust  as t  on  t.d_nw_cust = s.d_nw_cust
+    left outer join /bi0/td_nw_cntry as ct on  ct.d_nw_cntry = p.d_nw_cntry and ct.langu = 'E'
+    left outer join /bi0/td_nw_ind   as it on  it.d_nw_ind = p.d_nw_ind
+{
+  key s.sid       as SID,
+      s.d_nw_cust as D_NW_CUST,
+      coalesce( t.txtmd, s.d_nw_cust )   as TXTMD,
+      p.d_nw_cntry                       as D_NW_CNTRY,
+      coalesce( ct.txtmd, p.d_nw_cntry ) as CNTRY_TXT,
+      p.d_nw_ind                         as D_NW_IND,
+      coalesce( it.txtmd, p.d_nw_ind )   as IND_TXT
+}

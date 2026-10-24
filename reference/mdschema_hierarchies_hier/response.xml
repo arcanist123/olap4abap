@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<DiscoverResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <row>
+        <CATALOG_NAME>ZCLHIER</CATALOG_NAME>
+        <SCHEMA_NAME>ZCLHIER</SCHEMA_NAME>
+        <CUBE_NAME>ZCLHIER</CUBE_NAME>
+        <DIMENSION_UNIQUE_NAME>[ZCLDIAG]</DIMENSION_UNIQUE_NAME>
+        <HIERARCHY_NAME>ZCLDIAG.ZCLDIAG_ICD</HIERARCHY_NAME>
+        <HIERARCHY_UNIQUE_NAME>[ZCLDIAG.ZCLDIAG_ICD]</HIERARCHY_UNIQUE_NAME>
+        <HIERARCHY_CAPTION>Diagnoses by ICD-10 Chapter</HIERARCHY_CAPTION>
+        <DIMENSION_TYPE>3</DIMENSION_TYPE>
+        <HIERARCHY_CARDINALITY>73</HIERARCHY_CARDINALITY>
+        <DEFAULT_MEMBER>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</DEFAULT_MEMBER>
+        <ALL_MEMBER>[ZCLDIAG.ZCLDIAG_ICD].[All Diagnoses by ICD-10 Chapter]</ALL_MEMBER>
+        <DESCRIPTION>ZCLHIER Cube - ZCLDIAG.ZCLDIAG_ICD Hierarchy</DESCRIPTION>
+        <STRUCTURE>0</STRUCTURE>
+        <IS_VIRTUAL>false</IS_VIRTUAL>
+        <IS_READWRITE>false</IS_READWRITE>
+        <DIMENSION_UNIQUE_SETTINGS>0</DIMENSION_UNIQUE_SETTINGS>
+        <DIMENSION_IS_VISIBLE>true</DIMENSION_IS_VISIBLE>
+        <HIERARCHY_ORDINAL>4</HIERARCHY_ORDINAL>
+        <DIMENSION_IS_SHARED>true</DIMENSION_IS_SHARED>
+        <HIERARCHY_IS_VISIBLE>true</HIERARCHY_IS_VISIBLE>
+        <HIERARCHY_ORIGIN>1</HIERARCHY_ORIGIN>
+        <HIERARCHY_DISPLAY_FOLDER/>
+        <HIERARCHY_VISIBILITY>1</HIERARCHY_VISIBILITY>
+        <PARENT_CHILD>false</PARENT_CHILD>
+      </row>
+    </root>
+  </return>
+</DiscoverResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

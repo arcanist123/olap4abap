@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<SOAP-ENV:Fault>
+  <faultcode>SOAP-ENV:Client.00HSBB07</faultcode>
+  <faultstring>XMLA SOAP bad Execute Command element Mondrian Error:Internal error: Invalid XML/A message: Wrong number of Command children elements: 2</faultstring>
+  <faultactor>Mondrian</faultactor>
+  <detail>
+    <Error ErrorCode="3238658121" Description="The Mondrian XML: Mondrian Error:Internal error: Invalid XML/A message: Wrong number of Command children elements: 2"/>
+  </detail>
+</SOAP-ENV:Fault>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

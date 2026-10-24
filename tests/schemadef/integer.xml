@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<!-- Integer and Long attributes as java.lang.Integer / Long write them back. -->
+<Schema name="Int">
+  <Dimension name="Store" table="store">
+    <DimensionAttribute name="Id" usage="Key" estimatedCount="+0012"><KeyColumn dataType="Integer" columnName="id" dataSize="-7"/></DimensionAttribute>
+  </Dimension>
+</Schema>

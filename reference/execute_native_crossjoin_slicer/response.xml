@@ -1,0 +1,1615 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<ExecuteResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:mddataset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:schemas-microsoft-com:xml-analysis:mddataset" xmlns="urn:schemas-microsoft-com:xml-analysis:mddataset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:sql="urn:schemas-microsoft-com:xml-sql" elementFormDefault="qualified">
+        <xsd:complexType name="MemberType">
+          <xsd:sequence>
+            <xsd:element name="UName" type="xsd:string"/>
+            <xsd:element name="Caption" type="xsd:string"/>
+            <xsd:element name="LName" type="xsd:string"/>
+            <xsd:element name="LNum" type="xsd:unsignedInt"/>
+            <xsd:element name="DisplayInfo" type="xsd:unsignedInt"/>
+            <xsd:sequence maxOccurs="unbounded" minOccurs="0">
+              <xsd:any processContents="lax" maxOccurs="unbounded"/>
+            </xsd:sequence>
+          </xsd:sequence>
+          <xsd:attribute name="Hierarchy" type="xsd:string"/>
+        </xsd:complexType>
+        <xsd:complexType name="PropType">
+          <xsd:attribute name="name" type="xsd:string"/>
+        </xsd:complexType>
+        <xsd:complexType name="TupleType">
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:element name="Member" type="MemberType"/>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:complexType name="MembersType">
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:element name="Member" type="MemberType"/>
+          </xsd:sequence>
+          <xsd:attribute name="Hierarchy" type="xsd:string"/>
+        </xsd:complexType>
+        <xsd:complexType name="TuplesType">
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:element name="Tuple" type="TupleType"/>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:complexType name="CrossProductType">
+          <xsd:sequence>
+            <xsd:choice minOccurs="0" maxOccurs="unbounded">
+              <xsd:element name="Members" type="MembersType"/>
+              <xsd:element name="Tuples" type="TuplesType"/>
+            </xsd:choice>
+          </xsd:sequence>
+          <xsd:attribute name="Size" type="xsd:unsignedInt"/>
+        </xsd:complexType>
+        <xsd:complexType name="OlapInfo">
+          <xsd:sequence>
+            <xsd:element name="CubeInfo">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element name="Cube" maxOccurs="unbounded">
+                    <xsd:complexType>
+                      <xsd:sequence>
+                        <xsd:element name="CubeName" type="xsd:string"/>
+                      </xsd:sequence>
+                    </xsd:complexType>
+                  </xsd:element>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="AxesInfo">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element name="AxisInfo" maxOccurs="unbounded">
+                    <xsd:complexType>
+                      <xsd:sequence>
+                        <xsd:element name="HierarchyInfo" minOccurs="0" maxOccurs="unbounded">
+                          <xsd:complexType>
+                            <xsd:sequence>
+                              <xsd:sequence maxOccurs="unbounded">
+                                <xsd:element name="UName" type="PropType"/>
+                                <xsd:element name="Caption" type="PropType"/>
+                                <xsd:element name="LName" type="PropType"/>
+                                <xsd:element name="LNum" type="PropType"/>
+                                <xsd:element name="DisplayInfo" type="PropType" minOccurs="0" maxOccurs="unbounded"/>
+                              </xsd:sequence>
+                              <xsd:sequence>
+                                <xsd:any processContents="lax" minOccurs="0" maxOccurs="unbounded"/>
+                              </xsd:sequence>
+                            </xsd:sequence>
+                            <xsd:attribute name="name" type="xsd:string" use="required"/>
+                          </xsd:complexType>
+                        </xsd:element>
+                      </xsd:sequence>
+                      <xsd:attribute name="name" type="xsd:string"/>
+                    </xsd:complexType>
+                  </xsd:element>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="CellInfo">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:sequence minOccurs="0" maxOccurs="unbounded">
+                    <xsd:choice>
+                      <xsd:element name="Value" type="PropType"/>
+                      <xsd:element name="FmtValue" type="PropType"/>
+                      <xsd:element name="BackColor" type="PropType"/>
+                      <xsd:element name="ForeColor" type="PropType"/>
+                      <xsd:element name="FontName" type="PropType"/>
+                      <xsd:element name="FontSize" type="PropType"/>
+                      <xsd:element name="FontFlags" type="PropType"/>
+                      <xsd:element name="FormatString" type="PropType"/>
+                      <xsd:element name="NonEmptyBehavior" type="PropType"/>
+                      <xsd:element name="SolveOrder" type="PropType"/>
+                      <xsd:element name="Updateable" type="PropType"/>
+                      <xsd:element name="Visible" type="PropType"/>
+                      <xsd:element name="Expression" type="PropType"/>
+                    </xsd:choice>
+                  </xsd:sequence>
+                  <xsd:sequence maxOccurs="unbounded" minOccurs="0">
+                    <xsd:any processContents="lax" maxOccurs="unbounded"/>
+                  </xsd:sequence>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:complexType name="Axes">
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:element name="Axis">
+              <xsd:complexType>
+                <xsd:choice minOccurs="0" maxOccurs="unbounded">
+                  <xsd:element name="CrossProduct" type="CrossProductType"/>
+                  <xsd:element name="Tuples" type="TuplesType"/>
+                  <xsd:element name="Members" type="MembersType"/>
+                </xsd:choice>
+                <xsd:attribute name="name" type="xsd:string"/>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:complexType name="CellData">
+          <xsd:sequence>
+            <xsd:element name="Cell" minOccurs="0" maxOccurs="unbounded">
+              <xsd:complexType>
+                <xsd:sequence maxOccurs="unbounded">
+                  <xsd:choice>
+                    <xsd:element name="Value"/>
+                    <xsd:element name="FmtValue" type="xsd:string"/>
+                    <xsd:element name="BackColor" type="xsd:unsignedInt"/>
+                    <xsd:element name="ForeColor" type="xsd:unsignedInt"/>
+                    <xsd:element name="FontName" type="xsd:string"/>
+                    <xsd:element name="FontSize" type="xsd:unsignedShort"/>
+                    <xsd:element name="FontFlags" type="xsd:unsignedInt"/>
+                    <xsd:element name="FormatString" type="xsd:string"/>
+                    <xsd:element name="NonEmptyBehavior" type="xsd:unsignedShort"/>
+                    <xsd:element name="SolveOrder" type="xsd:unsignedInt"/>
+                    <xsd:element name="Updateable" type="xsd:unsignedInt"/>
+                    <xsd:element name="Visible" type="xsd:unsignedInt"/>
+                    <xsd:element name="Expression" type="xsd:string"/>
+                  </xsd:choice>
+                </xsd:sequence>
+                <xsd:attribute name="CellOrdinal" type="xsd:unsignedInt" use="required"/>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:element name="root">
+          <xsd:complexType>
+            <xsd:sequence maxOccurs="unbounded">
+              <xsd:element name="OlapInfo" type="OlapInfo"/>
+              <xsd:element name="Axes" type="Axes"/>
+              <xsd:element name="CellData" type="CellData"/>
+            </xsd:sequence>
+          </xsd:complexType>
+        </xsd:element>
+      </xsd:schema>
+      <OlapInfo>
+        <CubeInfo>
+          <Cube>
+            <CubeName>ZFMSALES</CubeName>
+            <LastDataUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-05T08:05:27</LastDataUpdate>
+            <LastSchemaUpdate xmlns="http://schemas.microsoft.com/analysisservices/2003/engine">2026-10-05T08:05:27</LastSchemaUpdate>
+          </Cube>
+        </CubeInfo>
+        <AxesInfo>
+          <AxisInfo name="Axis0">
+            <HierarchyInfo name="[Measures]">
+              <UName name="[Measures].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
+              <Caption name="[Measures].[MEMBER_CAPTION]" type="xsd:string"/>
+              <LName name="[Measures].[LEVEL_UNIQUE_NAME]" type="xsd:string"/>
+              <LNum name="[Measures].[LEVEL_NUMBER]" type="xsd:unsignedInt"/>
+              <DisplayInfo name="[Measures].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
+            </HierarchyInfo>
+          </AxisInfo>
+          <AxisInfo name="Axis1">
+            <HierarchyInfo name="[Customers]">
+              <UName name="[Customers].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
+              <Caption name="[Customers].[MEMBER_CAPTION]" type="xsd:string"/>
+              <LName name="[Customers].[LEVEL_UNIQUE_NAME]" type="xsd:string"/>
+              <LNum name="[Customers].[LEVEL_NUMBER]" type="xsd:unsignedInt"/>
+              <DisplayInfo name="[Customers].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
+            </HierarchyInfo>
+            <HierarchyInfo name="[Product]">
+              <UName name="[Product].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
+              <Caption name="[Product].[MEMBER_CAPTION]" type="xsd:string"/>
+              <LName name="[Product].[LEVEL_UNIQUE_NAME]" type="xsd:string"/>
+              <LNum name="[Product].[LEVEL_NUMBER]" type="xsd:unsignedInt"/>
+              <DisplayInfo name="[Product].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
+            </HierarchyInfo>
+          </AxisInfo>
+          <AxisInfo name="SlicerAxis">
+            <HierarchyInfo name="[Store]">
+              <UName name="[Store].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
+              <Caption name="[Store].[MEMBER_CAPTION]" type="xsd:string"/>
+              <LName name="[Store].[LEVEL_UNIQUE_NAME]" type="xsd:string"/>
+              <LNum name="[Store].[LEVEL_NUMBER]" type="xsd:unsignedInt"/>
+              <DisplayInfo name="[Store].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
+            </HierarchyInfo>
+            <HierarchyInfo name="[Time]">
+              <UName name="[Time].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
+              <Caption name="[Time].[MEMBER_CAPTION]" type="xsd:string"/>
+              <LName name="[Time].[LEVEL_UNIQUE_NAME]" type="xsd:string"/>
+              <LNum name="[Time].[LEVEL_NUMBER]" type="xsd:unsignedInt"/>
+              <DisplayInfo name="[Time].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
+            </HierarchyInfo>
+          </AxisInfo>
+        </AxesInfo>
+        <CellInfo>
+          <Value name="VALUE"/>
+          <FmtValue name="FORMATTED_VALUE" type="xsd:string"/>
+        </CellInfo>
+      </OlapInfo>
+      <Axes>
+        <Axis name="Axis0">
+          <Tuples>
+            <Tuple>
+              <Member Hierarchy="[Measures]">
+                <UName>[Measures].[Store Sales]</UName>
+                <Caption>Store Sales</Caption>
+                <LName>[Measures].[MeasuresLevel]</LName>
+                <LNum>0</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+          </Tuples>
+        </Axis>
+        <Axis name="Axis1">
+          <Tuples>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Burlingame].[Peggy Justice]</UName>
+                <Caption>Peggy Justice</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Snack Foods].[Snack Foods].[Popcorn].[Fast].[Fast No Salt Popcorn]</UName>
+                <Caption>Fast No Salt Popcorn</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Colma].[Marion Sheeley]</UName>
+                <Caption>Marion Sheeley</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Deli].[Meat].[Hot Dogs].[Moms].[Moms Chicken Hot Dogs]</UName>
+                <Caption>Moms Chicken Hot Dogs</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Colma].[Marion Sheeley]</UName>
+                <Caption>Marion Sheeley</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Non-Consumable].[Health and Hygiene].[Pain Relievers].[Acetominifen].[Faux Products].[Faux Products 200 MG Acetominifen]</UName>
+                <Caption>Faux Products 200 MG Acetominifen</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Daly City].[Donald Davis]</UName>
+                <Caption>Donald Davis</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Drink].[Alcoholic Beverages].[Beer and Wine].[Wine].[Portsmouth].[Portsmouth Chardonnay]</UName>
+                <Caption>Portsmouth Chardonnay</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Daly City].[Donald Davis]</UName>
+                <Caption>Donald Davis</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Baking Goods].[Jams and Jellies].[Jam].[Super].[Super Strawberry Jam]</UName>
+                <Caption>Super Strawberry Jam</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Daly City].[Donald Davis]</UName>
+                <Caption>Donald Davis</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Seafood].[Seafood].[Shellfish].[Kiwi].[Kiwi Scallops]</UName>
+                <Caption>Kiwi Scallops</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Fremont].[Robert Cooper]</UName>
+                <Caption>Robert Cooper</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Baking Goods].[Jams and Jellies].[Peanut Butter].[Landslide].[Landslide Creamy Peanut Butter]</UName>
+                <Caption>Landslide Creamy Peanut Butter</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Fremont].[Robert Cooper]</UName>
+                <Caption>Robert Cooper</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Eggs].[Eggs].[Eggs].[Giant].[Giant Large Brown Eggs]</UName>
+                <Caption>Giant Large Brown Eggs</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Mill Valley].[Joseph Anderson]</UName>
+                <Caption>Joseph Anderson</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Canned Foods].[Vegetables].[Canned Vegetables].[Just Right].[Just Right Canned Peas]</UName>
+                <Caption>Just Right Canned Peas</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Mill Valley].[Joseph Anderson]</UName>
+                <Caption>Joseph Anderson</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Frozen Foods].[Meat].[Frozen Chicken].[Golden].[Golden Frozen Chicken Breast]</UName>
+                <Caption>Golden Frozen Chicken Breast</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Mill Valley].[Joseph Anderson]</UName>
+                <Caption>Joseph Anderson</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Frozen Foods].[Meat].[Frozen Chicken].[PigTail].[PigTail Frozen Chicken Breast]</UName>
+                <Caption>PigTail Frozen Chicken Breast</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Mill Valley].[Joseph Anderson]</UName>
+                <Caption>Joseph Anderson</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Snack Foods].[Snack Foods].[Chips].[Best Choice].[Best Choice Low Fat Chips]</UName>
+                <Caption>Best Choice Low Fat Chips</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Mill Valley].[Joseph Anderson]</UName>
+                <Caption>Joseph Anderson</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Non-Consumable].[Health and Hygiene].[Cold Remedies].[Cold Remedies].[Steady].[Steady Childrens Cold Remedy]</UName>
+                <Caption>Steady Childrens Cold Remedy</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Novato].[Maya Gutierrez]</UName>
+                <Caption>Maya Gutierrez</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Deli].[Meat].[Deli Meats].[Moms].[Moms Sliced Turkey]</UName>
+                <Caption>Moms Sliced Turkey</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Novato].[Shirley Head]</UName>
+                <Caption>Shirley Head</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Produce].[Fruit].[Fresh Fruit].[Tri-State].[Tri-State Fuji Apples]</UName>
+                <Caption>Tri-State Fuji Apples</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Novato].[Karen Koman]</UName>
+                <Caption>Karen Koman</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Drink].[Alcoholic Beverages].[Beer and Wine].[Wine].[Top Measure].[Top Measure Chardonnay]</UName>
+                <Caption>Top Measure Chardonnay</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Novato].[Karen Koman]</UName>
+                <Caption>Karen Koman</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Snack Foods].[Snack Foods].[Dips].[Fast].[Fast Avocado Dip]</UName>
+                <Caption>Fast Avocado Dip</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Novato].[Karen Koman]</UName>
+                <Caption>Karen Koman</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Non-Consumable].[Household].[Paper Products].[Paper Wipes].[Denny].[Denny Toilet Paper]</UName>
+                <Caption>Denny Toilet Paper</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Palo Alto].[Jane Rogers]</UName>
+                <Caption>Jane Rogers</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Dairy].[Dairy].[Cheese].[Club].[Club Cheese Spread]</UName>
+                <Caption>Club Cheese Spread</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Palo Alto].[Jane Rogers]</UName>
+                <Caption>Jane Rogers</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Produce].[Vegetables].[Fresh Vegetables].[Hermanos].[Hermanos Potatos]</UName>
+                <Caption>Hermanos Potatos</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Palo Alto].[Jane Rogers]</UName>
+                <Caption>Jane Rogers</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Snack Foods].[Snack Foods].[Chips].[Fort West].[Fort West BBQ Potato Chips]</UName>
+                <Caption>Fort West BBQ Potato Chips</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Palo Alto].[Jane Rogers]</UName>
+                <Caption>Jane Rogers</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Snack Foods].[Snack Foods].[Pretzels].[Fort West].[Fort West Salted Pretzels]</UName>
+                <Caption>Fort West Salted Pretzels</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Palo Alto].[Paul Burmeister]</UName>
+                <Caption>Paul Burmeister</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Drink].[Alcoholic Beverages].[Beer and Wine].[Wine].[Walrus].[Walrus Chardonnay Wine]</UName>
+                <Caption>Walrus Chardonnay Wine</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Palo Alto].[Paul Burmeister]</UName>
+                <Caption>Paul Burmeister</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Baking Goods].[Jams and Jellies].[Jam].[CDR].[CDR Strawberry Jam]</UName>
+                <Caption>CDR Strawberry Jam</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Palo Alto].[Paul Burmeister]</UName>
+                <Caption>Paul Burmeister</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Eggs].[Eggs].[Eggs].[Blue Medal].[Blue Medal Large Eggs]</UName>
+                <Caption>Blue Medal Large Eggs</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Palo Alto].[Paul Burmeister]</UName>
+                <Caption>Paul Burmeister</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Produce].[Fruit].[Fresh Fruit].[Hermanos].[Hermanos Macintosh Apples]</UName>
+                <Caption>Hermanos Macintosh Apples</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Palo Alto].[Paul Burmeister]</UName>
+                <Caption>Paul Burmeister</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Non-Consumable].[Household].[Paper Products].[Paper Dishes].[Sunset].[Sunset Paper Plates]</UName>
+                <Caption>Sunset Paper Plates</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Palo Alto].[Andre Thompson]</UName>
+                <Caption>Andre Thompson</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Baking Goods].[Jams and Jellies].[Peanut Butter].[Plato].[Plato Creamy Peanut Butter]</UName>
+                <Caption>Plato Creamy Peanut Butter</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Palo Alto].[Andre Thompson]</UName>
+                <Caption>Andre Thompson</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Frozen Foods].[Frozen Entrees].[TV Dinner].[Carrington].[Carrington Turkey TV Dinner]</UName>
+                <Caption>Carrington Turkey TV Dinner</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Palo Alto].[Andre Thompson]</UName>
+                <Caption>Andre Thompson</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Produce].[Fruit].[Fresh Fruit].[High Top].[High Top Honey Dew]</UName>
+                <Caption>High Top Honey Dew</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Palo Alto].[Andre Thompson]</UName>
+                <Caption>Andre Thompson</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Snack Foods].[Snack Foods].[Chips].[Fort West].[Fort West Corn Chips]</UName>
+                <Caption>Fort West Corn Chips</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Palo Alto].[Andre Thompson]</UName>
+                <Caption>Andre Thompson</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Snack Foods].[Snack Foods].[Dried Fruit].[Best Choice].[Best Choice Dried Apples]</UName>
+                <Caption>Best Choice Dried Apples</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Palo Alto].[Sandy Melton]</UName>
+                <Caption>Sandy Melton</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Baked Goods].[Bread].[Bagels].[Sphinx].[Sphinx Bagels]</UName>
+                <Caption>Sphinx Bagels</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Palo Alto].[Sandy Melton]</UName>
+                <Caption>Sandy Melton</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Canned Foods].[Canned Clams].[Clams].[Bravo].[Bravo Fancy Canned Clams]</UName>
+                <Caption>Bravo Fancy Canned Clams</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Palo Alto].[Sandy Melton]</UName>
+                <Caption>Sandy Melton</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Produce].[Vegetables].[Fresh Vegetables].[High Top].[High Top Cauliflower]</UName>
+                <Caption>High Top Cauliflower</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Palo Alto].[Sandy Melton]</UName>
+                <Caption>Sandy Melton</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Starchy Foods].[Starchy Foods].[Pasta].[Medalist].[Medalist Spaghetti]</UName>
+                <Caption>Medalist Spaghetti</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Redwood City].[Juan Bradley]</UName>
+                <Caption>Juan Bradley</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Deli].[Meat].[Deli Meats].[Red Spade].[Red Spade Sliced Chicken]</UName>
+                <Caption>Red Spade Sliced Chicken</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Redwood City].[Juan Bradley]</UName>
+                <Caption>Juan Bradley</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Produce].[Specialty].[Nuts].[Tri-State].[Tri-State Party Nuts]</UName>
+                <Caption>Tri-State Party Nuts</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Redwood City].[Juan Bradley]</UName>
+                <Caption>Juan Bradley</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Produce].[Vegetables].[Fresh Vegetables].[Hermanos].[Hermanos Cauliflower]</UName>
+                <Caption>Hermanos Cauliflower</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Redwood City].[Juan Bradley]</UName>
+                <Caption>Juan Bradley</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Produce].[Vegetables].[Fresh Vegetables].[High Top].[High Top Cauliflower]</UName>
+                <Caption>High Top Cauliflower</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Redwood City].[Juan Bradley]</UName>
+                <Caption>Juan Bradley</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Snack Foods].[Snack Foods].[Donuts].[Horatio].[Horatio Mini Donuts]</UName>
+                <Caption>Horatio Mini Donuts</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Redwood City].[Juan Bradley]</UName>
+                <Caption>Juan Bradley</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Non-Consumable].[Household].[Hardware].[Tools].[Cormorant].[Cormorant Screw Driver]</UName>
+                <Caption>Cormorant Screw Driver</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Redwood City].[Cleo Passig]</UName>
+                <Caption>Cleo Passig</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Canned Foods].[Vegetables].[Canned Vegetables].[Better].[Better Creamed Corn]</UName>
+                <Caption>Better Creamed Corn</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Redwood City].[Cleo Passig]</UName>
+                <Caption>Cleo Passig</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Meat].[Meat].[Hamburger].[Gerolli].[Gerolli Seasoned Hamburger]</UName>
+                <Caption>Gerolli Seasoned Hamburger</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Redwood City].[Cleo Passig]</UName>
+                <Caption>Cleo Passig</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Produce].[Fruit].[Fresh Fruit].[High Top].[High Top Lemons]</UName>
+                <Caption>High Top Lemons</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Redwood City].[Cleo Passig]</UName>
+                <Caption>Cleo Passig</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Non-Consumable].[Household].[Hardware].[Tools].[Red Wing].[Red Wing Scissors]</UName>
+                <Caption>Red Wing Scissors</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Richmond].[Mildred Bartz]</UName>
+                <Caption>Mildred Bartz</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Canned Foods].[Canned Sardines].[Sardines].[Better].[Better Fancy Canned Sardines]</UName>
+                <Caption>Better Fancy Canned Sardines</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Richmond].[Mildred Bartz]</UName>
+                <Caption>Mildred Bartz</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Deli].[Meat].[Bologna].[Cutting Edge].[Cutting Edge Pimento Loaf]</UName>
+                <Caption>Cutting Edge Pimento Loaf</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Richmond].[Mildred Bartz]</UName>
+                <Caption>Mildred Bartz</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Snack Foods].[Snack Foods].[Dips].[Horatio].[Horatio Cheese Dip]</UName>
+                <Caption>Horatio Cheese Dip</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Richmond].[Mildred Bartz]</UName>
+                <Caption>Mildred Bartz</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Non-Consumable].[Health and Hygiene].[Bathroom Products].[Shampoo].[Steady].[Steady Extra Moisture Shampoo]</UName>
+                <Caption>Steady Extra Moisture Shampoo</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Richmond].[Mildred Bartz]</UName>
+                <Caption>Mildred Bartz</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Non-Consumable].[Health and Hygiene].[Pain Relievers].[Acetominifen].[Bird Call].[Bird Call 200 MG Acetominifen]</UName>
+                <Caption>Bird Call 200 MG Acetominifen</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Richmond].[Heysel Stratton]</UName>
+                <Caption>Heysel Stratton</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Deli].[Side Dishes].[Deli Salads].[American].[American Low Fat Cole Slaw]</UName>
+                <Caption>American Low Fat Cole Slaw</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[Richmond].[Heysel Stratton]</UName>
+                <Caption>Heysel Stratton</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Produce].[Vegetables].[Fresh Vegetables].[Tell Tale].[Tell Tale Sweet Onion]</UName>
+                <Caption>Tell Tale Sweet Onion</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[San Carlos].[Tyler Bohn]</UName>
+                <Caption>Tyler Bohn</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Baking Goods].[Jams and Jellies].[Jam].[BBB Best].[BBB Best Apple Jam]</UName>
+                <Caption>BBB Best Apple Jam</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[San Carlos].[Tyler Bohn]</UName>
+                <Caption>Tyler Bohn</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Non-Consumable].[Household].[Paper Products].[Paper Dishes].[Cormorant].[Cormorant Paper Plates]</UName>
+                <Caption>Cormorant Paper Plates</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[San Carlos].[Mary Welch]</UName>
+                <Caption>Mary Welch</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Baked Goods].[Bread].[Muffins].[Modell].[Modell English Muffins]</UName>
+                <Caption>Modell English Muffins</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[San Carlos].[Mary Welch]</UName>
+                <Caption>Mary Welch</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Breakfast Foods].[Breakfast Foods].[Cereal].[Johnson].[Johnson Grits]</UName>
+                <Caption>Johnson Grits</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[San Carlos].[Mary Welch]</UName>
+                <Caption>Mary Welch</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Canned Foods].[Canned Soup].[Soup].[Pleasant].[Pleasant Beef Soup]</UName>
+                <Caption>Pleasant Beef Soup</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[San Carlos].[Mary Welch]</UName>
+                <Caption>Mary Welch</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Canned Products].[Fruit].[Canned Fruit].[Toucan].[Toucan Canned Mixed Fruit]</UName>
+                <Caption>Toucan Canned Mixed Fruit</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[San Carlos].[Mary Welch]</UName>
+                <Caption>Mary Welch</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Produce].[Packaged Vegetables].[Tofu].[Hermanos].[Hermanos Firm Tofu]</UName>
+                <Caption>Hermanos Firm Tofu</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[San Carlos].[Mary Welch]</UName>
+                <Caption>Mary Welch</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Produce].[Vegetables].[Fresh Vegetables].[High Top].[High Top Mushrooms]</UName>
+                <Caption>High Top Mushrooms</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[San Carlos].[Mary Welch]</UName>
+                <Caption>Mary Welch</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Produce].[Vegetables].[Fresh Vegetables].[Tell Tale].[Tell Tale Asparagus]</UName>
+                <Caption>Tell Tale Asparagus</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[San Jose].[Joseph Burke]</UName>
+                <Caption>Joseph Burke</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Produce].[Fruit].[Fresh Fruit].[High Top].[High Top Cantelope]</UName>
+                <Caption>High Top Cantelope</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[San Jose].[Michael Cellini]</UName>
+                <Caption>Michael Cellini</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Canned Foods].[Vegetables].[Canned Vegetables].[Blue Label].[Blue Label Canned Yams]</UName>
+                <Caption>Blue Label Canned Yams</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[San Jose].[Michael Cellini]</UName>
+                <Caption>Michael Cellini</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Dairy].[Dairy].[Cheese].[Club].[Club Sharp Cheddar Cheese]</UName>
+                <Caption>Club Sharp Cheddar Cheese</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[San Jose].[Michael Cellini]</UName>
+                <Caption>Michael Cellini</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Food].[Snack Foods].[Snack Foods].[Cookies].[Horatio].[Horatio Low Fat Cookies]</UName>
+                <Caption>Horatio Low Fat Cookies</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+            <Tuple>
+              <Member Hierarchy="[Customers]">
+                <UName>[Customers].[USA].[CA].[San Jose].[Michael Cellini]</UName>
+                <Caption>Michael Cellini</Caption>
+                <LName>[Customers].[Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>131072</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Product]">
+                <UName>[Product].[Non-Consumable].[Health and Hygiene].[Bathroom Products].[Shampoo].[Bird Call].[Bird Call Conditioning Shampoo]</UName>
+                <Caption>Bird Call Conditioning Shampoo</Caption>
+                <LName>[Product].[Product Name]</LName>
+                <LNum>6</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+          </Tuples>
+        </Axis>
+        <Axis name="SlicerAxis">
+          <Tuples>
+            <Tuple>
+              <Member Hierarchy="[Store]">
+                <UName>[Store].[USA].[CA].[San Francisco].[Store 14]</UName>
+                <Caption>Store 14</Caption>
+                <LName>[Store].[Store Name]</LName>
+                <LNum>4</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+              <Member Hierarchy="[Time]">
+                <UName>[Time].[1997].[Q1].[1]</UName>
+                <Caption>1</Caption>
+                <LName>[Time].[Month]</LName>
+                <LNum>2</LNum>
+                <DisplayInfo>0</DisplayInfo>
+              </Member>
+            </Tuple>
+          </Tuples>
+        </Axis>
+      </Axes>
+      <CellData>
+        <Cell CellOrdinal="0">
+          <Value xsi:type="xsd:double">3.76</Value>
+          <FmtValue>3.76</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="1">
+          <Value xsi:type="xsd:double">2.98</Value>
+          <FmtValue>2.98</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="2">
+          <Value xsi:type="xsd:double">2.32</Value>
+          <FmtValue>2.32</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="3">
+          <Value xsi:type="xsd:double">5.4</Value>
+          <FmtValue>5.4</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="4">
+          <Value xsi:type="xsd:double">3.96</Value>
+          <FmtValue>3.96</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="5">
+          <Value xsi:type="xsd:double">4.76</Value>
+          <FmtValue>4.76</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="6">
+          <Value xsi:type="xsd:double">1.4</Value>
+          <FmtValue>1.4</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="7">
+          <Value xsi:type="xsd:double">3.84</Value>
+          <FmtValue>3.84</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="8">
+          <Value xsi:type="xsd:double">2.49</Value>
+          <FmtValue>2.49</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="9">
+          <Value xsi:type="xsd:double">2.81</Value>
+          <FmtValue>2.81</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="10">
+          <Value xsi:type="xsd:double">1.51</Value>
+          <FmtValue>1.51</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="11">
+          <Value xsi:type="xsd:double">1.72</Value>
+          <FmtValue>1.72</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="12">
+          <Value xsi:type="xsd:double">0.67</Value>
+          <FmtValue>0.67</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="13">
+          <Value xsi:type="xsd:double">1.08</Value>
+          <FmtValue>1.08</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="14">
+          <Value xsi:type="xsd:double">5.38</Value>
+          <FmtValue>5.38</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="15">
+          <Value xsi:type="xsd:double">4.62</Value>
+          <FmtValue>4.62</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="16">
+          <Value xsi:type="xsd:double">5.9</Value>
+          <FmtValue>5.9</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="17">
+          <Value xsi:type="xsd:double">2.91</Value>
+          <FmtValue>2.91</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="18">
+          <Value xsi:type="xsd:double">4.34</Value>
+          <FmtValue>4.34</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="19">
+          <Value xsi:type="xsd:double">1.86</Value>
+          <FmtValue>1.86</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="20">
+          <Value xsi:type="xsd:double">3.88</Value>
+          <FmtValue>3.88</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="21">
+          <Value xsi:type="xsd:double">4.26</Value>
+          <FmtValue>4.26</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="22">
+          <Value xsi:type="xsd:double">1.66</Value>
+          <FmtValue>1.66</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="23">
+          <Value xsi:type="xsd:double">5.9</Value>
+          <FmtValue>5.9</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="24">
+          <Value xsi:type="xsd:double">7.26</Value>
+          <FmtValue>7.26</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="25">
+          <Value xsi:type="xsd:double">1.48</Value>
+          <FmtValue>1.48</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="26">
+          <Value xsi:type="xsd:double">3.5</Value>
+          <FmtValue>3.5</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="27">
+          <Value xsi:type="xsd:double">2.32</Value>
+          <FmtValue>2.32</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="28">
+          <Value xsi:type="xsd:double">3.68</Value>
+          <FmtValue>3.68</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="29">
+          <Value xsi:type="xsd:double">1.87</Value>
+          <FmtValue>1.87</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="30">
+          <Value xsi:type="xsd:double">1.26</Value>
+          <FmtValue>1.26</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="31">
+          <Value xsi:type="xsd:double">4.22</Value>
+          <FmtValue>4.22</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="32">
+          <Value xsi:type="xsd:double">1.83</Value>
+          <FmtValue>1.83</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="33">
+          <Value xsi:type="xsd:double">3.85</Value>
+          <FmtValue>3.85</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="34">
+          <Value xsi:type="xsd:double">2.23</Value>
+          <FmtValue>2.23</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="35">
+          <Value xsi:type="xsd:double">7.6</Value>
+          <FmtValue>7.6</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="36">
+          <Value xsi:type="xsd:double">3.38</Value>
+          <FmtValue>3.38</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="37">
+          <Value xsi:type="xsd:double">2.63</Value>
+          <FmtValue>2.63</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="38">
+          <Value xsi:type="xsd:double">2.72</Value>
+          <FmtValue>2.72</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="39">
+          <Value xsi:type="xsd:double">4.46</Value>
+          <FmtValue>4.46</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="40">
+          <Value xsi:type="xsd:double">1.73</Value>
+          <FmtValue>1.73</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="41">
+          <Value xsi:type="xsd:double">4.56</Value>
+          <FmtValue>4.56</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="42">
+          <Value xsi:type="xsd:double">2.52</Value>
+          <FmtValue>2.52</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="43">
+          <Value xsi:type="xsd:double">2.68</Value>
+          <FmtValue>2.68</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="44">
+          <Value xsi:type="xsd:double">1.67</Value>
+          <FmtValue>1.67</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="45">
+          <Value xsi:type="xsd:double">1.64</Value>
+          <FmtValue>1.64</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="46">
+          <Value xsi:type="xsd:double">2.4</Value>
+          <FmtValue>2.4</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="47">
+          <Value xsi:type="xsd:double">1.82</Value>
+          <FmtValue>1.82</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="48">
+          <Value xsi:type="xsd:double">2.31</Value>
+          <FmtValue>2.31</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="49">
+          <Value xsi:type="xsd:double">3.6</Value>
+          <FmtValue>3.6</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="50">
+          <Value xsi:type="xsd:double">6.36</Value>
+          <FmtValue>6.36</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="51">
+          <Value xsi:type="xsd:double">4.54</Value>
+          <FmtValue>4.54</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="52">
+          <Value xsi:type="xsd:double">1.36</Value>
+          <FmtValue>1.36</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="53">
+          <Value xsi:type="xsd:double">3.18</Value>
+          <FmtValue>3.18</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="54">
+          <Value xsi:type="xsd:double">1.7</Value>
+          <FmtValue>1.7</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="55">
+          <Value xsi:type="xsd:double">1.65</Value>
+          <FmtValue>1.65</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="56">
+          <Value xsi:type="xsd:double">2.35</Value>
+          <FmtValue>2.35</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="57">
+          <Value xsi:type="xsd:double">2.86</Value>
+          <FmtValue>2.86</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="58">
+          <Value xsi:type="xsd:double">1.4</Value>
+          <FmtValue>1.4</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="59">
+          <Value xsi:type="xsd:double">4.34</Value>
+          <FmtValue>4.34</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="60">
+          <Value xsi:type="xsd:double">2.58</Value>
+          <FmtValue>2.58</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="61">
+          <Value xsi:type="xsd:double">7.28</Value>
+          <FmtValue>7.28</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="62">
+          <Value xsi:type="xsd:double">2.47</Value>
+          <FmtValue>2.47</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="63">
+          <Value xsi:type="xsd:double">5.56</Value>
+          <FmtValue>5.56</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="64">
+          <Value xsi:type="xsd:double">3.61</Value>
+          <FmtValue>3.61</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="65">
+          <Value xsi:type="xsd:double">1.88</Value>
+          <FmtValue>1.88</FmtValue>
+        </Cell>
+        <Cell CellOrdinal="66">
+          <Value xsi:type="xsd:double">5.86</Value>
+          <FmtValue>5.86</FmtValue>
+        </Cell>
+      </CellData>
+    </root>
+  </return>
+</ExecuteResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

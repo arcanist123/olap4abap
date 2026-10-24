@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<ExecuteResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:sql="urn:schemas-microsoft-com:xml-sql" elementFormDefault="qualified">
+        <xsd:element name="root">
+          <xsd:complexType>
+            <xsd:sequence>
+              <xsd:element maxOccurs="unbounded" minOccurs="0" name="row" type="row"/>
+            </xsd:sequence>
+          </xsd:complexType>
+        </xsd:element>
+        <xsd:simpleType name="uuid">
+          <xsd:restriction base="xsd:string">
+            <xsd:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+          </xsd:restriction>
+        </xsd:simpleType>
+        <xsd:complexType name="row">
+          <xsd:sequence>
+            <xsd:element minOccurs="0" name="City" sql:field="City" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Family" sql:field="Family" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Product" sql:field="Product" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Media" sql:field="Media" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Customer" sql:field="Customer" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Day" sql:field="Day" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Sales" sql:field="Sales" type="xsd:decimal"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:schema>
+      <row>
+        <City xsi:type="xsd:string">Beverly Hills</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">1</Product>
+        <Media xsi:type="xsd:string">No Media</Media>
+        <Customer xsi:type="xsd:integer">5607</Customer>
+        <Day xsi:type="xsd:integer">529</Day>
+        <Sales xsi:type="xsd:decimal">11.4</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Beverly Hills</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">2</Product>
+        <Media xsi:type="xsd:string">Daily Paper, Radio, TV</Media>
+        <Customer xsi:type="xsd:integer">4926</Customer>
+        <Day xsi:type="xsd:integer">646</Day>
+        <Sales xsi:type="xsd:decimal">1.48</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Beverly Hills</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">2</Product>
+        <Media xsi:type="xsd:string">No Media</Media>
+        <Customer xsi:type="xsd:integer">5161</Customer>
+        <Day xsi:type="xsd:integer">658</Day>
+        <Sales xsi:type="xsd:decimal">2.96</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Beverly Hills</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">2</Product>
+        <Media xsi:type="xsd:string">Product Attachment</Media>
+        <Customer xsi:type="xsd:integer">5635</Customer>
+        <Day xsi:type="xsd:integer">469</Day>
+        <Sales xsi:type="xsd:decimal">2.22</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Beverly Hills</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">3</Product>
+        <Media xsi:type="xsd:string">Daily Paper, Radio, TV</Media>
+        <Customer xsi:type="xsd:integer">9991</Customer>
+        <Day xsi:type="xsd:integer">646</Day>
+        <Sales xsi:type="xsd:decimal">2.49</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Beverly Hills</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">3</Product>
+        <Media xsi:type="xsd:string">No Media</Media>
+        <Customer xsi:type="xsd:integer">417</Customer>
+        <Day xsi:type="xsd:integer">720</Day>
+        <Sales xsi:type="xsd:decimal">3.32</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Beverly Hills</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">3</Product>
+        <Media xsi:type="xsd:string">No Media</Media>
+        <Customer xsi:type="xsd:integer">3258</Customer>
+        <Day xsi:type="xsd:integer">472</Day>
+        <Sales xsi:type="xsd:decimal">2.49</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Beverly Hills</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">3</Product>
+        <Media xsi:type="xsd:string">No Media</Media>
+        <Customer xsi:type="xsd:integer">6897</Customer>
+        <Day xsi:type="xsd:integer">532</Day>
+        <Sales xsi:type="xsd:decimal">3.32</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Beverly Hills</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">3</Product>
+        <Media xsi:type="xsd:string">No Media</Media>
+        <Customer xsi:type="xsd:integer">8312</Customer>
+        <Day xsi:type="xsd:integer">612</Day>
+        <Sales xsi:type="xsd:decimal">4.15</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Beverly Hills</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">4</Product>
+        <Media xsi:type="xsd:string">No Media</Media>
+        <Customer xsi:type="xsd:integer">3449</Customer>
+        <Day xsi:type="xsd:integer">367</Day>
+        <Sales xsi:type="xsd:decimal">14.56</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Beverly Hills</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">4</Product>
+        <Media xsi:type="xsd:string">No Media</Media>
+        <Customer xsi:type="xsd:integer">7363</Customer>
+        <Day xsi:type="xsd:integer">372</Day>
+        <Sales xsi:type="xsd:decimal">7.28</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Beverly Hills</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">4</Product>
+        <Media xsi:type="xsd:string">No Media</Media>
+        <Customer xsi:type="xsd:integer">7477</Customer>
+        <Day xsi:type="xsd:integer">548</Day>
+        <Sales xsi:type="xsd:decimal">7.28</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Beverly Hills</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">4</Product>
+        <Media xsi:type="xsd:string">Product Attachment</Media>
+        <Customer xsi:type="xsd:integer">5183</Customer>
+        <Day xsi:type="xsd:integer">470</Day>
+        <Sales xsi:type="xsd:decimal">10.92</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Beverly Hills</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">5</Product>
+        <Media xsi:type="xsd:string">Cash Register Handout</Media>
+        <Customer xsi:type="xsd:integer">7695</Customer>
+        <Day xsi:type="xsd:integer">716</Day>
+        <Sales xsi:type="xsd:decimal">8.76</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Beverly Hills</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">5</Product>
+        <Media xsi:type="xsd:string">Product Attachment</Media>
+        <Customer xsi:type="xsd:integer">3462</Customer>
+        <Day xsi:type="xsd:integer">469</Day>
+        <Sales xsi:type="xsd:decimal">6.57</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Beverly Hills</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">5</Product>
+        <Media xsi:type="xsd:string">TV</Media>
+        <Customer xsi:type="xsd:integer">5001</Customer>
+        <Day xsi:type="xsd:integer">663</Day>
+        <Sales xsi:type="xsd:decimal">10.95</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Beverly Hills</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">6</Product>
+        <Media xsi:type="xsd:string">Bulk Mail</Media>
+        <Customer xsi:type="xsd:integer">4525</Customer>
+        <Day xsi:type="xsd:integer">677</Day>
+        <Sales xsi:type="xsd:decimal">5.75</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Beverly Hills</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">6</Product>
+        <Media xsi:type="xsd:string">No Media</Media>
+        <Customer xsi:type="xsd:integer">3936</Customer>
+        <Day xsi:type="xsd:integer">472</Day>
+        <Sales xsi:type="xsd:decimal">3.45</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Beverly Hills</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">6</Product>
+        <Media xsi:type="xsd:string">No Media</Media>
+        <Customer xsi:type="xsd:integer">6261</Customer>
+        <Day xsi:type="xsd:integer">590</Day>
+        <Sales xsi:type="xsd:decimal">3.45</Sales>
+      </row>
+      <row>
+        <City xsi:type="xsd:string">Beverly Hills</City>
+        <Family xsi:type="xsd:string">Drink</Family>
+        <Product xsi:type="xsd:integer">7</Product>
+        <Media xsi:type="xsd:string">No Media</Media>
+        <Customer xsi:type="xsd:integer">3316</Customer>
+        <Day xsi:type="xsd:integer">696</Day>
+        <Sales xsi:type="xsd:decimal">10.44</Sales>
+      </row>
+    </root>
+  </return>
+</ExecuteResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

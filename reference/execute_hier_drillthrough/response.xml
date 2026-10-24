@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<ExecuteResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:sql="urn:schemas-microsoft-com:xml-sql" elementFormDefault="qualified">
+        <xsd:element name="root">
+          <xsd:complexType>
+            <xsd:sequence>
+              <xsd:element maxOccurs="unbounded" minOccurs="0" name="row" type="row"/>
+            </xsd:sequence>
+          </xsd:complexType>
+        </xsd:element>
+        <xsd:simpleType name="uuid">
+          <xsd:restriction base="xsd:string">
+            <xsd:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+          </xsd:restriction>
+        </xsd:simpleType>
+        <xsd:complexType name="row">
+          <xsd:sequence>
+            <xsd:element minOccurs="0" name="Patient" sql:field="Patient" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Physician" sql:field="Physician" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Diagnosis" sql:field="Diagnosis" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Visit_x0020_Type" sql:field="Visit Type" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Date" sql:field="Date" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Site" sql:field="Site" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Room" sql:field="Room" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Fiscal_x0020_Year_x0020_Variant" sql:field="Fiscal Year Variant" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Fiscal_x0020_Year" sql:field="Fiscal Year" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Fiscal_x0020_Period" sql:field="Fiscal Period" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Service" sql:field="Service" type="xsd:string"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:schema>
+      <row>
+        <Patient xsi:type="xsd:string">000001</Patient>
+        <Physician xsi:type="xsd:string">001</Physician>
+        <Diagnosis xsi:type="xsd:string">J02</Diagnosis>
+        <Visit_x0020_Type xsi:type="xsd:string">Outpatient</Visit_x0020_Type>
+        <Date xsi:type="xsd:string">20250312</Date>
+        <Site xsi:type="xsd:string">SOUTH</Site>
+        <Room xsi:type="xsd:string">R02</Room>
+        <Fiscal_x0020_Year_x0020_Variant xsi:type="xsd:string">K4</Fiscal_x0020_Year_x0020_Variant>
+        <Fiscal_x0020_Year xsi:type="xsd:string">2025</Fiscal_x0020_Year>
+        <Fiscal_x0020_Period xsi:type="xsd:string">2025003</Fiscal_x0020_Period>
+        <Service xsi:type="xsd:string">2008</Service>
+      </row>
+      <row>
+        <Patient xsi:type="xsd:string">000001</Patient>
+        <Physician xsi:type="xsd:string">001</Physician>
+        <Diagnosis xsi:type="xsd:string">J06</Diagnosis>
+        <Visit_x0020_Type xsi:type="xsd:string">Follow-up</Visit_x0020_Type>
+        <Date xsi:type="xsd:string">20250327</Date>
+        <Site xsi:type="xsd:string">SOUTH</Site>
+        <Room xsi:type="xsd:string">R02</Room>
+        <Fiscal_x0020_Year_x0020_Variant xsi:type="xsd:string">K4</Fiscal_x0020_Year_x0020_Variant>
+        <Fiscal_x0020_Year xsi:type="xsd:string">2025</Fiscal_x0020_Year>
+        <Fiscal_x0020_Period xsi:type="xsd:string">2025003</Fiscal_x0020_Period>
+        <Service xsi:type="xsd:string">1002</Service>
+      </row>
+      <row>
+        <Patient xsi:type="xsd:string">000005</Patient>
+        <Physician xsi:type="xsd:string">002</Physician>
+        <Diagnosis xsi:type="xsd:string">J06</Diagnosis>
+        <Visit_x0020_Type xsi:type="xsd:string">Outpatient</Visit_x0020_Type>
+        <Date xsi:type="xsd:string">20240119</Date>
+        <Site xsi:type="xsd:string">NORTH</Site>
+        <Room xsi:type="xsd:string">R01</Room>
+        <Fiscal_x0020_Year_x0020_Variant xsi:type="xsd:string">K4</Fiscal_x0020_Year_x0020_Variant>
+        <Fiscal_x0020_Year xsi:type="xsd:string">2024</Fiscal_x0020_Year>
+        <Fiscal_x0020_Period xsi:type="xsd:string">2024001</Fiscal_x0020_Period>
+        <Service xsi:type="xsd:string">2008</Service>
+      </row>
+      <row>
+        <Patient xsi:type="xsd:string">000006</Patient>
+        <Physician xsi:type="xsd:string">007</Physician>
+        <Diagnosis xsi:type="xsd:string">J06</Diagnosis>
+        <Visit_x0020_Type xsi:type="xsd:string"/>
+        <Date xsi:type="xsd:string">20250313</Date>
+        <Site xsi:type="xsd:string">SOUTH</Site>
+        <Room xsi:type="xsd:string">R03</Room>
+        <Fiscal_x0020_Year_x0020_Variant xsi:type="xsd:string">K4</Fiscal_x0020_Year_x0020_Variant>
+        <Fiscal_x0020_Year xsi:type="xsd:string">2025</Fiscal_x0020_Year>
+        <Fiscal_x0020_Period xsi:type="xsd:string">2025003</Fiscal_x0020_Period>
+        <Service xsi:type="xsd:string">2008</Service>
+      </row>
+      <row>
+        <Patient xsi:type="xsd:string">000006</Patient>
+        <Physician xsi:type="xsd:string">008</Physician>
+        <Diagnosis xsi:type="xsd:string">J06</Diagnosis>
+        <Visit_x0020_Type xsi:type="xsd:string">Outpatient</Visit_x0020_Type>
+        <Date xsi:type="xsd:string">20240115</Date>
+        <Site xsi:type="xsd:string">NORTH</Site>
+        <Room xsi:type="xsd:string">R02</Room>
+        <Fiscal_x0020_Year_x0020_Variant xsi:type="xsd:string">K4</Fiscal_x0020_Year_x0020_Variant>
+        <Fiscal_x0020_Year xsi:type="xsd:string">2024</Fiscal_x0020_Year>
+        <Fiscal_x0020_Period xsi:type="xsd:string">2024001</Fiscal_x0020_Period>
+        <Service xsi:type="xsd:string">2008</Service>
+      </row>
+      <row>
+        <Patient xsi:type="xsd:string">000006</Patient>
+        <Physician xsi:type="xsd:string">008</Physician>
+        <Diagnosis xsi:type="xsd:string">J06</Diagnosis>
+        <Visit_x0020_Type xsi:type="xsd:string">Outpatient</Visit_x0020_Type>
+        <Date xsi:type="xsd:string">20240619</Date>
+        <Site xsi:type="xsd:string">NORTH</Site>
+        <Room xsi:type="xsd:string">R02</Room>
+        <Fiscal_x0020_Year_x0020_Variant xsi:type="xsd:string">K4</Fiscal_x0020_Year_x0020_Variant>
+        <Fiscal_x0020_Year xsi:type="xsd:string">2024</Fiscal_x0020_Year>
+        <Fiscal_x0020_Period xsi:type="xsd:string">2024006</Fiscal_x0020_Period>
+        <Service xsi:type="xsd:string">2008</Service>
+      </row>
+      <row>
+        <Patient xsi:type="xsd:string">000008</Patient>
+        <Physician xsi:type="xsd:string">002</Physician>
+        <Diagnosis xsi:type="xsd:string">J01</Diagnosis>
+        <Visit_x0020_Type xsi:type="xsd:string">Outpatient</Visit_x0020_Type>
+        <Date xsi:type="xsd:string">20250904</Date>
+        <Site xsi:type="xsd:string">NORTH</Site>
+        <Room xsi:type="xsd:string">R04</Room>
+        <Fiscal_x0020_Year_x0020_Variant xsi:type="xsd:string">K2</Fiscal_x0020_Year_x0020_Variant>
+        <Fiscal_x0020_Year xsi:type="xsd:string">2025</Fiscal_x0020_Year>
+        <Fiscal_x0020_Period xsi:type="xsd:string">2025009</Fiscal_x0020_Period>
+        <Service xsi:type="xsd:string">1001</Service>
+      </row>
+      <row>
+        <Patient xsi:type="xsd:string">000009</Patient>
+        <Physician xsi:type="xsd:string">003</Physician>
+        <Diagnosis xsi:type="xsd:string">J02</Diagnosis>
+        <Visit_x0020_Type xsi:type="xsd:string">Outpatient</Visit_x0020_Type>
+        <Date xsi:type="xsd:string">20241217</Date>
+        <Site xsi:type="xsd:string">SOUTH</Site>
+        <Room xsi:type="xsd:string">R02</Room>
+        <Fiscal_x0020_Year_x0020_Variant xsi:type="xsd:string">K1</Fiscal_x0020_Year_x0020_Variant>
+        <Fiscal_x0020_Year xsi:type="xsd:string">2024</Fiscal_x0020_Year>
+        <Fiscal_x0020_Period xsi:type="xsd:string">2024012</Fiscal_x0020_Period>
+        <Service xsi:type="xsd:string">2204</Service>
+      </row>
+      <row>
+        <Patient xsi:type="xsd:string">000009</Patient>
+        <Physician xsi:type="xsd:string">005</Physician>
+        <Diagnosis xsi:type="xsd:string">J01</Diagnosis>
+        <Visit_x0020_Type xsi:type="xsd:string">Telehealth</Visit_x0020_Type>
+        <Date xsi:type="xsd:string">20240508</Date>
+        <Site xsi:type="xsd:string">SOUTH</Site>
+        <Room xsi:type="xsd:string">R02</Room>
+        <Fiscal_x0020_Year_x0020_Variant xsi:type="xsd:string">K1</Fiscal_x0020_Year_x0020_Variant>
+        <Fiscal_x0020_Year xsi:type="xsd:string">2024</Fiscal_x0020_Year>
+        <Fiscal_x0020_Period xsi:type="xsd:string">2024005</Fiscal_x0020_Period>
+        <Service xsi:type="xsd:string">1004</Service>
+      </row>
+      <row>
+        <Patient xsi:type="xsd:string">000011</Patient>
+        <Physician xsi:type="xsd:string">005</Physician>
+        <Diagnosis xsi:type="xsd:string">J06</Diagnosis>
+        <Visit_x0020_Type xsi:type="xsd:string">Outpatient</Visit_x0020_Type>
+        <Date xsi:type="xsd:string">20240708</Date>
+        <Site xsi:type="xsd:string">SOUTH</Site>
+        <Room xsi:type="xsd:string">R04</Room>
+        <Fiscal_x0020_Year_x0020_Variant xsi:type="xsd:string">K2</Fiscal_x0020_Year_x0020_Variant>
+        <Fiscal_x0020_Year xsi:type="xsd:string">2024</Fiscal_x0020_Year>
+        <Fiscal_x0020_Period xsi:type="xsd:string">2024007</Fiscal_x0020_Period>
+        <Service xsi:type="xsd:string">1001</Service>
+      </row>
+      <row>
+        <Patient xsi:type="xsd:string">000011</Patient>
+        <Physician xsi:type="xsd:string">008</Physician>
+        <Diagnosis xsi:type="xsd:string">J06</Diagnosis>
+        <Visit_x0020_Type xsi:type="xsd:string">Outpatient</Visit_x0020_Type>
+        <Date xsi:type="xsd:string">20240417</Date>
+        <Site xsi:type="xsd:string">NORTH</Site>
+        <Room xsi:type="xsd:string">R02</Room>
+        <Fiscal_x0020_Year_x0020_Variant xsi:type="xsd:string">K4</Fiscal_x0020_Year_x0020_Variant>
+        <Fiscal_x0020_Year xsi:type="xsd:string">2024</Fiscal_x0020_Year>
+        <Fiscal_x0020_Period xsi:type="xsd:string">2024004</Fiscal_x0020_Period>
+        <Service xsi:type="xsd:string">2008</Service>
+      </row>
+      <row>
+        <Patient xsi:type="xsd:string">000012</Patient>
+        <Physician xsi:type="xsd:string">001</Physician>
+        <Diagnosis xsi:type="xsd:string">J01</Diagnosis>
+        <Visit_x0020_Type xsi:type="xsd:string">Follow-up</Visit_x0020_Type>
+        <Date xsi:type="xsd:string">20241029</Date>
+        <Site xsi:type="xsd:string">SOUTH</Site>
+        <Room xsi:type="xsd:string">R01</Room>
+        <Fiscal_x0020_Year_x0020_Variant xsi:type="xsd:string">K4</Fiscal_x0020_Year_x0020_Variant>
+        <Fiscal_x0020_Year xsi:type="xsd:string">2024</Fiscal_x0020_Year>
+        <Fiscal_x0020_Period xsi:type="xsd:string">2024010</Fiscal_x0020_Period>
+        <Service xsi:type="xsd:string">1002</Service>
+      </row>
+      <row>
+        <Patient xsi:type="xsd:string">000012</Patient>
+        <Physician xsi:type="xsd:string">001</Physician>
+        <Diagnosis xsi:type="xsd:string">J06</Diagnosis>
+        <Visit_x0020_Type xsi:type="xsd:string">Outpatient</Visit_x0020_Type>
+        <Date xsi:type="xsd:string">20240126</Date>
+        <Site xsi:type="xsd:string">SOUTH</Site>
+        <Room xsi:type="xsd:string">R01</Room>
+        <Fiscal_x0020_Year_x0020_Variant xsi:type="xsd:string">K1</Fiscal_x0020_Year_x0020_Variant>
+        <Fiscal_x0020_Year xsi:type="xsd:string">2024</Fiscal_x0020_Year>
+        <Fiscal_x0020_Period xsi:type="xsd:string">2024001</Fiscal_x0020_Period>
+        <Service xsi:type="xsd:string">2204</Service>
+      </row>
+      <row>
+        <Patient xsi:type="xsd:string">000015</Patient>
+        <Physician xsi:type="xsd:string">006</Physician>
+        <Diagnosis xsi:type="xsd:string">J06</Diagnosis>
+        <Visit_x0020_Type xsi:type="xsd:string">Follow-up</Visit_x0020_Type>
+        <Date xsi:type="xsd:string">20251023</Date>
+        <Site xsi:type="xsd:string">NORTH</Site>
+        <Room xsi:type="xsd:string">R01</Room>
+        <Fiscal_x0020_Year_x0020_Variant xsi:type="xsd:string">K2</Fiscal_x0020_Year_x0020_Variant>
+        <Fiscal_x0020_Year xsi:type="xsd:string">2025</Fiscal_x0020_Year>
+        <Fiscal_x0020_Period xsi:type="xsd:string">2025010</Fiscal_x0020_Period>
+        <Service xsi:type="xsd:string">1002</Service>
+      </row>
+      <row>
+        <Patient xsi:type="xsd:string">000015</Patient>
+        <Physician xsi:type="xsd:string">007</Physician>
+        <Diagnosis xsi:type="xsd:string">J02</Diagnosis>
+        <Visit_x0020_Type xsi:type="xsd:string">Outpatient</Visit_x0020_Type>
+        <Date xsi:type="xsd:string">20251002</Date>
+        <Site xsi:type="xsd:string">SOUTH</Site>
+        <Room xsi:type="xsd:string">R04</Room>
+        <Fiscal_x0020_Year_x0020_Variant xsi:type="xsd:string">K2</Fiscal_x0020_Year_x0020_Variant>
+        <Fiscal_x0020_Year xsi:type="xsd:string">2025</Fiscal_x0020_Year>
+        <Fiscal_x0020_Period xsi:type="xsd:string">2025010</Fiscal_x0020_Period>
+        <Service xsi:type="xsd:string">1001</Service>
+      </row>
+      <row>
+        <Patient xsi:type="xsd:string">000015</Patient>
+        <Physician xsi:type="xsd:string">007</Physician>
+        <Diagnosis xsi:type="xsd:string">J06</Diagnosis>
+        <Visit_x0020_Type xsi:type="xsd:string">Outpatient</Visit_x0020_Type>
+        <Date xsi:type="xsd:string">20240228</Date>
+        <Site xsi:type="xsd:string">SOUTH</Site>
+        <Room xsi:type="xsd:string">R04</Room>
+        <Fiscal_x0020_Year_x0020_Variant xsi:type="xsd:string">K4</Fiscal_x0020_Year_x0020_Variant>
+        <Fiscal_x0020_Year xsi:type="xsd:string">2024</Fiscal_x0020_Year>
+        <Fiscal_x0020_Period xsi:type="xsd:string">2024002</Fiscal_x0020_Period>
+        <Service xsi:type="xsd:string">2008</Service>
+      </row>
+      <row>
+        <Patient xsi:type="xsd:string">000015</Patient>
+        <Physician xsi:type="xsd:string">007</Physician>
+        <Diagnosis xsi:type="xsd:string">J06</Diagnosis>
+        <Visit_x0020_Type xsi:type="xsd:string">Outpatient</Visit_x0020_Type>
+        <Date xsi:type="xsd:string">20241104</Date>
+        <Site xsi:type="xsd:string">SOUTH</Site>
+        <Room xsi:type="xsd:string">R04</Room>
+        <Fiscal_x0020_Year_x0020_Variant xsi:type="xsd:string">K2</Fiscal_x0020_Year_x0020_Variant>
+        <Fiscal_x0020_Year xsi:type="xsd:string">2024</Fiscal_x0020_Year>
+        <Fiscal_x0020_Period xsi:type="xsd:string">2024011</Fiscal_x0020_Period>
+        <Service xsi:type="xsd:string">1001</Service>
+      </row>
+      <row>
+        <Patient xsi:type="xsd:string">000016</Patient>
+        <Physician xsi:type="xsd:string">002</Physician>
+        <Diagnosis xsi:type="xsd:string">J01</Diagnosis>
+        <Visit_x0020_Type xsi:type="xsd:string">Outpatient</Visit_x0020_Type>
+        <Date xsi:type="xsd:string">20250704</Date>
+        <Site xsi:type="xsd:string">NORTH</Site>
+        <Room xsi:type="xsd:string">R02</Room>
+        <Fiscal_x0020_Year_x0020_Variant xsi:type="xsd:string">K2</Fiscal_x0020_Year_x0020_Variant>
+        <Fiscal_x0020_Year xsi:type="xsd:string">2025</Fiscal_x0020_Year>
+        <Fiscal_x0020_Period xsi:type="xsd:string">2025007</Fiscal_x0020_Period>
+        <Service xsi:type="xsd:string">1001</Service>
+      </row>
+      <row>
+        <Patient xsi:type="xsd:string">000016</Patient>
+        <Physician xsi:type="xsd:string">004</Physician>
+        <Diagnosis xsi:type="xsd:string">J06</Diagnosis>
+        <Visit_x0020_Type xsi:type="xsd:string">Outpatient</Visit_x0020_Type>
+        <Date xsi:type="xsd:string">20250206</Date>
+        <Site xsi:type="xsd:string">NORTH</Site>
+        <Room xsi:type="xsd:string">R02</Room>
+        <Fiscal_x0020_Year_x0020_Variant xsi:type="xsd:string">K2</Fiscal_x0020_Year_x0020_Variant>
+        <Fiscal_x0020_Year xsi:type="xsd:string">2025</Fiscal_x0020_Year>
+        <Fiscal_x0020_Period xsi:type="xsd:string">2025002</Fiscal_x0020_Period>
+        <Service xsi:type="xsd:string">1001</Service>
+      </row>
+      <row>
+        <Patient xsi:type="xsd:string">000017</Patient>
+        <Physician xsi:type="xsd:string">002</Physician>
+        <Diagnosis xsi:type="xsd:string">J01</Diagnosis>
+        <Visit_x0020_Type xsi:type="xsd:string">Outpatient</Visit_x0020_Type>
+        <Date xsi:type="xsd:string">20250415</Date>
+        <Site xsi:type="xsd:string">NORTH</Site>
+        <Room xsi:type="xsd:string">R03</Room>
+        <Fiscal_x0020_Year_x0020_Variant xsi:type="xsd:string">K4</Fiscal_x0020_Year_x0020_Variant>
+        <Fiscal_x0020_Year xsi:type="xsd:string">2025</Fiscal_x0020_Year>
+        <Fiscal_x0020_Period xsi:type="xsd:string">2025004</Fiscal_x0020_Period>
+        <Service xsi:type="xsd:string">2008</Service>
+      </row>
+    </root>
+  </return>
+</ExecuteResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

@@ -1,0 +1,6 @@
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<SOAP-ENV:Body>
+<Execute xmlns="urn:schemas-microsoft-com:xml-analysis" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<Command><Statement>with member measures.__XlItemPath as Generate(Ascendants([ZCLDIAG.ZCLDIAG_ICD].currentmember), [ZCLDIAG.ZCLDIAG_ICD].currentmember.unique_name, "|__XLPATHSEP__|") member measures.__XlSiblingCount as Generate(Ascendants([ZCLDIAG.ZCLDIAG_ICD].currentmember), AddCalculatedMembers([ZCLDIAG.ZCLDIAG_ICD].currentmember.siblings).count, "|__XLPATHSEP__|") member measures.__XlChildCount as AddCalculatedMembers([ZCLDIAG.ZCLDIAG_ICD].currentmember.children).count select { measures.__XlItemPath, measures.__XlSiblingCount, measures.__XlChildCount } on columns, { [ZCLDIAG.ZCLDIAG_ICD].[DIAGNOSES].[RESPIRATORY].[UPPER_RESPIRATORY_INFECTIONS].[J06] } dimension properties MEMBER_TYPE on rows from [ZCLHIER] cell properties value</Statement></Command>
+<Properties><PropertyList><DataSourceInfo>ABAP BW</DataSourceInfo><Catalog>ZCLHIER</Catalog><Format>Multidimensional</Format><AxisFormat>TupleFormat</AxisFormat><Content>SchemaData</Content></PropertyList></Properties>
+</Execute></SOAP-ENV:Body></SOAP-ENV:Envelope>

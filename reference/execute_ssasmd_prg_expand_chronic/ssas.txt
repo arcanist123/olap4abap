@@ -1,0 +1,1 @@
+Captured from the local SSAS Multidimensional (scripts/ssas_texts.py); recapture-cases.py asks it again.

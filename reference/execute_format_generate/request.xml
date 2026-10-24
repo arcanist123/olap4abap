@@ -1,0 +1,19 @@
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<SOAP-ENV:Body>
+<Execute xmlns="urn:schemas-microsoft-com:xml-analysis" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<Command><Statement>with
+  member [Measures].[Tom1] as
+    ([Measures].[Store Sales] / [Measures].[Unit Sales]),
+    solve_order = 1
+  set spark1 as
+    ([Time].[1997].[Q1].[1] : [Time].[1997].[Q2].[4])
+  member [Time].[Time].[Past 4 months] as
+     Generate(
+         [spark1],
+         CAST(Format(([Measures].CurrentMember + 0.0), '###.0#') AS String),
+         ", "),     solve_order = 2
+select {[Time].[Past 4 months]} ON COLUMNS,
+  {[Measures].[Unit Sales], [Measures].[Tom1]} ON ROWS
+from [ZFMSALES]</Statement></Command>
+<Properties><PropertyList><DataSourceInfo>ABAP BW</DataSourceInfo><Catalog>ZFOODMART</Catalog><Format>Multidimensional</Format><AxisFormat>TupleFormat</AxisFormat><Content>SchemaData</Content></PropertyList></Properties>
+</Execute></SOAP-ENV:Body></SOAP-ENV:Envelope>

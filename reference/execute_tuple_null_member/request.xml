@@ -1,0 +1,6 @@
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<SOAP-ENV:Body>
+<Execute xmlns="urn:schemas-microsoft-com:xml-analysis" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<Command><Statement>WITH MEMBER [Measures].[x] AS ([Measures].[Unit Sales], [Time].CurrentMember.FirstChild) MEMBER [Measures].[Foo] AS ([Measures].[Foo], [Time].CurrentMember.FirstChild) SELECT {[Measures].[x], [Measures].[Foo]} ON 0, {[Time].[1997].[Q1], [Time].[1997].[Q1].[1]} ON 1 FROM [ZFMSALES]</Statement></Command>
+<Properties><PropertyList><DataSourceInfo>ABAP BW</DataSourceInfo><Catalog>ZFOODMART</Catalog><Format>Multidimensional</Format><AxisFormat>TupleFormat</AxisFormat><Content>SchemaData</Content></PropertyList></Properties>
+</Execute></SOAP-ENV:Body></SOAP-ENV:Envelope>

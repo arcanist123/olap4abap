@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<!--
+  Demo, modelled as BW shows it: the characteristic company code 0D_NW_CODE of 0D_NW_C01 with its navigation
+  attribute Country, on the view ZZXXMLA1VNWCOMP (SID, D_NW_CODE, TXTMD, D_NW_CNTRY, CNTRY_TXT).
+  Identifiers are BW's technical names, which do not change; what users read are captions:
+  - [0D_NW_CODE]: the characteristic (caption Company), keyed by the SID (the fact table's join), members named by the
+    company code ([0D_NW_CODE].[1111]), the EN text as member property;
+  - [0D_NW_CODE.0D_NW_CODE__0D_NW_CNTRY]: the navigation attribute, named as BW names it (caption Country of
+    Company), members named by the country key ([0D_NW_CODE.0D_NW_CODE__0D_NW_CNTRY].[DE]), the EN text as member
+    property. Not nested with the companies.
+  Both are flat hierarchies of one level, written out only because a member property needs a level.
+-->
+<Schema name="NWCOMPANY">
+  <Dimension name="0D_NW_CODE" caption="Company" table="ZZXXMLA1VNWCOMP">
+    <DimensionAttribute name="0D_NW_CODE SID" usage="Key" attributeHierarchyEnabled="false">
+      <KeyColumn dataType="Integer" columnName="SID"/>
+      <NameColumn dataType="String" columnName="D_NW_CODE"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="0D_NW_CODE Text" attributeHierarchyEnabled="false">
+      <KeyColumn dataType="String" columnName="TXTMD"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="0D_NW_CODE__0D_NW_CNTRY" attributeHierarchyEnabled="false">
+      <KeyColumn dataType="String" columnName="D_NW_CNTRY"/>
+    </DimensionAttribute>
+    <DimensionAttribute name="0D_NW_CODE__0D_NW_CNTRY Text" attributeHierarchyEnabled="false">
+      <KeyColumn dataType="String" columnName="CNTRY_TXT"/>
+    </DimensionAttribute>
+    <Hierarchy hasAll="true" allMemberName="All Companies" caption="Company">
+      <Level name="0D_NW_CODE" caption="Company" uniqueMembers="true" sourceAttribute="0D_NW_CODE SID">
+        <Property name="Text" caption="Company Name" sourceAttribute="0D_NW_CODE Text"/>
+      </Level>
+    </Hierarchy>
+    <Hierarchy name="0D_NW_CODE__0D_NW_CNTRY" caption="Country of Company" hasAll="true"
+               allMemberName="All Countries of Companies">
+      <Level name="0D_NW_CNTRY" caption="Country of Company" uniqueMembers="true"
+             sourceAttribute="0D_NW_CODE__0D_NW_CNTRY">
+        <Property name="Text" caption="Country Name" sourceAttribute="0D_NW_CODE__0D_NW_CNTRY Text"/>
+      </Level>
+    </Hierarchy>
+  </Dimension>
+  <Cube name="NW Company Sales" caption="0D_NW_C01 by company" defaultMeasure="0D_NW_NETV">
+    <Table name="/BI0/F0D_NW_C01"/>
+    <DimensionUsage name="0D_NW_CODE" caption="Company" source="0D_NW_CODE" foreignKey="SID_0D_NW_CODE"/>
+    <Measure name="0D_NW_NETV" caption="Net Value" column="D_NW_NETV" aggregator="sum" formatString="#,##0.00"/>
+    <Measure name="0D_NW_QUANT" caption="Quantity" column="D_NW_QUANT" aggregator="sum" formatString="#,##0"/>
+  </Cube>
+</Schema>

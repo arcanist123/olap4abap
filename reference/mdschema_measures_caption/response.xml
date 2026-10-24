@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<DiscoverResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <row>
+        <CATALOG_NAME>ZFMCAPT</CATALOG_NAME>
+        <SCHEMA_NAME>ZFMCAPT</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALESCP</CUBE_NAME>
+        <MEASURE_NAME>Store Sales</MEASURE_NAME>
+        <MEASURE_UNIQUE_NAME>[Measures].[Store Sales]</MEASURE_UNIQUE_NAME>
+        <MEASURE_CAPTION>Store Sales</MEASURE_CAPTION>
+        <MEASURE_AGGREGATOR>1</MEASURE_AGGREGATOR>
+        <DATA_TYPE>5</DATA_TYPE>
+        <MEASURE_IS_VISIBLE>true</MEASURE_IS_VISIBLE>
+        <LEVELS_LIST>[Store].[Store Name],[Store.Store Id].[Store Id],[Store.Country].[Country],[Promotions].[Promotion],[Promotions.Promotion Id].[Promotion Id],[Product].[Product Name],[Product.Product Family].[Product Family]</LEVELS_LIST>
+        <DESCRIPTION>ZFMSALESCP Cube - Store Sales Member</DESCRIPTION>
+        <MEASUREGROUP_NAME>ZFMSALESCP</MEASUREGROUP_NAME>
+        <MEASURE_DISPLAY_FOLDER/>
+        <MEASURE_VISIBILITY>1</MEASURE_VISIBILITY>
+      </row>
+      <row>
+        <CATALOG_NAME>ZFMCAPT</CATALOG_NAME>
+        <SCHEMA_NAME>ZFMCAPT</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALESCP</CUBE_NAME>
+        <MEASURE_NAME>Unit Sales</MEASURE_NAME>
+        <MEASURE_UNIQUE_NAME>[Measures].[Unit Sales]</MEASURE_UNIQUE_NAME>
+        <MEASURE_CAPTION>Units sold</MEASURE_CAPTION>
+        <MEASURE_AGGREGATOR>1</MEASURE_AGGREGATOR>
+        <DATA_TYPE>5</DATA_TYPE>
+        <MEASURE_IS_VISIBLE>true</MEASURE_IS_VISIBLE>
+        <LEVELS_LIST>[Store].[Store Name],[Store.Store Id].[Store Id],[Store.Country].[Country],[Promotions].[Promotion],[Promotions.Promotion Id].[Promotion Id],[Product].[Product Name],[Product.Product Family].[Product Family]</LEVELS_LIST>
+        <DESCRIPTION>ZFMSALESCP Cube - Unit Sales Member</DESCRIPTION>
+        <MEASUREGROUP_NAME>ZFMSALESCP</MEASUREGROUP_NAME>
+        <MEASURE_DISPLAY_FOLDER/>
+        <MEASURE_VISIBILITY>1</MEASURE_VISIBILITY>
+      </row>
+    </root>
+  </return>
+</DiscoverResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

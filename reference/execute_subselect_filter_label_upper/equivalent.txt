@@ -1,0 +1,1 @@
+SELECT {[Measures].[Unit Sales]} ON 0, Hierarchize({DrilldownLevel({[Store].[All Stores]})}) ON 1 FROM (SELECT {[Store].[USA].[CA], [Store].[Mexico].[Yucatan], [Store].[Mexico].[Zacatecas]} ON 0 FROM [ZFMSALES])

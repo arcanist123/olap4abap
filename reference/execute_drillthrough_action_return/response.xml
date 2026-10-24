@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<ExecuteResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:sql="urn:schemas-microsoft-com:xml-sql" elementFormDefault="qualified">
+        <xsd:element name="root">
+          <xsd:complexType>
+            <xsd:sequence>
+              <xsd:element maxOccurs="unbounded" minOccurs="0" name="row" type="row"/>
+            </xsd:sequence>
+          </xsd:complexType>
+        </xsd:element>
+        <xsd:simpleType name="uuid">
+          <xsd:restriction base="xsd:string">
+            <xsd:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+          </xsd:restriction>
+        </xsd:simpleType>
+        <xsd:complexType name="row">
+          <xsd:sequence>
+            <xsd:element minOccurs="0" name="Store_x0020_Name" sql:field="Store Name" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Product_x0020_Name" sql:field="Product Name" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="The_x0020_Date" sql:field="The Date" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Unit_x0020_Sales" sql:field="Unit Sales" type="xsd:decimal"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:schema>
+      <row>
+        <Store_x0020_Name xsi:type="xsd:string">Store 14</Store_x0020_Name>
+        <Product_x0020_Name xsi:type="xsd:string">BBB Best Columbian Coffee</Product_x0020_Name>
+        <The_x0020_Date xsi:type="xsd:string">1997-04-10</The_x0020_Date>
+        <Unit_x0020_Sales xsi:type="xsd:decimal">1</Unit_x0020_Sales>
+      </row>
+      <row>
+        <Store_x0020_Name xsi:type="xsd:string">Store 14</Store_x0020_Name>
+        <Product_x0020_Name xsi:type="xsd:string">BBB Best Hot Chocolate</Product_x0020_Name>
+        <The_x0020_Date xsi:type="xsd:string">1997-06-06</The_x0020_Date>
+        <Unit_x0020_Sales xsi:type="xsd:decimal">2</Unit_x0020_Sales>
+      </row>
+      <row>
+        <Store_x0020_Name xsi:type="xsd:string">Store 14</Store_x0020_Name>
+        <Product_x0020_Name xsi:type="xsd:string">BBB Best Hot Chocolate</Product_x0020_Name>
+        <The_x0020_Date xsi:type="xsd:string">1997-06-23</The_x0020_Date>
+        <Unit_x0020_Sales xsi:type="xsd:decimal">1</Unit_x0020_Sales>
+      </row>
+      <row>
+        <Store_x0020_Name xsi:type="xsd:string">Store 14</Store_x0020_Name>
+        <Product_x0020_Name xsi:type="xsd:string">BBB Best Regular Coffee</Product_x0020_Name>
+        <The_x0020_Date xsi:type="xsd:string">1997-10-02</The_x0020_Date>
+        <Unit_x0020_Sales xsi:type="xsd:decimal">1</Unit_x0020_Sales>
+      </row>
+      <row>
+        <Store_x0020_Name xsi:type="xsd:string">Store 14</Store_x0020_Name>
+        <Product_x0020_Name xsi:type="xsd:string">BBB Best Regular Coffee</Product_x0020_Name>
+        <The_x0020_Date xsi:type="xsd:string">1997-12-24</The_x0020_Date>
+        <Unit_x0020_Sales xsi:type="xsd:decimal">2</Unit_x0020_Sales>
+      </row>
+      <row>
+        <Store_x0020_Name xsi:type="xsd:string">Store 14</Store_x0020_Name>
+        <Product_x0020_Name xsi:type="xsd:string">Booker Chocolate Milk</Product_x0020_Name>
+        <The_x0020_Date xsi:type="xsd:string">1997-08-25</The_x0020_Date>
+        <Unit_x0020_Sales xsi:type="xsd:decimal">2</Unit_x0020_Sales>
+      </row>
+      <row>
+        <Store_x0020_Name xsi:type="xsd:string">Store 14</Store_x0020_Name>
+        <Product_x0020_Name xsi:type="xsd:string">Booker Whole Milk</Product_x0020_Name>
+        <The_x0020_Date xsi:type="xsd:string">1997-12-04</The_x0020_Date>
+        <Unit_x0020_Sales xsi:type="xsd:decimal">1</Unit_x0020_Sales>
+      </row>
+      <row>
+        <Store_x0020_Name xsi:type="xsd:string">Store 14</Store_x0020_Name>
+        <Product_x0020_Name xsi:type="xsd:string">CDR Columbian Coffee</Product_x0020_Name>
+        <The_x0020_Date xsi:type="xsd:string">1997-06-03</The_x0020_Date>
+        <Unit_x0020_Sales xsi:type="xsd:decimal">1</Unit_x0020_Sales>
+      </row>
+      <row>
+        <Store_x0020_Name xsi:type="xsd:string">Store 14</Store_x0020_Name>
+        <Product_x0020_Name xsi:type="xsd:string">CDR Columbian Coffee</Product_x0020_Name>
+        <The_x0020_Date xsi:type="xsd:string">1997-07-06</The_x0020_Date>
+        <Unit_x0020_Sales xsi:type="xsd:decimal">2</Unit_x0020_Sales>
+      </row>
+      <row>
+        <Store_x0020_Name xsi:type="xsd:string">Store 14</Store_x0020_Name>
+        <Product_x0020_Name xsi:type="xsd:string">CDR Decaf Coffee</Product_x0020_Name>
+        <The_x0020_Date xsi:type="xsd:string">1997-07-16</The_x0020_Date>
+        <Unit_x0020_Sales xsi:type="xsd:decimal">2</Unit_x0020_Sales>
+      </row>
+      <row>
+        <Store_x0020_Name xsi:type="xsd:string">Store 14</Store_x0020_Name>
+        <Product_x0020_Name xsi:type="xsd:string">CDR Decaf Coffee</Product_x0020_Name>
+        <The_x0020_Date xsi:type="xsd:string">1997-07-28</The_x0020_Date>
+        <Unit_x0020_Sales xsi:type="xsd:decimal">1</Unit_x0020_Sales>
+      </row>
+      <row>
+        <Store_x0020_Name xsi:type="xsd:string">Store 14</Store_x0020_Name>
+        <Product_x0020_Name xsi:type="xsd:string">CDR French Roast Coffee</Product_x0020_Name>
+        <The_x0020_Date xsi:type="xsd:string">1997-07-02</The_x0020_Date>
+        <Unit_x0020_Sales xsi:type="xsd:decimal">1</Unit_x0020_Sales>
+      </row>
+      <row>
+        <Store_x0020_Name xsi:type="xsd:string">Store 14</Store_x0020_Name>
+        <Product_x0020_Name xsi:type="xsd:string">CDR Hot Chocolate</Product_x0020_Name>
+        <The_x0020_Date xsi:type="xsd:string">1997-05-14</The_x0020_Date>
+        <Unit_x0020_Sales xsi:type="xsd:decimal">1</Unit_x0020_Sales>
+      </row>
+      <row>
+        <Store_x0020_Name xsi:type="xsd:string">Store 14</Store_x0020_Name>
+        <Product_x0020_Name xsi:type="xsd:string">CDR Hot Chocolate</Product_x0020_Name>
+        <The_x0020_Date xsi:type="xsd:string">1997-08-28</The_x0020_Date>
+        <Unit_x0020_Sales xsi:type="xsd:decimal">2</Unit_x0020_Sales>
+      </row>
+      <row>
+        <Store_x0020_Name xsi:type="xsd:string">Store 14</Store_x0020_Name>
+        <Product_x0020_Name xsi:type="xsd:string">Carlson 2% Milk</Product_x0020_Name>
+        <The_x0020_Date xsi:type="xsd:string">1997-03-06</The_x0020_Date>
+        <Unit_x0020_Sales xsi:type="xsd:decimal">1</Unit_x0020_Sales>
+      </row>
+      <row>
+        <Store_x0020_Name xsi:type="xsd:string">Store 14</Store_x0020_Name>
+        <Product_x0020_Name xsi:type="xsd:string">Carlson 2% Milk</Product_x0020_Name>
+        <The_x0020_Date xsi:type="xsd:string">1997-04-19</The_x0020_Date>
+        <Unit_x0020_Sales xsi:type="xsd:decimal">2</Unit_x0020_Sales>
+      </row>
+      <row>
+        <Store_x0020_Name xsi:type="xsd:string">Store 14</Store_x0020_Name>
+        <Product_x0020_Name xsi:type="xsd:string">Carlson Buttermilk</Product_x0020_Name>
+        <The_x0020_Date xsi:type="xsd:string">1997-05-28</The_x0020_Date>
+        <Unit_x0020_Sales xsi:type="xsd:decimal">1</Unit_x0020_Sales>
+      </row>
+      <row>
+        <Store_x0020_Name xsi:type="xsd:string">Store 14</Store_x0020_Name>
+        <Product_x0020_Name xsi:type="xsd:string">Carlson Buttermilk</Product_x0020_Name>
+        <The_x0020_Date xsi:type="xsd:string">1997-06-23</The_x0020_Date>
+        <Unit_x0020_Sales xsi:type="xsd:decimal">1</Unit_x0020_Sales>
+      </row>
+      <row>
+        <Store_x0020_Name xsi:type="xsd:string">Store 14</Store_x0020_Name>
+        <Product_x0020_Name xsi:type="xsd:string">Carlson Buttermilk</Product_x0020_Name>
+        <The_x0020_Date xsi:type="xsd:string">1997-12-24</The_x0020_Date>
+        <Unit_x0020_Sales xsi:type="xsd:decimal">2</Unit_x0020_Sales>
+      </row>
+      <row>
+        <Store_x0020_Name xsi:type="xsd:string">Store 14</Store_x0020_Name>
+        <Product_x0020_Name xsi:type="xsd:string">Carlson Chocolate Milk</Product_x0020_Name>
+        <The_x0020_Date xsi:type="xsd:string">1997-09-19</The_x0020_Date>
+        <Unit_x0020_Sales xsi:type="xsd:decimal">2</Unit_x0020_Sales>
+      </row>
+    </root>
+  </return>
+</ExecuteResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

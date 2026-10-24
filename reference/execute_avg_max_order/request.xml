@@ -1,0 +1,28 @@
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<SOAP-ENV:Body>
+<Execute xmlns="urn:schemas-microsoft-com:xml-analysis" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<Command><Statement>with member [Measures].[Average Unit Sales] as 'Avg(Descendants([Time].[Time].CurrentMember, [Time].[Month]), 
+[Measures].[Unit Sales])' 
+member [Measures].[Max Unit Sales] as 'Max(Descendants([Time].[Time].CurrentMember, [Time].[Month]), [Measures].[Unit Sales])' 
+select {[Measures].[Average Unit Sales], [Measures].[Max Unit Sales], [Measures].[Unit Sales]} ON columns, 
+  NON EMPTY Order(
+    Crossjoin(
+      {[Store].[USA].[OR].[Portland],
+       [Store].[USA].[OR].[Salem],
+       [Store].[USA].[OR].[Salem].[Store 13],
+       [Store].[USA].[CA].[San Francisco],
+       [Store].[USA].[CA].[San Diego],
+       [Store].[USA].[CA].[Beverly Hills],
+       [Store].[USA].[CA].[Los Angeles],
+       [Store].[USA].[WA].[Walla Walla],
+       [Store].[USA].[WA].[Bellingham],
+       [Store].[USA].[WA].[Yakima],
+       [Store].[USA].[WA].[Spokane],
+       [Store].[USA].[WA].[Seattle], 
+       [Store].[USA].[WA].[Bremerton],
+       [Store].[USA].[WA].[Tacoma]},
+     [Time].[Year].Members), 
+  [Measures].[Average Unit Sales], ASC) ON rows
+from [ZFMSALES]</Statement></Command>
+<Properties><PropertyList><DataSourceInfo>ABAP BW</DataSourceInfo><Catalog>ZFOODMART</Catalog><Format>Multidimensional</Format><AxisFormat>TupleFormat</AxisFormat><Content>SchemaData</Content></PropertyList></Properties>
+</Execute></SOAP-ENV:Body></SOAP-ENV:Envelope>

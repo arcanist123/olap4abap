@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<DiscoverResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <MEASURE_NAME>Store Cost</MEASURE_NAME>
+        <MEASURE_UNIQUE_NAME>[Measures].[Store Cost]</MEASURE_UNIQUE_NAME>
+        <MEASURE_CAPTION>Store Cost</MEASURE_CAPTION>
+        <MEASURE_AGGREGATOR>1</MEASURE_AGGREGATOR>
+        <DATA_TYPE>5</DATA_TYPE>
+        <MEASURE_IS_VISIBLE>true</MEASURE_IS_VISIBLE>
+        <LEVELS_LIST>[Product].[Product Name],[Product.Product Id].[Product Id],[Product.Product Name].[Product Name],[Product.Brand Name].[Brand Name],[Product.Subcategory].[Subcategory],[Product.Product Category].[Product Category],[Product.Department].[Department],[Product.Product Family].[Product Family],[Customers].[Name],[Customers.Customer Id].[Customer Id],[Customers.Customer Name].[Customer Name],[Customers.Country].[Country],[Customers.State Province].[State Province],[Customers.City].[City],[Customers.Gender].[Gender],[Customers.Marital Status].[Marital Status],[Customers.Education].[Education],[Customers.Yearly Income].[Yearly Income],[Store].[Store Name],[Store.Store Id].[Store Id],[Store.Store Name].[Store Name],[Store.Country].[Country],[Store.State Province].[State Province],[Store.City].[City],[Store.Store Type].[Store Type],[Store.Store Manager].[Store Manager],[Store.Store Sqft].[Store Sqft],[Store.Grocery Sqft].[Grocery Sqft],[Store.Frozen Sqft].[Frozen Sqft],[Store.Meat Sqft].[Meat Sqft],[Store.Has Coffee Bar].[Has Coffee Bar],[Store.Street Address].[Street Address],[Promotions].[Promotion Name],[Promotions.Promotion Id].[Promotion Id],[Promotions.Promotion Name].[Promotion Name],[Promotions.Media Type].[Media Type],[Time].[Month],[Time.Weekly].[Day],[Time.Time Id].[Time Id],[Time.The Date].[The Date],[Time.Day Name].[Day Name],[Time.Month Name].[Month Name],[Time.Year].[Year],[Time.Day of Month].[Day of Month],[Time.Week of Year].[Week of Year],[Time.Month of Year].[Month of Year],[Time.Quarter].[Quarter],[Time.Fiscal Period].[Fiscal Period]</LEVELS_LIST>
+        <DESCRIPTION>ZFMSALES Cube - Store Cost Member</DESCRIPTION>
+        <MEASUREGROUP_NAME>ZFMSALES</MEASUREGROUP_NAME>
+        <MEASURE_DISPLAY_FOLDER/>
+        <MEASURE_VISIBILITY>1</MEASURE_VISIBILITY>
+      </row>
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <MEASURE_NAME>Store Sales</MEASURE_NAME>
+        <MEASURE_UNIQUE_NAME>[Measures].[Store Sales]</MEASURE_UNIQUE_NAME>
+        <MEASURE_CAPTION>Store Sales</MEASURE_CAPTION>
+        <MEASURE_AGGREGATOR>1</MEASURE_AGGREGATOR>
+        <DATA_TYPE>5</DATA_TYPE>
+        <MEASURE_IS_VISIBLE>true</MEASURE_IS_VISIBLE>
+        <LEVELS_LIST>[Product].[Product Name],[Product.Product Id].[Product Id],[Product.Product Name].[Product Name],[Product.Brand Name].[Brand Name],[Product.Subcategory].[Subcategory],[Product.Product Category].[Product Category],[Product.Department].[Department],[Product.Product Family].[Product Family],[Customers].[Name],[Customers.Customer Id].[Customer Id],[Customers.Customer Name].[Customer Name],[Customers.Country].[Country],[Customers.State Province].[State Province],[Customers.City].[City],[Customers.Gender].[Gender],[Customers.Marital Status].[Marital Status],[Customers.Education].[Education],[Customers.Yearly Income].[Yearly Income],[Store].[Store Name],[Store.Store Id].[Store Id],[Store.Store Name].[Store Name],[Store.Country].[Country],[Store.State Province].[State Province],[Store.City].[City],[Store.Store Type].[Store Type],[Store.Store Manager].[Store Manager],[Store.Store Sqft].[Store Sqft],[Store.Grocery Sqft].[Grocery Sqft],[Store.Frozen Sqft].[Frozen Sqft],[Store.Meat Sqft].[Meat Sqft],[Store.Has Coffee Bar].[Has Coffee Bar],[Store.Street Address].[Street Address],[Promotions].[Promotion Name],[Promotions.Promotion Id].[Promotion Id],[Promotions.Promotion Name].[Promotion Name],[Promotions.Media Type].[Media Type],[Time].[Month],[Time.Weekly].[Day],[Time.Time Id].[Time Id],[Time.The Date].[The Date],[Time.Day Name].[Day Name],[Time.Month Name].[Month Name],[Time.Year].[Year],[Time.Day of Month].[Day of Month],[Time.Week of Year].[Week of Year],[Time.Month of Year].[Month of Year],[Time.Quarter].[Quarter],[Time.Fiscal Period].[Fiscal Period]</LEVELS_LIST>
+        <DESCRIPTION>ZFMSALES Cube - Store Sales Member</DESCRIPTION>
+        <MEASUREGROUP_NAME>ZFMSALES</MEASUREGROUP_NAME>
+        <MEASURE_DISPLAY_FOLDER/>
+        <MEASURE_VISIBILITY>1</MEASURE_VISIBILITY>
+      </row>
+      <row>
+        <CATALOG_NAME>ZFOODMART</CATALOG_NAME>
+        <SCHEMA_NAME>ZFOODMART</SCHEMA_NAME>
+        <CUBE_NAME>ZFMSALES</CUBE_NAME>
+        <MEASURE_NAME>Unit Sales</MEASURE_NAME>
+        <MEASURE_UNIQUE_NAME>[Measures].[Unit Sales]</MEASURE_UNIQUE_NAME>
+        <MEASURE_CAPTION>Unit Sales</MEASURE_CAPTION>
+        <MEASURE_AGGREGATOR>1</MEASURE_AGGREGATOR>
+        <DATA_TYPE>5</DATA_TYPE>
+        <MEASURE_IS_VISIBLE>true</MEASURE_IS_VISIBLE>
+        <LEVELS_LIST>[Product].[Product Name],[Product.Product Id].[Product Id],[Product.Product Name].[Product Name],[Product.Brand Name].[Brand Name],[Product.Subcategory].[Subcategory],[Product.Product Category].[Product Category],[Product.Department].[Department],[Product.Product Family].[Product Family],[Customers].[Name],[Customers.Customer Id].[Customer Id],[Customers.Customer Name].[Customer Name],[Customers.Country].[Country],[Customers.State Province].[State Province],[Customers.City].[City],[Customers.Gender].[Gender],[Customers.Marital Status].[Marital Status],[Customers.Education].[Education],[Customers.Yearly Income].[Yearly Income],[Store].[Store Name],[Store.Store Id].[Store Id],[Store.Store Name].[Store Name],[Store.Country].[Country],[Store.State Province].[State Province],[Store.City].[City],[Store.Store Type].[Store Type],[Store.Store Manager].[Store Manager],[Store.Store Sqft].[Store Sqft],[Store.Grocery Sqft].[Grocery Sqft],[Store.Frozen Sqft].[Frozen Sqft],[Store.Meat Sqft].[Meat Sqft],[Store.Has Coffee Bar].[Has Coffee Bar],[Store.Street Address].[Street Address],[Promotions].[Promotion Name],[Promotions.Promotion Id].[Promotion Id],[Promotions.Promotion Name].[Promotion Name],[Promotions.Media Type].[Media Type],[Time].[Month],[Time.Weekly].[Day],[Time.Time Id].[Time Id],[Time.The Date].[The Date],[Time.Day Name].[Day Name],[Time.Month Name].[Month Name],[Time.Year].[Year],[Time.Day of Month].[Day of Month],[Time.Week of Year].[Week of Year],[Time.Month of Year].[Month of Year],[Time.Quarter].[Quarter],[Time.Fiscal Period].[Fiscal Period]</LEVELS_LIST>
+        <DESCRIPTION>ZFMSALES Cube - Unit Sales Member</DESCRIPTION>
+        <MEASUREGROUP_NAME>ZFMSALES</MEASUREGROUP_NAME>
+        <MEASURE_DISPLAY_FOLDER/>
+        <MEASURE_VISIBILITY>1</MEASURE_VISIBILITY>
+      </row>
+    </root>
+  </return>
+</DiscoverResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

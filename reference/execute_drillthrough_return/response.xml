@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<ExecuteResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:sql="urn:schemas-microsoft-com:xml-sql" elementFormDefault="qualified">
+        <xsd:element name="root">
+          <xsd:complexType>
+            <xsd:sequence>
+              <xsd:element maxOccurs="unbounded" minOccurs="0" name="row" type="row"/>
+            </xsd:sequence>
+          </xsd:complexType>
+        </xsd:element>
+        <xsd:simpleType name="uuid">
+          <xsd:restriction base="xsd:string">
+            <xsd:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+          </xsd:restriction>
+        </xsd:simpleType>
+        <xsd:complexType name="row">
+          <xsd:sequence>
+            <xsd:element minOccurs="0" name="Product_x0020_Name" sql:field="Product Name" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Store_x0020_Sales" sql:field="Store Sales" type="xsd:decimal"/>
+            <xsd:element minOccurs="0" name="Name_x0020__x0028_Key_x0029_" sql:field="Name (Key)" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Name" sql:field="Name" type="xsd:string"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:schema>
+      <row>
+        <Product_x0020_Name xsi:type="xsd:string">ADJ Rosy Sunglasses</Product_x0020_Name>
+        <Store_x0020_Sales xsi:type="xsd:decimal">5.52</Store_x0020_Sales>
+        <Name_x0020__x0028_Key_x0029_ xsi:type="xsd:integer">7419</Name_x0020__x0028_Key_x0029_>
+        <Name xsi:type="xsd:string">Marilyn Bowman</Name>
+      </row>
+      <row>
+        <Product_x0020_Name xsi:type="xsd:string">American Beef Bologna</Product_x0020_Name>
+        <Store_x0020_Sales xsi:type="xsd:decimal">2.34</Store_x0020_Sales>
+        <Name_x0020__x0028_Key_x0029_ xsi:type="xsd:integer">1534</Name_x0020__x0028_Key_x0029_>
+        <Name xsi:type="xsd:string">Heather Sanchez</Name>
+      </row>
+      <row>
+        <Product_x0020_Name xsi:type="xsd:string">American Beef Bologna</Product_x0020_Name>
+        <Store_x0020_Sales xsi:type="xsd:decimal">2.34</Store_x0020_Sales>
+        <Name_x0020__x0028_Key_x0029_ xsi:type="xsd:integer">2164</Name_x0020__x0028_Key_x0029_>
+        <Name xsi:type="xsd:string">Angela Cottle</Name>
+      </row>
+    </root>
+  </return>
+</ExecuteResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

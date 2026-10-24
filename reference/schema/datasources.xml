@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<!--
+  eMondrian data sources for the reference container: the same as the one shipped with eMondrian, except that the
+  catalogs are ZFOODMART (reference/schema/FoodmartBW.xml), the schema that mirrors our BW model, ZFMDRILL
+  (reference/schema/FoodmartBWDrill.xml, drill-through actions), ZFMCAPT
+  (reference/schema/FoodmartBWCaption.xml, captions) and ZCLVISIT (reference/schema/ClinicBW.xml, the
+  clinic InfoCube with the BW hierarchy ZCLDIAG_ICD). The original FoodMart catalog is gone on
+  purpose, so that every answer of the container can be compared one-to-one with our ABAP server.
+  Installed by scripts/deploy-reference-schema.sh.
+-->
+<DataSources>
+  <DataSource>
+    <DataSourceName>ABAP BW</DataSourceName>
+    <DataSourceDescription>Foodmart Sample Data</DataSourceDescription>
+    <URL>http://localhost:8080/emondrian/xmla</URL>
+    <DataSourceInfo>Provider=mondrian;Jdbc=jdbc:hsqldb:res:/hsqldb-foodmart/foodmart;JdbcDrivers=org.hsqldb.jdbc.JDBCDriver</DataSourceInfo>
+    <ProviderName>Mondrian</ProviderName>
+    <ProviderType>MDP</ProviderType>
+    <AuthenticationMode>Unauthenticated</AuthenticationMode>
+    <Catalogs>
+        <Catalog name="ZFOODMART">
+            <Definition>/WEB-INF/schema/FoodmartBW.xml</Definition>
+        </Catalog>
+        <Catalog name="ZFMDRILL">
+            <Definition>/WEB-INF/schema/FoodmartBWDrill.xml</Definition>
+        </Catalog>
+        <Catalog name="ZFMCAPT">
+            <Definition>/WEB-INF/schema/FoodmartBWCaption.xml</Definition>
+        </Catalog>
+        <Catalog name="ZCLHIER">
+            <Definition>/WEB-INF/schema/ClinicBW.xml</Definition>
+        </Catalog>
+    </Catalogs>
+  </DataSource>
+</DataSources>

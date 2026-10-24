@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<SOAP-ENV:Fault>
+  <faultcode>SOAP-ENV:Client.00HSBE02</faultcode>
+  <faultstring>XMLA Drill Through format error &#60;Format&#62;: only &#39;Tabular&#39; allowed when drilling through</faultstring>
+  <faultactor>Mondrian</faultactor>
+  <detail>
+    <Error ErrorCode="3238789130" Description="The Mondrian XML: &#60;Format&#62;: only &#39;Tabular&#39; allowed when drilling through"/>
+  </detail>
+</SOAP-ENV:Fault>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

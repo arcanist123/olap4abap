@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<!-- Defaults are filled in and written back; a Boolean without a default stays null and is not written. -->
+<Schema name="Defaults">
+  <Dimension name="Store">
+    <Hierarchy hasAll="true" primaryKey="id">
+      <Table name="store"/>
+      <Level name="Country" column="country"/>
+    </Hierarchy>
+  </Dimension>
+  <Cube name="Sales">
+    <Table name="sales_fact"/>
+    <DimensionUsage name="Store" source="Store" foreignKey="store_id"/>
+    <Measure name="Units" column="units" aggregator="sum"/>
+    <CalculatedMember name="Double" dimension="Measures" formula="[Measures].[Units] * 2"/>
+  </Cube>
+</Schema>

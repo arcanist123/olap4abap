@@ -1,0 +1,1 @@
+The server may have catalogs besides FoodMart's (the demos, the schema builder's): FoodMart's rows must be there, others may be too.

@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<Schema name="Err">
+  <Cube name="Sales">
+    <View alias="v"></View>
+  </Cube>
+</Schema>

@@ -1,0 +1,24 @@
+diff --git a/mondrian/src/main/java/mondrian/rolap/RolapResult.java b/mondrian/src/main/java/mondrian/rolap/RolapResult.java
+index fe1840b02..281c697e3 100644
+--- a/mondrian/src/main/java/mondrian/rolap/RolapResult.java
++++ b/mondrian/src/main/java/mondrian/rolap/RolapResult.java
+@@ -879,7 +879,8 @@ public class RolapResult extends ResultBase {
+ 
+     // If evaluator contains Null member - return;
+     for(Member member: evaluator.getMembers()) {
+-      if(member.isNull()) {
++      // the placeholder of a compound slicer delegates to the null member but is no empty slicer
++      if(member.isNull() && !(member instanceof CompoundSlicerRolapMember)) {
+         return;
+       }
+     }
+@@ -938,7 +939,8 @@ public class RolapResult extends ResultBase {
+ 
+     // If evaluator contains Null member - return empty list;
+     for(Member member: evaluator.getMembers()) {
+-      if(member.isNull()) {
++      // the placeholder of a compound slicer delegates to the null member but is no empty slicer
++      if(member.isNull() && !(member instanceof CompoundSlicerRolapMember)) {
+         TupleList axisResult = TupleCollections.emptyList( arity );
+         return axisResult;
+       }

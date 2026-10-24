@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >
+<SOAP-ENV:Header>
+</SOAP-ENV:Header>
+<SOAP-ENV:Body>
+<ExecuteResponse xmlns="urn:schemas-microsoft-com:xml-analysis">
+  <return>
+    <root xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:EX="urn:schemas-microsoft-com:xml-analysis:exception">
+      <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns="urn:schemas-microsoft-com:xml-analysis:rowset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:sql="urn:schemas-microsoft-com:xml-sql" elementFormDefault="qualified">
+        <xsd:element name="root">
+          <xsd:complexType>
+            <xsd:sequence>
+              <xsd:element maxOccurs="unbounded" minOccurs="0" name="row" type="row"/>
+            </xsd:sequence>
+          </xsd:complexType>
+        </xsd:element>
+        <xsd:simpleType name="uuid">
+          <xsd:restriction base="xsd:string">
+            <xsd:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+          </xsd:restriction>
+        </xsd:simpleType>
+        <xsd:complexType name="row">
+          <xsd:sequence>
+            <xsd:element minOccurs="0" name="Product_x0020_Family" sql:field="Product Family" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Product_x0020_Department" sql:field="Product Department" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Product_x0020_Category" sql:field="Product Category" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Product_x0020_Subcategory" sql:field="Product Subcategory" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Brand_x0020_Name" sql:field="Brand Name" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Product_x0020_Name" sql:field="Product Name" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Product_x0020_Id" sql:field="Product Id" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Country" sql:field="Country" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="State_x0020_Province" sql:field="State Province" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="City" sql:field="City" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Name" sql:field="Name" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Name_x0020__x0028_Key_x0029_" sql:field="Name (Key)" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Gender" sql:field="Gender" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Marital_x0020_Status" sql:field="Marital Status" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Education" sql:field="Education" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Yearly_x0020_Income" sql:field="Yearly Income" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Store_x0020_Country" sql:field="Store Country" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Store_x0020_State" sql:field="Store State" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Store_x0020_City" sql:field="Store City" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Store_x0020_Name" sql:field="Store Name" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Store_x0020_Id" sql:field="Store Id" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Store_x0020_Type" sql:field="Store Type" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Store_x0020_Manager" sql:field="Store Manager" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Store_x0020_Sqft" sql:field="Store Sqft" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Grocery_x0020_Sqft" sql:field="Grocery Sqft" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Frozen_x0020_Sqft" sql:field="Frozen Sqft" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Meat_x0020_Sqft" sql:field="Meat Sqft" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Has_x0020_Coffee_x0020_Bar" sql:field="Has Coffee Bar" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Street_x0020_Address" sql:field="Street Address" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Promotion_x0020_Name" sql:field="Promotion Name" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Promotion_x0020_Id" sql:field="Promotion Id" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Media_x0020_Type" sql:field="Media Type" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Year" sql:field="Year" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Quarter" sql:field="Quarter" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Month" sql:field="Month" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Week" sql:field="Week" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Day" sql:field="Day" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="Time_x0020_Id" sql:field="Time Id" type="xsd:integer"/>
+            <xsd:element minOccurs="0" name="The_x0020_Date" sql:field="The Date" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Day_x0020_Name" sql:field="Day Name" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Month_x0020_Name" sql:field="Month Name" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Fiscal_x0020_Period" sql:field="Fiscal Period" type="xsd:string"/>
+            <xsd:element minOccurs="0" name="Unit_x0020_Sales" sql:field="Unit Sales" type="xsd:decimal"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:schema>
+    </root>
+  </return>
+</ExecuteResponse>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

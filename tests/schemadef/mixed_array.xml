@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<!-- An array of an abstract class (CubeDimension) takes any run of its subclasses; tags are case-insensitive in the
+     first letter only. -->
+<Schema name="Mixed">
+  <Cube name="x"><Table name="t"/><DimensionUsage name="d" source="s"/><Dimension name="e"/><dimensionUsage name="f" source="s"/></Cube>
+</Schema>

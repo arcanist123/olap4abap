@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<!-- Fields and arrays of abstract classes: Join of Table and View, InlineTable, VirtualCube, Role grants,
+     Annotations, Formula and SQL text (trimmed; comments ignored; CDATA and text concatenated). -->
+<Schema name="Poly">
+  <Annotations><Annotation name="a1">value &amp; more</Annotation></Annotations>
+  <Dimension name="Product">
+    <Hierarchy hasAll="true" primaryKey="product_id" primaryKeyTable="product">
+      <Join leftKey="product_class_id" rightAlias="pc" rightKey="product_class_id">
+        <Table name="product"><SQL dialect="hana">"x" = 'A'</SQL></Table>
+        <View alias="pc">
+          <SQL dialect="generic"><![CDATA[select * from "product_class" where a < b]]></SQL>
+          <SQL dialect="hana">
+            <!-- a comment -->
+            select *  <![CDATA[from "product_class"]]>
+          </SQL>
+        </View>
+      </Join>
+      <Level name="Family" table="pc" column="family" levelType="Regular">
+        <KeyExpression><SQL dialect="generic">upper(family)</SQL></KeyExpression>
+        <Property name="Size" column="size" type="Numeric"/>
+      </Level>
+    </Hierarchy>
+  </Dimension>
+  <Cube name="Sales">
+    <Table name="sales_fact"/>
+    <Dimension name="Promo" foreignKey="promo_id">
+      <Hierarchy hasAll="false" primaryKey="id">
+        <InlineTable alias="promo">
+          <ColumnDefs><ColumnDef name="id" type="Numeric"/><ColumnDef name="name" type="String"/></ColumnDefs>
+          <Rows><Row><Value column="id">1</Value><Value column="name">Größe "A" &lt;1&gt;</Value></Row></Rows>
+        </InlineTable>
+        <Level name="Name" column="name" uniqueMembers="true"/>
+      </Hierarchy>
+    </Dimension>
+    <Measure name="Units" column="units" aggregator="sum" formatString="#,###" visible="false"/>
+    <CalculatedMember name="Ratio" dimension="Measures">
+      <Formula>  [Measures].[Units] / 2  </Formula>
+      <CalculatedMemberProperty name="FORMAT_STRING" value="0.00%"/>
+    </CalculatedMember>
+    <NamedSet name="Top"><Formula>TopCount([Product].Members, 5)</Formula></NamedSet>
+  </Cube>
+  <VirtualCube name="V">
+    <CubeUsages><CubeUsage cubeName="Sales" ignoreUnrelatedDimensions="true"/></CubeUsages>
+    <VirtualCubeDimension cubeName="Sales" name="Promo"/>
+    <VirtualCubeMeasure cubeName="Sales" name="[Measures].[Units]"/>
+  </VirtualCube>
+  <Role name="R">
+    <SchemaGrant access="none">
+      <CubeGrant cube="Sales" access="custom">
+        <HierarchyGrant hierarchy="[Promo]" access="custom" rollupPolicy="partial">
+          <MemberGrant member="[Promo].[x]" access="all"/>
+        </HierarchyGrant>
+      </CubeGrant>
+    </SchemaGrant>
+  </Role>
+</Schema>

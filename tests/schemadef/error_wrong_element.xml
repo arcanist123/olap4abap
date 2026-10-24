@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<!-- A required element of an abstract class (RelationOrJoin) that is not of that class. -->
+<Schema name="Err">
+  <Dimension name="Product">
+    <Hierarchy hasAll="true" primaryKey="id" primaryKeyTable="product">
+      <Join leftKey="class_id" rightKey="id">
+        <Table name="product"/>
+        <Measure name="x" aggregator="sum"/>
+      </Join>
+      <Level name="Family" column="family"/>
+    </Hierarchy>
+  </Dimension>
+</Schema>

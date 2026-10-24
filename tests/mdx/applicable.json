@@ -1,0 +1,1582 @@
+[
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/CustomizedParserTest.java:47",
+  "mdx": "select from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:170",
+  "mdx": "with member [measures].[foo] as '([Measures].[unit sales], [Time].[1997].[Q1].Lag(-2147483648))' select [measures].[foo] on columns, [time].[1997].children on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:1018",
+  "mdx": "with\nset [*ancestors] as\n  'Ancestors([Store].[USA].[CA].[Los Angeles], [Store].[Store Country])'\nselect\n  [*ancestors] on columns\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:1053",
+  "mdx": "with\nset [*ancestors] as\n  'Ancestors([Store].[USA].[CA].[Los Angeles], 2)'\nselect\n  [*ancestors] on columns\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:1506",
+  "mdx": "with member [Measures].[Xxx] AS ' [Measures].[Unit Sales] 'select {[Measures].members} on columns from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:1534",
+  "mdx": "with member [Measures].[Xxx] AS ' [Measures].[Unit Sales] 'select {[Measures].[Measures].members} on columns from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:1624",
+  "mdx": "with member [Measures].[Xxx] AS ' [Measures].[Unit Sales] 'select {[Measures].allmembers} on columns from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:2233",
+  "mdx": "with set [Time Regular] as [Time].[Time].Members\n set [Time Reversed] as Order([Time Regular], [Time Regular].CurrentOrdinal, BDESC)\nselect [Time Reversed] on 0\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:2321",
+  "mdx": "with set [Time Regular] as [Time].[Time].Members\nset [Every Other Time] as\n  Generate(\n    [Time Regular],\n    {[Time].[Time].Members.Item(\n      [Time Regular].CurrentOrdinal * 2)})\nselect [Every Other Time] on 0\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:2375",
+  "mdx": "with set [Time Regular] as [Time].[Time].Members\n set [Time Subset] as    Filter([Time Regular], [Time Regular].CurrentOrdinal = 3                       or [Time Regular].CurrentOrdinal = 5)\nselect [Time Subset] on 0\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:3143",
+  "mdx": "WITH\nMEMBER [Measures].[Declining Stores Count] AS\n ' Count(Filter(Descendants(Store.CurrentMember, Store.[Store Name]), [Store Sales] < ([Store Sales],Time.Time.PrevMember))) '\n MEMBER \n  [Store].[XL_QZX] AS 'Aggregate ({ [Store].[All Stores].[USA].[WA] , [Store].[All Stores].[USA].[CA] })' \nSELECT \n  NON EMPTY HIERARCHIZE(AddCalculatedMembers({DrillDownLevel({[Product].[All Products]})})) \n    DIMENSION PROPERTIES PARENT_UNIQUE_NAME ON COLUMNS \nfrom [ZFMSALES] \nWHERE ([Measures].[Declining Stores Count], [Time].[1998].[Q3], [Store].[XL_QZX])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:3607",
+  "mdx": "select\n  filter(\n    [Time].[1997].[Q1].[2] : [Time].[1997].[Q3].[9] as t,    mod(t.CurrentOrdinal, 2) = 0) on 0\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:3635",
+  "mdx": "select Measures.[Unit Sales] on 0, \n  {[Time].[1997].Children as t, \n   Descendants(t, [Time].[Month])} on 1 \nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:3679",
+  "mdx": "select Measures.[Unit Sales] on 0,\n  {[Time].[1997] as t,\n   Descendants(t, [Time].[Month])} on 1\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:5245",
+  "mdx": "WITH MEMBER [Product].[Non-Consumable].[Other] AS\n 'Sum(Except( [Product].[Product Department].Members,\n       TopCount([Product].[Product Department].Members, 3)),\n       Measures.[Unit Sales])'\nSELECT\n  { [Measures].[Unit Sales] } ON COLUMNS,\n  { TopCount([Product].[Product Department].Members,3),\n              [Product].[Non-Consumable].[Other] } ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:5483",
+  "mdx": "with\n    member Measures.[Coal1] as 'coalesceempty(([Time].[1997], Measures.[Store Sales]), ([Time].[1998], Measures.[Store Sales]))'\n    member Measures.[Coal2] as 'coalesceempty(([Time].[1997], Measures.[Unit Sales]), ([Time].[1998], Measures.[Unit Sales]))'\nselect \n    {Measures.[Coal1], Measures.[Coal2]} on columns,\n    {[Store].[All Stores].[Mexico].[DF], [Store].[All Stores].[USA].[WA]} on rows\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:6320",
+  "mdx": "WITH MEMBER [Measures].[Foo] AS \n ' ParallelPeriod([Time].[Year]).UniqueName '\nSELECT {[Measures].[Foo]} ON COLUMNS\nfrom [ZFMSALES]\nWHERE [Time].[1997].[Q3].[8]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:6334",
+  "mdx": "WITH MEMBER [Measures].[Foo] AS \n ' ParallelPeriod([Time].[Quarter]).UniqueName '\nSELECT {[Measures].[Foo]} ON COLUMNS\nfrom [ZFMSALES]\nWHERE [Time].[1997].[Q3].[8]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:6347",
+  "mdx": "WITH MEMBER [Measures].[Foo] AS \n ' ParallelPeriod([Time].[Month]).UniqueName '\nSELECT {[Measures].[Foo]} ON COLUMNS\nfrom [ZFMSALES]\nWHERE [Time].[1997].[Q3].[8]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:6361",
+  "mdx": "WITH MEMBER [Measures].[Foo] AS \n ' ParallelPeriod([Time].[Month]).UniqueName '\nSELECT {[Measures].[Foo]} ON COLUMNS\nfrom [ZFMSALES]\nWHERE [Time].[1997].[Q3]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:6653",
+  "mdx": "with member measures.x as 'String(3, \"yahoo\")'\nselect measures.x on 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:7157",
+  "mdx": "WITH MEMBER [Store].[Lineage of Time] AS\n Generate(Ascendants([Time].CurrentMember), [Time].CurrentMember.Properties(\"MEMBER_CAPTION\"), \",\")\n SELECT\n  {[Time].[1997]} ON Axis(0),\n  Union(\n   {([Store].[Lineage of Time])},\n   {[Store].[All Stores]}) ON Axis(1)\n from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:7238",
+  "mdx": "SELECT\n                        UNION(\n                            {([Customers].CURRENTMEMBER)},\n                            HEAD(\n                                {([Customers].CURRENTMEMBER)},\n                                IIF(\n                                    COUNT(\n                                        FILTER(\n                                            DESCENDANTS(\n                                                [Customers].CURRENTMEMBER,\n                                                [Customers].[Country]),\n                                            [Measures].[Unit Sales] >= 66),\n                                        INCLUDEEMPTY)> 0,\n                                    1,\n                                    0)),\n                            ALL)\n    ON AXIS(0)\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:7266",
+  "mdx": "WITH\n    MEMBER\n        [Customers].[COG_OQP_INT_t2]AS '1',\n        SOLVE_ORDER = 65535\nSELECT\n                        UNION(\n                            {([Customers].[COG_OQP_INT_t2])},\n                            HEAD(\n                                {([Customers].CURRENTMEMBER)},\n                                IIF(\n                                    COUNT(\n                                        FILTER(\n                                            DESCENDANTS(\n                                                [Customers].CURRENTMEMBER,\n                                                [Customers].[Country]),\n                                            [Measures].[Unit Sales]>= 66),\n                                        INCLUDEEMPTY)> 0,\n                                    1,\n                                    0)),\n                            ALL)\n    ON AXIS(0)\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:7767",
+  "mdx": "with member [Measures].[Product Name Length] as 'LEN([Product].CurrentMember.Name)'\nselect {[Measures].[Product Name Length]} ON COLUMNS,\nOrder([Product].[All Products].Children, [Measures].[Product Name Length], BASC) ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:8050",
+  "mdx": "SELECT Order({[Time].[Year].members}, [Measures].[Unit Sales]) on columns\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:8063",
+  "mdx": "with member [Measures].[Average Unit Sales] as 'Avg(Descendants([Time].[Time].CurrentMember, [Time].[Month]), \n[Measures].[Unit Sales])' \nmember [Measures].[Max Unit Sales] as 'Max(Descendants([Time].[Time].CurrentMember, [Time].[Month]), [Measures].[Unit Sales])' \nselect {[Measures].[Average Unit Sales], [Measures].[Max Unit Sales], [Measures].[Unit Sales]} ON columns, \n  NON EMPTY Order(\n    Crossjoin(\n      {[Store].[USA].[OR].[Portland],\n       [Store].[USA].[OR].[Salem],\n       [Store].[USA].[OR].[Salem].[Store 13],\n       [Store].[USA].[CA].[San Francisco],\n       [Store].[USA].[CA].[San Diego],\n       [Store].[USA].[CA].[Beverly Hills],\n       [Store].[USA].[CA].[Los Angeles],\n       [Store].[USA].[WA].[Walla Walla],\n       [Store].[USA].[WA].[Bellingham],\n       [Store].[USA].[WA].[Yakima],\n       [Store].[USA].[WA].[Spokane],\n       [Store].[USA].[WA].[Seattle], \n       [Store].[USA].[WA].[Bremerton],\n       [Store].[USA].[WA].[Tacoma]},\n     [Time].[Year].Members), \n  [Measures].[Average Unit Sales], ASC) ON rows\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:8155",
+  "mdx": "select \n  Order(    {},    [Customers].currentMember, BDESC) \non 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:8167",
+  "mdx": "select \n  Order(    {[Customers].[All Customers].[USA].[CA].[Woodland Hills].[Abel Young]},    [Customers].currentMember, BDESC) \non 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:8181",
+  "mdx": "select \n  Order(    {},    [Customers].currentMember.OrderKey, BDESC) \non 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:8193",
+  "mdx": "select \n  Order(    {[Customers].[All Customers].[USA].[CA].[Woodland Hills].[Abel Young]},    [Customers].currentMember.OrderKey, BDESC) \non 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:8208",
+  "mdx": "SELECT\n{[Measures].[Store Sales]} ON COLUMNS,\n{Order(\n  {{[Product].[Drink], [Product].[Drink].Children}},\n  [Product].CurrentMember.Name,\n  DESC)} ON ROWS\nfrom [ZFMSALES]\nWHERE {[Time].[1997].[Q3].[7]}"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:8240",
+  "mdx": "select \n  Order(    {[Customers].[All Customers].[USA].[CA].[Woodland Hills].[Abel Young],     [Customers].[All Customers].[USA].[CA].[Santa Monica].[Adeline Chun]},    [Customers].currentMember.OrderKey, BDESC) \non 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:8269",
+  "mdx": "select \n  Order(    {[Customers].[All Customers].[USA].[CA].[Woodland Hills].[Abel Young],     [Customers].[All Customers].[USA].[CA].[Santa Monica].[Adeline Chun]},    [Customers].currentMember, BDESC) \non 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:8290",
+  "mdx": "with \n  Member [Measures].[Zero] as '0' \nselect \n  Order(    {[Customers].[All Customers].[USA].[CA].[Woodland Hills].[Abel Young],     [Customers].[All Customers].[USA].[CA].[Santa Monica].[Adeline Chun]},    [Customers].currentMember.OrderKey) \non 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:8310",
+  "mdx": "with \n  Member [Measures].[Zero] as '0' \nselect \n  Order(    {[Customers].[All Customers].[USA].[CA].[Woodland Hills].[Abel Young],     [Customers].[All Customers].[USA].[CA].[Santa Monica].[Adeline Chun]},    [Measures].[Store Cost]) \non 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:8331",
+  "mdx": "select \n  Order(    {[Customers].[All Customers].[USA].[CA].[Woodland Hills].[Abel Young],     [Customers].[All Customers].[USA].[CA].[Santa Monica].[Adeline Chun]},    [Customers].currentMember.OrderKey, DESC) \non 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:8349",
+  "mdx": "select \n  Order(    {[Customers].[USA].[WA].[Issaquah].[Abe Tramel],     [Customers].[All Customers].[USA].[CA].[Woodland Hills].[Abel Young],     [Customers].[All Customers].[USA].[CA].[Santa Monica].[Adeline Chun]},    [Measures].[Unit Sales], BDESC, [Customers].currentMember.OrderKey, BDESC) \non 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:8375",
+  "mdx": "select \n  Order(    {[Customers].[USA].[WA].[Issaquah].[Abe Tramel],     [Customers].[All Customers].[USA].[CA].[Woodland Hills].[Abel Young],     [Customers].[All Customers].[USA].[CA].[Santa Monica].[Adeline Chun]},    [Customers].currentMember.Parent.Parent.OrderKey, BASC, [Customers].currentMember.OrderKey, BDESC) \non 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:8399",
+  "mdx": "select \n  Order(    {[Customers].[USA].[WA].[Issaquah].[Abe Tramel],     [Customers].[All Customers].[USA].[CA].[Woodland Hills].[Abel Young],     [Customers].[All Customers].[USA].[CA].[Santa Monica].[Adeline Chun]},    [Measures].[Unit Sales], BDESC, [Time].[Time].currentMember, BDESC) \non 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:8425",
+  "mdx": "with \n  set [NECJ] as \n    'NonEmptyCrossJoin( \n    {[Customers].[USA].[WA].[Issaquah].[Abe Tramel],     [Customers].[All Customers].[USA].[CA].[Woodland Hills].[Abel Young],     [Customers].[All Customers].[USA].[CA].[Santa Monica].[Adeline Chun]},    {[Store].[USA].[WA].[Seattle],\n     [Store].[USA].[CA],\n     [Store].[USA].[OR]})'\nselect \n Order([NECJ], [Customers].currentMember.OrderKey, BDESC) \non 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:8459",
+  "mdx": "with \n  set [NECJ] as \n    'NonEmptyCrossJoin( \n    {[Customers].[USA].[WA].[Issaquah].[Abe Tramel],     [Customers].[All Customers].[USA].[CA].[Woodland Hills].[Abel Young],     [Customers].[All Customers].[USA].[CA].[Santa Monica].[Adeline Chun]},    {[Store].[USA].[WA].[Seattle],\n     [Store].[USA].[CA],\n     [Store].[USA].[OR]})'\nselect \n Order([NECJ], [Store].currentMember.OrderKey, DESC) \non 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:8487",
+  "mdx": "with \n  set [NECJ] as \n    'NonEmptyCrossJoin( \n    {[Store].[USA].[CA],\n     [Store].[USA].[WA]},\n    {[Customers].[USA].[WA].[Issaquah].[Abe Tramel],     [Customers].[All Customers].[USA].[CA].[Woodland Hills].[Abel Young],     [Customers].[All Customers].[USA].[CA].[Santa Monica].[Adeline Chun]})' \nselect \n Order([NECJ], [Store].currentMember.OrderKey, BDESC, [Measures].[Unit Sales], BDESC) \non 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:8511",
+  "mdx": "with \n  set [NECJ] as \n    'NonEmptyCrossJoin( \n    {[Store].[USA].[CA],\n     [Store].[USA].[WA]},\n    {[Customers].[USA].[WA].[Issaquah].[Abe Tramel],     [Customers].[All Customers].[USA].[CA].[Woodland Hills].[Abel Young],     [Customers].[All Customers].[USA].[CA].[Santa Monica].[Adeline Chun]})' \nselect \n Order([NECJ], [Measures].[Unit Sales], BDESC, Ancestor([Customers].currentMember, [Customers].[Name]).OrderKey, BDESC) \non 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:8538",
+  "mdx": "with \n  set [NECJ] as \n    'NonEmptyCrossJoin( \n    {[Store].[USA].[CA],\n     [Store].[USA].[WA]},\n    {[Customers].[USA].[WA].[Issaquah].[Abe Tramel],     [Customers].[All Customers].[USA].[CA].[Woodland Hills].[Abel Young],     [Customers].[All Customers].[USA].[CA].[Santa Monica].[Adeline Chun]})' \nselect \n Order([NECJ], [Measures].[Unit Sales], DESC, Ancestor([Customers].currentMember, [Customers].[Name]), BDESC) \non 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:8625",
+  "mdx": "select \n  Order(    {[Customers].[USA].[WA].[Issaquah].[Abe Tramel],     [Customers].[All Customers].[USA].[CA].[Woodland Hills].[Abel Young],     [Customers].[All Customers].[USA].[CA].[Santa Monica].[Adeline Chun]},    [Customers].[USA].OrderKey, BDESC, [Customers].currentMember.OrderKey, BASC) \non 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:8969",
+  "mdx": "SELECT [Measures].[Store Sales] ON 0,\nTopCount([Time].[Month].members * [Customers].[Name].members, 3, [Measures].[Store Sales]) ON 1\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:9025",
+  "mdx": "with \nset [Set1] as 'Crossjoin({[Time].[1997].[Q1]:[Time].[1997].[Q4]},{[Store].[USA].[CA]:[Store].[USA].[OR]})'\nset [Set2] as 'Crossjoin({[Time].[1997].[Q2]:[Time].[1997].[Q3]},{[Store].[Mexico].[DF]:[Store].[Mexico].[Veracruz]})'\nselect \n{[Measures].[Unit Sales]} ON COLUMNS,\nUnion([Set1], [Set2], ALL) ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:9594",
+  "mdx": "with member [Measures].[Foo] as ' SetToStr(PeriodsToDate([Time].[Quarter])) '\nselect {[Measures].[Foo]} on columns\nfrom [ZFMSALES]\nwhere [Time].[1997].[Q2].[5]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:9634",
+  "mdx": "with member [Measures].[Position] as\n 'Sum(PeriodsToDate([Time].[Time].Levels(0), [Time].[Time].CurrentMember), [Measures].[Store Sales])'\nselect {[Time].[1997],\n [Time].[1997].[Q1],\n [Time].[1997].[Q1].[1],\n [Time].[1997].[Q1].[2],\n [Time].[1997].[Q1].[3]} ON COLUMNS,\n{[Measures].[Store Sales], [Measures].[Position] } ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:9669",
+  "mdx": "select\n{[Measures].[Unit Sales]} on columns,\nperiodstodate(\n    [Product].[Product Category],\n    [Product].[Food].[Baked Goods].[Bread].[Muffins]) on rows\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:9899",
+  "mdx": "with member [Measures].[Sibling Rank] as ' Rank([Product].CurrentMember, [Product].CurrentMember.Siblings) '\n  member [Measures].[Sales Rank] as ' Rank([Product].CurrentMember, Order([Product].Parent.Children, [Measures].[Unit Sales], DESC)) '\n  member [Measures].[Sales Rank2] as ' Rank([Product].CurrentMember, [Product].Parent.Children, [Measures].[Unit Sales]) '\nselect {[Measures].[Unit Sales], [Measures].[Sales Rank], [Measures].[Sales Rank2]} on columns,\n {[Product].[All Products].[Drink].[Alcoholic Beverages].[Beer and Wine].[Beer].children} on rows\nfrom [ZFMSALES]\nWHERE ([Store].[USA].[OR].[Portland].[Store 11], [Time].[1997].[Q2].[6])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:9939",
+  "mdx": "with  Set [Beers] as {[Product].[All Products].[Drink].[Alcoholic Beverages].[Beer and Wine].[Beer].children}   member [Measures].[Sales Rank] as ' Rank([Product].CurrentMember, [Beers], [Measures].[Unit Sales]) '\nselect {[Measures].[Unit Sales], [Measures].[Sales Rank]} on columns,\n Generate([Beers], {[Product].CurrentMember}) on rows\nfrom [ZFMSALES]\nWHERE ([Store].[USA].[OR].[Portland].[Store 11], [Time].[1997].[Q2].[6])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:9971",
+  "mdx": "with  Set [Beers for Store] as 'NonEmptyCrossJoin([Product].[All Products].[Drink].[Alcoholic Beverages].[Beer and Wine].[Beer].children, {[Store].[USA].[OR].[Portland].[Store 11]})'   member [Measures].[Sales Rank] as ' Rank(([Product].CurrentMember,[Store].CurrentMember), [Beers for Store], [Measures].[Unit Sales]) '\nselect {[Measures].[Unit Sales], [Measures].[Sales Rank]} on columns,\n Generate([Beers for Store], {([Product].CurrentMember, [Store].CurrentMember)}) on rows\nfrom [ZFMSALES]\nWHERE ([Time].[1997].[Q2].[6])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:10563",
+  "mdx": "select {[Measures].[Unit Sales]} on columns, {VisualTotals(    {[Product].[All Products].[Food].[Baked Goods].[Bread],     [Product].[All Products].[Food].[Baked Goods].[Bread].[Bagels],     [Product].[All Products].[Food].[Baked Goods].[Bread].[Muffins]},     \"**Subtotal - *\")} on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:10588",
+  "mdx": "select {[Measures].[Unit Sales]} on columns, {VisualTotals(    {[Product].[All Products].[Food].[Baked Goods].[Bread],     [Product].[All Products].[Food].[Baked Goods].[Bread].[Bagels],     [Product].[All Products].[Food].[Baked Goods].[Bread].[Bagels],     [Product].[All Products].[Food].[Baked Goods].[Bread].[Bagels].[Colony],     [Product].[All Products].[Food].[Baked Goods].[Bread].[Bagels],     [Product].[All Products].[Food].[Baked Goods].[Bread].[Muffins]},     \"**Subtotal - *\")} on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:10637",
+  "mdx": "select {[Measures].[Unit Sales]} on columns, {Filter(    VisualTotals(        {[Product].[All Products].[Food].[Baked Goods].[Bread],         [Product].[All Products].[Food].[Baked Goods].[Bread].[Bagels],         [Product].[All Products].[Food].[Baked Goods].[Bread].[Muffins]},        \"**Subtotal - *\"),[Measures].[Unit Sales] > 3400)} on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:10663",
+  "mdx": "select {[Measures].[Unit Sales]} on columns, {VisualTotals(    Filter(        VisualTotals(            {[Product].[All Products].[Food].[Baked Goods].[Bread],             [Product].[All Products].[Food].[Baked Goods].[Bread].[Bagels],             [Product].[All Products].[Food].[Baked Goods].[Bread].[Muffins]},            \"**Subtotal - *\"),    [Measures].[Unit Sales] > 3400),    \"Second total - *\")} on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:10690",
+  "mdx": "select {[Measures].[Unit Sales]} on columns, {VisualTotals(    Filter(        {[Product].[All Products].[Food].[Baked Goods].[Bread],         [Product].[All Products].[Food].[Baked Goods].[Bread].[Bagels],         [Product].[All Products].[Food].[Baked Goods].[Bread].[Muffins]},        [Measures].[Unit Sales] > 3400),    \"**Subtotal - *\")} on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:10713",
+  "mdx": "select {[Measures].[Unit Sales]} on columns, {VisualTotals(    {[Product].[All Products].[Food].[Baked Goods].[Bread].[Bagels],     [Product].[All Products].[Food].[Baked Goods].[Bread],     [Product].[All Products].[Food].[Baked Goods].[Bread].[Muffins]},    \"**Subtotal - *\")} on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:10738",
+  "mdx": "select {[Measures].[Unit Sales]} on columns, {VisualTotals(    {[Product].[All Products].[Food],     [Product].[All Products].[Food].[Baked Goods].[Bread],     [Product].[All Products].[Food].[Baked Goods].[Bread].[Bagels],     [Product].[All Products].[Food].[Frozen Foods].[Breakfast Foods],     [Product].[All Products].[Food].[Frozen Foods].[Breakfast Foods].[Pancake Mix].[Golden],     [Product].[All Products].[Food].[Frozen Foods].[Breakfast Foods].[Pancake Mix].[Big Time],     [Product].[All Products].[Food].[Baked Goods].[Bread].[Muffins]},    \"**Subtotal - *\")} on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:10789",
+  "mdx": "SELECT \n  {[Measures].[Unit Sales]} ON 0, \n  VisualTotals(\n    {[Customers].[All Customers],\n     [Customers].[USA],\n     [Customers].[USA].[CA],\n     [Customers].[USA].[OR]}) ON 1\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:10828",
+  "mdx": "WITH SET [CA_OR] AS\n    VisualTotals(\n        {[Customers].[All Customers],\n         [Customers].[USA],\n         [Customers].[USA].[CA],\n         [Customers].[USA].[OR]})\nSELECT \n    Drilldownlevel({[Time].[1997]}) ON 0, \n    [CA_OR] ON 1 \nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:10874",
+  "mdx": "WITH SET [CA_OR] AS\n    VisualTotals(\n        {[Customers].[All Customers],\n         [Customers].[USA],\n         [Customers].[USA].[CA],\n         [Customers].[USA].[OR]})\nSELECT \n    [CA_OR] ON 0,\n    Drilldownlevel({[Time].[1997]}) ON 1\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:10927",
+  "mdx": "WITH\nSET [XL_Row_Dim_0] AS 'VisualTotals(Distinct(Hierarchize({Ascendants([Customers].[All Customers].[USA]), Descendants([Customers].[All Customers].[USA])})))' \nSELECT \nNON EMPTY Hierarchize({[Time].[Year].members}) ON COLUMNS , \nNON EMPTY Hierarchize(Intersect({DrilldownLevel({[Customers].[All Customers]})}, [XL_Row_Dim_0])) ON ROWS \nfrom [ZFMSALES] \nWHERE ([Measures].[Store Sales])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:11236",
+  "mdx": "select {[Measures].[Unit Sales]} on columns,\n{[Product].[All Products],\n [Product].[All Products].[Food].[Baked Goods].[Bread],\n VisualTotals(\n    {[Product].[All Products].[Food].[Baked Goods].[Bread],\n     [Product].[All Products].[Food].[Baked Goods].[Bread].[Bagels],\n     [Product].[All Products].[Food].[Baked Goods].[Bread].[Muffins]},\n     \"**Subtotal - *\")} on rows\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:11273",
+  "mdx": "with member [Measures].[Foo] as\n [Product].CurrentMember.Name || ' : ' || [Product].Level.Name\nselect {[Measures].[Unit Sales], [Measures].[Foo]} on columns,\n{[Product].[All Products],\n [Product].[All Products].[Food].[Baked Goods].[Bread],\n VisualTotals(\n    {[Product].[All Products].[Food].[Baked Goods].[Bread],\n     [Product].[All Products].[Food].[Baked Goods].[Bread].[Bagels],\n     [Product].[All Products].[Food].[Baked Goods].[Bread].[Muffins]},\n     \"**Subtotal - *\")} on rows\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:11313",
+  "mdx": "with\n member [Product].[All Products].[Drink].[Calculated Child] as '[Product].[All Products].[Drink].[Alcoholic Beverages]'\n member [Product].[All Products].[Non-Consumable].[Calculated Child] as '[Product].[All Products].[Non-Consumable].[Carousel]'\n member [Measures].[Unit Sales CC] as '([Measures].[Unit Sales],[Product].currentmember.CalculatedChild(\"Calculated Child\"))'\n select non empty {[Measures].[Unit Sales CC]} on columns,\n non empty {[Product].[Drink], [Product].[Non-Consumable]} on rows\n from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:11343",
+  "mdx": "with\n member [Product].[All Products].[Drink].[Calculated Child] as '[Product].[All Products].[Drink].[Alcoholic Beverages]'\n member [Product].[All Products].[Non-Consumable].[Calculated Child] as '[Product].[All Products].[Non-Consumable].[Carousel]'\n member [Measures].[Unit Sales CC] as '([Measures].[Unit Sales],AddCalculatedMembers([Product].currentmember.children).Item(\"Calculated Child\"))'\n select non empty {[Measures].[Unit Sales CC]} on columns,\n non empty {[Product].[Drink], [Product].[Non-Consumable]} on rows\n from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:12092",
+  "mdx": "with member [Time].[Time].[Date Range] as \n'Aggregate({[Time].[1997].[Q1]:[Time].[1997].[Q3]})'\nselect\n{[Measures].[Unit Sales],[Measures].[Store Cost],\n[Measures].[Store Sales]} ON columns,\nNON EMPTY Filter ([Store].[Store State].members,\n[Measures].[Store Cost] > 75000) ON rows\nfrom [ZFMSALES] where [Time].[Date Range]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:12112",
+  "mdx": "with member [Time].[Time].[Date Range] as \n'Aggregate({[Time].[1997].[Q1]:[Time].[1997].[Q3]})'\nselect\n{[Measures].[Unit Sales],[Measures].[Store Cost],\n[Measures].[Store Sales]} ON columns,\nNON EMPTY Order (Filter ([Store].[Store State].members,\n[Measures].[Store Cost] > 100),[Measures].[Store Cost], DESC) ON rows\nfrom [ZFMSALES] where [Time].[Date Range]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:12551",
+  "mdx": "SELECT {[Measures].[Unit Sales], [Measures].[Store Sales]} ON COLUMNS, Hierarchize(Except({[Customers].[USA].Children, [Customers].[USA].[CA].Children}, [Customers].[USA].[CA])) ON ROWS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:12553",
+  "mdx": "SELECT {[Measures].[Unit Sales], [Measures].[Store Sales]} ON COLUMNS, Except(Hierarchize({[Customers].[USA].Children, [Customers].[USA].[CA].Children}), [Customers].[USA].[CA]) ON ROWS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:12744",
+  "mdx": "WITH\nSET [Top Count] AS\n{\nTOPCOUNT(\nDISTINCT([Customers].[Name].Members),\n5,\n[Measures].[Unit Sales]\n)\n}\nSELECT\n[Top Count] * [Measures].[Unit Sales] on 0\nfrom [ZFMSALES]\nWHERE [Time].[1997].[Q1].[1] : [Time].[1997].[Q3].[8]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:12750",
+  "mdx": "SELECT\nTOPCOUNT( DISTINCT( [Customers].[Name].Members), 5, [Measures].[Unit Sales]) * [Measures].[Unit Sales] on 0\nfrom [ZFMSALES]\nWHERE [Time].[1997].[Q1].[1]:[Time].[1997].[Q3].[8]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:13252",
+  "mdx": "with \n  member measures.ExistingCount as\n  count(Existing [Product].[Product Subcategory].Members)\n  select {measures.ExistingCount} on 0,\n  [Product].[Product Family].Members on 1\n  from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:13271",
+  "mdx": "with member measures.StaticCount as\n  count([Product].[Product Subcategory].Members)\n  member measures.WithExisting as\n  count(Existing [Product].[Product Subcategory].Members)\n  member measures.WithExists as\n  count(Exists([Product].[Product Subcategory].Members, [Product].CurrentMember))\n  select {measures.StaticCount, measures.WithExisting, measures.WithExists} on 0,\n  [Product].[Product Family].Members on 1\n  from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:13304",
+  "mdx": "WITH \nSET [*NATIVE_CJ_SET] AS 'FILTER({[Time.Weekly].[All Time.Weeklys].[1997].[2],[Time.Weekly].[All Time.Weeklys].[1997].[24]}, NOT ISEMPTY ([Measures].[Store Sales]) OR NOT ISEMPTY ([Measures].[CALCULATED_MEASURE_1]))' \nSET [*SORTED_ROW_AXIS] AS 'ORDER([*CJ_ROW_AXIS],[Time.Weekly].CURRENTMEMBER.ORDERKEY,BASC,ANCESTOR([Time.Weekly].CURRENTMEMBER,[Time.Weekly].[Year]).ORDERKEY,BASC)'\nSET [*BASE_MEMBERS__Measures_] AS '{[Measures].[*FORMATTED_MEASURE_0],[Measures].[CALCULATED_MEASURE_1]}'\nSET [*BASE_MEMBERS__Time.Weekly_] AS '{[Time.Weekly].[All Time.Weeklys].[1997].[2],[Time.Weekly].[All Time.Weeklys].[1997].[24]}'\nSET [*CJ_ROW_AXIS] AS 'GENERATE([*NATIVE_CJ_SET], {([Time.Weekly].CURRENTMEMBER)})'\nMEMBER [Measures].[CALCULATED_MEASURE_1] AS 'SetToStr( EXISTING [Time.Weekly].[Week].Members )'\nMEMBER [Measures].[*FORMATTED_MEASURE_0] AS '[Measures].[Store Sales]', FORMAT_STRING = '#,###.00', SOLVE_ORDER=500\nSELECT\n[*BASE_MEMBERS__Measures_] ON COLUMNS\n, NON EMPTY\n[*SORTED_ROW_AXIS] ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:13339",
+  "mdx": "with \n  member measures.subcategorystring as SetToStr( EXISTING [Product].[Product Subcategory].Members)\n  select { measures.subcategorystring } on 0\n  from [ZFMSALES]\n  where {[Product].[Drink].[Alcoholic Beverages].[Beer and Wine]}"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:13352",
+  "mdx": "with MEMBER [Measures].[*CALCULATED_MEASURE_1] AS 'SetToStr( EXISTING [Product].[Product Category].Members )'\n SELECT {[Measures].[*CALCULATED_MEASURE_1]} ON COLUMNS\n from [ZFMSALES]\n WHERE {[Product].[Drink].[Alcoholic Beverages].[Beer and Wine].[Beer], [Product].[Drink].[Alcoholic Beverages].[Beer and Wine].[Wine], [Product].[Food].[Eggs].[Eggs] }"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:13369",
+  "mdx": "WITH MEMBER [Measures].[Edible Sales] AS \nAggregate( Existing {[Product].[Drink], [Product].[Food]}, Measures.[Unit Sales] )\nSELECT {Measures.[Unit Sales], Measures.[Edible Sales]} ON 0,\n{ [Product].[Product Family].Members, [Product].[All Products] } ON 1\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:13397",
+  "mdx": "WITH SET BestOfFamilies AS\n  Generate( [Product].[Product Family].Members,\n            TopCount( Existing [Product].[Brand Name].Members, 10, Measures.[Unit Sales]) ) \nMEMBER Measures.[Top 10 Brand Sales] AS Aggregate(Existing BestOfFamilies, Measures.[Unit Sales])MEMBER Measures.[Rest Brand Sales] AS Aggregate( Except(Existing [Product].[Brand Name].Members, Existing BestOfFamilies), Measures.[Unit Sales])SELECT { Measures.[Unit Sales], Measures.[Top 10 Brand Sales], Measures.[Rest Brand Sales] } ON 0,\n       {[Product].[Product Family].Members} ON 1\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:13429",
+  "mdx": "WITH MEMBER Measures.[StaticSumNC] AS\n 'Sum(Generate([Product].[Non-Consumable],    Existing [Product].[Product Department].Members), Measures.[Unit Sales])'\nSELECT { Measures.[StaticSumNC], Measures.[Unit Sales] } ON 0,\n    NON EMPTY {[Product].[Product Family].Members} ON 1\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:13451",
+  "mdx": "WITH MEMBER Measures.[StaticSumNC] AS\n 'Sum(Generate([Product].[Product Family].Members,    Existing [Product].[Product Department].Members), Measures.[Unit Sales])'\nSELECT { Measures.[StaticSumNC], Measures.[Unit Sales] } ON 0,\n    NON EMPTY {[Product].[Non-Consumable]} ON 1\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/NativizeSetFunDefTest.java:1319",
+  "mdx": "SELECT   Nativizeset  (    {      [Store].Levels(0).MEMBERS    }  ) ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/SortTest.java:235",
+  "mdx": "WITH\nSET [*NATIVE_CJ_SET] AS 'NONEMPTYCROSSJOIN([*BASE_MEMBERS__Customers_],[*BASE_MEMBERS__Product_])'\nSET [*SORTED_ROW_AXIS] AS 'ORDER([*CJ_ROW_AXIS],[Customers].CURRENTMEMBER.ORDERKEY,BASC,ANCESTOR([Customers].CURRENTMEMBER,[Customers].[City]).ORDERKEY,BASC,[Measures].[*SORTED_MEASURE],BASC)'\nSET [*BASE_MEMBERS__Measures_] AS '{[Measures].[*FORMATTED_MEASURE_0],[Measures].[*FORMATTED_MEASURE_1]}'\nSET [*BASE_MEMBERS__Customers_] AS '[Customers].[Name].MEMBERS'\nSET [*BASE_MEMBERS__Product_] AS '[Product].[Product Name].MEMBERS'\nSET [*CJ_ROW_AXIS] AS 'GENERATE([*NATIVE_CJ_SET], {([Customers].CURRENTMEMBER,[Product].CURRENTMEMBER)})'\nMEMBER [Measures].[*FORMATTED_MEASURE_0] AS '[Measures].[Unit Sales]', FORMAT_STRING = 'Standard', SOLVE_ORDER=500\nMEMBER [Measures].[*FORMATTED_MEASURE_1] AS '[Measures].[Store Sales]', FORMAT_STRING = '#,###', SOLVE_ORDER=500\nMEMBER [Measures].[*SORTED_MEASURE] AS '([Measures].[*FORMATTED_MEASURE_1])', SOLVE_ORDER=400\nSELECT\n[*BASE_MEMBERS__Measures_] ON COLUMNS\n, NON EMPTY\nHEAD([*SORTED_ROW_AXIS],5) ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/VisualTotalsTest.java:81",
+  "mdx": "select {[Measures].[Unit Sales]} on columns, {VisualTotals(    {[Product].[Food].[Baked Goods].[Bread],     [Product].[Food].[Baked Goods].[Bread].[Bagels],     [Product].[Food].[Baked Goods].[Bread].[Muffins]},     \"**Subtotal - *\")} on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/VisualTotalsTest.java:117",
+  "mdx": "select {[Measures].[Unit Sales]} on columns, VisualTotals(    {[Product].[Food].[Baked Goods].[Bread],     [Product].[Food].[Baked Goods].[Bread].[Bagels],     [Product].[Food].[Baked Goods].[Bread].[Muffins]},     \"**Subtotal - *\") on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/HierarchyBugTest.java:45",
+  "mdx": "select NON EMPTY Crossjoin(Hierarchize(Union({[Time].[Time].LastSibling}, [Time].[Time].LastSibling.Children)), {[Measures].[Unit Sales],      [Measures].[Store Cost]}) ON columns, NON EMPTY Hierarchize(Union({[Store].[All Stores]}, [Store].[All Stores].Children)) ON rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/HierarchyBugTest.java:89",
+  "mdx": "SELECT\n   [Measures].[Unit Sales] ON COLUMNS,\n   [Time].[Time].[Year].Members ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/HierarchyBugTest.java:119",
+  "mdx": "SELECT\n   [Measures].[Unit Sales] ON COLUMNS,\n   [Time].[Year].Members ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/HierarchyBugTest.java:132",
+  "mdx": "SELECT\n   [Measures].[Unit Sales] ON COLUMNS,\n   [Time.Weekly].[Year].Members ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/IdBatchResolverTest.java:166",
+  "mdx": "WITH\nSET [*NATIVE_CJ_SET] AS 'NONEMPTYCROSSJOIN([*BASE_MEMBERS__Promotions_],[*BASE_MEMBERS__Store_])'\nSET [*BASE_MEMBERS__Store_] AS '{[Store].[USA].[WA].[Bellingham],[Store].[USA].[CA].[Beverly Hills],[Store].[USA].[WA].[Bremerton],[Store].[USA].[CA].[Los Angeles]}'\nSET [*SORTED_COL_AXIS] AS 'ORDER([*CJ_COL_AXIS],[Promotions].CURRENTMEMBER.ORDERKEY,BASC)'\nSET [*BASE_MEMBERS__Measures_] AS '{[Measures].[*FORMATTED_MEASURE_0]}'\nSET [*CJ_ROW_AXIS] AS 'GENERATE([*NATIVE_CJ_SET], {([Store].CURRENTMEMBER)})'\nSET [*BASE_MEMBERS__Promotions_] AS '{[Promotions].[Bag Stuffers],[Promotions].[Best Savings],[Promotions].[Big Promo],[Promotions].[Big Time Discounts],[Promotions].[Big Time Savings],[Promotions].[Bye Bye Baby]}'\nSET [*SORTED_ROW_AXIS] AS 'ORDER([*CJ_ROW_AXIS],[Store].CURRENTMEMBER.ORDERKEY,BASC,ANCESTOR([Store].CURRENTMEMBER,[Store].[Store State]).ORDERKEY,BASC)'\nSET [*CJ_COL_AXIS] AS 'GENERATE([*NATIVE_CJ_SET], {([Promotions].CURRENTMEMBER)})'\nMEMBER [Measures].[*FORMATTED_MEASURE_0] AS '[Measures].[Unit Sales]', FORMAT_STRING = 'Standard', SOLVE_ORDER=500\nSELECT\nCROSSJOIN([*SORTED_COL_AXIS],[*BASE_MEMBERS__Measures_]) ON COLUMNS\n,NON EMPTY\n[*SORTED_ROW_AXIS] ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/IdBatchResolverTest.java:258",
+  "mdx": "WITH\nSET [*NATIVE_CJ_SET] AS 'FILTER([*BASE_MEMBERS__Time.Weekly_], NOT ISEMPTY ([Measures].[Unit Sales]))'\nSET [*BASE_MEMBERS__Time.Weekly_] AS '{[Time.Weekly].[1997].[4],[Time.Weekly].[1997].[5],[Time.Weekly].[1997].[6]}'\nSET [*BASE_MEMBERS__Measures_] AS '{[Measures].[*FORMATTED_MEASURE_0]}'\nSET [*CJ_SLICER_AXIS] AS 'GENERATE([*NATIVE_CJ_SET], {([Time.Weekly].CURRENTMEMBER)})'\nMEMBER [Measures].[*FORMATTED_MEASURE_0] AS '[Measures].[Unit Sales]', FORMAT_STRING = 'Standard', SOLVE_ORDER=500\nSELECT\n[*BASE_MEMBERS__Measures_] ON COLUMNS\nfrom [ZFMSALES]\nWHERE ([*CJ_SLICER_AXIS])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/ParserTest.java:297",
+  "mdx": "with set [Set1] as '([Product].[Drink] : [Product].[Food])'\nselect [Set1] ON COLUMNS,\n  {[Measures].defaultMember} ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/ParserTest.java:307",
+  "mdx": "select ([Product].[Drink] : [Product].[Food]) ON COLUMNS,\n  {[Measures].defaultMember} ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/ParserTest.java:604",
+  "mdx": "with member [Measures].[Small Number] as '([Measures].[Store Sales] / 9000)'\nselect {[Measures].[Small Number]} ON COLUMNS,\n  {Filter([Product].[Product Department].members, (([Measures].[Small Number] >= 0.3) AND ([Measures].[Small Number] <= 0.5000001234)))} ON ROWS\nfrom [ZFMSALES]\nwhere ([Time].[1997].[Q2].[4])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/ParserTest.java:663",
+  "mdx": "select NON EMPTY HIERARCHIZE(\n  {DrillDownLevelTop(\n     {[Product].[All Products]},3,,[Measures].[Unit Sales])}  ) ON COLUMNS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/ParserTest.java:668",
+  "mdx": "select NON EMPTY HIERARCHIZE({DrillDownLevelTop({[Product].[All Products]}, 3, , [Measures].[Unit Sales])}) ON COLUMNS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/agg/SegmentCacheTest.java:110",
+  "mdx": "select {[Measures].[Unit Sales]} on columns from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/agg/SegmentLoaderTest.java:92",
+  "mdx": "select {[Store].[Store Country].Members} on rows, {[Time].[Time].[Year].Members} on columns from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/agg/SegmentLoaderTest.java:95",
+  "mdx": "select {[Time].[Time].[Year].Members} on columns from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/aggmatcher/AggMeasureFactCountTest.java:81",
+  "mdx": "select [Time].[Quarter].Members on columns, \n{[Measures].[Store Sales], [Measures].[Store Cost], [Measures].[Unit Sales]} on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/CacheControlTest.java:100",
+  "mdx": "select {[Time].[Time].Members} on columns,\n {[Product].Children} on rows\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/CacheControlTest.java:1219",
+  "mdx": "select NON EMPTY {[Measures].[Unit Sales]} ON COLUMNS, \nNON EMPTY {[Store].[All Stores].Children} ON ROWS \nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/DataSourceChangeListenerTest.java:97",
+  "mdx": "select {[Store].[All Stores].[USA].[CA].[San Francisco]} on columns from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/FilterTest.java:767",
+  "mdx": "select {[Measures].[Store Sales]} ON COLUMNS, Order(Filter(Descendants([Customers].[All Customers].[USA].[CA], [Customers].[Name]), ([Measures].[Store Sales] > 200.0)), [Measures].[Store Sales], DESC) ON ROWS from [ZFMSALES] where ([Time].[1997])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/FilterTest.java:789",
+  "mdx": "with member [Measures].[Rendite] as '([Measures].[Store Sales] - [Measures].[Store Cost]) / [Measures].[Store Cost]' select NON EMPTY {[Measures].[Unit Sales], [Measures].[Store Cost], [Measures].[Rendite], [Measures].[Store Sales]} ON COLUMNS, NON EMPTY Order(Filter([Product].[Product Name].Members, ([Measures].[Rendite] > 1.8)), [Measures].[Rendite], BDESC) ON ROWS from [ZFMSALES] where ([Store].[All Stores].[USA].[CA], [Time].[1997])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/FilterTest.java:935",
+  "mdx": "with\nmember [Time].[Time].[Date Range] as 'Aggregate({[Time].[1997].[Q1]:[Time].[1997].[Q4]})'\nselect\n{[Measures].[Unit Sales]} ON columns,\nFilter ([Store].[Store State].members, [Measures].[Store Cost] > 100) ON rows\nfrom [ZFMSALES]\nwhere [Time].[Date Range]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/FilterTest.java:1126",
+  "mdx": "With Set [*NATIVE_CJ_SET] as 'Filter([*BASE_MEMBERS_Product], Not IsEmpty ([Measures].[Unit Sales]))' Set [*BASE_MEMBERS_Product] as 'Filter([Product].[Product Department].Members,(Ancestor([Product].CurrentMember, [Product].[Product Family]) In {[Product].[Drink],[Product].[Food]}) AND ([Product].CurrentMember In {[Product].[Drink].[Dairy]}))' Select [Measures].[Unit Sales] on columns, [*NATIVE_CJ_SET] on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/FilterTest.java:1132",
+  "mdx": "With Set [*NATIVE_CJ_SET] as 'Filter([*BASE_MEMBERS_Product], Not IsEmpty ([Measures].[Unit Sales]))' Set [*BASE_MEMBERS_Product] as 'Filter([Product].[Product Department].Members,(Ancestor([Product].CurrentMember, [Product].[Product Family]) In {[Product].[Drink],[Product].[Food]}) AND ([Product].CurrentMember Not In {[Product].[Drink].[Dairy]}))' Select [Measures].[Unit Sales] on columns, [*NATIVE_CJ_SET] on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/MemberCacheControlTest.java:319",
+  "mdx": "SELECT {[Measures].[Unit Sales]} ON COLUMNS, {[Store].[USA].[CA].[San Francisco].[Store 14]} ON ROWS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/MemberCacheControlTest.java:1018",
+  "mdx": "select [Store].[Mexico].[Yucatan] on 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NativeFilterAgainstAggTableTest.java:81",
+  "mdx": "SELECT    {FILTER(      {[Product].[All Products].Children},      [Measures].[Store Sales] > 11586   )} ON COLUMNS,   {[Measures].[Store Sales]} on ROWS from [ZFMSALES] WHERE [Time].[1997].[Q1]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NativeFilterAgainstAggTableTest.java:187",
+  "mdx": "select filter(Time.[1997].children,  measures.[Store Sales] +  measures.[unit sales] > 0) on 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NativeFilterMatchingTest.java:78",
+  "mdx": "With\nSet [*NATIVE_CJ_SET] as 'Filter([*BASE_MEMBERS_Customers], Not IsEmpty ([Measures].[Unit Sales]))'\nSet [*SORTED_COL_AXIS] as 'Order([*CJ_COL_AXIS],[Customers].CurrentMember.OrderKey,BASC,Ancestor([Customers].CurrentMember,[Customers].[City]).OrderKey,BASC)'\nSet [*BASE_MEMBERS_Customers] as 'Filter([Customers].[Name].Members,[Customers].CurrentMember.Caption Matches (\"(?i).*\\Qjeanne\\E.*\"))'\nSet [*BASE_MEMBERS_Measures] as '{[Measures].[*FORMATTED_MEASURE_0]}'\nSet [*CJ_COL_AXIS] as 'Generate([*NATIVE_CJ_SET], {([Customers].currentMember)})'\nMember [Measures].[*FORMATTED_MEASURE_0] as '[Measures].[Unit Sales]', FORMAT_STRING = 'Standard', SOLVE_ORDER=400\nSelect\nCrossJoin([*SORTED_COL_AXIS],[*BASE_MEMBERS_Measures]) on columns\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NativeFilterMatchingTest.java:135",
+  "mdx": "With\nSet [*NATIVE_CJ_SET] as 'Filter([*BASE_MEMBERS_Customers], Not IsEmpty ([Measures].[Unit Sales]))'\nSet [*SORTED_COL_AXIS] as 'Order([*CJ_COL_AXIS],[Customers].CurrentMember.OrderKey,BASC,Ancestor([Customers].CurrentMember,[Customers].[City]).OrderKey,BASC)'\nSet [*BASE_MEMBERS_Customers] as 'Filter([Customers].[Name].Members,[Customers].CurrentMember.Caption Not Matches (\"(?i).*\\Qjeanne\\E.*\"))'\nSet [*BASE_MEMBERS_Measures] as '{[Measures].[*FORMATTED_MEASURE_0]}'\nSet [*CJ_COL_AXIS] as 'Generate([*NATIVE_CJ_SET], {([Customers].currentMember)})'\nMember [Measures].[*FORMATTED_MEASURE_0] as '[Measures].[Unit Sales]', FORMAT_STRING = 'Standard', SOLVE_ORDER=400\nSelect\nCrossJoin([*SORTED_COL_AXIS],[*BASE_MEMBERS_Measures]) on columns\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NativeFilterMatchingTest.java:169",
+  "mdx": "With\nSet [*NATIVE_CJ_SET] as 'Filter([*BASE_MEMBERS_Product], Not IsEmpty ([Measures].[Unit Sales]))' \nSet [*SORTED_ROW_AXIS] as 'Order([*CJ_ROW_AXIS],[Product].CurrentMember.OrderKey,BASC,Ancestor([Product].CurrentMember,[Product].[Product Department]).OrderKey,BASC)' \nSet [*NATIVE_MEMBERS_Product] as 'Generate([*NATIVE_CJ_SET], {[Product].CurrentMember})' \nSet [*BASE_MEMBERS_Product] as 'Filter([Product].[Product Category].Members,[Product].CurrentMember.Caption Matches (\"(?i).*\\Qa\"\"\\); window.alert(\"\"woot'');\\E.*\"))' \nSet [*BASE_MEMBERS_Measures] as '{[Measures].[*FORMATTED_MEASURE_0]}' \nSet [*CJ_ROW_AXIS] as 'Generate([*NATIVE_CJ_SET], {([Product].currentMember)})' \nSet [*CJ_COL_AXIS] as '[*NATIVE_CJ_SET]' \nMember [Product].[*TOTAL_MEMBER_SEL~SUM] as 'Sum([*NATIVE_MEMBERS_Product])', SOLVE_ORDER=-100 \nMember [Measures].[*FORMATTED_MEASURE_0] as '[Measures].[Unit Sales]', FORMAT_STRING = 'Standard', SOLVE_ORDER=400 \nSelect\n[*BASE_MEMBERS_Measures] on columns,\nUnion({[Product].[*TOTAL_MEMBER_SEL~SUM]},[*SORTED_ROW_AXIS]) on rows\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NativeFilterMatchingTest.java:596",
+  "mdx": "WITH MEMBER [Measures].[TotalVal] AS 'Aggregate(Filter({[Store].[Store City].members}, ([Measures].[Unit Sales] > 1000 OR ( [Measures].[Unit Sales] > 40 AND [Store].[Store City].CurrentMember.Name = \"San Francisco\" ) ) ) )'\nSELECT [Measures].[TotalVal] ON 0, [Product].[All Products].Children on 1 from [ZFMSALES] WHERE {[Time].[1997].[Q1],[Time].[1997].[Q2]}"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NativeFilterMatchingTest.java:604",
+  "mdx": "WITH MEMBER [Measures].[TotalVal] AS 'Aggregate(Filter({[Store].[Store City].members}, [Measures].[Unit Sales] > 1000 ) )'\nSELECT [Measures].[TotalVal] ON 0, [Product].[All Products].Children on 1 from [ZFMSALES] WHERE {[Time].[1997].[Q1],[Time].[1997].[Q2]}"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NativeFilterMatchingTest.java:612",
+  "mdx": "WITH MEMBER [Measures].[TotalVal] AS 'Aggregate(Filter({[Store].[Store City].members}, ([Measures].[Unit Sales] > 1000 OR ( [Measures].[Unit Sales] > 500 AND [Store].[Store City].CurrentMember.Name = \"San Francisco\" ) ) ) )'\nSELECT [Measures].[TotalVal] ON 0, [Product].[All Products].Children on 1 from [ZFMSALES] WHERE {[Time].[1997].[Q1],[Time].[1997].[Q2]}"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyPropertyForAllAxisTest.java:16",
+  "mdx": "select {[Country].[USA].[OR].Children} on 0, {[Promotions].Members} on 1 from [ZFMSALES] where [Product].[All Products].[Drink].[Alcoholic Beverages].[Beer and Wine].[Beer].[Good].[Good Light Beer]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyPropertyForAllAxisTest.java:64",
+  "mdx": "SELECT {customers.USA.CA.[Santa Cruz].[Brian Merlo]} on 0, [product].[product category].members on 1 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyPropertyForAllAxisTest.java:188",
+  "mdx": "select from [ZFMSALES]\nwhere [Time].[1997]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:119",
+  "mdx": "WITH Member [Time].[Time].[Aggr] AS 'Aggregate({[Time].[1998].[Q1], [Time].[1998].[Q2]})' SELECT {[Measures].[Store Sales]} ON COLUMNS, NON EMPTY Order(TopCount([Customers].[Name].Members,3,[Measures].[Store Sales]),[Measures].[Store Sales],BASC) ON ROWS from [ZFMSALES] WHERE ([Time].[Aggr])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:605",
+  "mdx": "with member [Measures].[AvgRevenue] as 'Avg([Store].[Store Name].Members, [Measures].[Store Sales])' select NON EMPTY {[Measures].[Store Sales], [Measures].[AvgRevenue]} ON COLUMNS, NON EMPTY Filter([Store].[Store Name].Members, ([Measures].[AvgRevenue] < [Measures].[Store Sales])) ON ROWS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:650",
+  "mdx": "with member [Time].[Time].[First Term] as 'Aggregate({[Time].[1997].[Q1], [Time].[1997].[Q2]})' select {[Measures].[Unit Sales]} ON COLUMNS, TopCount([Product].[Product Subcategory].Members, 3, [Measures].[Unit Sales]) ON ROWS from [ZFMSALES] where ([Time].[First Term])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:676",
+  "mdx": "select {[Measures].[Unit Sales]} ON COLUMNS, TopCount([Product].[Product Subcategory].Members, 2, [Measures].[Unit Sales]) ON ROWS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:690",
+  "mdx": "select {[Measures].[Unit Sales]} ON COLUMNS, TopCount([Product].[Product Subcategory].Members, 3, [Measures].[Unit Sales]) ON ROWS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:910",
+  "mdx": "With Set [*Filtered_Set] as Filter([Product].[Product Name].Members, [Product].CurrentMember IS [Product].[Product Name].[Fast Raisins]) Set [*NECJ_Set] as NonEmptyCrossJoin([Store].[Store Country].Members, [*Filtered_Set]) select [*NECJ_Set] on columns from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:958",
+  "mdx": "select NON EMPTY {[Time].[1997]} ON COLUMNS,\n       NON EMPTY Crossjoin(Hierarchize(Union({[Store].[All Stores]},\n           [Store].[USA].[CA].[San Francisco].[Store 14].Children)), {[Product].[All Products]}) \n           ON ROWS\n    from [ZFMSALES]\n    where [Measures].[Unit Sales]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1151",
+  "mdx": "select NonEmptyCrossJoin(    Descendants([Customers].[All Customers].[USA].[WA].[Yakima]),     [Product].Children) on columns from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1318",
+  "mdx": "select NonEmptyCrossJoin({[Store].[All Stores]}, {[Product].[All Products]}) on columns from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1348",
+  "mdx": "select NonEmptyCrossJoin([Product].[All Products].Children, {[Store].[All Stores]}) on columns from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1382",
+  "mdx": "select {[Measures].[Unit Sales]} ON COLUMNS, NON EMPTY Crossjoin(  Descendants([Customers].[All Customers].[USA], [Customers].[City]),   {[Product].[All Products]}) ON ROWS from [ZFMSALES] where ([Promotions].[All Promotions].[Bag Stuffers])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1396",
+  "mdx": "select {[Measures].[Store Sales]} on columns,  NON EMPTY Order(        CrossJoin([Customers].[All Customers].[USA].children, [Promotions].[Promotion Name].Members),         [Measures].[Store Sales]) ON ROWS from [ZFMSALES] where (  [Store].[All Stores].[USA].[CA].[San Francisco].[Store 14],  [Time].[1997].[Q1].[1])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1416",
+  "mdx": "select {[Measures].[Store Sales]} on columns,  NON EMPTY TopCount(        CrossJoin([Customers].[All Customers].[USA].children, [Promotions].[Promotion Name].Members),         3, (3 * [Measures].[Store Sales]) - 100) ON ROWS from [ZFMSALES] where (  [Store].[All Stores].[USA].[CA].[San Francisco].[Store 14],  [Time].[1997].[Q1].[1])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1442",
+  "mdx": "with member [Measures].[Store Profit Rate] as '([Measures].[Store Sales]-[Measures].[Store Cost])/[Measures].[Store Cost]', format = '#.00%' select {[Measures].[Store Sales]} on columns,  NON EMPTY TopCount(        [Customers].[All Customers].[USA].children,         3, [Measures].[Store Profit Rate] / 2) ON ROWS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1490",
+  "mdx": "select NON EMPTY {[Time].[1997]} ON COLUMNS,   NON EMPTY [Store].[All Stores].[USA].[CA].Children ON ROWS  from [ZFMSALES]  where ([Measures].[Unit Sales], [Customers].[All Customers].[USA], [Product].[All Products].[Drink])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1515",
+  "mdx": "with member [Time].[Time].[Jan] as  'Aggregate({[Time].[1998].[Q1].[1], [Time].[1997].[Q1].[1]})'  select NON EMPTY {[Measures].[Unit Sales]} ON columns,  NON EMPTY TopCount({[Time].[Jan]}, 2) ON rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1527",
+  "mdx": "with member [Time].[Time].[Jan] as  'Aggregate({[Time].[1998].[Q1].[1], [Time].[1997].[Q1].[1]})'  select NON EMPTY {[Measures].[Unit Sales]} ON columns,  NON EMPTY [Product].Children ON rows from [ZFMSALES] where ([Time].[Jan])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1556",
+  "mdx": "select NON EMPTY {[Measures].[Unit Sales]} ON columns,  NON EMPTY [Product].Children ON rows from [ZFMSALES] where {[Time].[1998].[Q1].[1], [Time].[1997].[Q1].[1]}"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1577",
+  "mdx": "select {[Measures].[Store Sales]} on columns,  NON EMPTY Crossjoin(    Crossjoin(        [Customers].[Name].Members,        [Product].[Product Name].Members),     [Promotions].[Promotion Name].Members) ON rows  from [ZFMSALES] where (  [Store].[USA].[CA].[San Francisco].[Store 14],  [Time].[1997].[Q1].[1])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1785",
+  "mdx": "select {[Measures].[Unit Sales]} ON COLUMNS, NonEmptyCrossjoin({[Product].[All Products].[Drink].[Beverages], [Product].[All Products].[Drink].[Dairy]}, {[Customers].[All Customers].[USA].[OR].[Portland], [Customers].[All Customers].[USA].[OR].[Salem]}) ON ROWS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1815",
+  "mdx": "select {[Measures].[Unit Sales]} ON COLUMNS, NON EMPTY Crossjoin(  Descendants([Customers].[All Customers].[USA], [Customers].[City]),   {[Product].[All Products], [Product].[All Products].[Drink].[Dairy]}) ON ROWS from [ZFMSALES] where ([Promotions].[All Promotions].[Bag Stuffers])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1835",
+  "mdx": "select {[Measures].[Unit Sales]} ON COLUMNS, NON EMPTY Crossjoin(  Descendants([Customers].[All Customers].[USA], [Customers].[City]),   {[Product].[All Products].[Drink].[Beverages], [Product].[All Products].[Drink].[Dairy]}) ON ROWS from [ZFMSALES] where ([Promotions].[All Promotions].[Bag Stuffers])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1856",
+  "mdx": "select {[Measures].[Unit Sales]} ON COLUMNS, NON EMPTY Crossjoin(  {[Product].[All Products].[Drink].[Beverages], [Product].[All Products].[Drink].[Dairy]},   [Customers].[All Customers].[USA].[WA].Children) ON ROWS from [ZFMSALES] where ([Promotions].[All Promotions].[Bag Stuffers])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1878",
+  "mdx": "select {[Measures].[Unit Sales]} ON COLUMNS, NON EMPTY Crossjoin(  {[Product].[All Products].[Food], [Product].[All Products].[Drink].[Dairy]},   [Customers].[All Customers].[USA].[WA].Children) ON ROWS from [ZFMSALES] where ([Promotions].[All Promotions].[Bag Stuffers])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1891",
+  "mdx": "select {[Measures].[Store Sales]} on columns, NON EMPTY Crossjoin(   Descendants([Customers].[All Customers].[USA].[CA], [Customers].[Name]),     [Product].[Product Name].Members) ON rows  from [ZFMSALES] where (  [Store].[All Stores].[USA].[CA].[San Francisco].[Store 14],  [Time].[1997].[Q1].[1])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1904",
+  "mdx": "select {[Measures].[Store Sales]} on columns, NON EMPTY Crossjoin(  [Product].[Product Name].Members,  Descendants([Customers].[All Customers].[USA].[CA], [Customers].[Name])) ON rows  from [ZFMSALES] where (  [Store].[All Stores].[USA].[CA].[San Francisco].[Store 14],  [Time].[1997].[Q1].[1])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1918",
+  "mdx": "select {[Measures].[Store Sales]} on columns, NON EMPTY Crossjoin(  {[Product].[Product Name].Members},  {Descendants([Customers].[All Customers].[USA].[CA], 2)}) ON rows  from [ZFMSALES] where (  [Store].[All Stores].[USA].[CA].[San Francisco].[Store 14],  [Time].[1997].[Q1].[1])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1931",
+  "mdx": "select {[Measures].[Store Sales]} on columns,  NON EMPTY Crossjoin([Customers].[All Customers].[USA].[CA].children,    [Product].[Product Name].Members) ON rows  from [ZFMSALES] where (  [Store].[All Stores].[USA].[CA].[San Francisco].[Store 14],  [Time].[1997].[Q1].[1])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1943",
+  "mdx": "select {[Measures].[Store Sales]} on columns,  NON EMPTY Crossjoin([Product].[Product Name].Members,    [Customers].[All Customers].[USA].[CA].children) ON rows  from [ZFMSALES] where (  [Store].[All Stores].[USA].[CA].[San Francisco].[Store 14],  [Time].[1997].[Q1].[1])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1955",
+  "mdx": "select {[Measures].[Store Sales]} on columns,  NON EMPTY Crossjoin([Customers].[Name].Members,    [Product].[Product Name].Members) ON rows  from [ZFMSALES] where (  [Store].[All Stores].[USA].[CA].[San Francisco].[Store 14],  [Time].[1997].[Q1].[1])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1967",
+  "mdx": "select {[Measures].[Store Sales]} on columns,   NON EMPTY Crossjoin(    [Product].[All Products].[Drink].[Alcoholic Beverages].[Beer and Wine].[Wine].children,     [Customers].[All Customers].[USA].[CA].CHILDREN) ON rows from [ZFMSALES] where (  [Store].[All Stores].[USA].[CA].[San Francisco].[Store 14],  [Time].[1997].[Q1].[1])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:1982",
+  "mdx": "with set [Filtered Store City Set] as {[Store].[USA].[OR].[Portland],  [Store].[USA].[OR].[Salem],  [Store].[USA].[CA].[San Francisco],  [Store].[USA].[WA].[Tacoma]} set [NECJ] as NonEmptyCrossJoin([Filtered Store City Set], {[Product].[Product Family].Food}) select [NECJ] on columns from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:2456",
+  "mdx": "SELECT DESCENDANTS([Time].[1997], [Month]) ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:2472",
+  "mdx": "select non empty CrossJoin([Customers].[Name].Members, {[Promotions].[All Promotions].[Fantastic Discounts]}) ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:2494",
+  "mdx": "with member [Measures].[CustomerCount] as \n'Count(CrossJoin({[Product].[All Products]}, [Customers].[Name].Members))'\nselect \nNON EMPTY{[Measures].[CustomerCount]} ON columns,\nNON EMPTY{[Product].[All Products]} ON rows\nfrom [ZFMSALES]\nwhere ([Store].[All Stores].[USA].[CA].[San Francisco].[Store 14], [Time].[1997].[Q1].[1])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:2530",
+  "mdx": "select \n{[Measures].[Unit Sales]} ON columns,\nNON EMPTY {[Customers].[All Customers], [Customers].[Name].Members} ON rows\nfrom [ZFMSALES]\nwhere ([Store].[All Stores].[USA].[CA].[San Francisco].[Store 14], [Time].[1997].[Q1].[1])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:2589",
+  "mdx": "select \n{[Measures].[Unit Sales]} ON columns,\n{[Customers].[All Customers], [Customers].[Name].Members} ON rows\nfrom [ZFMSALES]\nwhere ([Store].[All Stores].[USA].[CA].[San Francisco].[Store 14], [Time].[1997].[Q1].[1])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:2645",
+  "mdx": "select \n{[Measures].[Unit Sales]} ON columns,\nNON EMPTY [Customers].Members ON rows\nfrom [ZFMSALES]\nwhere ([Store].[All Stores].[USA].[CA].[San Francisco].[Store 14], [Time].[1997].[Q1].[1])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:2660",
+  "mdx": "select \n{[Measures].[Unit Sales]} ON columns,\nNON EMPTY [Customers].[All Customers].[USA].[CA].[Palo Alto].Children ON rows\nfrom [ZFMSALES]\nwhere ([Store].[All Stores].[USA].[CA].[San Francisco].[Store 14], [Time].[1997].[Q1].[1])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:2675",
+  "mdx": "select {[Measures].[Unit Sales]} ON columns,\nNON EMPTY [Promotions].[All Promotions].Children ON rows from [ZFMSALES]\nwhere ([Time].[1997].[Q1].[1])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:2707",
+  "mdx": "select {[Measures].[Unit Sales]} ON columns,\nNON EMPTY [Promotions].[All Promotions].Children ON rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:2751",
+  "mdx": "select \n{[Measures].[Unit Sales]} ON columns,\nNON EMPTY Crossjoin({[Store].[USA].[CA].[San Francisco].[Store 14]}, [Customers].[USA].[CA].[Palo Alto].Children) ON rows\nfrom [ZFMSALES] where ([Time].[1997].[Q1].[1])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:2786",
+  "mdx": "select \n{[Measures].[Unit Sales]} ON columns, NON EMPTY {[Customers].[All Customers], Descendants([Customers].[All Customers].[USA].[CA], [Customers].[Name])} on rows from [ZFMSALES] where ([Store].[All Stores].[USA].[CA].[San Francisco].[Store 14], [Time].[1997].[Q1].[1])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:3259",
+  "mdx": "with SET [ProductChildren] as '[Product].[All Products].children' SET [StoreMembers] as '[Store].[Store Country].members' select {[Measures].[Store Sales]} on columns, non empty crossjoin([ProductChildren], [StoreMembers]) on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:3278",
+  "mdx": "with SET [ProductChildren] as '{[Product].[All Products].[Drink], [Product].[All Products].[Food], [Product].[All Products].[Non-Consumable]}' SET [StoreChildren] as '[Store].[All Stores].children' select {[Measures].[Store Sales]} on columns, non empty crossjoin([ProductChildren], [StoreChildren]) on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:3382",
+  "mdx": "With Set [*NATIVE_CJ_SET] as 'NonEmptyCrossJoin([*BASE_MEMBERS_Store], [*BASE_MEMBERS_Products])' Set [*TOP_BOTTOM_SET] as 'Order([*GENERATED_MEMBERS_Store], ([Measures].[Unit Sales], [Product].[All Products].[*TOP_BOTTOM_MEMBER]), BDESC)' Set [*BASE_MEMBERS_Store] as '[Store].members' Set [*GENERATED_MEMBERS_Store] as 'Generate([*NATIVE_CJ_SET], {[Store].CurrentMember})' Set [*BASE_MEMBERS_Products] as '{[Product].[All Products].[Food], [Product].[All Products].[Drink], [Product].[All Products].[Non-Consumable]}' Set [*GENERATED_MEMBERS_Products] as 'Generate([*NATIVE_CJ_SET], {[Product].CurrentMember})' Member [Product].[All Products].[*TOP_BOTTOM_MEMBER] as 'Aggregate([*GENERATED_MEMBERS_Products])'Member [Measures].[*TOP_BOTTOM_MEMBER] as 'Rank([Store].CurrentMember,[*TOP_BOTTOM_SET])' Member [Store].[All Stores].[*SUBTOTAL_MEMBER_SEL~SUM] as 'sum(Filter([*GENERATED_MEMBERS_Store], [Measures].[*TOP_BOTTOM_MEMBER] <= 10))'Select {[Measures].[Store Cost]} on columns, Non Empty Filter(Generate([*NATIVE_CJ_SET], {([Store].CurrentMember)}), [Measures].[*TOP_BOTTOM_MEMBER] <= 10) on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:3442",
+  "mdx": "With Set [*NATIVE_CJ_SET] as 'NonEmptyCrossJoin([*BASE_MEMBERS_Dates], [*BASE_MEMBERS_Stores])' Set [*BASE_MEMBERS_Dates] as '{[Time].[1997].[Q1], [Time].[1997].[Q2]}' Set [*GENERATED_MEMBERS_Dates] as 'Generate([*NATIVE_CJ_SET], {[Time].[Time].CurrentMember})' Set [*GENERATED_MEMBERS_Measures] as '{[Measures].[*SUMMARY_METRIC_0]}' Set [*BASE_MEMBERS_Stores] as '{[Store].[USA].[CA], [Store].[USA].[WA]}' Set [*GENERATED_MEMBERS_Stores] as 'Generate([*NATIVE_CJ_SET], {[Store].CurrentMember})' Member [Time].[Time].[*SM_CTX_SEL] as 'Aggregate([*GENERATED_MEMBERS_Dates])' Member [Measures].[*SUMMARY_METRIC_0] as '[Measures].[Unit Sales]/([Measures].[Unit Sales],[Time].[*SM_CTX_SEL])', FORMAT_STRING = '0.00%' Member [Time].[Time].[*SUBTOTAL_MEMBER_SEL~SUM] as 'sum([*GENERATED_MEMBERS_Dates])' Member [Store].[*SUBTOTAL_MEMBER_SEL~SUM] as 'sum(Filter([*GENERATED_MEMBERS_Stores], ([Measures].[Unit Sales], [Time].[*SUBTOTAL_MEMBER_SEL~SUM]) > 0.0))' Select Union (CrossJoin (Filter (Generate([*NATIVE_CJ_SET], {([Time].[Time].CurrentMember)}), Not IsEmpty ([Measures].[Unit Sales])), [*GENERATED_MEMBERS_Measures]), CrossJoin (Filter ({[Time].[*SUBTOTAL_MEMBER_SEL~SUM]}, Not IsEmpty ([Measures].[Unit Sales])), [*GENERATED_MEMBERS_Measures])) on columns, Non Empty Union (Filter (Filter (Generate([*NATIVE_CJ_SET], {([Store].CurrentMember)}), ([Measures].[Unit Sales], [Time].[*SUBTOTAL_MEMBER_SEL~SUM]) > 0.0), Not IsEmpty ([Measures].[Unit Sales])), Filter({[Store].[*SUBTOTAL_MEMBER_SEL~SUM]}, Not IsEmpty ([Measures].[Unit Sales]))) on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:3928",
+  "mdx": "select NON EMPTY {[Measures].[Unit Sales], [Measures].[Store Cost]} ON columns, NON EMPTY Filter([Product].[Brand Name].Members, ([Measures].[Unit Sales] > 100000.0)) ON rows from [ZFMSALES] where [Time].[1997]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:4319",
+  "mdx": "SELECT from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:4348",
+  "mdx": "WITH SET [#DataSet#] AS 'Crossjoin({Descendants([Customers].[All Customers], 2)}, {[Product].[All Products]})' \nSELECT {[Measures].[Unit Sales], [Measures].[Store Sales]} on columns, \nNON EMPTY Hierarchize({[#DataSet#]}) on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:5106",
+  "mdx": "select [Product].[Product Family].Members on 0\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:5113",
+  "mdx": "select [Product].[Drink].Children on 0\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:5173",
+  "mdx": "select [Measures].[Unit Sales] on 0,\n [Product].[Product Family].Members on 1\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:5199",
+  "mdx": "WITH SET [CustomerSet] as {[Customers].[Canada].[BC].[Burnaby].[Alexandra Wellington], [Customers].[USA].[WA].[Tacoma].[Eric Coleman]} SET [InterestingCustomers] as [CustomerSet] SET [TimeRange] as {[Time].[1998].[Q1], [Time].[1998].[Q2]} SELECT {[Measures].[Store Sales]} ON COLUMNS, CrossJoin([InterestingCustomers], [TimeRange]) ON ROWS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/NonEmptyTest.java:5608",
+  "mdx": "select NON EMPTY\n Crossjoin([Product].[Drink].[Alcoholic Beverages].[Beer and Wine].[Beer].[Portsmouth]\n , [Customers].[USA].[WA].[Puyallup].Children) ON COLUMNS\nfrom [ZFMSALES]\nwhere ([Time].[1997].[Q1].[2] : [Time].[1997].[Q2].[5])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/OrderKeyOneToOneCheckTest.java:76",
+  "mdx": "with member [Measures].[Count Month] as 'Count(Descendants(Time.CurrentMember, [Time].[Month]))' \nselect [Measures].[Count Month] on 0,\n[Time].[1997] on 1 \nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/RolapNativeTopCountTestCases.java:123",
+  "mdx": "SELECT [Measures].[Unit Sales] ON COLUMNS, TOPCOUNT([Customers].[Country].Members, 2, [Measures].[Unit Sales]) ON ROWS from [ZFMSALES] WHERE [Time].[1997].[Q3]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/RolapNativeTopCountTestCases.java:148",
+  "mdx": "SELECT [Measures].[Unit Sales] ON COLUMNS, TOPCOUNT([Customers].[State Province].Members, 6, [Measures].[Unit Sales]) ON ROWS from [ZFMSALES] WHERE [Time].[1997].[Q3]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/RolapNativeTopCountTestCases.java:184",
+  "mdx": "SELECT [Measures].[Unit Sales] ON COLUMNS, TOPCOUNT([Customers].[Country].Members, 10, [Measures].[Unit Sales]) ON ROWS from [ZFMSALES] WHERE [Time].[1997].[Q3]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/RolapNativeTopCountTestCases.java:210",
+  "mdx": "SELECT [Measures].[Unit Sales] ON COLUMNS, NON EMPTY TOPCOUNT([Customers].[Country].Members, 2, [Measures].[Unit Sales]) ON ROWS from [ZFMSALES] WHERE [Time].[1997].[Q3]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/RolapNativeTopCountTestCases.java:331",
+  "mdx": "SELECT TOPCOUNT([Customers].[State Province].members, 3) ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/RolapNativeTopCountTestCases.java:429",
+  "mdx": "SELECT TOPCOUNT([Customers].[Country].members, 5) ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/RolapNativeTopCountTestCases.java:452",
+  "mdx": "SELECT NON EMPTY TOPCOUNT([Customers].[State Province].members, 3) ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/sql/SqlQueryTest.java:661",
+  "mdx": "select {[Time.Weekly].[All Time.Weeklys]} ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/sql/SqlQueryTest.java:722",
+  "mdx": "select NON EMPTY { [Store].[Store].[Store State].members } on 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/TestAggregationManager.java:360",
+  "mdx": "select {[Measures].[Unit Sales]} on columns, {[Store].[USA].[CA], [Store].[USA].[OR]} on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/TestAggregationManager.java:455",
+  "mdx": "With Set [*NATIVE_CJ_SET] as 'NonEmptyCrossJoin([*BASE_MEMBERS_Store],[*BASE_MEMBERS_Product])' Set [*BASE_MEMBERS_Store] as '{[Store].[All Stores].[USA]}' Set [*GENERATED_MEMBERS_Store] as 'Generate([*NATIVE_CJ_SET], {[Store].CurrentMember})' Set [*BASE_MEMBERS_Product] as '{[Product].[All Products].[Food],[Product].[All Products].[Drink]}' Set [*GENERATED_MEMBERS_Product] as 'Generate([*NATIVE_CJ_SET], {[Product].CurrentMember})' Member [Store].[*FILTER_MEMBER] as 'Aggregate ([*GENERATED_MEMBERS_Store])' Member [Product].[*FILTER_MEMBER] as 'Aggregate ([*GENERATED_MEMBERS_Product])' Select {[Measures].[Store Sales]} on columns from [ZFMSALES] Where ([Store].[*FILTER_MEMBER], [Product].[*FILTER_MEMBER])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/TestAggregationManager.java:933",
+  "mdx": "select NON EMPTY {[Customers].[USA]} ON COLUMNS,\n       NON EMPTY Crossjoin(Hierarchize(Union({[Store].[All Stores]},\n           [Store].[All Stores].Children)), {[Product].[All Products]}) \n           ON ROWS\n    from [ZFMSALES]\n    where ([Measures].[Unit Sales], [Time].[1998])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/TestAggregationManager.java:1480",
+  "mdx": "select {[Measures].[Unit Sales]} ON COLUMNS, NON EMPTY {[Store].[Store State].Members} ON ROWS from [ZFMSALES] where [Time].[1997].[Q1]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/TestAggregationManager.java:1594",
+  "mdx": "select non empty{[Promotions].[All Promotions].Children} ON rows, non empty {[Store].[All Stores]} ON columns from [ZFMSALES] where {[Measures].[Unit Sales]}"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:112",
+  "mdx": "SELECT {[Measures].Members} ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:368",
+  "mdx": "select {[Store].Children} on 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:677",
+  "mdx": "select NON EMPTY {[Measures].[Unit Sales]} ON COLUMNS, \n  Filter( [Store].[USA].[CA].children,          [Measures].[Unit Sales]>0) ON ROWS \nfrom [ZFMSALES] \nwhere ([Time].[1997].[Q1].[2])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:694",
+  "mdx": "select NON EMPTY {[Measures].[Unit Sales]} ON COLUMNS, \n  TopCount( [Store].[USA].[CA].children, 20,            [Measures].[Unit Sales]) ON ROWS \nfrom [ZFMSALES] \nwhere ([Time].[1997].[Q1].[2])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:712",
+  "mdx": "select NON EMPTY {[Measures].[Unit Sales]} ON COLUMNS, \n  Filter( [Store].[Store State].Members,          [Measures].[Unit Sales]>4000) ON ROWS \nfrom [ZFMSALES] \nwhere ([Time].[1997].[Q1].[2])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:862",
+  "mdx": "select NON EMPTY {[Measures].[Unit Sales]} ON COLUMNS, \n  TopCount([Store].[USA].[CA].Children, 10,           [Measures].[Unit Sales]) ON ROWS \nfrom [ZFMSALES] \nwhere ([Time].[1997].[Q1].[2])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:879",
+  "mdx": "select NON EMPTY {[Measures].[Unit Sales]} ON COLUMNS, \n  NON EMPTY TopCount([Store].[USA].[CA].Children, 10,            [Measures].[Unit Sales]) ON ROWS \nfrom [ZFMSALES] \nwhere ([Time].[1997].[Q1].[2])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:903",
+  "mdx": "select NON EMPTY {[Measures].[Unit Sales]} ON COLUMNS, \n  TopCount([Store].[USA].[CA].Children, 10,           [Measures].[Unit Sales]) ON ROWS \nfrom [ZFMSALES] \nwhere ([Time].[1997].[Q1].[2] : [Time].[1997].[Q1].[3])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:921",
+  "mdx": "select NON EMPTY {[Measures].[Unit Sales]} ON COLUMNS, \n  NON EMPTY TopCount([Store].[USA].[CA].Children, 10,            [Measures].[Unit Sales]) ON ROWS \nfrom [ZFMSALES] \nwhere ([Time].[1997].[Q1].[2] : [Time].[1997].[Q1].[3])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:980",
+  "mdx": "select {[Unit Sales]} on columns,\n{[Store].[USA], [Store].[USA].children} on rows\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:1161",
+  "mdx": "select {[Store].[USA], [Store].[USA].Children} on 0\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:1542",
+  "mdx": "select Hierarchize(\n{[Customers].[USA].Children,\n [Customers].[USA].[OR].Children}) on 0\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:1725",
+  "mdx": "select {[Customers].[State Province].Members} on columns from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:1733",
+  "mdx": "select {[Customers].[Country].Members} on columns from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:1880",
+  "mdx": "select {[Measures].[Unit Sales]} ON COLUMNS,\nHierarchize(Union(Union(Union({[Store].[All Stores]}, [Store].[All Stores].Children), [Store].[All Stores].[USA].Children), [Store].[All Stores].[USA].[CA].Children)) ON ROWS\nfrom [ZFMSALES]\nwhere [Time].[1997]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:2441",
+  "mdx": "select [Measures].[Unit Sales] ON COLUMNS, {[Store].[Store Country].Members} ON ROWS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:2455",
+  "mdx": "select [Measures].[Unit Sales] ON COLUMNS, Descendants([Store],[Store].[Store Name]) ON ROWS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:2485",
+  "mdx": "select [Customers].[City].Members on 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:2679",
+  "mdx": "select [Measures] on 0,\n Hierarchize(\n   {[Customers].[USA].Children,\n    [Customers].[USA].[CA].Children}) on 1\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:2765",
+  "mdx": "with member [Store].[USA].[CA].[Foo] as\n 1\nselect {[Measures].[Unit Sales]} on columns,\n{[Store].[USA].[CA],\n [Store].[USA].[CA].[Los Angeles],\n [Store].[USA].[CA].[Foo]} on rows\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:3157",
+  "mdx": "select {[Measures].[Unit Sales]} on 0,\n   {[Customers].[USA]} on 1\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:3190",
+  "mdx": "select {[Store].Members} on columns from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:3244",
+  "mdx": "select non empty {[Store].Members} on columns from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:3315",
+  "mdx": "With\nSet [*NATIVE_CJ_SET] as 'NonEmptyCrossJoin([*BASE_MEMBERS_Time],[*BASE_MEMBERS_Product])'\nSet [*SORTED_ROW_AXIS] as 'Order([*CJ_ROW_AXIS],Ancestor([Time].CurrentMember, [Time].[Year]).OrderKey,BASC,Ancestor([Time].CurrentMember, [Time].[Quarter]).OrderKey,BASC,[Time].CurrentMember.OrderKey,BASC,[Product].CurrentMember.OrderKey,BASC)'\nSet [*BASE_MEMBERS_Product] as '{[Product].[All Products]}'\nSet [*BASE_MEMBERS_Measures] as '{[Measures].[*FORMATTED_MEASURE_0]}'\nSet [*CJ_ROW_AXIS] as 'Generate([*NATIVE_CJ_SET], {([Time].currentMember,[Product].currentMember)})'\nSet [*BASE_MEMBERS_Time] as '[Time].[Year].Members'\nSet [*CJ_COL_AXIS] as '[*NATIVE_CJ_SET]'\nMember [Measures].[*FORMATTED_MEASURE_0] as '[Measures].[Unit Sales]', FORMAT_STRING = 'Standard', SOLVE_ORDER=400\nSelect\n[*BASE_MEMBERS_Measures] on columns,\nNon Empty [*SORTED_ROW_AXIS] on rows\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:3403",
+  "mdx": "select {[Measures].[Unit Sales]} on columns,                  {[Product].[Food].[Baked Goods].[Bread]} on rows                  from [ZFMSALES]  where { [Store].[USA].[OR], [Store].[USA].[CA]}"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:3418",
+  "mdx": "select {[Measures].[Unit Sales]} on columns,                  {[Product].[Food].[Baked Goods].[Bread]} on rows                  from [ZFMSALES]  where { [Store].[USA].[CA], [Store].[USA].[OR]}"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/AccessControlTest.java:3470",
+  "mdx": "select from [ZFMSALES] where {[Measures].[Unit Sales]}"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:343",
+  "mdx": "SELECT {} ON ROWS, {} ON COLUMNS from [ZFMSALES]/* trailing comment*/"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:397",
+  "mdx": "SELECT {} ON ROWS, {} ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:436",
+  "mdx": "-- an entire select statement commented out\n-- SELECT {} ON ROWS, {} ON COLUMNS from [ZFMSALES];\n/*SELECT {} ON ROWS, {} ON COLUMNS from [ZFMSALES];*/\n// SELECT {} ON ROWS, {} ON COLUMNS from [ZFMSALES];\nSELECT {} ON ROWS, {} ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:901",
+  "mdx": "WITH MEMBER [Measures].[ProfitPercent] AS\n     '([Measures].[Store Sales]-[Measures].[Store Cost])/([Measures].[Store Cost])',\n FORMAT_STRING = '#.00%', SOLVE_ORDER = 1\n Member [Time].[Time].[1997].[First Half] AS  '[Time].[1997].[Q1] + [Time].[1997].[Q2]'\n Member [Time].[Time].[1997].[Second Half] AS '[Time].[1997].[Q3] + [Time].[1997].[Q4]'\n SELECT {[Time].[1997].[First Half],\n     [Time].[1997].[Second Half],\n     [Time].[1997].CHILDREN} ON COLUMNS,\n {[Store].[Store Country].[USA].CHILDREN} ON ROWS\n from [ZFMSALES]\n WHERE ([Measures].[ProfitPercent])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:912",
+  "mdx": "WITH MEMBER MEASURES.ProfitPercent AS\n     '([Measures].[Store Sales]-[Measures].[Store Cost])/([Measures].[Store Cost])',\n FORMAT_STRING = '#.00%', SOLVE_ORDER = 1\n Member [Time].[Time].[First Half 97] AS  '[Time].[1997].[Q1] + [Time].[1997].[Q2]'\n Member [Time].[Time].[Second Half 97] AS '[Time].[1997].[Q3] + [Time].[1997].[Q4]'\n SELECT {[Time].[First Half 97],\n     [Time].[Second Half 97],\n     [Time].[1997].CHILDREN} ON COLUMNS,\n {[Store].[Store Country].[USA].CHILDREN} ON ROWS\n from [ZFMSALES]\n WHERE (MEASURES.ProfitPercent)"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:959",
+  "mdx": "select {[Measures].[Unit Sales]} on columns,\n {[Store], [Store].children} on rows\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:1345",
+  "mdx": "with member [Measures].[xxx] as '[Measures].[Store Sales]',\n format_string = IIf([Measures].[Unit Sales] > 100000, \"AAA######.00\",\"BBB###.00\")\nselect {[Measures].[xxx]} ON columns,\n {[Product].children} ON rows\nfrom [ZFMSALES] where [Time].[1997]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:1443",
+  "mdx": "select {[Measures].[Unit Sales]} ON columns,\n{[Product].[All Products].[Drink].[Beverages].[Drinks].[Flavored Drinks].children} ON rows\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:1468",
+  "mdx": "select {[Measures].[Unit Sales], [Measures].[Store Cost],[Measures].[Store Sales]} ON columns, Order({([Store].[All Stores].[USA].[CA], [Product].[All Products].[Drink].[Alcoholic Beverages]), ([Store].[All Stores].[USA].[CA], [Product].[All Products].[Drink].[Beverages]), Crossjoin({[Store].[All Stores].[USA].[CA].Children}, {[Product].[All Products].[Drink].[Beverages]}), ([Store].[All Stores].[USA].[CA], [Product].[All Products].[Drink].[Dairy]), ([Store].[All Stores].[USA].[OR], [Product].[All Products].[Drink].[Alcoholic Beverages]), ([Store].[All Stores].[USA].[OR], [Product].[All Products].[Drink].[Beverages]), ([Store].[All Stores].[USA].[OR], [Product].[All Products].[Drink].[Dairy]), ([Store].[All Stores].[USA].[WA], [Product].[All Products].[Drink].[Alcoholic Beverages]), ([Store].[All Stores].[USA].[WA], [Product].[All Products].[Drink].[Beverages]), ([Store].[All Stores].[USA].[WA], [Product].[All Products].[Drink].[Dairy])}, [Measures].[Store Cost], BDESC) ON rows from [ZFMSALES] where ([Time].[1997])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:1480",
+  "mdx": "select {[Measures].[Unit Sales], [Measures].[Store Cost], [Measures].[Store Sales]} ON columns, Order({([Store].[All Stores].[USA].[WA], [Product].[All Products].[Drink].[Beverages]), ([Store].[All Stores].[USA].[CA], [Product].[All Products].[Drink].[Beverages]), ([Store].[All Stores].[USA].[OR], [Product].[All Products].[Drink].[Beverages]), ([Store].[All Stores].[USA].[WA], [Product].[All Products].[Drink].[Alcoholic Beverages]), ([Store].[All Stores].[USA].[CA], [Product].[All Products].[Drink].[Alcoholic Beverages]), ([Store].[All Stores].[USA].[OR], [Product].[All Products].[Drink].[Alcoholic Beverages]), ([Store].[All Stores].[USA].[WA], [Product].[All Products].[Drink].[Dairy]), ([Store].[All Stores].[USA].[CA].[San Diego], [Product].[All Products].[Drink].[Beverages]), ([Store].[All Stores].[USA].[CA].[Los Angeles], [Product].[All Products].[Drink].[Beverages]), Crossjoin({[Store].[All Stores].[USA].[CA].[Los Angeles]}, {[Product].[All Products].[Drink].[Beverages].Children}), ([Store].[All Stores].[USA].[CA].[Beverly Hills], [Product].[All Products].[Drink].[Beverages]), ([Store].[All Stores].[USA].[CA], [Product].[All Products].[Drink].[Dairy]), ([Store].[All Stores].[USA].[OR], [Product].[All Products].[Drink].[Dairy]), ([Store].[All Stores].[USA].[CA].[San Francisco], [Product].[All Products].[Drink].[Beverages])}, [Measures].[Store Cost], BDESC) ON rows from [ZFMSALES] where ([Time].[1997])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:1504",
+  "mdx": "select {[Measures].[Unit Sales], [Measures].[Store Cost], [Measures].[Store Sales]} ON columns,\n Order(TopCount({[Product].[Product Category].Members}, 10.0, [Measures].[Unit Sales]), [Measures].[Store Sales], ASC) ON rows\nfrom [ZFMSALES]\nwhere [Time].[1997]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:1778",
+  "mdx": "SELECT\n[Measures].[Unit Sales] ON COLUMNS,\nFILTER([Time].[Quarter].MEMBERS, NOT ISEMPTY ([Measures].[Unit Sales])) ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:1907",
+  "mdx": "select\n[Measures].[Unit Sales] on columns,\nDescendants([Time].[1997], [Time].[Quarter]) on rows\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:2176",
+  "mdx": "with member [Measures].[Rendite] as '(([Measures].[Store Sales] - [Measures].[Store Cost]) / [Measures].[Store Cost])', format_string = IIf((((([Measures].[Store Sales] - [Measures].[Store Cost]) / [Measures].[Store Cost]) * 100) > Parameter(\"UpperLimit\", NUMERIC, 151, \"Obere Grenze\")), \"|#.00%|arrow='up'\", IIf((((([Measures].[Store Sales] - [Measures].[Store Cost]) / [Measures].[Store Cost]) * 100) < Parameter(\"LowerLimit\", NUMERIC, 150, \"Untere Grenze\")), \"|#.00%|arrow='down'\", \"|#.00%|arrow='right'\"))\nselect {[Measures].Members} ON COLUMNS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:2196",
+  "mdx": "with member [Measures].[Foo] as '1', format_string = \"##0.00\", funny = IIf((1 = 1), \"x\"\"y\", \"foo\")\nselect {[Measures].[Foo]} ON COLUMNS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:2354",
+  "mdx": "with\nmember measures.x as 'Mid(\"yahoo\",5, 1)'\nselect {measures.x} ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:3156",
+  "mdx": "with member [Customers].[my] as \n  'Aggregate(Filter([Customers].[City].Members, (([Measures].[Unit Sales] / ([Measures].[Unit Sales], [Product].[All Products])) > 0.1)))' \nselect  \n  {[Measures].[Unit Sales]} ON columns, \n  {[Product].[All Products].[Food].[Deli], [Product].[All Products].[Food].[Frozen Foods]} ON rows \nfrom [ZFMSALES] \nwhere ([Customers].[my], [Time].[1997])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:3175",
+  "mdx": "WITH SET [#DataSet#] AS 'Filter(Crossjoin({[Store].[All Stores]}, {[Customers].[All Customers]}), [Measures].[Unit Sales] > 5)' MEMBER [Customers].[#GT#] as 'Aggregate({[#DataSet#]})' MEMBER [Store].[#GT#] as 'Aggregate({[#DataSet#]})' SET [#GrandTotalSet#] as 'Crossjoin({[Store].[#GT#]}, {[Customers].[#GT#]})' SELECT {[Measures].[Unit Sales]} on columns, Union([#GrandTotalSet#], Hierarchize({[#DataSet#]})) on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:3183",
+  "mdx": "WITH SET [#DataSet#] AS 'Crossjoin({[Store].[All Stores]}, {[Customers].[All Customers]})' SET [#GrandTotalSet#] as 'Crossjoin({[Store].[All Stores]}, {[Customers].[All Customers]})' SELECT {[Measures].[Unit Sales]} on columns, Union([#GrandTotalSet#], Hierarchize({[#DataSet#]})) on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:3222",
+  "mdx": "select {[Measures].[Store Sales]} on columns,\n  NON EMPTY Crossjoin(\n    Filter([Customers].[Name].Members,\n      (([Measures].[Store Sales],\n        [Store].[All Stores].[USA].[CA].[San Francisco].[Store 14],\n        [Time].[1997].[Q1].[1]) > 5.0)),\n    Filter([Product].[Product Name].Members,\n      (([Measures].[Store Sales],\n        [Store].[All Stores].[USA].[CA].[San Francisco].[Store 14],\n        [Time].[1997].[Q1].[1]) > 5.0))\n ) ON rows\nfrom [ZFMSALES]\nwhere (\n  [Store].[All Stores].[USA].[CA].[San Francisco].[Store 14],\n  [Time].[1997].[Q1].[1]\n)"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:3247",
+  "mdx": "select {[Measures].[Store Sales]} on columns,\n  NON EMPTY Crossjoin(\n    [Customers].[Name].Members,\n    [Product].[Product Name].Members\n ) ON rows\nfrom [ZFMSALES]\nwhere (\n  [Store].[All Stores].[USA].[CA].[San Francisco].[Store 14],\n  [Time].[1997].[Q1].[1]\n)"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:3311",
+  "mdx": "with member [Time].[Time].[1997].[Q1].[xxx] as\n'Aggregate({[Time].[1997].[Q1].[1], [Time].[1997].[Q1].[2]})'\nselect {[Measures].[Unit Sales], [Measures].[Store Cost],\n[Measures].[Store Sales]} ON columns,\nHierarchize(Union(Union({[Time].[1997], [Time].[1998],\n[Time].[1997].[Q1].[xxx]}, [Time].[1997].Children),\n[Time].[1997].[Q1].Children)) ON rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:3580",
+  "mdx": "with member [Measures].[West Coast Total] as  ' Aggregate({[Store].[USA].[CA], [Store].[USA].[OR], [Store].[USA].[WA]}) ' \nselect    {[Measures].[Store Sales], \n    [Measures].[Unit Sales]} on Columns,\n CrossJoin(\n   {[Product].children},\n   {[Store].children}) on Rows\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:3874",
+  "mdx": "with member [Measures].[o] as 0\nset necj as nonemptycrossjoin(\n[Store].[Store State].members, [Customers].[Name].members)\nselect tail(necj,5) on rows,\n{[Measures].[o]} on columns\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:3888",
+  "mdx": "with member [Measures].[o] as 0\nselect tail([Customers].[Name].members, 5)\non rows,\n{[Measures].[o]} on columns\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:4028",
+  "mdx": "SELECT {[Measures].[Unit Sales]} ON COLUMNS,\n  {[Product].members} ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:4064",
+  "mdx": "SELECT {[Measures].[Unit Sales]} ON COLUMNS,\n  {[Customers].[Mexico].[Guerrero].[Acapulco].Children} ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:4218",
+  "mdx": "with member [Measures].[Test] as '23', FORMAT_STRING = '|<|arrow=\"up\"'\nselect [Measures].[Test] on 0\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:4222",
+  "mdx": "with member [Measures].[Test] as '\"23\"', FORMAT_STRING = '|<|arrow=\"up\"'\nselect [Measures].[Test] on 0\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:4226",
+  "mdx": "with member [Measures].[Test] as '\"Foo \" || \"Bar\"', FORMAT_STRING = '|<|arrow=\"up\"'\nselect [Measures].[Test] on 0\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:4273",
+  "mdx": "With Set [*NATIVE_CJ_SET] as 'NonEmptyCrossJoin([*BASE_MEMBERS_Dates], [*BASE_MEMBERS_Stores])' Set [*BASE_MEMBERS_Dates] as '{[Time].[1997].[Q1], [Time].[1997].[Q2], [Time].[1997].[Q3], [Time].[1997].[Q4]}' Set [*GENERATED_MEMBERS_Dates] as 'Generate([*NATIVE_CJ_SET], {[Time].[Time].CurrentMember})' Set [*GENERATED_MEMBERS_Measures] as '{[Measures].[*SUMMARY_METRIC_0]}' Set [*BASE_MEMBERS_Stores] as '{[Store].[USA].[CA], [Store].[USA].[WA], [Store].[USA].[OR]}' Set [*GENERATED_MEMBERS_Stores] as 'Generate([*NATIVE_CJ_SET], {[Store].CurrentMember})' Member [Time].[Time].[*SM_CTX_SEL] as 'Aggregate([*GENERATED_MEMBERS_Dates])' Member [Measures].[*SUMMARY_METRIC_0] as '[Measures].[Unit Sales]/([Measures].[Unit Sales],[Time].[*SM_CTX_SEL])' Member [Time].[Time].[*SUBTOTAL_MEMBER_SEL~SUM] as 'sum([*GENERATED_MEMBERS_Dates])' Member [Store].[*SUBTOTAL_MEMBER_SEL~SUM] as 'sum([*GENERATED_MEMBERS_Stores])' select crossjoin({[Time].[*SUBTOTAL_MEMBER_SEL~SUM]}, {[Store].[*SUBTOTAL_MEMBER_SEL~SUM]}) on columns from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:4375",
+  "mdx": "select {[Measures].[Unit Sales]} on columns, Filter(Descendants([Product].[Food].[Baked Goods].[Bread]), Count([Product].currentMember.children)) on Rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:4471",
+  "mdx": "select NON EMPTY {[Measures].[Unit Sales]} ON COLUMNS,\nNON EMPTY Crossjoin(  {Product.[All Products]},\n  Filter(    Descendants(Time.[Time], [Time].[Month]),     Time.[Time].CurrentMember.Name = '5')) ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:4475",
+  "mdx": "select NON EMPTY {[Measures].[Unit Sales]} ON COLUMNS,\nNON EMPTY Filter(  Crossjoin(    {Product.[All Products]},\n    Descendants(Time.[Time], [Time].[Month])),  Time.[Time].CurrentMember.Name = '5') ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:4612",
+  "mdx": "select {[Measures].[Unit Sales]} ON COLUMNS, NON EMPTY Crossjoin({[Store].[All Stores]}, Crossjoin({[Product].[All Products]}, {[Customers].[All Customers]})) ON ROWS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:4616",
+  "mdx": "select {[Measures].[Unit Sales]} ON COLUMNS,   Crossjoin({[Store].[All Stores]}, Crossjoin({[Product].[All Products]}, {[Customers].[All Customers]})) ON ROWS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:4620",
+  "mdx": "select {[Measures].[Unit Sales]} ON COLUMNS, NON EMPTY [Store].[All Stores]  * [Product].[All Products] * [Customers].[All Customers] ON ROWS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:4623",
+  "mdx": "select {[Measures].[Unit Sales]} ON COLUMNS, NON EMPTY [Store].[All Stores]  * {([Product].[All Products],     [Customers].[All Customers])} ON ROWS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:4829",
+  "mdx": "WITH MEMBER [Measures].[NegativeSales] AS '- [Measures].[Store Sales]' MEMBER [Product].[SameName] AS 'Aggregate(Filter([Product].[Product Name].members,([Measures].[Store Sales] > 0)))' MEMBER [Measures].[SameName] AS '([Measures].[Store Sales],[Product].[SameName])' select {[Measures].[Store Sales], [Measures].[NegativeSales], [Measures].[SameName]} ON COLUMNS, [Store].[Store Country].members ON ROWS from [ZFMSALES] where [Time].[1997]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:4874",
+  "mdx": "select {TopCount([Customers].Members, 10, [Measures].[Unit Sales])} on columns from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:4915",
+  "mdx": "select [Product].Children on 0\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:5475",
+  "mdx": "with\nmember [Measures].[Drink Sales Previous Period] as\n'( Time.CurrentMember.lag(1), [Product].[All Products].[Drink], measures.[unit sales] )'\nmember [Measures].[Drink Sales Current Period] as\n'( Time.CurrentMember, [Product].[All Products].[Drink], [Measures].[Unit Sales] )'\nselect\n{ [Measures].[Drink Sales Current Period], [Measures].[Drink Sales Current Period] } on 0\nfrom [ZFMSALES]\nwhere { [Time].[1997].[Q4],[Time].[1997].[Q3] }"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:5514",
+  "mdx": "select\n    {[Measures].[Unit Sales]} ON COLUMNS,\n    {Descendants([Customers].[All Customers], 4)} ON ROWS\nfrom [ZFMSALES]\nwhere\n    ([Time].[1997].[Q4].[12])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:5516",
+  "mdx": "select\n    {[Measures].[Unit Sales]} ON COLUMNS,\n    {[Customers].[Name].Members} ON ROWS\nfrom [ZFMSALES]\nwhere\n    ([Time].[1997].[Q4].[12])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:5520",
+  "mdx": "select\n    non empty {[Measures].[Unit Sales]} ON COLUMNS,\n    non empty {Descendants([Customers].[All Customers], 4)} ON ROWS\nfrom [ZFMSALES]\nwhere\n    ([Time].[1997].[Q4].[12])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/BasicQueryTest.java:5522",
+  "mdx": "select\n    non empty {[Measures].[Unit Sales]} ON COLUMNS,\n    non empty {[Customers].[Name].Members} ON ROWS\nfrom [ZFMSALES]\nwhere\n    ([Time].[1997].[Q4].[12])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/CaptionTest.java:36",
+  "mdx": "SELECT {[Measures].[Unit Sales]} ON COLUMNS, {[Time].[1997].[Q1]} ON ROWS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/CaptionTest.java:116",
+  "mdx": "SELECT {[Measures].[Unit Sales]} ON COLUMNS, {[Time].[Year].Members} ON ROWS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/CompoundSlicerTest.java:233",
+  "mdx": "with set a as '([Time].[1997].[Q1] : [Time].[1997].[Q2])'\nmember Time.x as Aggregate(a,[Measures].[Store Sales])\nmember Measures.x1 as ([Time].[1997].[Q1],[Measures].[Store Sales])\nmember Measures.x2 as ([Time].[1997].[Q2], [Measures].[Store Sales])\nset products as TopCount(Product.[Product Name].Members,1,Measures.[Store Sales])\nSELECT\nNON EMPTY products ON 1,\nNON EMPTY {[Measures].[Store Sales], Measures.x1, Measures.x2} ON 0\nfrom [ZFMSALES]\nwhere ([Time].[1997].[Q1] : [Time].[1997].[Q2])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/CompoundSlicerTest.java:303",
+  "mdx": "select [Measures].[Unit Sales] on 0,\n    TopCount(\n      [Product].[Product Category].Members\n      * [Customers].[City].Members,\n      10) on 1\nfrom [ZFMSALES]\nwhere [Time].[1997].[Q3]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/CompoundSlicerTest.java:876",
+  "mdx": "select NON EMPTY {[Measures].[Unit Sales]} ON COLUMNS, \n  Tail(\n    TopCount([Customers].[Name].Members, 40, [Measures].[Unit Sales]),\n    30) ON ROWS \nfrom [ZFMSALES] \nwhere ([Time].[1997].[Q1].[2] : [Time].[1997].[Q4].[11])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/CompoundSlicerTest.java:888",
+  "mdx": "select NON EMPTY {[Measures].[Unit Sales]} ON COLUMNS, \n  TopCount([Customers].[USA].[WA].[Spokane].Children, 10, [Measures].[Unit Sales]) ON ROWS \nfrom [ZFMSALES] \nwhere ([Time].[1997].[Q1].[2] : [Time].[1997].[Q1].[3])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/CompoundSlicerTest.java:923",
+  "mdx": "select NON EMPTY {[Measures].[Unit Sales]} ON COLUMNS, \n  TopCount([Customers].[USA].[WA].[Spokane].Children, 10, [Measures].[Unit Sales]) ON ROWS \nfrom [ZFMSALES] \nwhere {[Time].[1997].[Q1].[2] : [Time].[1997].[Q1].[3]}*{[Product].[All Products]}"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/CompoundSlicerTest.java:993",
+  "mdx": "with\nmember Time.x as Aggregate([Time].[1997].[Q1] : [Time].[1997].[Q2], [Measures].[Store Sales])\nmember Measures.x1 as ([Time].[1997].[Q1], [Measures].[Store Sales])\nmember Measures.x2 as ([Time].[1997].[Q2], [Measures].[Store Sales])\n set products as TopCount(Product.[Product Name].Members, 2, Measures.[Store Sales])\n SELECT NON EMPTY products ON 1,\nNON EMPTY {[Measures].[Store Sales], Measures.x1, Measures.x2} ON 0\nfrom [ZFMSALES] where Time.x"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/CompoundSlicerTest.java:1024",
+  "mdx": "with set TO_AGGREGATE as '{[Time].[1997].[Q1] , [Time].[1997].[Q2]}'\nmember Time.x as Aggregate(TO_AGGREGATE, [Measures].[Store Sales])\nmember Measures.x1 as ([Time].[1997].[Q1], [Measures].[Store Sales])\nmember Measures.x2 as ([Time].[1997].[Q2], [Measures].[Store Sales])\n set products as TopCount(Product.[Product Name].Members, 2, Measures.[Store Sales])\n SELECT NON EMPTY products ON 1,\nNON EMPTY {[Measures].[Store Sales], Measures.x1, Measures.x2} ON 0\n from [ZFMSALES] where Time.x"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/CompoundSlicerTest.java:1055",
+  "mdx": "with\nmember Time.x as Aggregate({[Time].[1997].[Q1] , [Time].[1997].[Q2]}, [Measures].[Store Sales])\nmember Measures.x1 as ([Time].[1997].[Q1], [Measures].[Store Sales])\nmember Measures.x2 as ([Time].[1997].[Q2], [Measures].[Store Sales])\n set products as TopCount(Product.[Product Name].Members, 2, Measures.[Store Sales])\n SELECT NON EMPTY products ON 1,\nNON EMPTY {[Measures].[Store Sales], Measures.x1, Measures.x2} ON 0\nfrom [ZFMSALES] where Time.x"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/CompoundSlicerTest.java:1086",
+  "mdx": "with\nmember Time.x as Aggregate([Time].[1997].[Q1] : [Time].[1997].[Q2], [Measures].[Store Sales])\nmember Measures.x1 as ([Time].[1997].[Q1], [Measures].[Store Sales])\nmember Measures.x2 as ([Time].[1997].[Q2], [Measures].[Store Sales])\n set products as TopCount(Product.[Product Name].Members,2,(Measures.[Store Sales],Time.x))\n SELECT NON EMPTY products ON 1,\nNON EMPTY {[Measures].[Store Sales], Measures.x1, Measures.x2} ON 0\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/CompoundSlicerTest.java:1144",
+  "mdx": "with\nmember Time.x as Aggregate(Union({[Time].[1997].[Q4]},[Time].[1997].[Q1] : [Time].[1997].[Q2]),[Measures].[Store Sales]) \nmember Measures.x1 as ([Time].[1997].[Q1],[Measures].[Store Sales]) \nmember Measures.x2 as ([Time].[1997].[Q2],[Measures].[Store Sales]) \n set products as TopCount(Product.[Product Name].Members,2,(Measures.[Store Sales]))\n SELECT NON EMPTY products ON 1, \nNON EMPTY {[Measures].[Store Sales], Measures.x1, Measures.x2} ON 0 \nfrom [ZFMSALES]\nwhere  Time.x"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/CompoundSlicerTest.java:1177",
+  "mdx": "select NON EMPTY {[Measures].[Unit Sales]} ON COLUMNS,\n  Tail(Filter([Customers].[Name].Members, ([Measures].[Unit Sales] IS EMPTY)), 3) ON ROWS \nfrom [ZFMSALES]\nwhere ([Time].[1997].[Q1].[2] : [Time].[1997].[Q4].[10])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/CompoundSlicerTest.java:1268",
+  "mdx": "WITH SET [aSet] as 'Filter( Except([Store].[Store Country].Members, [Store].[Store Country].[Canada]), Measures.[Store Sales] > 0)'\nSELECT\n  { Measures.[Unit Sales] } ON COLUMNS,\n  [aSet] ON ROWS\nfrom [ZFMSALES]\nWHERE CrossJoin( {[Product].[Drink]}, { [Time].[1997].[Q2], [Time].[1998].[Q1]} )"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/ConcurrentMdxTest.java:49",
+  "mdx": "select {[Measures].[Store Cost]} on 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/ConcurrentMdxTest.java:804",
+  "mdx": "WITH MEMBER MEASURES.ProfitPercent AS\n     '([Measures].[Store Sales]-[Measures].[Store Cost])/([Measures].[Store Cost])',\n FORMAT_STRING = '#.00%', SOLVE_ORDER = 1\n Member [Time].[Time].[First Half 97] AS  '[Time].[1997].[Q1] + [Time].[1997].[Q2]'\n Member [Time].[Time].[Second Half 97] AS '[Time].[1997].[Q3] + [Time].[1997].[Q4]'\n SELECT {[Time].[First Half 97],\n     [Time].[Second Half 97],\n     [Time].[1997].CHILDREN} ON COLUMNS,\n {[Store].[Store Country].[USA].CHILDREN} ON ROWS\n from [ZFMSALES]\n WHERE ([Measures].[ProfitPercent])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/DrillThroughFieldListTest.java:48",
+  "mdx": "SELECT\n[Measures].[Unit Sales] ON COLUMNS,\n[Time].[Quarter].[Q1] ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/DrillThroughFieldListTest.java:116",
+  "mdx": "SELECT\n{[Measures].[Unit Sales], [Measures].[Store Cost]} ON COLUMNS,\n[Time].[Quarter].[Q1] ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/DrillThroughFieldListTest.java:188",
+  "mdx": "SELECT\n{[Measures].[Unit Sales], [Measures].[Store Cost]} ON COLUMNS,\nNONEMPTYCROSSJOIN({[Time].[Quarter].[Q1]}, {[Product].[Product Name].[Good Imported Beer]}) ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/DrillThroughTest.java:625",
+  "mdx": "with set [Date Range] as '{[Time].[1997].[Q1], [Time].[1997].[Q2]}'\nmember [Time].[Time].[Date Range] as 'Aggregate([Date Range])'\nselect {[Measures].[Unit Sales]} ON COLUMNS,\nHierarchize(Union(Union(Union({[Store].[All Stores]}, [Store].[All Stores].Children), [Store].[All Stores].[USA].Children), [Store].[All Stores].[USA].[CA].Children)) ON ROWS\nfrom [ZFMSALES]\nwhere [Time].[Date Range]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/DrillThroughTest.java:1470",
+  "mdx": "SELECT {[Measures].[Unit Sales]} ON COLUMNS,\n {[Product].[All Products]} ON ROWS\nfrom [ZFMSALES]\nWHERE {[Time].[1997].[Q1], [Time].[1997].[Q2]}"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/DrillThroughTest.java:1651",
+  "mdx": "SELECT {[Measures].[Unit Sales]} ON COLUMNS,\n {[Product].[All Products]} ON ROWS\nfrom [ZFMSALES]\nWHERE {[Time].[1997].[Q1], [Time].[1997].[Q1].[1]}"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/DrillThroughTest.java:1787",
+  "mdx": "WITH\nSET [*NATIVE_CJ_SET] AS 'FILTER([*BASE_MEMBERS__Customers_], NOT ISEMPTY ([Measures].[Unit Sales]))'\nSET [*BASE_MEMBERS__Measures_] AS '{[Measures].[*FORMATTED_MEASURE_0]}'\nSET [*BASE_MEMBERS__Customers_] AS '[Customers].[Name].MEMBERS'\nSET [*CJ_ROW_AXIS] AS 'GENERATE([*NATIVE_CJ_SET], {([Customers].CURRENTMEMBER)})'\nSET [*SORTED_ROW_AXIS] AS 'ORDER([*CJ_ROW_AXIS],[Customers].CURRENTMEMBER.ORDERKEY,BASC,ANCESTOR([Customers].CURRENTMEMBER,[Customers].[City]).ORDERKEY,BASC)'\nMEMBER [Measures].[*FORMATTED_MEASURE_0] AS '[Measures].[Unit Sales]', FORMAT_STRING = 'Standard', SOLVE_ORDER=500\nSELECT\nFILTER([*BASE_MEMBERS__Measures_],([Measures].CurrentMember Is [Measures].[*FORMATTED_MEASURE_0])) ON COLUMNS\n,FILTER([*SORTED_ROW_AXIS],([Customers].CurrentMember Is [Customers].[USA].[CA].[San Gabriel].[A. Joyce Jarvis])) ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/I18nTest.java:89",
+  "mdx": "WITH MEMBER [Measures].[Foo] AS ' 12345.67 ',\n FORMAT_STRING='#,###.00'\nSELECT {[Measures].[Foo]} ON COLUMNS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/MonitorTest.java:43",
+  "mdx": "WITH MEMBER [Measures].[Foo] AS\n [Measures].[Unit Sales] + case when [Measures].[Unit Sales] > 0\n   then CInt( ([Measures].[Foo], [Time].PrevMember) )\n   end\nSELECT [Measures].[Foo] on 0\nfrom [ZFMSALES]\nwhere [Time].[1997].[Q3].[9]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/MultipleHierarchyTest.java:122",
+  "mdx": "with member [Measures].[Sales to Date] as \n ' Sum(PeriodsToDate([Time].[Year], [Time].[Time].CurrentMember), [Measures].[Unit Sales])'\nselect {[Measures].[Sales to Date]} on columns,\n {[Time].[1997].[Q2].[4],  [Time].[1997].[Q2].[5]} on rows\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/MultipleHierarchyTest.java:304",
+  "mdx": "with member [Measures].[Time Child Count] as\n  [Time].Children.Count\nselect [Measures].[Time Child Count] on 0\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/NamedSetTest.java:675",
+  "mdx": "with \n  member [Measures].[DateName] as \n    'Generate({[Time].[1997].[Q1], [Time].[1997].[Q2]}, [Time].[Time].CurrentMember.Name) '\nselect {[Measures].[DateName]} on columns,\n {[Time].[1997].[Q1], [Time].[1997].[Q2]} on rows\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/NamedSetTest.java:692",
+  "mdx": "with \n  member [Measures].[DateName] as \n    'Generate({[Time].[1997].[Q1], [Time].[1997].[Q2]}, [Time].[Time].CurrentMember.Name, \" and \") '\nselect {[Measures].[DateName]} on columns,\n {[Time].[1997].[Q1], [Time].[1997].[Q2]} on rows\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/NamedSetTest.java:752",
+  "mdx": "WITH SET [CA Cities] AS '{[Store].[USA].[OR].[Portland]}' SELECT {[Measures].[Unit Sales]} ON COLUMNS,\n {[CA Cities]} ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/NamedSetTest.java:1137",
+  "mdx": "SELECT\nNON EMPTY TopCount([Customers].[Name].Members, 5, [Measures].[Unit Sales]) * [Measures].[Unit Sales] on 0\nfrom [ZFMSALES]\nWHERE [Time].[1997].[Q1].[1]:[Time].[1997].[Q4].[10]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/NamedSetTest.java:1144",
+  "mdx": "SELECT\nTopCount([Customers].[Name].Members, 5, [Measures].[Unit Sales]) * [Measures].[Unit Sales] on 0\nfrom [ZFMSALES]\nWHERE [Time].[1997].[Q1].[1]:[Time].[1997].[Q4].[10]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/NamedSetTest.java:1151",
+  "mdx": "SELECT\nTopCount(Distinct([Customers].[Name].Members), 5, [Measures].[Unit Sales]) * [Measures].[Unit Sales] on 0\nfrom [ZFMSALES]\nWHERE [Time].[1997].[Q1].[1]:[Time].[1997].[Q4].[10]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/NamedSetTest.java:1161",
+  "mdx": "WITH SET [Top Count] AS\n  TopCount([Customers].[Name].Members, 5, [Measures].[Unit Sales])\nSELECT [Top Count] * [Measures].[Unit Sales] on 0\nfrom [ZFMSALES]\nWHERE [Time].[1997].[Q1].[1]:[Time].[1997].[Q4].[10]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/NamedSetTest.java:1170",
+  "mdx": "WITH SET [Top Count] AS\n{\n  TopCount(\n    Distinct([Customers].[Name].Members),\n    5,\n    [Measures].[Unit Sales])\n}\nSELECT [Top Count] * [Measures].[Unit Sales] on 0\nfrom [ZFMSALES]\nWHERE [Time].[1997].[Q1].[1]:[Time].[1997].[Q4].[10]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/NativeSetEvaluationTest.java:181",
+  "mdx": "with\nmember [Time.Weekly].x as Aggregate({[Time.Weekly].[1997].[1] : [Time.Weekly].[1997].[39]}, [Measures].[Store Sales])\nmember Measures.x1 as ([Time].[1997].[Q1], [Measures].[Store Sales])\nmember Measures.x2 as ([Time].[1997].[Q2], [Measures].[Store Sales])\nmember Measures.x3 as ([Time].[1997].[Q3], [Measures].[Store Sales])\n set products as TopCount(Product.[Product Name].Members, 2, Measures.[Store Sales])\n SELECT NON EMPTY products ON 1,\nNON EMPTY {[Measures].[Store Sales], Measures.x1, Measures.x2, Measures.x3} ON 0\nfrom [ZFMSALES] where [Time.Weekly].x"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/NativeSetEvaluationTest.java:216",
+  "mdx": "with set TO_AGGREGATE as '{[Time.Weekly].[1997].[1] : [Time.Weekly].[1997].[39]}'\nmember [Time.Weekly].x as Aggregate(TO_AGGREGATE, [Measures].[Store Sales])\nmember Measures.x1 as ([Time].[1997].[Q1], [Measures].[Store Sales])\nmember Measures.x2 as ([Time].[1997].[Q2], [Measures].[Store Sales])\nmember Measures.x3 as ([Time].[1997].[Q3], [Measures].[Store Sales])\n set products as TopCount(Product.[Product Name].Members, 2, Measures.[Store Sales])\n SELECT NON EMPTY products ON 1,\nNON EMPTY {[Measures].[Store Sales], Measures.x1, Measures.x2, Measures.x3} ON 0\nfrom [ZFMSALES] where [Time.Weekly].x"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/NativeSetEvaluationTest.java:247",
+  "mdx": "with\n  set QUARTERS as Descendants([Time].[1997], [Time].[Time].[Quarter])\n  member Time.x as Aggregate(QUARTERS, [Measures].[Store Sales])\n  set products as Filter([Product].[Food].[Produce].[Vegetables].[Fresh Vegetables].[Hermanos].Children, [Measures].[Store Sales] > 700)\n  SELECT NON EMPTY products ON 1,\n  NON EMPTY {[Measures].[Store Sales]} ON 0\n  from [ZFMSALES] where Time.x"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/NativeSetEvaluationTest.java:876",
+  "mdx": "with member [Time.Weekly].x as Aggregate([Time.Weekly].[1997].Children) set products as 'TopCount([Product].[Product Department].Members, 2, [Measures].[Store Sales])' select NON EMPTY {[Measures].[Store Sales]} ON COLUMNS, NON EMPTY [products] ON ROWS  from [ZFMSALES] where [Time.Weekly].[x]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/NativeSetEvaluationTest.java:1016",
+  "mdx": "select NON EMPTY [Customers].[USA].[CA].[San Francisco].Children ON COLUMNS \nfrom [ZFMSALES] \nwhere ([Time].[1997].[Q1] : [Time].[1997].[Q3])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/NativeSetEvaluationTest.java:1459",
+  "mdx": "WITH MEMBER [Measures].[TotalVal] AS 'Aggregate(Filter({[Store].[Store City].members},[Measures].[Unit Sales] > 1000))'\nSELECT [Measures].[TotalVal] ON 0, [Product].[All Products].Children on 1 \nfrom [ZFMSALES] WHERE {[Time].[1997].[Q1],[Time].[1997].[Q2]}"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/NativeSetEvaluationTest.java:1641",
+  "mdx": "SELECT [Measures].[Unit Sales] ON 0,\n Filter({[Store].[Store City].members},[Measures].[Unit Sales] > 10000) on 1 \nfrom [ZFMSALES] WHERE {[Time].[1997].[Q1], [Time].[1997].[Q2].[4]}"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/NativeSetEvaluationTest.java:1681",
+  "mdx": "select [Measures].[Unit Sales] on columns, Filter([Time].[1997].Children, [Measures].[Unit Sales] < 12335) on rows from [ZFMSALES] where {([Product].[Drink],[Store].[USA].[CA]),([Product].[Food],[Store].[USA].[OR])}"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/NativeSetEvaluationTest.java:1818",
+  "mdx": "WITH member [Customers].[AggregatePageMembers] AS \n'Aggregate({[Customers].[USA].[CA].[Altadena].[Amy Petranoff], [Customers].[USA].[CA].[Altadena].[Arvid Duran]})'\nmember [Measures].[test set] AS \n'SetToStr(Filter([Product].[Product Name].Members,[Measures].[Store Sales] > 0))'\nSELECT {[Measures].[test set]} ON COLUMNS,\n{[Product].[All Products], [Product].[All Products].Children} ON ROWS\nfrom [ZFMSALES]\nWHERE [Customers].[AggregatePageMembers]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/NativeSetEvaluationTest.java:1824",
+  "mdx": "WITH member [Customers].[AggregatePageMembers] AS \n'Aggregate({[Customers].[USA].[CA].[Altadena].[Arvid Duran], [Customers].[USA].[CA].[Altadena].[Amy Petranoff]})'\nmember [Measures].[test set] AS \n'SetToStr(Filter([Product].[Product Name].Members,[Measures].[Store Sales] > 0))'\nSELECT {[Measures].[test set]} ON COLUMNS,\n{[Product].[All Products], [Product].[All Products].Children} ON ROWS\nfrom [ZFMSALES]\nWHERE [Customers].[AggregatePageMembers]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/Olap4jTest.java:78",
+  "mdx": "select [Measures].[Unit Sales] on 0\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/Olap4jTest.java:86",
+  "mdx": "select [Measures].Members on 0\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/Olap4jTest.java:94",
+  "mdx": "select [Measures].[Measures].Members on 0\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/Olap4jTest.java:198",
+  "mdx": "select [Store].[Store Name].Members on 0\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/Olap4jTest.java:505",
+  "mdx": "select [Product].Members on 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/Olap4jTest.java:506",
+  "mdx": "select [Product].[Drink].Children on 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/Olap4jTest.java:507",
+  "mdx": "select [Product].[Food].Children on 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/Olap4jTest.java:648",
+  "mdx": "select AddCalculatedMembers([Time].[Time].Members) on 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/Olap4jTest.java:660",
+  "mdx": "select Filter(\n AddCalculatedMembers([Time].[Time].Members),\n [Time].[Time].CurrentMember.Properties('MEMBER_TYPE') = 4) on 0\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/ParallelTest.java:67",
+  "mdx": "select {[Measures].[Unit Sales]} on columns, {[Product].Members} on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/ParameterTest.java:61",
+  "mdx": "select {Parameter(\"Foo\",[Time],[Time].[1997],\"Foo\")} ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/ParameterTest.java:76",
+  "mdx": "select {Parameter(\"Foo\", [Time], [Time].[1997].[Q2].[5], \"Foo\")} ON COLUMNS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/ParameterTest.java:83",
+  "mdx": "with member [Measures].[X] as '[Measures].[Store Sales]',\nformat_string = Parameter(\"fmtstrpara\", STRING, \"#\")\nselect {[Measures].[X]} ON COLUMNS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/ParameterTest.java:272",
+  "mdx": "with member [Measures].[Foo] as\n len(Parameter(\"sProduct\", STRING, \"foobar\"))\nselect {[Measures].[Foo]} ON COLUMNS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/ParameterTest.java:444",
+  "mdx": "select [Measures].[Unit Sales] on 0,\n [Product].Children on 1\nfrom [ZFMSALES]where Parameter(\n  \"Foo\",\n   [Time].[Time],\n   Tail(\n     {\n       [Time].[Time],\n       Filter(\n         [Time].[Month].Members,\n         0 < ([Customers].[USA].[CA].[Bellflower],\n           [Product].[Drink].[Alcoholic Beverages].[Beer and Wine].[Beer].[Good]))\n     },\n     1),\n   \"Description\")"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/ParameterTest.java:1010",
+  "mdx": "select [Measures].[Unit Sales] on 0,\n Parameter(\"Foo\", [Time], {}, \"Foo\") on 1\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/ParameterTest.java:1030",
+  "mdx": "select {[Measures].[Unit Sales]} ON COLUMNS,\n  Parameter(\"Foo\", [Time], {[Time].[1997].[Q2].[5], [Time].[1997].[Q3]}, \"Foo\") ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/PerformanceTest.java:290",
+  "mdx": "WITH SET [Selected Customers]\n  AS Parameter('Foo', [Customers], {}, 'Description')\nSELECT {[Measures].[Unit Sales],\n        [Measures].[Store Sales]} on 0,\n  [Selected Customers] on 1\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/PerformanceTest.java:593",
+  "mdx": "select {[Measures].[Unit Sales]} on COLUMNS,\n[Store].[USA].[CA].Children on ROWS\nfrom [ZFMSALES]\nwhere ([Time.Weekly].[All Time.Weeklys].[1997].[4].[16]\n : [Time.Weekly].[All Time.Weeklys].[1997].[5].[25])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/PropertiesTest.java:187",
+  "mdx": "SELECT {[Customers].[All Customers].[USA].[CA]} DIMENSION PROPERTIES \n CATALOG_NAME, SCHEMA_NAME, CUBE_NAME, DIMENSION_UNIQUE_NAME, \n HIERARCHY_UNIQUE_NAME, LEVEL_UNIQUE_NAME, LEVEL_NUMBER, MEMBER_UNIQUE_NAME, \n MEMBER_NAME, MEMBER_TYPE, MEMBER_GUID, MEMBER_CAPTION, MEMBER_ORDINAL, CHILDREN_CARDINALITY,\n PARENT_LEVEL, PARENT_UNIQUE_NAME, PARENT_COUNT, DESCRIPTION ON COLUMNS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/QueryRunner.java:165",
+  "mdx": "WITH MEMBER MEASURES.ProfitPercent AS\n     '([Measures].[Store Sales]-[Measures].[Store Cost])/([Measures].[Store Cost])',\n FORMAT_STRING = '#.00%', SOLVE_ORDER = 1\n MEMBER [Time].[Time].[First Half 97] AS  '[Time].[1997].[Q1] + [Time].[1997].[Q2]'\n MEMBER [Time].[Time].[Second Half 97] AS '[Time].[1997].[Q3] + [Time].[1997].[Q4]'\n SELECT {[Time].[First Half 97],\n     [Time].[Second Half 97],\n     [Time].[1997].CHILDREN} ON COLUMNS,\n {[Store].[Store Country].[USA].CHILDREN} ON ROWS\n from [ZFMSALES]\n WHERE ([Measures].[ProfitPercent])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/QueryRunner.java:197",
+  "mdx": "select {[Measures].[Unit Sales]} on columns,\n {[Customers].members} on rows\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/ScenarioTest.java:59",
+  "mdx": "select {[Measures].[Unit Sales]} on 0,\n{[Product].Children} on 1\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/ScenarioTest.java:99",
+  "mdx": "with member [Measures].[Unit Sales Plus One]\n   as ' [Measures].[Unit Sales] + 1 '\nselect {[Measures].[Unit Sales Plus One]} on 0,\n{[Product].Children} on 1\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/ScenarioTest.java:118",
+  "mdx": "with member [Product].[FoodDrink]\n   as Aggregate({[Product].[Food], [Product].[Drink]})\nselect {[Measures].[Unit Sales]} on 0,\n{[Product].Children, [Product].[FoodDrink]} on 1\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/SchemaTest.java:1837",
+  "mdx": "select {[Measures]} on 0 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/SchemaTest.java:2537",
+  "mdx": "WITH SET [Non CA State Stores] AS 'EXCEPT({[Store].[Store Country].[USA].children},{[Store].[Store Country].[USA].[CA]})'\nMEMBER [Store].[Total Non CA State] AS \n'SUM({[Non CA State Stores]})'\nSELECT {[Store].[Store Country].[USA],[Store].[Total Non CA State]} ON 0,{[Measures].[Unit Sales]} ON 1 from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/Ssas2005CompatibilityTest.java:450",
+  "mdx": "WITH MEMBER [Measures].[ProfitPercent] AS\n     '([Measures].[Store Sales]-[Measures].[Store Cost])/([Measures].[Store Cost])',\n FORMAT_STRING = '#.00%', SOLVE_ORDER = 1\n MEMBER [Time].[First Half 97] AS  '[Time].[1997].[Q1] + [Time].[1997].[Q2]'\n MEMBER [Time].[Second Half 97] AS '[Time].[1997].[Q3] + [Time].[1997].[Q4]'\n SELECT {[Time].[First Half 97],\n     [Time].[Second Half 97],\n     [Time].[1997].CHILDREN} ON COLUMNS,\n {[Store].[Store Country].[USA].CHILDREN} ON ROWS\n from [ZFMSALES]\n WHERE ([Measures].[ProfitPercent])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/TestCalculatedMembers.java:236",
+  "mdx": "WITH MEMBER [Measures].[Profit]\n AS '(Measures.[Store Sales] - Measures.[Store Cost])', FORMAT_STRING='#,###' \nSELECT {[Measures].[Profit]} ON COLUMNS,\n {[Time].[1997].[Q2]} ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/TestCalculatedMembers.java:306",
+  "mdx": "with\n member [Time].[Time].[1997].[Q1].[1999] as 1\n member [Time].[Time].[1997].[Q1].[1998] as 2\n member [Time].[Time].[1997].[Q2].[1998] as 3\n member [Time].[Time].[1997].[1998] as 4\n select [Time].[Time].[1998] on 0\n from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/TestCalculatedMembers.java:512",
+  "mdx": "with member [Measures].[has a [bracket]] in it] as \n' [Measures].CurrentMember.Name '\nselect {[Measures].[has a [bracket]] in it]} on columns\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/TestCalculatedMembers.java:606",
+  "mdx": "with member [Measures].[Foo] as ' [Measures].[Unit Sales] * 2 ', FORMAT_STRING=IIf([Measures].[Foo] < 600000, \"|#,##0|style=red\",\"#,##0\")  select {[Measures].[Foo]} on columns from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/TestCalculatedMembers.java:621",
+  "mdx": "with member [Measures].[Foo] as '1 + 2'\nselect from [ZFMSALES] where [Measures].[Foo]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/TestCalculatedMembers.java:629",
+  "mdx": "with member [Measures].[Foo] as 1 + 2\nselect from [ZFMSALES] where [Measures].[Foo]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/TestCalculatedMembers.java:637",
+  "mdx": "with member [Measures].[Foo] as \"1 + 2\"\nselect from [ZFMSALES] where [Measures].[Foo]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/TestCalculatedMembers.java:656",
+  "mdx": "with member [Measures].[Foo] as ' \"quoted string with ''apostrophe'' in it\" ' select {[Measures].[Foo]} on columns from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/TestCalculatedMembers.java:667",
+  "mdx": "with member [Measures].[Foo] as ' \"quoted string with \"\"double-quote\"\" in it\" ' select {[Measures].[Foo]} on columns from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/TestCalculatedMembers.java:678",
+  "mdx": "with member [Measures].[Foo] as \"quoted string with 'apos' in it\" select {[Measures].[Foo]} on columns from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/TestCalculatedMembers.java:692",
+  "mdx": "with member [Measures].[Foo] as ' ''quoted string and ''''apos''''.'' ' select {[Measures].[Foo]} on columns from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/TestCalculatedMembers.java:705",
+  "mdx": "with member [Measures].[Foo] as ' \"quoted string and ''apos''.\" ' select {[Measures].[Foo]} on columns from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/TestCalculatedMembers.java:716",
+  "mdx": "with member [Measures].[Colored Profit] as  ' [Measures].[Store Sales] - [Measures].[Store Cost] ',   FORMAT_STRING = Iif([Measures].[Colored Profit] < 0, '|($#,##0.00)|style=red', '|$#,##0.00|style=green') select {[Measures].[Colored Profit]} on columns, {[Product].Children} on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/TestCalculatedMembers.java:735",
+  "mdx": "with member [Measures].[Colored Profit] as  ' [Measures].[Store Sales] - [Measures].[Store Cost] ',   FORMAT_STRING = Iif([Measures].[Colored Profit] < 0, \"|($#,##0.00)|style=red\", \"|$#,##0.00|style=green\") select {[Measures].[Colored Profit]} on columns, {[Product].Children} on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/TestCalculatedMembers.java:833",
+  "mdx": "with member [Time].[Time].[# Months Product Sold] as 'Count(Descendants([Time].[Time].LastSibling, [Time].[Month]), EXCLUDEEMPTY)'\nselect Crossjoin([Time].[# Months Product Sold].Children,\n     [Store].[All Stores].Children) ON COLUMNS,\n   [Product].[All Products].Children ON ROWS from [ZFMSALES] where [Measures].[Unit Sales]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/TestCalculatedMembers.java:1007",
+  "mdx": "with member [Store].[CA or OR] as ' Aggregate({[Store].[USA].[CA], [Store].[USA].[OR]}) ',\n CELL_FORMATTER='mondrian.test.UdfTest.FooBarCellFormatter'\nselect {[Store].[USA], [Store].[CA or OR]} on columns\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/TestCalculatedMembers.java:1115",
+  "mdx": "WITH MEMBER [Product].[Calculated Member] as 'AGGREGATE({})'\nSELECT {[Measures].[Unit Sales]} on 0\nfrom [ZFMSALES]\nWHERE ([Product].[Calculated Member])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/TestCalculatedMembers.java:1702",
+  "mdx": "with member [Measures].[Bar] as cast(123 as string)\n member [Measures].[Foo] as [Measures].[Bar] / 2\nselect [Measures].[Foo] on 0\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/TestCalculatedMembers.java:1724",
+  "mdx": "with\n  member [Measures].[Tom1] as\n    ([Measures].[Store Sales] / [Measures].[Unit Sales])\n  set spark1 as\n    ([Time].[1997].[Q1].[1] : [Time].[1997].[Q2].[4])\n  member [Time].[Time].[Past 4 months] as\n     Generate(\n         [spark1],\n           CAST(Format(([Measures].CurrentMember + 0.0), '###.0#') as String),\n         \", \")\nselect {[Time].[Past 4 months]} ON COLUMNS,\n  {[Measures].[Unit Sales], [Measures].[Tom1]} ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/TestCalculatedMembers.java:1749",
+  "mdx": "with\n  member [Measures].[Tom1] as\n    ([Measures].[Store Sales] / [Measures].[Unit Sales]),\n    solve_order = 1\n  set spark1 as\n    ([Time].[1997].[Q1].[1] : [Time].[1997].[Q2].[4])\n  member [Time].[Time].[Past 4 months] as\n     Generate(\n         [spark1],\n         CAST(Format(([Measures].CurrentMember + 0.0), '###.0#') AS String),\n         \", \"),     solve_order = 2\nselect {[Time].[Past 4 months]} ON COLUMNS,\n  {[Measures].[Unit Sales], [Measures].[Tom1]} ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/TestCalculatedMembers.java:1788",
+  "mdx": "with member [Store].[USA].[Foo] as\n [Store].[USA] + [Store].[Canada].[BC]\nselect [Store].[All Stores].[USA].[Foo] on 0\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/TestCalculatedMembers.java:1796",
+  "mdx": "with member [Store].[All Stores].[USA].[Foo] as\n [Store].[USA] + [Store].[Canada].[BC]\nselect [Store].[USA].[Foo] on 0\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/TupleListTest.java:184",
+  "mdx": "select {[Measures].[Store Sales]} ON COLUMNS, Hierarchize(Except({[Customers].[All Customers], [Customers].[All Customers].Children}, {[Customers].[All Customers]})) ON ROWS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/UdfTest.java:174",
+  "mdx": "SELECT { CurrentDateMember([Time].[Time], \"[Ti\\me]\\.[yyyy]\\.[Qq]\\.[m]\", BEFORE)} ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/UdfTest.java:185",
+  "mdx": "WITH MEMBER [Measures].[Last Unit Sales] AS \n '([Measures].[Unit Sales], \n   LastNonEmpty(Descendants([Time].[Time]), [Measures].[Unit Sales]))'\nSELECT {[Measures].[Last Unit Sales]} ON COLUMNS,\n CrossJoin(\n  {[Time].[1997], [Time].[1997].[Q1], [Time].[1997].[Q1].Children},\n  {[Product].[All Products].[Drink].[Alcoholic Beverages].[Beer and Wine].[Beer].children}) ON ROWS\nfrom [ZFMSALES]\nWHERE ([Store].[All Stores].[USA].[OR].[Portland].[Store 11])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/UdfTest.java:260",
+  "mdx": "with\n     member\n     [Measures].[Last Sale] as ([Measures].[Unit Sales],\n         LastNonEmpty(Descendants([Time].[Time].CurrentMember, [Time].[Month]),\n         [Measures].[Unit Sales]))\nselect\n     NON EMPTY {[Measures].[Last Sale]} ON columns,\n     NON EMPTY Order([Store].[All Stores].Children,\n         [Measures].[Last Sale], DESC) ON rows\nfrom [ZFMSALES]\nwhere [Time].[Time].LastSibling"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/UdfTest.java:283",
+  "mdx": "SELECT {} ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/UdfTest.java:396",
+  "mdx": "SELECT { CurrentDateMember([Time].[Time], \"[Ti\\me]\\.[yyyy]\\.[Qq]\\.[m]\", AFTER)} ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/UdfTest.java:410",
+  "mdx": "SELECT { CurrentDateMember([Time].[Time], \"[Ti\\me]\\.[yyyy]\\.[Qq]\\.[m]\", EXACT).lag(1)} ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/UdfTest.java:423",
+  "mdx": "SELECT { CurrentDateMember([Time].[Time], \"[Ti\\me]\\.[yyyy]\\.[Qq]\\.[m]\")} ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/UdfTest.java:437",
+  "mdx": "SELECT { CurrentDateMember([Time.Weekly], \"[Ti\\me\\.Weekl\\y]\\.[All Ti\\me\\.Weekl\\y\\s]\\.[yyyy]\\.[ww]\", BEFORE)} ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/UdfTest.java:454",
+  "mdx": "SELECT { CurrentDateMember([Time.Weekly], \"[Ti\\me]\\.[yyyy]\\.[Qq]\\.[m]\")} ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/UdfTest.java:467",
+  "mdx": "SELECT { CurrentDateMember([Time].[Time], \"[Ti\\me]\\.[1996]\\.[Q4]\", after)} ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/UdfTest.java:482",
+  "mdx": "SELECT { CurrentDateMember([Time].[Time], \"[Ti\\me]\\.[1997]\")} ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/UdfTest.java:497",
+  "mdx": "SELECT { CurrentDateMember([Time].[Time], \"[Ti\\me]\\.[1997]\\.[Q2]\\.[5]\")} ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/UdfTest.java:510",
+  "mdx": "SELECT { CurrentDateMember([Time].[Time], \"[Ti\\me]\\.[yyyy]\\.[Qq]\\.[m]\", BEFORE).PrevMember} ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/UdfTest.java:524",
+  "mdx": "SELECT\n    { [Measures].[Unit Sales] } ON COLUMNS,\n    { CurrentDateMember([Time].[Time], '[\"Time\"]\\.[yyyy]\\.[\"Q\"q]\\.[m]', BEFORE).Lag(3) :       CurrentDateMember([Time].[Time], '[\"Time\"]\\.[yyyy]\\.[\"Q\"q]\\.[m]', BEFORE) } ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/UdfTest.java:597",
+  "mdx": "SELECT {[Measures].[Unit Sales]} ON COLUMNS, FILTER([Product].[Product Family].MEMBERS, [Product].[Product Family].CurrentMember IN {[Product].[All Products].firstChild, [Product].[All Products].lastChild}) ON ROWS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/UdfTest.java:616",
+  "mdx": "SELECT {[Measures].[Unit Sales]} ON COLUMNS, FILTER([Product].[Product Family].MEMBERS, [Product].[Product Family].CurrentMember NOT IN {[Product].[All Products].firstChild, [Product].[All Products].lastChild}) ON ROWS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/UdfTest.java:633",
+  "mdx": "SELECT {[Measures].[Store Sales]} ON COLUMNS, {[Store].[Store Name].MEMBERS} ON ROWS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/UdfTest.java:695",
+  "mdx": "SELECT {[Measures].[Store Sales]} ON COLUMNS, Filter({[Store].[Store Name].MEMBERS}, [Store].[Store Name].CurrentMember IN {[Store].[All Stores].[Mexico], [Store].[All Stores].[USA]}) ON ROWS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/UdfTest.java:784",
+  "mdx": "SELECT {filter([Time].[Month].Members, [Time].[Time].CurrentMember in {CurrentDateMember([Time].[Time], '[\"Time\"]\\.[yyyy]\\.[\"Q\"q]\\.[m]', BEFORE)})} ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:139",
+  "mdx": "with member [measures].[foo] as '([Measures].[unit sales],ParallelPeriod([Time].[Quarter], -2147483648))' select [measures].[foo] on columns, [time].[1997].children on rows from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:1135",
+  "mdx": "with member [Measures].[Closing Unit Sales] as '([Measures].[Unit Sales], ClosingPeriod([Time].[Month]))'\nselect non empty {[Measures].[Closing Unit Sales]} on columns,\n {Descendants([Time].[1997])} on rows\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:1182",
+  "mdx": "with member [Measures].[Closing Unit Sales] as '([Measures].[Unit Sales], ClosingPeriod([Time].[Month]))'\nselect {[Measures].[Unit Sales], [Measures].[Closing Unit Sales]} on columns,\n {[Time].[1997], [Time].[1997].[Q1], [Time].[1997].[Q1].[1], [Time].[1997].[Q1].[3], [Time].[1997].[Q4].[12]} on rows\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:6100",
+  "mdx": "SELECT { [Store Sales] } ON COLUMNS,\n TOPCOUNT(Filter( [Store].[Store Name].Members,\n                   [Store].CurrentMember.Properties(\"Store Type\") = \"Supermarket\"),\n           10, [Store Sales]) ON ROWS\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:9505",
+  "mdx": "with member [Measures].[Foo] as ' SetToStr(Qtd()) '\nselect {[Measures].[Foo]} on columns\nfrom [ZFMSALES]\nwhere [Time].[1997].[Q2].[5]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:9606",
+  "mdx": "with member [Measures].[Foo] as ' SetToStr(PeriodsToDate()) '\nselect {[Measures].[Foo]} on columns\nfrom [ZFMSALES]\nwhere [Time].[1997].[Q2].[5]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/olap/fun/FunctionTest.java:9621",
+  "mdx": "with member [Measures].[Foo] as ' SetToStr(PeriodsToDate()) '\nselect {[Measures].[Foo]} on columns\nfrom [ZFMSALES]\nwhere [Time].[1997]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/rolap/RolapNativeTopCountTestCases.java:352",
+  "mdx": "SELECT TOPCOUNT([Customers].[City].members, 30) ON COLUMNS from [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/CompoundSlicerTest.java:868",
+  "mdx": "select NON EMPTY {[Measures].[Unit Sales]} ON COLUMNS, \n  Subset(Order([Customers].[Name].Members, [Measures].[Unit Sales], BDESC), 10.0, 30.0) ON ROWS \nfrom [ZFMSALES] \nwhere ([Time].[1997].[Q1].[2] : [Time].[1997].[Q4].[11])"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/CompoundSlicerTest.java:962",
+  "mdx": "with set TO_AGGREGATE as '([Time].[1997].[Q1] : [Time].[1997].[Q2])'\nmember Time.x as Aggregate(TO_AGGREGATE, [Measures].[Store Sales])\nmember Measures.x1 as ([Time].[1997].[Q1], [Measures].[Store Sales])\nmember Measures.x2 as ([Time].[1997].[Q2], [Measures].[Store Sales])\n set products as TopCount(Product.[Product Name].Members, 2, Measures.[Store Sales])\n SELECT NON EMPTY products ON 1,\nNON EMPTY {[Measures].[Store Sales], Measures.x1, Measures.x2} ON 0\n from [ZFMSALES] where Time.x"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/DrillThroughTest.java:1702",
+  "mdx": "SELECT {[Measures].[Unit Sales]} ON COLUMNS,\n {[Product].[All Products]} ON ROWS\nfrom [ZFMSALES]\nWHERE {[Time].[1997].[Q1].[1], [Time].[1997].[Q2]}"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/ParentChildHierarchyTest.java:736",
+  "mdx": "with member [Measures].[Foo] as \n  '([Measures].[Foo], OpeningPeriod([Time].[Month]))'\nselect\n {[Measures].[Unit Sales], [Measures].[Foo]} on Columns,\n { [Time].[1997].[Q2]} on rows\nfrom [ZFMSALES]"
+ },
+ {
+  "source": "mondrian/mondrian/src/it/java/mondrian/test/UdfTest.java:434",
+  "mdx": "SELECT { CurrentDateMember([Time.Weekly], \"[Ti\\me\\.Weekl\\y]\\.[All Weekl\\y\\s]\\.[yyyy]\\.[ww]\", BEFORE)} ON COLUMNS from [ZFMSALES]"
+ }
+]
