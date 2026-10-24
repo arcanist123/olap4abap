@@ -74,11 +74,16 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     "! @parameter max_visits | at most this many visits, spread evenly over the days; 0: all of them
     "! @parameter cube | the InfoCube ZCLVISIT and its catalog
     "! @parameter adso | the aDSO ZCLVISITA and its catalog
+    "! @parameter authorizations | the analysis authorization scenarios and their test users
+    "!                             (ZZXXMLA1_CL_BW_AUTH_GEN; deleted with the demo either way)
+    "! @parameter password | the test users' password; none: nobody can log on as them
     METHODS run
-      IMPORTING max_visits    TYPE i DEFAULT 0
-                cube          TYPE abap_bool DEFAULT abap_true
-                adso          TYPE abap_bool DEFAULT abap_true
-      RETURNING VALUE(result) TYPE string_table.
+      IMPORTING max_visits     TYPE i DEFAULT 0
+                cube           TYPE abap_bool DEFAULT abap_true
+                adso           TYPE abap_bool DEFAULT abap_true
+                authorizations TYPE abap_bool DEFAULT abap_false
+                password       TYPE csequence OPTIONAL
+      RETURNING VALUE(result)  TYPE string_table.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -534,6 +539,9 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     ENDIF.
 
     deploy_schemas( providers ).
+    IF authorizations = abap_true.
+      APPEND LINES OF NEW zzxxmla1_cl_bw_auth_gen( )->run( password ) TO log.
+    ENDIF.
     result = log.
   ENDMETHOD.
 
@@ -1604,6 +1612,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD delete_all.
+    " the analysis authorizations name the characteristics and their hierarchies
+    APPEND LINES OF NEW zzxxmla1_cl_bw_auth_gen( )->delete( ) TO log.
     remove_catalogs( ).
     " the providers and the views use the characteristics, so they go first; the fact views select from the providers
     LOOP AT VALUE string_table( ( CONV #( c_adso ) ) ( CONV #( c_cube ) ) ) INTO DATA(provider).

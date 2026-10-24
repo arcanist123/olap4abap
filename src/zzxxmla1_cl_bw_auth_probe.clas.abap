@@ -100,8 +100,8 @@ CLASS zzxxmla1_cl_bw_auth_probe DEFINITION
       RETURNING VALUE(result) TYPE ty_results.
 
     "! The analysis authorizations that restrict one of the characteristics (value and hierarchy authorizations,
-    "! RSECVAL and RSECHIE) with all their lines, and 0BI_ALL, each with whether the current user has it (S_RS_AUTH or
-    "! RSECADMIN's direct assignment).
+    "! RSECVAL_STRING and RSECHIE_STRING) with all their lines, and 0BI_ALL, each with whether the current user has it
+    "! (S_RS_AUTH or RSECADMIN's direct assignment).
     METHODS authorizations
       RETURNING VALUE(result) TYPE ty_authorizations.
 
@@ -623,12 +623,13 @@ CLASS zzxxmla1_cl_bw_auth_probe IMPLEMENTATION.
     TYPES ty_iobjnm_range TYPE RANGE OF rsiobjnm.
     DATA(restricted) = VALUE ty_iobjnm_range( FOR c IN characteristics ( sign = 'I' option = 'EQ' low = c ) ).
 
-    " the authorizations that restrict one of the characteristics, by value or by hierarchy, and 0BI_ALL
-    SELECT DISTINCT tctauth FROM rsecval
+    " the authorizations that restrict one of the characteristics, by value or by hierarchy, and 0BI_ALL; BW keeps the
+    " values in RSECVAL_STRING and RSECHIE_STRING (RSECVAL and RSECHIE hold only 0BI_ALL on this release)
+    SELECT DISTINCT tctauth FROM rsecval_string
       WHERE objvers = 'A'
         AND ( tctiobjnm IN @restricted OR tctauth = '0BI_ALL' )
       INTO TABLE @DATA(by_value).
-    SELECT DISTINCT tctauth FROM rsechie
+    SELECT DISTINCT tctauth FROM rsechie_string
       WHERE objvers = 'A'
         AND tctiobjnm IN @restricted
       INTO TABLE @DATA(by_hierarchy).
@@ -641,7 +642,7 @@ CLASS zzxxmla1_cl_bw_auth_probe IMPLEMENTATION.
     ENDIF.
 
     SELECT tctauth, tctiobjnm, tctsign, tctoption, tctlow, tcthigh
-      FROM rsecval
+      FROM rsecval_string
       WHERE objvers = 'A'
         AND tctauth IN @auths
       ORDER BY tctauth ASCENDING, tctiobjnm ASCENDING, tctlow ASCENDING
@@ -655,7 +656,7 @@ CLASS zzxxmla1_cl_bw_auth_probe IMPLEMENTATION.
     ENDLOOP.
 
     SELECT tctauth, tctiobjnm, tcthienm, tcthievers, tcthiedate, tctniobjnm, tctnode, tctatype, tctacompm, tcttlevel
-      FROM rsechie
+      FROM rsechie_string
       WHERE objvers = 'A'
         AND tctauth IN @auths
       ORDER BY tctauth ASCENDING, tctiobjnm ASCENDING, tcthienm ASCENDING, tctnode ASCENDING

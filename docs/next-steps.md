@@ -202,12 +202,13 @@ query planning); query planning step 7.
 
 Decided with the user 2026-10-23: analysis authorisations are the active work, ahead of the texts and captions (Now:
 texts and captions, below, waits). In scope since 2026-10-22 (`mvp-scope.md`, Authorisation decision): BW analysis
-authorisations as the probe `ZZXXMLA1_BW_AUTH_PROBE` defines them: flat values (`RSECVAL`, `:` included) and
-hierarchy values (`RSECHIE`, matched by hierarchy name and version and by node name and node type, not by `HIEID`,
-the node's values from the slice valid at the key date), variables not supported (a user with one is not authorised:
-a fault of the query), for the user `sy-uname` (identity is the SICF node's). The oracle is the probe: BW's own MDX
-on `$ZCLVISITA` as the user, per query OK, EMPTY, NO AUTH or ERROR (`clinic-demo.md`, Probing BW's authorizations on them), on the
-authorisation-relevant `ZCLDOC` (version-dependent, time-dependent hierarchies) and `ZCLDIAG` (plain hierarchy).
+authorisations as the probe `ZZXXMLA1_BW_AUTH_PROBE` defines them: flat values (`RSECVAL_STRING`, `:` included) and
+hierarchy values (`RSECHIE_STRING`, matched by hierarchy name and version and by node name and node type, not by
+`HIEID`, the node's values from the slice valid at the key date), variables not supported (a user with one is not
+authorised: a fault of the query), for the user `sy-uname` (identity is the SICF node's). The oracle is the probe: BW's
+own MDX on `$ZCLVISITA` as the user, per query OK, EMPTY, NO AUTH or ERROR (`clinic-demo.md`, Probing BW's
+authorizations on them), on the authorisation-relevant `ZCLDOC` (version-dependent, time-dependent hierarchies) and
+`ZCLDIAG` (plain hierarchy).
 
 Several key dates: the clinic generator makes `ZCLDOC`'s hierarchies with slices that differ by key date (to
 2024-12-31 and from 2025-01-01), and the probe runs every query once per key date (`RRT_SET_KEY_DATE`; 2024-06-15,
@@ -216,9 +217,11 @@ probe's key dates and compare its result (allowed, empty, no authorisation, faul
 date. Queries keep using 9999-12-31 only; the other key dates prove that the check is right for every slice, so key
 dates in queries can come later without changing it.
 
-State on 2026-10-23: the probe is done and has run with `0BI_ALL` only (2,244 queries, all OK). The system has no
-other analysis authorisation (`RSECVAL` holds only `0BI_ALL`, `RSECHIE` nothing); `RSDCHA-AUTHRELFL` is set on
-`ZCLDOC` and `ZCLDIAG`. Nothing of the check or the enforcement is built.
+State on 2026-10-24: the probe is done and has run with `0BI_ALL` only (2,244 queries, all OK); step 1 is done: the 21
+scenarios exist as analysis authorisations `ZCLA_*` with their test users `ZZXXMLA1_A01` to `A21` (`clinic-demo.md`,
+Authorization scenarios). BW keeps the values in `RSECVAL_STRING` and `RSECHIE_STRING` (`RSECVAL` and `RSECHIE` hold
+only `0BI_ALL`); the probe reads those now. `RSDCHA-AUTHRELFL` is set on `ZCLDOC` and `ZCLDIAG`. Nothing of the check or
+the enforcement is built; the probe has not yet run for a test user (step 2).
 
 ### Open decisions (answered by step 2, not guessed)
 
@@ -237,42 +240,42 @@ other analysis authorisation (`RSECVAL` holds only `0BI_ALL`, `RSECHIE` nothing)
 
 ### Steps
 
-1. **Scenarios and test users** (`ZZXXMLA1_CL_BW_AUTH_GEN`, called by the clinic generator, a checkbox of
-   `ZZXXMLA1_SETUP`): analysis authorisations `ZCLA_*`, each with the special characteristics BW requires
-   (`0TCAIPROV` `ZCLVISIT*`, `0TCAACTVT` `03`, `0TCAVALID` `*`), and per scenario a test user `ZZXXMLA1_A<nn>` with
-   them and the reporting authorisations BW's MDX needs (`S_RS_COMP`, `S_RS_COMP1`, `S_RS_AUTH`, `S_RFC`). How to
-   write authorisations and assign them (an API of RSECADMIN or the `RSEC*` tables, a role or the direct assignment
-   `RSECUSERAUTH` the probe already reads) is found out first; a run deletes and recreates them, as the demo's data.
-   Scenarios (each also documented in `clinic-demo.md`):
-   - `FULL`: `*` and `:` on both (the control, as `0BI_ALL`); `NONE`: no `ZCLA_*` at all.
-   - Flat: `ZCLDOC` `EQ` a few physicians, `BT` a range, `CP` a pattern, `#` (not assigned); each with and without
-     `:`; `ZCLDIAG` `*`.
-   - Hierarchy `ZCLDOC_ORG` version `001`, per node type (`TCTATYPE`): `0` the node only, `1` the subtree, `2` the
-     subtree to a level, `3` the whole hierarchy, `4` relative levels; a node whose values differ by key date (`GP`:
-     Dr. Hana Sato `008` moves there in 2025) and the same node in version `002`; a leaf as node.
-   - Two hierarchies of one characteristic (`ZCLDOC_ORG` and `ZCLDOC_SITE` nodes in one authorisation).
-   - `VARIABLE`: a `$` value on `ZCLDOC` next to `*` on both; olap4abap refuses every query (no oracle: BW fills
-     the variable).
-   - Combined: a `ZCLDOC` node with a `ZCLDIAG_ICD` node (`RESPIRATORY`); two authorisations that cross (physician
-     A with diagnosis X, physician B with Y), the case of OR of sub-cubes.
+1. **Scenarios and test users** (done 2026-10-24; `ZZXXMLA1_CL_BW_AUTH_GEN`, called by the clinic generator, the
+   checkbox "Also the analysis authorization scenarios and their test users" of `ZZXXMLA1_SETUP`, with a password
+   field; `clinic-demo.md`, Authorization scenarios). Analysis authorisations `ZCLA_*` with the special
+   characteristics (`0TCAIPROV` `CP ZCLVISIT*`, `0TCAACTVT` `03`, `0TCAVALID` `*`), written and activated with BW's
+   API (`RSEC_CREATE_AUTHORIZATION_API`) and assigned directly (`RSEC_ASSIGN_USER_AUTH_API`, `RSECUSERAUTH`, so the
+   users need no `S_RS_AUTH`); per scenario a service user `ZZXXMLA1_A01` ... `A21` with the profile `ZZXXMLA1_REP`
+   (`S_RS_COMP`, `S_RS_COMP1`, `S_RFC`; `SUSR_INTERFACE_PROF`), a run deletes and recreates them, as the demo's data.
+   Scenarios: `FULL`, `NONE`; flat `EQ`, `BT`, `CP`, `#`, each with and without `:`, and `:` alone; `ZCLDOC_ORG`
+   `001` node types 0 to 3 (`GP` node, `GP` subtree, `SPECIAL` to level 3, complete), version `002`, a leaf, a
+   subtree with `:`; `ZCLDOC_ORG` and `ZCLDOC_SITE` nodes in one authorisation; `PULM` with `ZCLDIAG_ICD`
+   `RESPIRATORY`; two crossing authorisations (`009` with `I10`, `012` with `J45`).
+   Left out, because BW does not keep them without a variable: node type 4 (relative level; BW corrects it to 3
+   without a node variable) and the `VARIABLE` scenario (BW drops a `$` value unless a customer exit variable of the
+   characteristic exists; none does, and olap4abap does not support variables). The end-to-end test of the variable
+   refusal is postponed (decided with the user 2026-10-24): the generator creates no variable scenario; it would need
+   a customer exit variable on `ZCLDOC` created in BW by hand (no documented API). Step 3 tests the refusal on
+   made-up lines.
 2. **The oracle**: the probe as each test user at the three key dates, kept as `reference/auth/<scenario>.json`
-   (`scripts/auth_probe.py`; the probe answers JSON through the schema API, `GET auth/probe`, logged on as the user,
-   or through a session as the user; first check whether BW's `RSUDO` mechanism lets one session probe as another
-   user). From the answers write BW's rules into `mvp-scope.md` (Authorisation decision): the open decisions above,
-   what `:` and `#` do, what a node type shows on rows, as slicer, children and parent, and EMPTY against NO AUTH.
-   The probe gets the queries the rules need that it lacks (NON EMPTY, a crossjoin of both characteristics, a
+   (`scripts/auth_probe.py`; the probe answers JSON through the schema API, `GET auth/probe`, logged on as the user, or
+   through a session as the user; first check whether BW's `RSUDO` mechanism lets one session probe as another user:
+   then the users need no password; else the setup gives them one, and `.env.sap` holds it for the scripts). The probe's
+   `authorizations( )` reads the direct assignment and `S_RS_AUTH` of the current user: probing as another user needs it
+   for that user. From the answers write BW's rules into `mvp-scope.md` (Authorisation decision): the open decisions
+   above, what `:` and `#` do, what a node type shows on rows, as slicer, children and parent, and EMPTY against NO
+   AUTH. The probe gets the queries the rules need that it lacks (NON EMPTY, a crossjoin of both characteristics, a
    drill-through, `Members` of a level).
-3. **The authorisations of a user** (`ZZXXMLA1_CL_BW_AUTH`, BW's `RSEC` logic, unit tests on made-up lines): for a
-   user, key date and provider, the authorisation-relevant characteristics of the provider (`RSDCHA-AUTHRELFL`) and
-   the user's authorisations (`S_RS_AUTH` values of the user, `SUSR_USER_AUTH_FOR_OBJ_GET` or the like, patterns
-   included, and `RSECUSERAUTH`), those whose `0TCAIPROV`/`0TCAACTVT`/`0TCAVALID` admit the provider, reading, at the
-   key date, as a region: OR over authorisations of AND over characteristics of a selection: key ranges from
-   `RSECVAL` (`EQ`, `BT`, `CP`, `*`), the aggregation flag `:`, `#`, and per hierarchy line the values of the node in
-   the slice of its name and version valid at the key date (`RSHIEDIR`, `/BIC/H<char>`, intervals `/BIC/J<char>`)
-   by node type and level. An applying authorisation with a `$` value makes the region not authorised (variables
-   are not supported). `check( user, key_date, selection )` answers
-   allowed, no authorisation or fault for a query's selection (per characteristic the values it shows or filters,
-   or aggregated).
+3. **The authorisations of a user** (`ZZXXMLA1_CL_BW_AUTH`, BW's `RSEC` logic, unit tests on made-up lines): for a user,
+   key date and provider, the authorisation-relevant characteristics of the provider (`RSDCHA-AUTHRELFL`) and the user's
+   authorisations (`S_RS_AUTH` values of the user, `SUSR_USER_AUTH_FOR_OBJ_GET` or the like, patterns included, and
+   `RSECUSERAUTH`), those whose `0TCAIPROV`/`0TCAACTVT`/`0TCAVALID` admit the provider, reading, at the key date, as a
+   region: OR over authorisations of AND over characteristics of a selection: key ranges from `RSECVAL_STRING` (`EQ`,
+   `BT`, `CP`, `*`), the aggregation flag `:`, `#`, and per hierarchy line the values of the node in the slice of its
+   name and version valid at the key date (`RSHIEDIR`, `/BIC/H<char>`, intervals `/BIC/J<char>`) by node type and level.
+   An applying authorisation with a `$` value makes the region not authorised (variables are not supported).
+   `check( user, key_date, selection )` answers allowed, no authorisation or fault for a query's selection (per
+   characteristic the values it shows or filters, or aggregated).
 4. **The check against the oracle at every key date** (`GET auth/check` of the schema API with user and key date,
    computed by any caller since the user is a parameter; `scripts/auth_check_test.py`): each probe row of
    `reference/auth/` translated into a selection, the check's answer compared with BW's. All three key dates must

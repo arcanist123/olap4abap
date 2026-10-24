@@ -388,7 +388,12 @@ Read before designing anything:
   hierarchies, `ZCLDOC_ORG` and `ZCLDOC_SITE` (two names are needed for authorization tests): version dependent,
   entire hierarchy time dependent, two versions of two time slices each (served per version, the slice valid to
   9999-12-31: `ZCLDOC_ORG_001`, `_002`, `ZCLDOC_SITE_001`, `_002`, ticked by the setup); the diagnosis `ZCLDIAG` is authorization
-  relevant with the plain hierarchy `ZCLDIAG_ICD`, for authorizations that combine the two characteristics. The
+  relevant with the plain hierarchy `ZCLDIAG_ICD`, for authorizations that combine the two characteristics. With a
+  further checkbox (and a password field) the analysis authorization scenarios (`ZZXXMLA1_CL_BW_AUTH_GEN`,
+  `docs/clinic-demo.md`, Authorization scenarios): 21 analysis authorizations `ZCLA_*` written with BW's
+  `RSEC_*_API`, each assigned directly to its service user `ZZXXMLA1_A01` ... `A21` (profile `ZZXXMLA1_REP`;
+  without password a generated one, no logon), deleted by every clinic run. BW keeps authorization values in
+  `RSECVAL_STRING` and `RSECHIE_STRING`, not `RSECVAL`/`RSECHIE`. The
   patient `ZCLPAT` has the plain hierarchy `ZCLPAT_PRG` (care programs) with link nodes (subtrees under two parents,
   recursively), duplicate and link leaves (patients in two programs) and postable nodes (parents with their
   children in family care), the test case of shared nodes (`docs/clinic-demo.md`).
@@ -499,5 +504,6 @@ After changing ABAP in SAP, run `pull` before committing so `src/` is current.
   and hierarchy values, hierarchies matched by name and version (node by name and node type, never `HIEID`), a node's
   values from the slice valid at the key date (queries use 9999-12-31, the tests compare the check with the probe at
   several key dates), variables not supported (a user with one is not authorised: a fault of the query), for the user `sy-uname` (identity is the
-  SICF node's, not olap4abap's) (`docs/mvp-scope.md`, Authorisation decision). Nothing is enforced yet.
+  SICF node's, not olap4abap's) (`docs/mvp-scope.md`, Authorisation decision). The scenarios and test users exist
+  (`docs/next-steps.md`, step 1); nothing is checked or enforced yet.
 - Third-party reference code (`mondrian/`, `eMondrian/`) is fetched by `scripts/setup-reference.sh`, not committed.

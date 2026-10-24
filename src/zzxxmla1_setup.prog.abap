@@ -16,7 +16,9 @@
 * demo (ZZXXMLA1_CL_BW_WIDE_GEN), which deletes and creates InfoArea ZXMLWIDE's InfoCube ZXMLWIDE and aDSO ZXMLWIDEA
 * with the characteristics ZXMLAD00 to ZXMLAD99, with p_wrecs records (0: 1,000,000). Many records take longer than a
 * dialog step may: then run it in the background (F9). A demo always deletes all its objects, and creates its InfoCube
-* only with p_cube and its aDSO only with p_adso.
+* only with p_cube and its aDSO only with p_adso. With p_auth the analysis authorization scenarios and their test
+* users (ZZXXMLA1_CL_BW_AUTH_GEN), with the clinic demo or alone, the users with the password p_apwd (none: nobody can
+* log on as them); it is not kept anywhere.
 REPORT zzxxmla1_setup.
 
 SELECTION-SCREEN BEGIN OF LINE.
@@ -26,6 +28,14 @@ SELECTION-SCREEN END OF LINE.
 SELECTION-SCREEN BEGIN OF LINE.
 SELECTION-SCREEN COMMENT 1(35) t_maxvis FOR FIELD p_maxvis.
 PARAMETERS p_maxvis TYPE i.
+SELECTION-SCREEN END OF LINE.
+SELECTION-SCREEN BEGIN OF LINE.
+PARAMETERS p_auth AS CHECKBOX.
+SELECTION-SCREEN COMMENT 4(70) t_auth FOR FIELD p_auth.
+SELECTION-SCREEN END OF LINE.
+SELECTION-SCREEN BEGIN OF LINE.
+SELECTION-SCREEN COMMENT 1(35) t_apwd FOR FIELD p_apwd.
+PARAMETERS p_apwd TYPE c LENGTH 40 LOWER CASE.
 SELECTION-SCREEN END OF LINE.
 SELECTION-SCREEN BEGIN OF LINE.
 PARAMETERS p_wide AS CHECKBOX.
@@ -47,10 +57,20 @@ SELECTION-SCREEN END OF LINE.
 INITIALIZATION.
   t_clinic = 'Also generate the clinic demo (BW objects, data, schemas, catalogs)'.
   t_maxvis = 'Clinic demo: max. visits (0: all)'.
+  t_auth = 'Also the analysis authorization scenarios and their test users'.
+  t_apwd = 'Test users: password (none: no logon)'.
   t_wide = 'Also generate the wide demo (100 characteristics, BW objects, data)'.
   t_wrecs = 'Wide demo: records (0: 1,000,000)'.
   t_cube = 'Demos: create the InfoCube (all objects are deleted either way)'.
   t_adso = 'Demos: create the aDSO (all objects are deleted either way)'.
+
+AT SELECTION-SCREEN OUTPUT.
+  LOOP AT SCREEN.
+    IF screen-name = 'P_APWD'.
+      screen-invisible = 1.
+      MODIFY SCREEN.
+    ENDIF.
+  ENDLOOP.
 
 START-OF-SELECTION.
   LOOP AT NEW zzxxmla1_cl_setup( )->run( clinic            = p_clinic
@@ -58,6 +78,8 @@ START-OF-SELECTION.
                                          wide              = p_wide
                                          wide_records      = p_wrecs
                                          cube              = p_cube
-                                         adso              = p_adso ) INTO DATA(line).
+                                         adso              = p_adso
+                                         authorizations    = p_auth
+                                         password          = p_apwd ) INTO DATA(line).
     WRITE / line.
   ENDLOOP.

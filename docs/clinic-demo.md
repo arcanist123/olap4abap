@@ -15,6 +15,10 @@ adso = ... )` of the class) choose the providers the run creates, loads and depl
 demo's objects and catalogs either way, and always creates the InfoObjects with their master data, texts and
 hierarchies. The checkboxes apply to the wide demo too.
 
+"Also the analysis authorization scenarios and their test users" (`run( authorizations = ... password = ... )`)
+creates the analysis authorizations `ZCLA_*` and the test users `ZZXXMLA1_A01` ... (see Authorization scenarios
+below), with the clinic demo or alone; a clinic run deletes them either way, as the rest of the demo.
+
 "Clinic demo: max. visits" (`run( max_visits = ... )` of the class) caps the number of visits for a smaller demo, e.g.
 on a test system: the visits are thinned evenly over the days, so every day keeps its share; 0 (the default) keeps all
 33,956. Patients, physicians and diagnoses stay the same.
@@ -120,7 +124,58 @@ once per key date (default 2024-06-15, 2025-06-15 and 9999-12-31, the key date o
   other as slicer (its leaves too with "combine with leaves").
 
 With `0BI_ALL` all 2,244 queries answer. The statement goes to BW in lines of 75 characters that BW
-joins respecting blanks.
+joins respecting blanks. BW keeps the authorizations' values in `RSECVAL_STRING` and `RSECHIE_STRING` (with the
+header `RSECBIAU` and the texts `RSECTXT`); `RSECVAL` and `RSECHIE` hold only `0BI_ALL` on the 2025 system, so the
+probe reads the string tables.
+
+### Authorization scenarios
+
+`ZZXXMLA1_CL_BW_AUTH_GEN` (setup checkbox "Also the analysis authorization scenarios and their test users", or
+`sapcli class execute ZZXXMLA1_CL_BW_AUTH_GEN` without password) creates per scenario an analysis authorization
+`ZCLA_*` and a test user that has it, for comparing olap4abap's check with BW's (`next-steps.md`, Now: analysis
+authorisations). It writes them with BW's API (`RSEC_CREATE_AUTHORIZATION_API`, activated;
+`RSEC_ASSIGN_USER_AUTH_API`, the direct assignment `RSECUSERAUTH`, so no `S_RS_AUTH`), and a run deletes every
+`ZCLA_*` and every `ZZXXMLA1_A<two digits>` user first.
+
+- Every authorization has the special characteristics BW requires: `0TCAIPROV` `CP ZCLVISIT*` (both providers),
+  `0TCAACTVT` `EQ 03`, `0TCAVALID` `CP *`; and `ZCLDIAG` `CP *` where the scenario restricts only the physician.
+- Hierarchy lines have the validity "Name and Version Identical" (`TCTACOMPM` 1), the matching olap4abap supports
+  (`mvp-scope.md`, Authorisation decision). BW resolves each to the slice of its name and version valid at the line's
+  date (9999-12-31) and keeps its `HIESID`; a clinic run deletes the authorizations with the hierarchies.
+- The users are service users (type `S`: the password never has to be changed, HTTP basic logons work) with the profile
+  `ZZXXMLA1_REP` (`S_RS_COMP` and `S_RS_COMP1` display and execute of every query component, `S_RFC` of every function
+  group), written with `SUSR_INTERFACE_PROF`. With the setup's password field empty they get a generated password
+  nobody knows: they cannot log on, BW's checks can still run for them. The password is not stored anywhere.
+
+| User | Scenario | Authorizations | Restriction (`ZCLDIAG` `*` unless named) |
+|---|---|---|---|
+| `ZZXXMLA1_A01` | FULL | `ZCLA_FULL` | `ZCLDOC` `*` (the control, as `0BI_ALL`) |
+| `ZZXXMLA1_A02` | NONE | - | no analysis authorization |
+| `ZZXXMLA1_A03` | EQ | `ZCLA_EQ` | `ZCLDOC` `EQ 001`, `008`, `012` |
+| `ZZXXMLA1_A04` | EQ_AGG | `ZCLA_EQ_AGG` | as EQ, and `:` |
+| `ZZXXMLA1_A05` | BT | `ZCLA_BT` | `ZCLDOC` `BT 001 005` (General Practice) |
+| `ZZXXMLA1_A06` | BT_AGG | `ZCLA_BT_AGG` | as BT, and `:` |
+| `ZZXXMLA1_A07` | CP | `ZCLA_CP` | `ZCLDOC` `CP 01*` (`010` to `019`) |
+| `ZZXXMLA1_A08` | CP_AGG | `ZCLA_CP_AGG` | as CP, and `:` |
+| `ZZXXMLA1_A09` | NA | `ZCLA_NA` | `ZCLDOC` `EQ #` (not assigned) |
+| `ZZXXMLA1_A10` | NA_AGG | `ZCLA_NA_AGG` | as NA, and `:` |
+| `ZZXXMLA1_A11` | AGG | `ZCLA_AGG` | `ZCLDOC` `:` only |
+| `ZZXXMLA1_A12` | H0 | `ZCLA_H0` | `ZCLDOC_ORG` `001`: node `GP`, type 0 (the node only) |
+| `ZZXXMLA1_A13` | H1 | `ZCLA_H1` | `ZCLDOC_ORG` `001`: node `GP`, type 1 (subtree; `008` is there from 2025) |
+| `ZZXXMLA1_A14` | H2 | `ZCLA_H2` | `ZCLDOC_ORG` `001`: node `SPECIAL`, type 2 to level 3 (departments in 2024, `INTMED` and `ORTH` from 2025) |
+| `ZZXXMLA1_A15` | H3 | `ZCLA_H3` | `ZCLDOC_ORG` `001`: type 3 (complete hierarchy) |
+| `ZZXXMLA1_A16` | HV2 | `ZCLA_HV2` | `ZCLDOC_ORG` `002`: node `GP`, type 1 (nobody moves in the plan) |
+| `ZZXXMLA1_A17` | HLEAF | `ZCLA_HLEAF` | `ZCLDOC_ORG` `001`: the leaf `008`, type 0 |
+| `ZZXXMLA1_A18` | H1_AGG | `ZCLA_H1_AGG` | as H1, and `ZCLDOC` `:` |
+| `ZZXXMLA1_A19` | 2HIE | `ZCLA_2HIE` | `ZCLDOC_ORG` `001` `CARD` and `ZCLDOC_SITE` `001` `RIVER`, type 1 |
+| `ZZXXMLA1_A20` | COMB | `ZCLA_COMB` | `ZCLDOC_ORG` `001` `PULM` and `ZCLDIAG_ICD` `RESPIRATORY`, type 1 (no `ZCLDIAG` `*`) |
+| `ZZXXMLA1_A21` | CROSS | `ZCLA_X1`, `ZCLA_X2` | `ZCLDOC` `009` with `ZCLDIAG` `I10`, and `012` with `J45`: OR of the two sub-cubes |
+
+No scenario has a variable or a relative level: BW takes a `$` value only if a customer exit variable of that name
+exists for the characteristic (the API leaves the line out, message RSEC 189), and corrects node type 4 (relative
+level) to 3 (complete hierarchy) without a node variable (a warning "Hierarchy corrected"). olap4abap supports no
+variables (`mvp-scope.md`), so neither has a BW answer to compare with; the check's refusal of a `$` value is tested on
+made-up lines.
 
 ## The hierarchy of the diagnoses
 
@@ -258,9 +313,11 @@ key of their path (`...&[LOCATIONS]&[ZCLSITE]&[NORTH]` and `...&[LOCATIONS]&[0HI
 `[LOCATIONS].[NORTH]` finds the site, the first one). The generator gives a node the InfoObject of its parent where the
 parent's name is not enough (`parent_iobjnm`).
 
-The run deletes the characteristics' hierarchies before the InfoObjects. Every run creates new `HIEID`s, which does
-not touch the hierarchy authorizations: BW defines them by hierarchy name and version and by node name and node type
-(`RSECHIE`: `TCTHIENM`, `TCTHIEVERS`, `TCTNODE`, `TCTNIOBJNM`), not by `HIEID`, and the run keeps the names.
+The run deletes the characteristics' hierarchies before the InfoObjects. Every run creates new `HIEID`s; BW defines a
+hierarchy authorization by hierarchy name and version and by node name and node type (`RSECHIE_STRING`: `TCTHIENM`,
+`TCTHIEVERS`, `TCTNODE`, `TCTNIOBJNM`), not by `HIEID`, and the run keeps the names. It keeps the slice's `HIESID`
+with the line too, so a run deletes the authorization scenarios with the hierarchies and creates them again when
+asked (Authorization scenarios above).
 
 ## The data
 

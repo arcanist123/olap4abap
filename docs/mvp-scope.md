@@ -189,8 +189,9 @@ Decisions taken by the project owner on 2026-10-02, with reasons.
 - **BW analysis authorisations are in scope** (decided with the user; until then out of scope, since reading the BW
   tables directly bypasses them). They are enforced as the probe `ZZXXMLA1_BW_AUTH_PROBE`
   (`ZZXXMLA1_CL_BW_AUTH_PROBE`, `clinic-demo.md`, Probing BW's authorizations on them) defines them:
-  - **Flat values** (`RSECVAL`: characteristic, sign, option, low, high), the aggregation authorisation `:` included.
-  - **Hierarchy values** (`RSECHIE`). BW defines a hierarchy authorisation by hierarchy name and version
+  - **Flat values** (`RSECVAL_STRING`: characteristic, sign, option, low, high), the aggregation authorisation `:`
+    included.
+  - **Hierarchy values** (`RSECHIE_STRING`). BW defines a hierarchy authorisation by hierarchy name and version
     (`TCTHIENM`, `TCTHIEVERS`) and by node name and node type (`TCTNODE`, `TCTNIOBJNM`: `0HIER_NODE` for a text node,
     else the characteristic or an external one), not by `HIEID`. A line applies to the hierarchy olap4abap serves
     under that name and version (`<name>_<version>` of a version-dependent one).

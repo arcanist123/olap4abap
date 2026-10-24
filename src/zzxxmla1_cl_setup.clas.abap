@@ -15,6 +15,8 @@
 "! - /WEB-INF/datasources.xml with one data source and no catalog, only if there is none: it holds the catalogs;
 "! - on request the clinic demo (ZZXXMLA1_CL_BW_CLINIC_GEN): BW objects, data, schemas and catalogs, with at most
 "!   clinic_max_visits visits if that is given;
+"! - on request the analysis authorization scenarios and their test users (ZZXXMLA1_CL_BW_AUTH_GEN), with the clinic
+"!   demo or alone (they need its characteristics and hierarchies);
 "! - on request the wide demo (ZZXXMLA1_CL_BW_WIDE_GEN): BW objects with 100 characteristics and their data, with at
 "!   wide_records records if that is given (1,000,000 if not).
 "! It can run any number of times.
@@ -29,6 +31,8 @@ CLASS zzxxmla1_cl_setup DEFINITION
     "! Sets up the server; the log of the run.
     "! @parameter cube | the demos create their InfoCube (they delete all their objects either way)
     "! @parameter adso | the demos create their aDSO
+    "! @parameter authorizations | the analysis authorization scenarios and their test users
+    "! @parameter password | the test users' password; none: nobody can log on as them
     METHODS run
       IMPORTING clinic            TYPE abap_bool DEFAULT abap_false
                 clinic_max_visits TYPE i DEFAULT 0
@@ -36,6 +40,8 @@ CLASS zzxxmla1_cl_setup DEFINITION
                 wide_records      TYPE i DEFAULT 0
                 cube              TYPE abap_bool DEFAULT abap_true
                 adso              TYPE abap_bool DEFAULT abap_true
+                authorizations    TYPE abap_bool DEFAULT abap_false
+                password          TYPE csequence OPTIONAL
       RETURNING VALUE(result)     TYPE string_table.
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -60,9 +66,13 @@ CLASS zzxxmla1_cl_setup IMPLEMENTATION.
     APPEND LINES OF write_datasources( ) TO result.
     COMMIT WORK.
     IF clinic = abap_true.
-      APPEND LINES OF NEW zzxxmla1_cl_bw_clinic_gen( )->run( max_visits = clinic_max_visits
-                                                             cube       = cube
-                                                             adso       = adso ) TO result.
+      APPEND LINES OF NEW zzxxmla1_cl_bw_clinic_gen( )->run( max_visits     = clinic_max_visits
+                                                             cube           = cube
+                                                             adso           = adso
+                                                             authorizations = authorizations
+                                                             password       = password ) TO result.
+    ELSEIF authorizations = abap_true.
+      APPEND LINES OF NEW zzxxmla1_cl_bw_auth_gen( )->run( password ) TO result.
     ENDIF.
     IF wide = abap_true.
       APPEND LINES OF NEW zzxxmla1_cl_bw_wide_gen( )->run( records = wide_records
