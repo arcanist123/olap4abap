@@ -31,6 +31,10 @@ CLASS zzxxmla1_main_endpoint DEFINITION
     METHODS handle_schema_api
       IMPORTING server TYPE REF TO if_http_server
                 !path  TYPE string.
+    "! Moves a request of the endpoint for BW's MDX between HTTP and ZZXXMLA1_CL_BW_MDX_API.
+    METHODS handle_bw_mdx
+      IMPORTING server TYPE REF TO if_http_server
+                !path  TYPE string.
     "! Moves a request for the schema generator's app (its files) between HTTP and ZZXXMLA1_CL_WEB_APP.
     METHODS handle_web_app
       IMPORTING server TYPE REF TO if_http_server
@@ -56,6 +60,11 @@ CLASS zzxxmla1_main_endpoint IMPLEMENTATION.
     ENDIF.
     IF zzxxmla1_cl_web_app=>is_app( path_info ).
       handle_web_app( server = server path = path_info ).
+      RETURN.
+    ENDIF.
+    " /bw/... is the endpoint for BW's MDX on InfoProviders (ZZXXMLA1_CL_BW_MDX_API)
+    IF zzxxmla1_cl_bw_mdx_api=>is_api( path_info ).
+      handle_bw_mdx( server = server path = path_info ).
       RETURN.
     ENDIF.
     " XMLA requests are SOAP envelopes sent with POST.
@@ -115,6 +124,30 @@ CLASS zzxxmla1_main_endpoint IMPLEMENTATION.
     server->response->set_status( code = result-status reason = SWITCH #( result-status
                                                                            WHEN 200 THEN `OK`
                                                                            WHEN 400 THEN `Bad Request`
+                                                                           WHEN 404 THEN `Not Found`
+                                                                           WHEN 405 THEN `Method Not Allowed`
+                                                                           ELSE `Internal Server Error` ) ).
+    IF result-allow IS NOT INITIAL.
+      server->response->set_header_field( name = 'Allow' value = result-allow ).
+    ENDIF.
+    server->response->set_content_type( result-content_type ).
+    server->response->set_cdata( result-body ).
+  ENDMETHOD.
+
+  METHOD handle_bw_mdx.
+    DATA fields TYPE tihttpnvp.
+    server->request->get_form_fields( CHANGING fields = fields ).
+    DATA(request) = VALUE zzxxmla1_cl_bw_mdx_api=>ty_request( method = server->request->get_method( )
+                                                               path   = path
+                                                               body   = server->request->get_cdata( ) ).
+    LOOP AT fields INTO DATA(field).
+      APPEND VALUE #( name = to_lower( field-name ) value = field-value ) TO request-parameters.
+    ENDLOOP.
+    DATA(result) = NEW zzxxmla1_cl_bw_mdx_api( )->handle( request ).
+    server->response->set_status( code = result-status reason = SWITCH #( result-status
+                                                                           WHEN 200 THEN `OK`
+                                                                           WHEN 400 THEN `Bad Request`
+                                                                           WHEN 403 THEN `Forbidden`
                                                                            WHEN 404 THEN `Not Found`
                                                                            WHEN 405 THEN `Method Not Allowed`
                                                                            ELSE `Internal Server Error` ) ).

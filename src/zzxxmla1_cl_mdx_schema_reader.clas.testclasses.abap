@@ -232,3 +232,197 @@ CLASS ltc_members IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+
+"! BW's names on the clinic demo's aDSO (ZZXXMLA1_SETUP, catalog and cube ZCLVISITA, docs/next-steps.md, Next: BW's
+"! MDX on InfoProviders): the names of the statements the probe asks BW (reference/auth/statements.json) looked up to
+"! olap4abap's elements.
+CLASS ltc_bw_names DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+  PRIVATE SECTION.
+    CLASS-DATA reader TYPE REF TO zzxxmla1_cl_mdx_schema_reader.
+    CLASS-METHODS class_setup RAISING zzxxmla1_cx_xmla.
+    "! BW's name of a BW hierarchy: characteristic, name and version in columns of 30 characters.
+    CLASS-METHODS hierarchy
+      IMPORTING characteristic TYPE string
+                !name          TYPE string
+                !version       TYPE string OPTIONAL
+      RETURNING VALUE(result)  TYPE string.
+    "! BW's name of a node: its name in 32 characters and its InfoObject in 30.
+    CLASS-METHODS node
+      IMPORTING !name         TYPE string
+                iobj          TYPE string DEFAULT `0HIER_NODE`
+      RETURNING VALUE(result) TYPE string.
+    "! The element the identifier (its segments in brackets) names: its kind and its unique name (a member's is matched
+    "! as a pattern, CP).
+    METHODS assert_lookup
+      IMPORTING segments TYPE string_table
+                kind     TYPE string
+                !name    TYPE string OPTIONAL.
+    METHODS split_hierarchy_name FOR TESTING.
+    METHODS split_member_name FOR TESTING.
+    METHODS characteristics FOR TESTING.
+    METHODS bw_hierarchies FOR TESTING.
+    METHODS levels FOR TESTING.
+    METHODS nodes_and_leaves FOR TESTING.
+    METHODS not_found FOR TESTING.
+    METHODS unknown_cube FOR TESTING.
+ENDCLASS.
+
+CLASS ltc_bw_names IMPLEMENTATION.
+
+  METHOD class_setup.
+    reader = zzxxmla1_cl_mdx_schema_reader=>for_bw_cube( `$ZCLVISITA` ).
+  ENDMETHOD.
+
+  METHOD hierarchy.
+    result = |{ characteristic WIDTH = 30 }{ name WIDTH = 30 }{ version }|.
+  ENDMETHOD.
+
+  METHOD node.
+    result = |{ name WIDTH = 32 }{ iobj WIDTH = 30 }|.
+  ENDMETHOD.
+
+  METHOD assert_lookup.
+    DATA(mdx) = concat_lines_of( table = VALUE string_table( FOR s IN segments ( |[{ s }]| ) ) sep = `.` ).
+    TRY.
+        DATA(id) = zzxxmla1_cl_mdx_parser=>parse_expression( mdx ).
+      CATCH zzxxmla1_cx_xmla INTO DATA(error).
+        cl_abap_unit_assert=>fail( error->description ).
+    ENDTRY.
+    DATA(element) = reader->lookup_compound( id->segments ).
+    cl_abap_unit_assert=>assert_equals( act = element-kind exp = kind msg = mdx ).
+    CASE kind.
+      WHEN zzxxmla1_cl_mdx_schema_reader=>c_element-member.
+        cl_abap_unit_assert=>assert_true( act = xsdbool( element-member-unique_name CP name )
+                                          msg = |{ mdx }: { element-member-unique_name }| ).
+      WHEN zzxxmla1_cl_mdx_schema_reader=>c_element-dimension.
+        cl_abap_unit_assert=>assert_equals( act = reader->get_dimension( element-id )-unique_name exp = name msg = mdx ).
+      WHEN zzxxmla1_cl_mdx_schema_reader=>c_element-hierarchy.
+        cl_abap_unit_assert=>assert_equals( act = reader->get_hierarchy( element-id )-unique_name exp = name msg = mdx ).
+      WHEN zzxxmla1_cl_mdx_schema_reader=>c_element-level.
+        cl_abap_unit_assert=>assert_equals( act = reader->get_level( element-id )-unique_name exp = name msg = mdx ).
+    ENDCASE.
+  ENDMETHOD.
+
+  METHOD split_hierarchy_name.
+    zzxxmla1_cl_mdx_schema_reader=>bw_hierarchy_name(
+      EXPORTING name           = hierarchy( characteristic = `ZCLDOC` name = `ZCLDOC_ORG` version = `001` )
+      IMPORTING characteristic = DATA(characteristic)
+                hierarchy      = DATA(name)
+                version        = DATA(version) ).
+    cl_abap_unit_assert=>assert_equals( act = characteristic exp = `ZCLDOC` ).
+    cl_abap_unit_assert=>assert_equals( act = name exp = `ZCLDOC_ORG` ).
+    cl_abap_unit_assert=>assert_equals( act = version exp = `001` ).
+    " not version dependent: no version
+    zzxxmla1_cl_mdx_schema_reader=>bw_hierarchy_name(
+      EXPORTING name           = hierarchy( characteristic = `ZCLDIAG` name = `ZCLDIAG_ICD` )
+      IMPORTING characteristic = characteristic
+                hierarchy      = name
+                version        = version ).
+    cl_abap_unit_assert=>assert_equals( act = characteristic exp = `ZCLDIAG` ).
+    cl_abap_unit_assert=>assert_equals( act = name exp = `ZCLDIAG_ICD` ).
+    cl_abap_unit_assert=>assert_initial( version ).
+    " one word: a characteristic, no BW hierarchy
+    zzxxmla1_cl_mdx_schema_reader=>bw_hierarchy_name(
+      EXPORTING name           = `ZCLDIAG`
+      IMPORTING characteristic = characteristic
+                hierarchy      = name
+                version        = version ).
+    cl_abap_unit_assert=>assert_initial( characteristic ).
+    cl_abap_unit_assert=>assert_initial( name ).
+  ENDMETHOD.
+
+  METHOD split_member_name.
+    zzxxmla1_cl_mdx_schema_reader=>bw_member_name( EXPORTING name      = node( `CARD` )
+                                                   IMPORTING node_name = DATA(node_name)
+                                                             iobj      = DATA(iobj) ).
+    cl_abap_unit_assert=>assert_equals( act = node_name exp = `CARD` ).
+    cl_abap_unit_assert=>assert_equals( act = iobj exp = `0HIER_NODE` ).
+    " a name of all 32 characters runs into the InfoObject
+    zzxxmla1_cl_mdx_schema_reader=>bw_member_name( EXPORTING name      = node( `CHRONIC_LOWER_RESPIRATORY_DISEAS` )
+                                                   IMPORTING node_name = node_name
+                                                             iobj      = iobj ).
+    cl_abap_unit_assert=>assert_equals( act = node_name exp = `CHRONIC_LOWER_RESPIRATORY_DISEAS` ).
+    cl_abap_unit_assert=>assert_equals( act = iobj exp = `0HIER_NODE` ).
+    " a leaf: its key, the initial value too
+    zzxxmla1_cl_mdx_schema_reader=>bw_member_name( EXPORTING name      = `A09`
+                                                   IMPORTING node_name = node_name
+                                                             iobj      = iobj ).
+    cl_abap_unit_assert=>assert_equals( act = node_name exp = `A09` ).
+    cl_abap_unit_assert=>assert_initial( iobj ).
+    zzxxmla1_cl_mdx_schema_reader=>bw_member_name( EXPORTING name      = ``
+                                                   IMPORTING node_name = node_name
+                                                             iobj      = iobj ).
+    cl_abap_unit_assert=>assert_initial( node_name ).
+    cl_abap_unit_assert=>assert_initial( iobj ).
+  ENDMETHOD.
+
+  METHOD characteristics.
+    assert_lookup( segments = VALUE #( ( `Measures` ) ) kind = `DIMENSION` name = `[Measures]` ).
+    assert_lookup( segments = VALUE #( ( `Measures` ) ( `ZCLVISNO` ) ) kind = `MEMBER` name = `[Measures].[ZCLVISNO]` ).
+    " a characteristic is its flat hierarchy, a value its key (NUMC with its zeros)
+    assert_lookup( segments = VALUE #( ( `ZCLDOC` ) ) kind = `HIERARCHY` name = `[ZCLDOC]` ).
+    assert_lookup( segments = VALUE #( ( `ZCLDIAG` ) ) kind = `HIERARCHY` name = `[ZCLDIAG]` ).
+    assert_lookup( segments = VALUE #( ( `ZCLDOC` ) ( `001` ) ) kind = `MEMBER` name = `[ZCLDOC].[001]` ).
+    assert_lookup( segments = VALUE #( ( `ZCLDIAG` ) ( `A09` ) ) kind = `MEMBER` name = `[ZCLDIAG].[A09]` ).
+  ENDMETHOD.
+
+  METHOD bw_hierarchies.
+    assert_lookup( segments = VALUE #( ( hierarchy( characteristic = `ZCLDIAG` name = `ZCLDIAG_ICD` ) ) )
+                   kind     = `HIERARCHY`
+                   name     = `[ZCLDIAG.ZCLDIAG_ICD]` ).
+    " version dependent: one hierarchy per version
+    assert_lookup( segments = VALUE #( ( hierarchy( characteristic = `ZCLDOC` name = `ZCLDOC_ORG` version = `001` ) ) )
+                   kind     = `HIERARCHY`
+                   name     = `[ZCLDOC.ZCLDOC_ORG_001]` ).
+    assert_lookup( segments = VALUE #( ( hierarchy( characteristic = `ZCLDOC` name = `ZCLDOC_SITE` version = `002` ) ) )
+                   kind     = `HIERARCHY`
+                   name     = `[ZCLDOC.ZCLDOC_SITE_002]` ).
+  ENDMETHOD.
+
+  METHOD levels.
+    " LEVEL00 is the All level
+    assert_lookup( segments = VALUE #( ( `ZCLDIAG` ) ( `LEVEL00` ) ) kind = `LEVEL` name = `[ZCLDIAG].[(All)]` ).
+    DATA(icd) = hierarchy( characteristic = `ZCLDIAG` name = `ZCLDIAG_ICD` ).
+    assert_lookup( segments = VALUE #( ( icd ) ( `LEVEL00` ) ) kind = `LEVEL` name = `[ZCLDIAG.ZCLDIAG_ICD].[(All)]` ).
+    assert_lookup( segments = VALUE #( ( icd ) ( `LEVEL02` ) ) kind = `LEVEL` name = `[ZCLDIAG.ZCLDIAG_ICD].[Level 02]` ).
+  ENDMETHOD.
+
+  METHOD nodes_and_leaves.
+    DATA(icd) = hierarchy( characteristic = `ZCLDIAG` name = `ZCLDIAG_ICD` ).
+    assert_lookup( segments = VALUE #( ( icd ) ( node( `RESPIRATORY` ) ) )
+                   kind     = `MEMBER`
+                   name     = `[ZCLDIAG.ZCLDIAG_ICD].[Level 02].&[0HIER_NODE]&[DIAGNOSES]&[0HIER_NODE]&[RESPIRATORY]` ).
+    assert_lookup( segments = VALUE #( ( icd ) ( node( `CHRONIC_LOWER_RESPIRATORY_DISEAS` ) ) )
+                   kind     = `MEMBER`
+                   name     = `*&[0HIER_NODE]&[CHRONIC_LOWER_RESPIRATORY_DISEAS]` ).
+    " a leaf by its key; the initial value is a leaf under NO_DIAGNOSIS
+    assert_lookup( segments = VALUE #( ( icd ) ( `A09` ) ) kind = `MEMBER` name = `*&[ZCLDIAG]&[A09]` ).
+    assert_lookup( segments = VALUE #( ( icd ) ( `` ) ) kind = `MEMBER` name = `*&[NO_DIAGNOSIS]&[ZCLDIAG]&[]` ).
+    DATA(org) = hierarchy( characteristic = `ZCLDOC` name = `ZCLDOC_ORG` version = `001` ).
+    assert_lookup( segments = VALUE #( ( org ) ( node( `CARD` ) ) ) kind = `MEMBER` name = `*&[0HIER_NODE]&[CARD]` ).
+    assert_lookup( segments = VALUE #( ( org ) ( `001` ) ) kind = `MEMBER` name = `*&[ZCLDOC]&[001]` ).
+  ENDMETHOD.
+
+  METHOD not_found.
+    " olap4abap's names are not BW's
+    assert_lookup( segments = VALUE #( ( `ZCLDIAG.ZCLDIAG_ICD` ) ) kind = `` ).
+    assert_lookup( segments = VALUE #( ( hierarchy( characteristic = `ZCLDIAG` name = `ZCLDIAG_ICD` ) ) ( `Level 02` ) )
+                   kind     = `` ).
+    assert_lookup( segments = VALUE #( ( hierarchy( characteristic = `ZCLDIAG` name = `NOWHERE` ) ) ) kind = `` ).
+    assert_lookup( segments = VALUE #( ( hierarchy( characteristic = `ZCLDIAG` name = `ZCLDIAG_ICD` ) )
+                                       ( node( `NOWHERE` ) ) )
+                   kind     = `` ).
+    assert_lookup( segments = VALUE #( ( `ZCLDOC` ) ( `999` ) ) kind = `` ).
+  ENDMETHOD.
+
+  METHOD unknown_cube.
+    TRY.
+        zzxxmla1_cl_mdx_schema_reader=>for_bw_cube( `$NOWHERE` ).
+        cl_abap_unit_assert=>fail( `no error` ).
+      CATCH zzxxmla1_cx_xmla INTO DATA(error).
+        cl_abap_unit_assert=>assert_equals( act = error->description
+                                            exp = `olap4abap Error:MDX cube '$NOWHERE' not found` ).
+    ENDTRY.
+  ENDMETHOD.
+
+ENDCLASS.

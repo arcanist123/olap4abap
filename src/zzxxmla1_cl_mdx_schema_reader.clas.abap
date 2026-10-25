@@ -132,6 +132,33 @@ CLASS zzxxmla1_cl_mdx_schema_reader DEFINITION
                 name          TYPE string
       RETURNING VALUE(result) TYPE REF TO zzxxmla1_cl_mdx_schema_reader
       RAISING   zzxxmla1_cx_xmla.
+    "! The schema reader of an InfoProvider's cube in BW's names (docs/next-steps.md, Next: BW's MDX on InfoProviders):
+    "! the name is BW's, $ and the provider ($ZCLVISITA), the cube the one the proposal names after the provider, in the
+    "! catalog of that name if there is one, else in any; MdxCubeNotFound if there is none. Identifiers are then looked
+    "! up in BW's names: [Measures], a characteristic is its flat hierarchy ([ZCLDOC], by the characteristic of its
+    "! dimension's table, not the schema's name), a BW hierarchy its characteristic, name and version
+    "! (bw_hierarchy_name), the levels LEVEL00 (the All level), LEVEL01, ..., a member of a BW hierarchy a node by its
+    "! name and InfoObject (bw_member_name) or a leaf by its key, the first occurrence where it is shared. The members
+    "! keep olap4abap's unique names.
+    CLASS-METHODS for_bw_cube
+      IMPORTING name          TYPE string
+      RETURNING VALUE(result) TYPE REF TO zzxxmla1_cl_mdx_schema_reader
+      RAISING   zzxxmla1_cx_xmla.
+    "! BW's name of a BW hierarchy split into characteristic, name and version, 30 characters each and the version the
+    "! rest ([ZCLDOC                        ZCLDOC_ORG                    001]); all initial for a name of one word (a
+    "! characteristic, Measures).
+    CLASS-METHODS bw_hierarchy_name
+      IMPORTING !name          TYPE string
+      EXPORTING characteristic TYPE string
+                hierarchy      TYPE string
+                !version       TYPE string.
+    "! BW's name of a member of a BW hierarchy split into a node's name, its first 32 characters, and InfoObject, the
+    "! rest ([CARD                            0HIER_NODE                    ]); a name of up to 32 characters (or
+    "! blanks after them) is a leaf's key, the name as it is, the InfoObject initial.
+    CLASS-METHODS bw_member_name
+      IMPORTING !name     TYPE string
+      EXPORTING node_name TYPE string
+                iobj      TYPE string.
 
     METHODS get_dimensions RETURNING VALUE(result) TYPE ty_t_dimension.
     "! The model hierarchies (without Measures) in model order, as ZZXXMLA1_CL_MODEL=>HIERARCHIES gives them.
@@ -371,6 +398,11 @@ CLASS zzxxmla1_cl_mdx_schema_reader DEFINITION
     DATA default_members   TYPE HASHED TABLE OF ty_default_member WITH UNIQUE KEY hierarchy.
     DATA calculated_members TYPE ty_t_calculated_member.
     DATA visual_totals TYPE ty_t_calculated_member.
+    "! identifiers are looked up in BW's names (for_bw_cube)
+    DATA bw_names TYPE abap_bool.
+    "! in BW's names: per model hierarchy (by its id) the characteristic it is of: of a BW hierarchy its copy's, else
+    "! the one of its dimension's table (ZZXXMLA1_CL_BW_VIEW_GEN=>characteristic_of_view), initial for another table
+    DATA bw_characteristics TYPE string_table.
 
     METHODS build
       RAISING zzxxmla1_cx_xmla.
@@ -464,6 +496,30 @@ CLASS zzxxmla1_cl_mdx_schema_reader DEFINITION
     METHODS lookup_child_of_cube
       IMPORTING segment       TYPE zzxxmla1_cl_mdx_node=>ty_segment
       RETURNING VALUE(result) TYPE ty_element.
+    "! In BW's names (for_bw_cube): the Measures dimension, a BW hierarchy by characteristic, name and version, or the
+    "! flat hierarchy of a characteristic: the first hierarchy of it that is no BW hierarchy (its dimension's).
+    METHODS lookup_bw_child_of_cube
+      IMPORTING segment       TYPE zzxxmla1_cl_mdx_node=>ty_segment
+      RETURNING VALUE(result) TYPE ty_element.
+    "! In BW's names: LEVELnn the level of depth nn (LEVEL00 the All level); in a BW hierarchy a member by BW's name
+    "! (lookup_bw_member); else as lookup_child_of_hierarchy.
+    METHODS lookup_bw_child_of_hierarchy
+      IMPORTING hierarchy     TYPE i
+                segment       TYPE zzxxmla1_cl_mdx_node=>ty_segment
+      RETURNING VALUE(result) TYPE ty_element.
+    "! A member of a BW hierarchy by BW's name: a node by its name and InfoObject, else a leaf by the characteristic
+    "! and its key (the name as it is, '' the initial value); the first occurrence, from the top level down and in
+    "! hierarchy order within a level.
+    METHODS lookup_bw_member
+      IMPORTING hierarchy     TYPE i
+                !name         TYPE string
+      RETURNING VALUE(result) TYPE ty_element.
+    "! The first member of a BW hierarchy whose own InfoObject and name are the given ones, from the top level down.
+    METHODS lookup_bw_occurrence
+      IMPORTING hierarchy     TYPE i
+                iobj          TYPE string
+                !name         TYPE string
+      RETURNING VALUE(result) TYPE ty_element.
     METHODS lookup_child_of_dimension
       IMPORTING dimension     TYPE i
                 segment       TYPE zzxxmla1_cl_mdx_node=>ty_segment
@@ -501,6 +557,76 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
                                     description = |olap4abap Error:MDX cube '{ name }' not found| ).
     ENDIF.
     result->build( ).
+  ENDMETHOD.
+
+  METHOD for_bw_cube.
+    IF strlen( name ) < 2 OR name(1) <> `$`.
+      zzxxmla1_cx_xmla=>raise_code( kind = `Server` code = `00HSBB01` text = `XMLA SOAP Body processing error`
+                                    description = |olap4abap Error:MDX cube '{ name }' not found| ).
+    ENDIF.
+    DATA(provider) = to_upper( substring( val = name off = 1 ) ).
+    DATA(catalogs) = zzxxmla1_cl_schema=>get( )->catalogs( ).
+    DATA(catalog) = ``.
+    LOOP AT catalogs INTO DATA(candidate) WHERE table_line = provider.
+      catalog = candidate.
+    ENDLOOP.
+    TRY.
+        result = for_cube( catalog = catalog name = provider ).
+      CATCH zzxxmla1_cx_xmla.
+        zzxxmla1_cx_xmla=>raise_code( kind = `Server` code = `00HSBB01` text = `XMLA SOAP Body processing error`
+                                      description = |olap4abap Error:MDX cube '{ name }' not found| ).
+    ENDTRY.
+    result->bw_names = abap_true.
+    TYPES: BEGIN OF ty_table_characteristic,
+             table          TYPE string,
+             characteristic TYPE string,
+           END OF ty_table_characteristic.
+    DATA characteristic_of TYPE HASHED TABLE OF ty_table_characteristic WITH UNIQUE KEY table.
+    LOOP AT result->model_hierarchies INTO DATA(model).
+      IF model-bw_hierarchy-characteristic IS NOT INITIAL.
+        APPEND model-bw_hierarchy-characteristic TO result->bw_characteristics.
+        CONTINUE.
+      ENDIF.
+      " one read of ZZXXMLA1_VIEW per table
+      READ TABLE characteristic_of INTO DATA(known) WITH TABLE KEY table = model-dim_table.
+      IF sy-subrc <> 0.
+        known = VALUE #( table          = model-dim_table
+                         characteristic = zzxxmla1_cl_bw_view_gen=>characteristic_of_view( model-dim_table ) ).
+        INSERT known INTO TABLE characteristic_of.
+      ENDIF.
+      APPEND known-characteristic TO result->bw_characteristics.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD bw_hierarchy_name.
+    CLEAR: characteristic, hierarchy, version.
+    IF strlen( name ) <= 30.
+      RETURN.
+    ENDIF.
+    DATA(rest) = substring( val = name off = 30 ).
+    IF condense( rest ) = ``.
+      RETURN.
+    ENDIF.
+    characteristic = condense( substring( val = name len = 30 ) ).
+    IF strlen( rest ) > 30.
+      hierarchy = condense( substring( val = rest len = 30 ) ).
+      version = condense( substring( val = rest off = 30 ) ).
+    ELSE.
+      hierarchy = condense( rest ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD bw_member_name.
+    node_name = name.
+    CLEAR iobj.
+    IF strlen( name ) <= 32.
+      RETURN.
+    ENDIF.
+    DATA(rest) = condense( substring( val = name off = 32 ) ).
+    IF rest IS NOT INITIAL.
+      node_name = condense( substring( val = name len = 32 ) ).
+      iobj = rest.
+    ENDIF.
   ENDMETHOD.
 
   METHOD build.
@@ -1221,11 +1347,19 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
   METHOD get_element_child.
     CASE parent-kind.
       WHEN c_element-cube.
-        result = lookup_child_of_cube( segment ).
+        IF bw_names = abap_true.
+          result = lookup_bw_child_of_cube( segment ).
+        ELSE.
+          result = lookup_child_of_cube( segment ).
+        ENDIF.
       WHEN c_element-dimension.
         result = lookup_child_of_dimension( dimension = parent-id segment = segment ).
       WHEN c_element-hierarchy.
-        result = lookup_child_of_hierarchy( hierarchy = parent-id segment = segment ).
+        IF bw_names = abap_true.
+          result = lookup_bw_child_of_hierarchy( hierarchy = parent-id segment = segment ).
+        ELSE.
+          result = lookup_child_of_hierarchy( hierarchy = parent-id segment = segment ).
+        ENDIF.
       WHEN c_element-level.
         result = lookup_child_of_level( level = parent-id segment = segment ).
       WHEN c_element-member.
@@ -1328,6 +1462,89 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
     LOOP AT dimensions INTO dimension.
       result = lookup_child_of_dimension( dimension = dimension-id segment = segment ).
       IF result-kind IS NOT INITIAL.
+        RETURN.
+      ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD lookup_bw_child_of_cube.
+    IF segment-quoting = zzxxmla1_cl_mdx_node=>c_quoting-key.
+      RETURN.
+    ENDIF.
+    IF equal_name( name1 = segment-name name2 = `Measures` ) = abap_true.
+      result = VALUE #( kind = c_element-dimension id = c_measures ).
+      RETURN.
+    ENDIF.
+    bw_hierarchy_name( EXPORTING name           = segment-name
+                       IMPORTING characteristic = DATA(characteristic)
+                                 hierarchy      = DATA(hierarchy_name)
+                                 version        = DATA(version) ).
+    LOOP AT hierarchies INTO DATA(hierarchy) WHERE id <> c_measures.
+      DATA(bw) = hierarchy-model-bw_hierarchy.
+      IF characteristic IS INITIAL.
+        IF bw-characteristic IS INITIAL
+            AND equal_name( name1 = bw_characteristics[ hierarchy-id ] name2 = segment-name ) = abap_true.
+          result = VALUE #( kind = c_element-hierarchy id = hierarchy-id ).
+          RETURN.
+        ENDIF.
+      ELSEIF equal_name( name1 = |{ bw-characteristic }| name2 = characteristic ) = abap_true
+          AND equal_name( name1 = |{ bw-name }| name2 = hierarchy_name ) = abap_true
+          AND equal_name( name1 = |{ bw-version }| name2 = version ) = abap_true.
+        result = VALUE #( kind = c_element-hierarchy id = hierarchy-id ).
+        RETURN.
+      ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD lookup_bw_child_of_hierarchy.
+    IF segment-quoting <> zzxxmla1_cl_mdx_node=>c_quoting-key AND hierarchy <> c_measures.
+      DATA(name) = to_upper( segment-name ).
+      IF strlen( name ) = 7 AND name(5) = `LEVEL` AND name+5(2) CO `0123456789`.
+        DATA(depth) = CONV i( name+5(2) ).
+        LOOP AT hierarchies[ hierarchy + 1 ]-levels INTO DATA(level_id).
+          IF levels[ level_id ]-depth = depth.
+            result = VALUE #( kind = c_element-level id = level_id ).
+            RETURN.
+          ENDIF.
+        ENDLOOP.
+        RETURN.
+      ENDIF.
+      IF hierarchies[ hierarchy + 1 ]-model-bw_hierarchy-characteristic IS NOT INITIAL.
+        result = lookup_bw_member( hierarchy = hierarchy name = segment-name ).
+        RETURN.
+      ENDIF.
+    ENDIF.
+    result = lookup_child_of_hierarchy( hierarchy = hierarchy segment = segment ).
+  ENDMETHOD.
+
+  METHOD lookup_bw_member.
+    bw_member_name( EXPORTING name = name IMPORTING node_name = DATA(node_name) iobj = DATA(iobj) ).
+    IF iobj IS NOT INITIAL.
+      result = lookup_bw_occurrence( hierarchy = hierarchy iobj = iobj name = node_name ).
+      IF result-kind IS NOT INITIAL.
+        RETURN.
+      ENDIF.
+    ENDIF.
+    " a leaf is named by the characteristic and its key (a key of more than 32 characters looks like a node)
+    result = lookup_bw_occurrence( hierarchy = hierarchy
+                                   iobj      = |{ model_hierarchies[ hierarchy ]-bw_hierarchy-characteristic }|
+                                   name      = name ).
+  ENDMETHOD.
+
+  METHOD lookup_bw_occurrence.
+    DATA(model) = model_hierarchies[ hierarchy ].
+    LOOP AT hierarchies[ hierarchy + 1 ]-levels INTO DATA(level_id).
+      DATA(level_no) = levels[ level_id ]-key_level.
+      IF level_no = 0.
+        CONTINUE.
+      ENDIF.
+      DATA(iobj_column) = zzxxmla1_cl_sql=>quote( zzxxmla1_cl_model=>bw_iobj_column( level_no ) ).
+      DATA(name_column) = zzxxmla1_cl_sql=>quote( model-levels[ level_no ]-name_column ).
+      DATA(condition) = |{ zzxxmla1_cl_sql=>key_condition( column = iobj_column key = iobj ) } AND | &&
+                        zzxxmla1_cl_sql=>key_condition( column = name_column key = name ).
+      DATA(found) = read( hierarchy = hierarchy level_no = level_no limit = 1 condition = condition ).
+      IF found IS NOT INITIAL.
+        result = VALUE #( kind = c_element-member id = found[ 1 ]-level member = found[ 1 ] ).
         RETURN.
       ENDIF.
     ENDLOOP.

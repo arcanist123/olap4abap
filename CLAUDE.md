@@ -62,7 +62,10 @@ Read before designing anything:
 - `ZZXXMLA1_CL_HTTP_HELLOWORLD` - hello world HTTP handler with a passing unit test (a leftover `ZCL_HTTP_HELLOWORLD`
   still exists in `$TMP` and can be deleted).
 - `ZZXXMLA1_MAIN_ENDPOINT` - `IF_HTTP_EXTENSION` handler behind ICF service `/zzxxmla1`: `/schema/api/...` goes to
-  `ZZXXMLA1_CL_SCHEMA_API`, the rest of `/schema/...` to `ZZXXMLA1_CL_WEB_APP` (the schema builder's files, from the code); otherwise GET returns the start page (links to the schema builder, MDX console, time master data and trace, and the XMLA URL
+  `ZZXXMLA1_CL_SCHEMA_API`, the rest of `/schema/...` to `ZZXXMLA1_CL_WEB_APP` (the schema builder's files, from the code),
+  `/bw/...` to `ZZXXMLA1_CL_BW_MDX_API` (BW's MDX on InfoProviders, `POST bw/check?user=&keyDate=`: the
+  authorisation result of a user for a statement in BW's names, never data; so far it resolves the statement,
+  `ZZXXMLA1_CL_MDX_SCHEMA_READER=>for_bw_cube`; `docs/next-steps.md`, Next: BW's MDX on InfoProviders); otherwise GET returns the start page (links to the schema builder, MDX console, time master data and trace, and the XMLA URL
   with `sap-client` for clients), POST hands the SOAP body to `ZZXXMLA1_CL_XMLA_HANDLER` (string in, string out; so far only
   DISCOVER_DATASOURCES, anything else is a SOAP fault), other methods 405.
 - XMLA tests: `python scripts/xmla_test.py` replays `reference/<case>/` against SAP (see `docs/test-strategy.md`);

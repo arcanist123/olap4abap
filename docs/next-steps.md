@@ -458,6 +458,14 @@ compared, not only 9999-12-31.
    and version (`ZCLDOC_ORG_001`), `LEVELnn`, a node by name and InfoObject on the copy's path table (`NODE_NAME`,
    `NODE_IOBJ`; the first occurrence where it is shared), a leaf and a flat member by key. Unit tests on the schema
    reader; done when every statement of `statements.json` resolves on `$ZCLVISITA`.
+   Steps 1 and 2 built 2026-10-25: `ZZXXMLA1_CL_BW_MDX_API` (`POST /zzxxmla1/bw/check`, so far answering RESOLVED
+   with the statement in olap4abap's names, `resolved`, or ERROR with the fault) and
+   `ZZXXMLA1_CL_MDX_SCHEMA_READER=>for_bw_cube` (`lookup_bw_child_of_cube`, `lookup_bw_child_of_hierarchy`,
+   `lookup_bw_member`; unit tests `ltc_bw_names` on `$ZCLVISITA`). Of the 1,289 distinct statements of
+   `statements.json` 1,282 resolve: all those of 9999-12-31. The other 7 are asked at 2024-06-15 only and name
+   `EMERGENCY` of `ZCLDOC_ORG` `002`, a node of the slice valid in 2024, which the schema does not serve (it serves
+   the slice valid to 9999-12-31): the comparison at the other key dates (step 5) needs the reader to take the
+   key date's slice of a BW hierarchy (`ZZXXMLA1_CL_BW_HIERARCHY_COPY=>current` with the key date).
 3. **The query's selection and the check:** parse, `resolve_query` and the axes' members (no cells), the selection
    from the axes, slicer and subcube as the authorisations' step 5a needs it, then
    `ZZXXMLA1_CL_BW_AUTH_SQL=>check` (and `check_members` for EMPTY) for the user at the key date. The check's
