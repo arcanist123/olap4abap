@@ -514,5 +514,11 @@ After changing ABAP in SAP, run `pull` before committing so `src/` is current.
   selection exist (`ZZXXMLA1_CL_BW_AUTH`, step 3) and agree with the oracle at every key date (step 4:
   `python scripts/auth_check_test.py`, `GET auth/check?user=...&keyDate=...`, `ZZXXMLA1_CL_BW_AUTH_QUERIES` asks the
   probe's queries as selections; a line's flat values from the slice of its date, a type 3 line the complete
-  hierarchy); nothing is enforced yet (step 5).
+  hierarchy). The same check in HANA (`ZZXXMLA1_CL_BW_AUTH_SQL`, step 5's engine: the profile per node, each
+  hierarchy line expanded on the path table of the copy of its slice at the key date and at its own date, one
+  statement per query, a crossjoin as its factors) agrees with the oracle at every key date too
+  (`auth_check_test.py --engine sql`, `GET auth/check?...&engine=sql`); nothing is enforced yet (step 5a, 5b). For it
+  the copies hold any slice (`current` with a key date; a slice's copy is deleted once BW has the slice no more) and
+  name a leaf by the characteristic and its key (`NODE_IOBJ`, `NODE_NAME`; copies filled before
+  `c_layout_since` are refilled once).
 - Third-party reference code (`mondrian/`, `eMondrian/`) is fetched by `scripts/setup-reference.sh`, not committed.

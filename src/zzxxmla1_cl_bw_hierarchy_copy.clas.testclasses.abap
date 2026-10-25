@@ -23,6 +23,9 @@ CLASS ltc_bw_hierarchy_copy DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DUR
     METHODS up_to_date FOR TESTING.
     "! a copy is kept while BW keeps its version, current or old, of the same TIMESTMP
     METHODS stale_copies FOR TESTING.
+    "! a leaf of the node table is named by the characteristic and its key from the SID table (of a compounded one its
+    "! compounding's keys at their lengths first), a node by /BIC/K
+    METHODS leaf_keys FOR TESTING.
     "! a member's values are its rows of the closure the hierarchy is read from, of its HIESID and SVER
     METHODS values_of_member FOR TESTING.
     "! a hierarchy that shows the not-assigned node is read from the view, one that suppresses it from the table
@@ -111,11 +114,13 @@ CLASS ltc_bw_hierarchy_copy IMPLEMENTATION.
     DATA(bw) = VALUE zzxxmla1_cl_bw_hierarchy_copy=>ty_bw_state( hiesid = 246 sver = '3' timestmp = '20261015165533'
                                                                   norestnodes = abap_true ).
     DATA(directory) = VALUE zzxxmla1_hiedir( hiesid = 246 sver = '3' timestmp = '20261015165533'
-                                             norestnodes = abap_true depth = 3 ).
+                                             norestnodes = abap_true depth = 3 filled_at = '20261101120000' ).
     cl_abap_unit_assert=>assert_true( zzxxmla1_cl_bw_hierarchy_copy=>up_to_date( directory = directory bw = bw ) ).
-    " a row written before the shape was kept
+    " a row written before the shape was kept, one filled before its leaves were named
     DATA(without_shape) = VALUE zzxxmla1_hiedir( BASE directory depth = 0 ).
     cl_abap_unit_assert=>assert_false( zzxxmla1_cl_bw_hierarchy_copy=>up_to_date( directory = without_shape bw = bw ) ).
+    DATA(unnamed_leaves) = VALUE zzxxmla1_hiedir( BASE directory filled_at = '20261020120000' ).
+    cl_abap_unit_assert=>assert_false( zzxxmla1_cl_bw_hierarchy_copy=>up_to_date( directory = unnamed_leaves bw = bw ) ).
     DATA(older) = VALUE zzxxmla1_hiedir( BASE directory sver = '2' timestmp = '20261015163621' ).
     cl_abap_unit_assert=>assert_false( zzxxmla1_cl_bw_hierarchy_copy=>up_to_date( directory = older bw = bw ) ).
     DATA(other) = VALUE zzxxmla1_hiedir( BASE directory hiesid = 237 ).
@@ -124,6 +129,31 @@ CLASS ltc_bw_hierarchy_copy IMPLEMENTATION.
     cl_abap_unit_assert=>assert_false( zzxxmla1_cl_bw_hierarchy_copy=>up_to_date( directory = given_again bw = bw ) ).
     cl_abap_unit_assert=>assert_false( zzxxmla1_cl_bw_hierarchy_copy=>up_to_date(
       directory = VALUE #( hieid = 'TS4QSEWMTR32GXZQ0N46FIHRR' ) bw = bw ) ).
+  ENDMETHOD.
+
+  METHOD leaf_keys.
+    DATA(doctor) = VALUE zzxxmla1_cl_bw_view_gen=>ty_metadata( tables = VALUE #( sids = '/BIC/SZCLDOC'
+                                                                                  key_field = '/BIC/ZCLDOC' ) ).
+    cl_abap_unit_assert=>assert_equals( exp = `s."/BIC/ZCLDOC"`
+                                        act = zzxxmla1_cl_bw_hierarchy_copy=>leaf_name( doctor ) ).
+    DATA(room) = VALUE zzxxmla1_cl_bw_view_gen=>ty_metadata(
+      tables      = VALUE #( sids = '/BIC/SZCLROOM' key_field = '/BIC/ZCLROOM' )
+      sid_columns = VALUE #( ( field = '/BIC/ZCLSITE' length = 10 ) ( field = '/BIC/ZCLROOM' length = 5 ) )
+      compounding = VALUE #( ( iobjnm = 'ZCLSITE' field = '/BIC/ZCLSITE' ) ) ).
+    cl_abap_unit_assert=>assert_equals( exp = `RPAD( s."/BIC/ZCLSITE", 10 ) || s."/BIC/ZCLROOM"`
+                                        act = zzxxmla1_cl_bw_hierarchy_copy=>leaf_name( room ) ).
+    DATA(sql) = zzxxmla1_cl_bw_hierarchy_copy=>nodes_sql(
+      tables         = VALUE #( node = 'ZZXXMLA1H0000002' )
+      bw_tables      = VALUE #( structure = '/BIC/IZCLDOC' node_sids = '/BIC/KZCLDOC' sids = '/BIC/SZCLDOC'
+                                leaf_name = `s."/BIC/ZCLDOC"` )
+      characteristic = 'ZCLDOC' ).
+    cl_abap_unit_assert=>assert_char_cp(
+      act = sql
+      exp = `*COALESCE( k."NIOBJNM", CASE WHEN i."SUCC" >= 0 THEN 'ZCLDOC' END, '' ), ` &&
+            `COALESCE( k."NODENAME", CASE WHEN i."SUCC" >= 0 THEN s."/BIC/ZCLDOC" END, '' )*` ).
+    cl_abap_unit_assert=>assert_char_cp(
+      act = sql
+      exp = `*LEFT OUTER JOIN "/BIC/SZCLDOC" AS s ON s."SID" = i."SUCC" AND i."SUCC" >= 0 *` ).
   ENDMETHOD.
 
   METHOD stale_copies.

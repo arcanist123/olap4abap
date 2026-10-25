@@ -23,7 +23,9 @@
 "! 3 without a node variable). An applying authorization with a variable ($) makes the user not authorized: olap4abap
 "! fills no variables.
 "! read( ) reads it from BW (RSECVAL_STRING, RSECHIE_STRING, the user's S_RS_AUTH and RSECUSERAUTH, RSHIEDIR and the
-"! hierarchy tables); create( ) builds it from given lines, for the unit tests.
+"! hierarchy tables); create( ) builds it from given lines, for the unit tests. Read without expanding the hierarchy
+"! lines (expand false), it reads no slice and gives the check in HANA (ZZXXMLA1_CL_BW_AUTH_SQL) its profile: the
+"! applying authorizations' flat parts and hierarchy lines, per node (docs/next-steps.md, Decisions of 2026-10-24).
 CLASS zzxxmla1_cl_bw_auth DEFINITION
   PUBLIC
   FINAL
@@ -137,6 +139,32 @@ CLASS zzxxmla1_cl_bw_auth DEFINITION
              reason  TYPE c LENGTH 12,
              message TYPE string,
            END OF ty_check.
+    "! a flat range of an authorization (EQ, BT, CP; the not-assigned value '', but in a pattern)
+    TYPES: BEGIN OF ty_range,
+             sign   TYPE c LENGTH 1,
+             option TYPE c LENGTH 2,
+             low    TYPE string,
+             high   TYPE string,
+           END OF ty_range.
+    TYPES ty_ranges TYPE STANDARD TABLE OF ty_range WITH EMPTY KEY.
+    "! what an applying authorization allows of a characteristic without its hierarchy lines: all values (CP * without
+    "! an exclusion), the aggregate (: or CP *) and its flat ranges
+    TYPES: BEGIN OF ty_flat,
+             auth      TYPE rsauth,
+             iobjnm    TYPE rsiobjnm,
+             all       TYPE abap_bool,
+             aggregate TYPE abap_bool,
+             ranges    TYPE ty_ranges,
+           END OF ty_flat.
+    TYPES ty_flats TYPE STANDARD TABLE OF ty_flat WITH EMPTY KEY.
+    "! the region per node: the provider's authorization-relevant characteristics, per applying authorization and
+    "! characteristic its flat part, and the hierarchy lines of the applying authorizations on these characteristics
+    "! (each with the date of the slice its values come from)
+    TYPES: BEGIN OF ty_profile,
+             characteristics TYPE ty_characteristics,
+             flats           TYPE ty_flats,
+             hierarchies     TYPE ty_hierarchy_lines,
+           END OF ty_profile.
 
     CONSTANTS: BEGIN OF c_kind,
                  value     TYPE c LENGTH 1 VALUE 'V',
@@ -163,11 +191,14 @@ CLASS zzxxmla1_cl_bw_auth DEFINITION
 
     "! The region of the user on the provider (an InfoCube or aDSO) at the key date.
     "! @parameter user | the user BW checks: RSEC_GET_USERNAME (current_user) for the caller's
+    "! @parameter expand | read the slices the hierarchy lines name (the check in ABAP); without, only profile( ) and
+    "!                     the checks before any member (provider, variable, unrestricted) are meaningful
     CLASS-METHODS read
       IMPORTING !user         TYPE xubname
                 provider      TYPE csequence
                 key_date      TYPE d DEFAULT c_key_date
                 today         TYPE d DEFAULT sy-datum
+                expand        TYPE abap_bool DEFAULT abap_true
       RETURNING VALUE(result) TYPE REF TO zzxxmla1_cl_bw_auth
       RAISING   zzxxmla1_cx_bw_provider.
     "! The region of given lines.
@@ -209,16 +240,22 @@ CLASS zzxxmla1_cl_bw_auth DEFINITION
     "! The authorizations that apply to the provider.
     METHODS applying
       RETURNING VALUE(result) TYPE ty_auths.
+    "! The region per node, as the check in HANA reads it.
+    METHODS profile
+      RETURNING VALUE(result) TYPE ty_profile.
+    "! The refusal of a member that no sub-cube allows, with BW's message (logged-on wording).
+    "! @parameter reason | c_reason-no_values, value, combination, hierarchy or node
+    CLASS-METHODS refusal
+      IMPORTING reason        TYPE csequence
+                member        TYPE ty_member
+      RETURNING VALUE(result) TYPE ty_check.
+    "! The refusal of every selection: no authorization applies to the provider, or an applying one has a variable;
+    "! initial if neither.
+    METHODS provider_refusal
+      RETURNING VALUE(result) TYPE ty_check.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
-    TYPES: BEGIN OF ty_range,
-             sign   TYPE c LENGTH 1,
-             option TYPE c LENGTH 2,
-             low    TYPE string,
-             high   TYPE string,
-           END OF ty_range.
-    TYPES ty_ranges TYPE STANDARD TABLE OF ty_range WITH EMPTY KEY.
     "! the nodes one authorization shows of a hierarchy
     TYPES: BEGIN OF ty_hierarchy_part,
              hienm   TYPE rshienm,
@@ -227,11 +264,13 @@ CLASS zzxxmla1_cl_bw_auth DEFINITION
              nodes    TYPE ty_visible_nodes,
            END OF ty_hierarchy_part.
     TYPES ty_hierarchy_parts TYPE SORTED TABLE OF ty_hierarchy_part WITH UNIQUE KEY hienm version.
-    "! what one authorization allows of one characteristic
+    "! what one authorization allows of one characteristic; flat: the ranges of its value lines, ranges these and the
+    "! values of its hierarchy lines
     TYPES: BEGIN OF ty_part,
              iobjnm      TYPE rsiobjnm,
              all         TYPE abap_bool,
              aggregate   TYPE abap_bool,
+             flat        TYPE ty_ranges,
              ranges      TYPE ty_ranges,
              hierarchies TYPE ty_hierarchy_parts,
            END OF ty_part.
@@ -258,6 +297,8 @@ CLASS zzxxmla1_cl_bw_auth DEFINITION
     DATA characteristics TYPE ty_characteristics.
     DATA subcubes TYPE ty_subcubes.
     DATA variable TYPE abap_bool.
+    "! the hierarchy lines of the applying authorizations on the authorization-relevant characteristics
+    DATA hierarchy_lines TYPE ty_hierarchy_lines.
 
     "! the part of one characteristic in an authorization; not present: the authorization has no line for it
     CLASS-METHODS part
@@ -401,7 +442,7 @@ CLASS zzxxmla1_cl_bw_auth IMPLEMENTATION.
                       type        = hierarchy-tctatype
                       level       = hierarchy-tcttlevel
                       date        = date ) TO lines-hierarchies.
-      IF NOT line_exists( lines-characteristics[ table_line = hierarchy-tctiobjnm ] ).
+      IF expand = abap_false OR NOT line_exists( lines-characteristics[ table_line = hierarchy-tctiobjnm ] ).
         CONTINUE.
       ENDIF.
       IF NOT line_exists( lines-slices[ iobjnm  = hierarchy-tctiobjnm
@@ -564,6 +605,11 @@ CLASS zzxxmla1_cl_bw_auth IMPLEMENTATION.
       ENDLOOP.
       IF applies = abap_true.
         APPEND subcube TO result->subcubes.
+        LOOP AT hierarchies INTO DATA(hierarchy) WHERE node NP '$*'.
+          IF line_exists( lines-characteristics[ table_line = hierarchy-iobjnm ] ).
+            APPEND hierarchy TO result->hierarchy_lines.
+          ENDIF.
+        ENDLOOP.
       ENDIF.
     ENDLOOP.
   ENDMETHOD.
@@ -595,6 +641,7 @@ CLASS zzxxmla1_cl_bw_auth IMPLEMENTATION.
       result-all = abap_false.
       APPEND VALUE #( sign = 'I' option = 'CP' low = `*` ) TO result-ranges.
     ENDIF.
+    result-flat = result-ranges.
 
     LOOP AT hierarchies INTO DATA(line) WHERE iobjnm = characteristic.
       present = abap_true.
@@ -793,16 +840,20 @@ CLASS zzxxmla1_cl_bw_auth IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
-  METHOD check_members.
+  METHOD provider_refusal.
     IF variable = abap_true.
       result = refused( reason  = c_reason-variable
                         message = |You do not have sufficient authorization: an analysis authorization with a | &&
                                   |variable applies to the InfoProvider { provider }, and variables are not supported| ).
-      RETURN.
-    ENDIF.
-    IF subcubes IS INITIAL.
+    ELSEIF subcubes IS INITIAL.
       result = refused( reason  = c_reason-provider
                         message = |You do not have sufficient authorization for the InfoProvider { provider }| ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD check_members.
+    result = provider_refusal( ).
+    IF result IS NOT INITIAL.
       RETURN.
     ENDIF.
     IF unrestricted( ) = abap_true.
@@ -844,31 +895,55 @@ CLASS zzxxmla1_cl_bw_auth IMPLEMENTATION.
 
     CASE member-kind.
       WHEN c_kind-value.
-        IF values = abap_false.
-          result = refused( reason  = c_reason-no_values
-                            message = |You do not have analysis authorization for any char. values of char. {
-                                      member-iobjnm }| ).
-        ELSEIF member-named = abap_true.
-          result = refused( reason  = c_reason-value
-                            status  = c_status-unknown
-                            message = |Value { COND string( WHEN normalized( member-value ) IS INITIAL THEN `#`
-                                                            ELSE member-value ) } for characteristic {
-                                      member-iobjnm } unknown| ).
-        ELSE.
-          result = refused( reason = c_reason-combination message = `You do not have sufficient authorization` ).
-        ENDIF.
+        result = refusal( reason = COND string( WHEN values = abap_false THEN c_reason-no_values
+                                           WHEN member-named = abap_true THEN c_reason-value
+                                           ELSE c_reason-combination )
+                          member = member ).
       WHEN c_kind-node.
-        DATA(hierarchy) = |{ member-hienm }{ COND string( WHEN member-version IS NOT INITIAL
-                                                          THEN | version { member-version }| ) }|.
-        IF lines_on_hierarchy = abap_false.
-          result = refused( reason  = c_reason-hierarchy
-                            message = |No authority for the node from characteristic { member-iobjnm }, hierarchy {
-                                      hierarchy }| ).
-        ELSE.
-          result = refused( reason  = c_reason-node
-                            message = |Hierarchy node { member-value } of { hierarchy } not authorized| ).
-        ENDIF.
+        result = refusal( reason = COND string( WHEN lines_on_hierarchy = abap_false THEN c_reason-hierarchy
+                                           ELSE c_reason-node )
+                          member = member ).
     ENDCASE.
+  ENDMETHOD.
+
+  METHOD refusal.
+    DATA(hierarchy) = |{ member-hienm }{ COND string( WHEN member-version IS NOT INITIAL
+                                                      THEN | version { member-version }| ) }|.
+    CASE reason.
+      WHEN c_reason-no_values.
+        result = refused( reason  = c_reason-no_values
+                          message = |You do not have analysis authorization for any char. values of char. {
+                                    member-iobjnm }| ).
+      WHEN c_reason-value.
+        result = refused( reason  = c_reason-value
+                          status  = c_status-unknown
+                          message = |Value { COND string( WHEN normalized( member-value ) IS INITIAL THEN `#`
+                                                          ELSE member-value ) } for characteristic {
+                                    member-iobjnm } unknown| ).
+      WHEN c_reason-hierarchy.
+        result = refused( reason  = c_reason-hierarchy
+                          message = |No authority for the node from characteristic { member-iobjnm }, hierarchy {
+                                    hierarchy }| ).
+      WHEN c_reason-node.
+        result = refused( reason  = c_reason-node
+                          message = |Hierarchy node { member-value } of { hierarchy } not authorized| ).
+      WHEN OTHERS.
+        result = refused( reason = c_reason-combination message = `You do not have sufficient authorization` ).
+    ENDCASE.
+  ENDMETHOD.
+
+  METHOD profile.
+    result-characteristics = characteristics.
+    LOOP AT subcubes INTO DATA(subcube).
+      LOOP AT subcube-parts INTO DATA(part).
+        APPEND VALUE #( auth      = subcube-auth
+                        iobjnm    = part-iobjnm
+                        all       = part-all
+                        aggregate = part-aggregate
+                        ranges    = part-flat ) TO result-flats.
+      ENDLOOP.
+    ENDLOOP.
+    result-hierarchies = hierarchy_lines.
   ENDMETHOD.
 
   METHOD tuple_allowed.

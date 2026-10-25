@@ -265,14 +265,16 @@ hierarchy the user has no node of empty where the logon refuses, and words refus
 2026-10-24 with `--verify 1`. Step 6 compares the endpoint's answers with them at 9999-12-31 (`next-steps.md`, Now:
 analysis authorisations).
 
-`python scripts/auth_check_test.py [--scenario S] [--key-date D] [--show N]` compares olap4abap's check with these
+`python scripts/auth_check_test.py [--scenario S] [--key-date D] [--show N] [--engine abap|sql]` compares olap4abap's
+check (in ABAP, `ZZXXMLA1_CL_BW_AUTH`, or in HANA, `ZZXXMLA1_CL_BW_AUTH_SQL`, which makes the copies of the slices it
+needs) with these
 files at every key date (step 4): `GET auth/check?user=...&keyDate=...` (`ZZXXMLA1_CL_BW_AUTH_QUERIES`) asks the
 probe's queries, each translated into its selection and checked by `ZZXXMLA1_CL_BW_AUTH` for the user, and the script
 compares them query by query: ALLOWED with BW's OK (EMPTY too for NON EMPTY), EMPTY, NO AUTH and UNKNOWN with BW's
 (the logged-on answer where there is one, BW's ERROR as a refusal), the members a restricted hierarchy shows with
 BW's rows and the hierarchies BW lists. At the other key dates, which have no logon, BW's EMPTY of a hierarchy without
 a line or a characteristic without values counts as refused ("empty through the switch"). Since 2026-10-24 all 63
-runs (21 scenarios, 3 key dates, 80,577 queries) agree.
+runs (21 scenarios, 3 key dates, 80,577 queries) agree; with `--engine sql` since 2026-10-25.
 
 ## Mondrian's own tests against our schema
 

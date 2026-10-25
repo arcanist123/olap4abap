@@ -120,8 +120,9 @@ Next, in this order:
    user): each version is a hierarchy of its own, its version part of the name, served at the slice valid to
    9999-12-31, no key date. BW keeps a row of `RSHIEDIR` per name, version and slice, each its own `HIEID` with one
    SID structure in `RSRHIEDIR_OLAP` (`HDATE` blank), so the copy is unchanged: `ZZXXMLA1_CL_BW_HIERARCHY_COPY=>current`
-   takes the version and picks the row valid to 9999-12-31 (`c_valid_to`); a refill deletes the copies of the
-   name's slices that no longer are (`delete_old_slices`). The schema names it by `olap4abap.bwHierarchy` (the
+   takes the version and picks the row valid to 9999-12-31 (`c_valid_to`; since 2026-10-25 the row valid at a key
+   date for the authorisation check); a refill deletes the copies of the name's slices that BW has no more
+   (`delete_old_slices`; until 2026-10-25 those no longer valid to 9999-12-31). The schema names it by `olap4abap.bwHierarchy` (the
    name) and `olap4abap.bwHierarchyVersion` (the version), the `<Hierarchy>` `<name>_<version>`
    (`hierarchy_name`: `ZCLDOC_ORG_001`); `offered` lists one per name and version with the latest slice's text
    (followed by `(version)` where two versions share it) and refuses a time-dependent structure
@@ -223,7 +224,8 @@ three key dates are in `reference/auth/` (`scripts/auth_probe.py`), BW's rules r
 (Authorisation decision, BW's rules). BW keeps the values in `RSECVAL_STRING` and `RSECHIE_STRING` (`RSECVAL` and
 `RSECHIE` hold only `0BI_ALL`). `RSDCHA-AUTHRELFL` is set on `ZCLDOC` and `ZCLDIAG`. Step 3 is built
 (`ZZXXMLA1_CL_BW_AUTH`, unit tests on made-up lines); step 4 is done: the check agrees with BW at every key date
-(`scripts/auth_check_test.py`); nothing is enforced yet (step 5).
+(`scripts/auth_check_test.py`); the same check in HANA (`ZZXXMLA1_CL_BW_AUTH_SQL`) agrees too (2026-10-25,
+`--engine sql`); nothing is enforced yet (step 5).
 
 ### Decisions answered by step 2
 
@@ -368,6 +370,21 @@ Decided with the user 2026-10-24, after an evaluation of the user's proposal: st
    (`0BI_ALL`) gets no condition and no cost. As step 2 decided (`mvp-scope.md`, BW's rules):
    The check and the restriction are SQL (Decisions of 2026-10-24, above), tested against `reference/auth/` at the
    three key dates as step 4 tests `check`.
+   Built 2026-10-25, the engine of 5a: `ZZXXMLA1_CL_BW_AUTH_SQL` (`read( user, provider, key_date )`, `check`,
+   `check_product( factors )`, `check_members`). Its profile is `ZZXXMLA1_CL_BW_AUTH=>read( ..., expand = false )`'s
+   `profile( )` (flat parts and hierarchy lines of the applying authorisations, no slice read), each line with the
+   copies of its hierarchy at the key date and at its date, made when the profile is read (`create_tables` first;
+   `current( ..., key_date )`). The statement: the request (members, per factor its tuples with a bit mask of their
+   characteristics) and the profile as derived tables of bound values, the path tables of the copies as a `UNION
+   ALL`, a line's cover (its node's path rows by type, each occurrence's own row) and the members each authorisation
+   admits as CTEs; the first member no authorisation admits (named first, in the order the product of the factors
+   shows them, as `check` meets them) with its reason, else a combination of one tuple per factor no authorisation
+   allows (`BITAND` of the characteristics no tuple has with the ones it aggregates). Values match by key (a leaf's
+   `NODE_NAME`, the flat ranges as BW's rules have them), so no SID table is read. `auth_check_test.py --engine sql`:
+   all 63 runs agree. The copies were changed for it as decided: any slice, deleted once BW has it no more, leaves
+   named by the characteristic and the key (a compounded key not observed yet). Open: wiring it into the engine
+   (the query's selection from the axes, slicer and subcube; 5a), the restriction (5b), and whether the ABAP check
+   stays (it builds the probe's queries in `ZZXXMLA1_CL_BW_AUTH_QUERIES` either way).
    - a. Refusal: after `resolve_query` and the axes, the query's selection per authorisation-relevant characteristic
      (the members of the axes, slicer and subcube, the characteristics aggregated) goes through the check statement; outside
      the region the query is a fault with BW's message in olap4abap's words (a rule in

@@ -100,9 +100,10 @@
 "!   9999-12-31; tests are the components of the probe's ty_tests, without tests all but combine_leaves. Nothing is
 "!   written;
 "! - GET auth/scenarios: the analysis authorization scenarios and their test users (ZZXXMLA1_CL_BW_AUTH_GEN).
-"! - GET auth/check[?user=U][&keyDate=YYYY-MM-DD][&pairs=v1:w1,...]: the probe's queries answered by olap4abap's
-"!   authorization check for U at the key date (ZZXXMLA1_CL_BW_AUTH_QUERIES; U as for auth/probe, without keyDate
-"!   9999-12-31): the authorizations that apply to the clinic demo's aDSO and per query its fields as auth/probe names
+"! - GET auth/check[?user=U][&keyDate=YYYY-MM-DD][&pairs=v1:w1,...][&engine=abap|sql]: the probe's queries answered
+"!   by olap4abap's authorization check for U at the key date (ZZXXMLA1_CL_BW_AUTH_QUERIES; U as for auth/probe,
+"!   without keyDate 9999-12-31; engine sql the check in HANA, ZZXXMLA1_CL_BW_AUTH_SQL, which makes the copies of the
+"!   slices it needs, else the one in ABAP): the authorizations that apply to the clinic demo's aDSO and per query its fields as auth/probe names
 "!   them, the check's status (ALLOWED, EMPTY, NO AUTH, UNKNOWN), reason and message, the members a restricted
 "!   hierarchy shows (null if not restricted) and the hierarchies listed (test HIERARCHIES). Nothing is written;
 "! It runs as the XMLA endpoint does (the anonymous logon of the node), accept included, for now.
@@ -1364,7 +1365,13 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
       APPEND VALUE #( first = first second = second ) TO pairs.
     ENDLOOP.
 
-    DATA(queries) = zzxxmla1_cl_bw_auth_queries=>read( user = user key_date = key_date ).
+    DATA(engine) = parameter( request = request name = `engine` ).
+    IF engine IS NOT INITIAL AND engine <> `abap` AND engine <> `sql`.
+      RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused
+        EXPORTING status  = 400
+                  message = |The engine is abap or sql, not { engine }|.
+    ENDIF.
+    DATA(queries) = zzxxmla1_cl_bw_auth_queries=>read( user = user key_date = key_date sql = xsdbool( engine = `sql` ) ).
     DATA results TYPE string_table.
     LOOP AT queries->run( pairs ) INTO DATA(row).
       APPEND |\{"characteristic":{ json( |{ row-characteristic }| ) },"hierarchy":{ json( row-hierarchy ) },| &&

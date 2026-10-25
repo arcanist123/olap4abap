@@ -5,7 +5,7 @@
    <VSEOCLASS>
     <CLSNAME>ZZXXMLA1_CL_BW_AUTH_QUERIES</CLSNAME>
     <LANGU>E</LANGU>
-    <DESCRIPT>The probe's queries answered by the authorization check</DESCRIPT>
+    <DESCRIPT>The probe&apos;s queries answered by the authorization check</DESCRIPT>
     <STATE>1</STATE>
     <CLSCCINCL>X</CLSCCINCL>
     <FIXPT>X</FIXPT>

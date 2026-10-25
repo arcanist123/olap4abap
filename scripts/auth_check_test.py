@@ -16,6 +16,7 @@ For a restricted hierarchy the members the check says the query shows are compar
 NON EMPTY query BW's among them. The hierarchies BW lists (HIERARCHIES) are compared as sets.
 
     python scripts/auth_check_test.py                       # every scenario at its key dates
+    python scripts/auth_check_test.py --engine sql          # the check in HANA (ZZXXMLA1_CL_BW_AUTH_SQL)
     python scripts/auth_check_test.py --scenario H1 --key-date 9999-12-31 --show 50
 """
 import argparse
@@ -73,6 +74,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--scenario", action="append", help="a scenario name (FULL, EQ, ...); repeatable")
     parser.add_argument("--key-date", action="append", help="YYYY-MM-DD; repeatable")
+    parser.add_argument("--engine", choices=("abap", "sql"), default="abap",
+                        help="the check in ABAP (ZZXXMLA1_CL_BW_AUTH) or in HANA (ZZXXMLA1_CL_BW_AUTH_SQL)")
     parser.add_argument("--show", type=int, default=10, help="differences shown per scenario and key date")
     parser.add_argument("--dir", default=os.path.join(ROOT, "reference", "auth"))
     args = parser.parse_args()
@@ -92,7 +95,8 @@ def main():
         for document in documents:
             for key_date in [k for k in document["keyDates"] if not args.key_date or k in args.key_date]:
                 status, body = api.get_json("/schema/api/auth/check",
-                                            {"user": document["user"], "keyDate": key_date, "pairs": ",".join(PAIRS)})
+                                            {"user": document["user"], "keyDate": key_date, "pairs": ",".join(PAIRS),
+                                             "engine": args.engine})
                 if status != 200:
                     sys.exit(f"{document['scenario']} {key_date}: {status} {body.get('error', body)}")
                 checked = {}

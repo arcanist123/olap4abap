@@ -20,6 +20,8 @@
 "! members are, where the user has a line on it, the visible nodes and the children of the visible nodes that may not
 "! be expanded (which the check refuses: .Members of such a hierarchy is refused), else all its nodes (allowed with *,
 "! refused as a hierarchy without a line).
+"! With sql the answers are the check in HANA's (ZZXXMLA1_CL_BW_AUTH_SQL), the queries still built from the region
+"! (what a query shows of a restricted hierarchy); a crossjoin is checked as its two sets, not multiplied out.
 CLASS zzxxmla1_cl_bw_auth_queries DEFINITION
   PUBLIC
   FINAL
@@ -72,11 +74,13 @@ CLASS zzxxmla1_cl_bw_auth_queries DEFINITION
 
     "! The queries on the provider at the key date for the user, the characteristics read from BW.
     "! @parameter characteristics | the probe's: ZCLDOC and ZCLDIAG if none
+    "! @parameter sql | answered by the check in HANA
     CLASS-METHODS read
       IMPORTING !user           TYPE xubname
                 provider        TYPE csequence DEFAULT `ZCLVISITA`
                 characteristics TYPE ty_iobjnms OPTIONAL
                 key_date        TYPE d
+                sql             TYPE abap_bool DEFAULT abap_false
       RETURNING VALUE(result)   TYPE REF TO zzxxmla1_cl_bw_auth_queries
       RAISING   zzxxmla1_cx_bw_provider.
     "! The queries on given characteristics for a region, for the unit tests.
@@ -138,6 +142,8 @@ CLASS zzxxmla1_cl_bw_auth_queries DEFINITION
     TYPES ty_row_sets TYPE STANDARD TABLE OF ty_row_set WITH EMPTY KEY.
 
     DATA region TYPE REF TO zzxxmla1_cl_bw_auth.
+    "! the check in HANA, if it answers
+    DATA sql_check TYPE REF TO zzxxmla1_cl_bw_auth_sql.
     DATA characteristics TYPE ty_characteristics.
     DATA views TYPE ty_views.
 
@@ -199,11 +205,13 @@ CLASS zzxxmla1_cl_bw_auth_queries DEFINITION
                 second        TYPE ty_members OPTIONAL
                 !with         TYPE zzxxmla1_cl_bw_auth=>ty_tuple OPTIONAL
       RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_auth=>ty_selection.
-    "! the row with the check's answer: of the selection, or without a tuple of the named members (EMPTY if allowed)
+    "! the row with the check's answer: of the selection, or without a tuple of the named members (EMPTY if allowed);
+    "! factors: the selection's tuples as a product, which the check in HANA is given instead
     METHODS answered
       IMPORTING !row          TYPE ty_result
                 selection     TYPE zzxxmla1_cl_bw_auth=>ty_selection
                 named         TYPE zzxxmla1_cl_bw_auth=>ty_tuple OPTIONAL
+                factors       TYPE zzxxmla1_cl_bw_auth_sql=>ty_factors OPTIONAL
       RETURNING VALUE(result) TYPE ty_result.
     METHODS flat_queries
       IMPORTING characteristic TYPE ty_characteristic
@@ -255,6 +263,9 @@ CLASS zzxxmla1_cl_bw_auth_queries IMPLEMENTATION.
                                                                   provider = provider
                                                                   key_date = key_date )
                      characteristics = list ).
+    IF sql = abap_true.
+      result->sql_check = zzxxmla1_cl_bw_auth_sql=>read( user = user provider = provider key_date = key_date ).
+    ENDIF.
   ENDMETHOD.
 
   METHOD create.
@@ -440,8 +451,16 @@ CLASS zzxxmla1_cl_bw_auth_queries IMPLEMENTATION.
 
   METHOD answered.
     result = row.
-    DATA(check) = COND #( WHEN selection IS INITIAL THEN region->check_members( named )
-                          ELSE region->check( selection ) ).
+    DATA check TYPE zzxxmla1_cl_bw_auth=>ty_check.
+    IF sql_check IS NOT BOUND.
+      check = COND #( WHEN selection IS INITIAL THEN region->check_members( named ) ELSE region->check( selection ) ).
+    ELSEIF selection IS INITIAL.
+      check = sql_check->check_members( named ).
+    ELSEIF factors IS NOT INITIAL.
+      check = sql_check->check_product( factors ).
+    ELSE.
+      check = sql_check->check( selection ).
+    ENDIF.
     result-status = check-status.
     result-reason = check-reason.
     result-message = check-message.
@@ -649,10 +668,12 @@ CLASS zzxxmla1_cl_bw_auth_queries IMPLEMENTATION.
                                      filter_char      = cross_with-iobjnm
                                      filter_hierarchy = right-label ).
         DATA(selection) = tuples( first = left-members second = right-members ).
+        DATA(factors) = VALUE zzxxmla1_cl_bw_auth_sql=>ty_factors( ( tuples( left-members ) )
+                                                                   ( tuples( right-members ) ) ).
         row-test = `CROSSJOIN`.
-        APPEND answered( row = row selection = selection ) TO result.
+        APPEND answered( row = row selection = selection factors = factors ) TO result.
         row-test = `CROSSJOIN NE`.
-        APPEND answered( row = row selection = selection ) TO result.
+        APPEND answered( row = row selection = selection factors = factors ) TO result.
       ENDLOOP.
     ENDLOOP.
   ENDMETHOD.

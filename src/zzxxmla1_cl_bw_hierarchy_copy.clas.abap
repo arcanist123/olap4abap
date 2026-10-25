@@ -17,8 +17,10 @@
 "! version dependent), served as BW serves it at the key date 9999-12-31, as the views read time-dependent attributes
 "! (ZZXXMLA1_CL_BW_VIEW_GEN): where the entire hierarchy is time dependent (RSDCHABAS-HIENMTFL) BW keeps a row of
 "! RSHIEDIR, its own HIEID, per slice, and the one valid to 9999-12-31 (c_valid_to) is copied; a version without such
-"! a slice is not served. A time-dependent structure (nodes with validity, RSDCHABAS-HIENDTFL) is refused. The copy
-"! of a slice that is no longer valid to 9999-12-31 is deleted by the next refill of the name.
+"! a slice is not served. A time-dependent structure (nodes with validity, RSDCHABAS-HIENDTFL) is refused. The
+"! authorization check (ZZXXMLA1_CL_BW_AUTH_SQL) copies the slice valid at any date (current with a key date): the
+"! slices of a name sit side by side, each its own HIEID, and the copy of a slice is deleted by the next refill of the
+"! name once BW has the slice no more.
 "! - Node table (ZZXXMLA1H followed by 7 digits): a row per occurrence, the shared subtrees expanded as BW's SID
 "!   structure /BIC/I holds them, keyed by HIESID, SVER, PARENT_SID and SID. An inner node has its own negative node SID of
 "!   /BIC/K (also each occurrence inside an expanded link, the postable nodes and the virtual root ROOTSID of
@@ -26,7 +28,10 @@
 "!   is PARENT_SID and SID). DEPTH is BW's TLEVEL, POS the depth-first number (BW's LISTNO; the values of an interval,
 "!   which share its LISTNO, by SID), END_POS the last POS of the subtree. NODE_IOBJ and NODE_NAME are BW's node name
 "!   (0HIER_NODE and the text node's name, or the characteristic and the key of a postable node, whose own value
-"!   VALUE_SID is its first leaf); a leaf is named by the characteristic's view.
+"!   VALUE_SID is its first leaf); of a leaf the characteristic and its key, as the hierarchy lines of BW's analysis
+"!   authorizations name a leaf (RSECHIE_STRING), so that the check matches a line on a leaf by name (a compounded
+"!   characteristic's key is its compounding's keys at their lengths followed by its own, not observed yet: no
+"!   authorization-relevant characteristic of the demos is compounded). levels_sql names a leaf by the view.
 "! - Closure table (ZZXXMLA1C, the same digits): per inner node occurrence the distinct SIDs of the leaves below it,
 "!   and per leaf its identity row (ANCESTOR_SID = SID), keyed by HIESID, SVER, ANCESTOR_SID and SID, so that every
 "!   member, node or leaf, is an ancestor, a fact read is one join (facts to the closure on SID, grouped by
@@ -89,6 +94,9 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
     CONSTANTS c_rest_iobj TYPE string VALUE `1HIER_REST`.
     "! The validity of the slice of a time-dependent hierarchy that is served: BW's key date 9999-12-31.
     CONSTANTS c_valid_to TYPE d VALUE '99991231'.
+    "! A copy filled before this time (UTC) has the layout before its leaves were named (NODE_IOBJ, NODE_NAME): it is
+    "! refilled once.
+    CONSTANTS c_layout_since TYPE timestampl VALUE '20261025000000'.
     "! The language of the node texts, as of the characteristics' texts in the views (ZZXXMLA1_CL_BW_VIEW_GEN).
     CONSTANTS c_language TYPE string VALUE `E`.
     "! The parts of a level's columns of levels_sql.
@@ -234,11 +242,13 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
                 test          TYPE abap_bool DEFAULT abap_false
       RETURNING VALUE(result) TYPE ty_t_deleted.
     "! The current copy of a hierarchy of a characteristic (the basic one, RSHIEDIR-IOBJNM) by name and version (its
-    "! slice valid to 9999-12-31), refilled first if BW's is newer. Raises ZZXXMLA1_CX_BW_HIERARCHY.
+    "! slice valid at the key date: queries read the one valid to 9999-12-31, the authorization check any), refilled
+    "! first if BW's is newer. Raises ZZXXMLA1_CX_BW_HIERARCHY.
     METHODS current
       IMPORTING characteristic TYPE rsiobjnm
                 name           TYPE rshienm
                 version        TYPE rshiedir-version OPTIONAL
+                key_date       TYPE d DEFAULT c_valid_to
       RETURNING VALUE(result)  TYPE ty_hierarchy.
     "! The name of a hierarchy's Hierarchy in a schema: BW's name, followed by _ and the version where it has one
     "! (ZCLDOC_ORG_001).
@@ -336,6 +346,7 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
         structure TYPE tabname,   " /BIC/I: SID structure
         node_sids TYPE tabname,   " /BIC/K: node SIDs and names
         sids      TYPE tabname,   " /BIC/S: the characteristic's SIDs
+        leaf_name TYPE string,    " the expression of a leaf's key over the SID table (alias s)
       END OF ty_bw_tables.
     TYPES:
       "! BW's current state of a hierarchy, which a copy is compared with
@@ -377,12 +388,13 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
     DATA package TYPE devclass.
     DATA handler TYPE REF TO if_dd_ddl_handler.
 
-    "! BW's current state of a hierarchy: its row of RSHIEDIR of the name and version valid to 9999-12-31 and its
+    "! BW's current state of a hierarchy: its row of RSHIEDIR of the name and version valid at the key date and its
     "! current row of RSRHIEDIR_OLAP (DELETETIMESTMP 0, which must be one).
     METHODS bw_state
       IMPORTING characteristic TYPE rsiobjnm
                 name           TYPE rshienm
                 version        TYPE rshiedir-version
+                key_date       TYPE d
       RETURNING VALUE(result)  TYPE ty_bw_state.
     "! The offered hierarchies of the slices of RSHIEDIR (offered), by name and version; none is served where the
     "! characteristic's structure is time dependent.
@@ -394,7 +406,7 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
     CLASS-METHODS structure_time_dependent
       IMPORTING characteristic TYPE rsiobjnm
       RETURNING VALUE(result)  TYPE abap_bool.
-    "! Deletes the copies of the other slices of a hierarchy's name that are no longer valid to 9999-12-31.
+    "! Deletes the copies of the other slices of a hierarchy's name that BW has no more (no active row of RSHIEDIR).
     METHODS delete_old_slices
       IMPORTING bw     TYPE ty_bw_state
                 tables TYPE ty_tables.
@@ -410,7 +422,7 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
       IMPORTING tables        TYPE ty_tables
       RETURNING VALUE(result) TYPE abap_bool.
     "! Whether the directory row is a copy of BW's current state with its shape (a row written before the shape was
-    "! kept has depth 0: it is refilled once).
+    "! kept has depth 0, one filled before c_layout_since has unnamed leaves: each is refilled once).
     CLASS-METHODS up_to_date
       IMPORTING directory     TYPE ty_directory
                 bw            TYPE ty_bw_state
@@ -477,8 +489,14 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
     "! The statements of a refill (the parameters in the order of their ?; HIESID and SVER are a copy's key).
     "! nodes: HIESID, SVER, ROOTSID
     CLASS-METHODS nodes_sql
-      IMPORTING tables        TYPE ty_tables
-                bw_tables     TYPE ty_bw_tables
+      IMPORTING tables         TYPE ty_tables
+                bw_tables      TYPE ty_bw_tables
+                characteristic TYPE rsiobjnm
+      RETURNING VALUE(result)  TYPE string.
+    "! The expression of a leaf's key over the SID table (alias s): the key field, of a compounded characteristic
+    "! the keys of its compounding, each at its length, followed by its own.
+    CLASS-METHODS leaf_name
+      IMPORTING metadata      TYPE zzxxmla1_cl_bw_view_gen=>ty_metadata
       RETURNING VALUE(result) TYPE string.
     "! subtree ends of the inner nodes: HIESID, SVER
     CLASS-METHODS end_pos_sql
@@ -885,7 +903,7 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD current.
-    DATA(bw) = bw_state( characteristic = characteristic name = name version = version ).
+    DATA(bw) = bw_state( characteristic = characteristic name = name version = version key_date = key_date ).
     DATA(tables) = registered_tables( bw-iobjnm ).
     IF tables IS INITIAL OR tables_exist( tables ) = abap_false.
       refuse( |The hierarchy { hierarchy_name( name = name version = version ) } of { characteristic } has no | &&
@@ -963,7 +981,7 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
 
   METHOD bw_state.
     DATA(shown) = hierarchy_name( name = name version = version ).
-    SELECT hieid, iobjnm, hienm, version, dateto, norestnodes FROM rshiedir
+    SELECT hieid, iobjnm, hienm, version, datefrom, dateto, norestnodes FROM rshiedir
       WHERE iobjnm = @characteristic AND hienm = @name AND version = @version AND objvers = 'A'
       ORDER BY dateto DESCENDING
       INTO TABLE @DATA(rows).
@@ -974,10 +992,16 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
       refuse( |The hierarchy { shown } of { characteristic } has a time-dependent structure, which olap4abap does | &&
               |not support yet| ).
     ENDIF.
-    IF rows[ 1 ]-dateto <> c_valid_to.
-      refuse( |The hierarchy { shown } of { characteristic } has no slice valid to { c_valid_to DATE = ISO }| ).
+    DATA(found) = abap_false.
+    LOOP AT rows INTO DATA(row) WHERE datefrom <= key_date AND dateto >= key_date.
+      found = abap_true.
+      EXIT.
+    ENDLOOP.
+    IF found = abap_false.
+      refuse( |The hierarchy { shown } of { characteristic } has no slice valid | &&
+              COND string( WHEN key_date = c_valid_to THEN |to { c_valid_to DATE = ISO }|
+                           ELSE |at { key_date DATE = ISO }| ) ).
     ENDIF.
-    DATA(row) = rows[ 1 ].
     result = VALUE #( hieid = row-hieid iobjnm = row-iobjnm hienm = row-hienm version = row-version
                       norestnodes = row-norestnodes ).
     SELECT hiesid, sver, timestmp, rootsid, resttopsid FROM rsrhiedir_olap
@@ -1009,9 +1033,26 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
     IF sy-subrc <> 0 OR structure IS INITIAL OR node_sids IS INITIAL.
       refuse( |BW has no hierarchy tables of { characteristic }| ).
     ENDIF.
+    DATA(metadata) = NEW zzxxmla1_cl_bw_view_gen( )->metadata( characteristic ).
     result = VALUE #( structure = structure
                       node_sids = node_sids
-                      sids      = NEW zzxxmla1_cl_bw_view_gen( )->tables( characteristic )-sids ).
+                      sids      = metadata-tables-sids
+                      leaf_name = leaf_name( metadata ) ).
+    IF result-sids IS INITIAL OR result-leaf_name IS INITIAL.
+      refuse( |BW has no SID table of { characteristic }| ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD leaf_name.
+    DATA(parts) = VALUE string_table( ).
+    LOOP AT metadata-compounding INTO DATA(compounding).
+      DATA(length) = VALUE i( metadata-sid_columns[ field = compounding-field ]-length OPTIONAL ).
+      APPEND |RPAD( s.{ quote( compounding-field ) }, { length } )| TO parts.
+    ENDLOOP.
+    IF metadata-tables-key_field IS NOT INITIAL.
+      APPEND |s.{ quote( metadata-tables-key_field ) }| TO parts.
+      result = concat_lines_of( table = parts sep = ` || ` ).
+    ENDIF.
   ENDMETHOD.
 
   METHOD up_to_date.
@@ -1021,15 +1062,17 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
                       AND directory-hiesid = bw-hiesid
                       AND directory-sver = bw-sver
                       AND directory-timestmp = bw-timestmp
-                      AND directory-depth > 0 ).
+                      AND directory-depth > 0
+                      AND directory-filled_at >= c_layout_since ).
   ENDMETHOD.
 
   METHOD delete_old_slices.
-    " a new slice of an entirely time-dependent hierarchy is a new HIEID: the copy of the slice it ends is read no more
+    " a slice of an entirely time-dependent hierarchy is a HIEID of its own: the check reads the copy of any slice BW
+    " has, so a copy is read no more once BW deletes its slice
     SELECT * FROM zzxxmla1_hiedir
       WHERE iobjnm = @bw-iobjnm AND hienm = @bw-hienm AND hieid <> @bw-hieid
         AND hieid NOT IN ( SELECT hieid FROM rshiedir
-                             WHERE iobjnm = @bw-iobjnm AND hienm = @bw-hienm AND objvers = 'A' AND dateto = @c_valid_to )
+                             WHERE iobjnm = @bw-iobjnm AND hienm = @bw-hienm AND objvers = 'A' )
       INTO TABLE @DATA(old).
     LOOP AT old INTO DATA(copy).
       delete_copy( tables = tables hiesid = copy-hiesid sver = copy-sver ).
@@ -1151,7 +1194,7 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
               |AND t."NODENAME" = p."NODE_NAME"| &&
               | LEFT OUTER JOIN { quote( value_table ) } AS pv | &&
               |ON p."NODE_IOBJ" = { zzxxmla1_cl_sql=>literal( CONV string( hierarchy-characteristic ) ) } | &&
-              |AND pv.{ quote( sid_column ) } = p."VALUE_SID"|.
+              |AND pv.{ quote( sid_column ) } = p."VALUE_SID" AND p."SID" < 0|.
       node_captions = |TO_NVARCHAR( pv.{ quote( caption_column ) } ), |.
     ENDIF.
     LOOP AT hierarchy-externals INTO DATA(external).
@@ -1277,7 +1320,7 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
         delete_old_slices( bw = bw tables = tables ).
         " rows of this SVER that no directory row names (a refill that did not finish)
         delete_copy( tables = tables hiesid = bw-hiesid sver = bw-sver ).
-        zzxxmla1_cl_sql=>execute( sql    = nodes_sql( tables = tables bw_tables = bw_tables )
+        zzxxmla1_cl_sql=>execute( sql    = nodes_sql( tables = tables bw_tables = bw_tables characteristic = bw-iobjnm )
                                   params = VALUE #( BASE key ( NEW i( bw-root_sid ) ) ) ).
         zzxxmla1_cl_sql=>execute( sql = end_pos_sql( tables ) params = key ).
         zzxxmla1_cl_sql=>execute( sql = closure_sql( tables ) params = VALUE #( BASE key ( LINES OF key ) ) ).
@@ -1340,15 +1383,20 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
 
   METHOD nodes_sql.
     " the root row of BW (LISTNO 0, the virtual root ROOTSID) and the numbered rows but the not-assigned ones; the
-    " correction rows (LISTNO 0) are left out
+    " correction rows (LISTNO 0) are left out; a node named by /BIC/K, a leaf (SID from 0) by the characteristic and
+    " its key
     DATA(listno) = |ROW_NUMBER( ) OVER ( ORDER BY i."LISTNO", i."SUCC" ) - 1|.
+    DATA(leaf) = |i."SUCC" >= 0|.
     result = |INSERT INTO { quote( tables-node ) } ( "HIESID", "SVER", "PARENT_SID", "SID", "DEPTH", "POS", "END_POS", | &&
              |"NODE_IOBJ", "NODE_NAME", "VALUE_SID" ) | &&
              |SELECT i."HIESID", i."SVER", CASE WHEN i."LISTNO" = 0 THEN 0 ELSE i."PRED" END, i."SUCC", | &&
              |CAST( i."TLEVEL" AS INTEGER ), { listno }, { listno }, | &&
-             |COALESCE( k."NIOBJNM", '' ), COALESCE( k."NODENAME", '' ), COALESCE( k."OSID", 0 ) | &&
+             |COALESCE( k."NIOBJNM", CASE WHEN { leaf } THEN { zzxxmla1_cl_sql=>literal( CONV string( characteristic ) ) } | &&
+             |END, '' ), COALESCE( k."NODENAME", CASE WHEN { leaf } THEN { bw_tables-leaf_name } END, '' ), | &&
+             |COALESCE( k."OSID", 0 ) | &&
              |FROM { quote( bw_tables-structure ) } AS i | &&
              |LEFT OUTER JOIN { quote( bw_tables-node_sids ) } AS k ON k."HIESID" = i."HIESID" AND k."SID" = i."SUCC" | &&
+             |LEFT OUTER JOIN { quote( bw_tables-sids ) } AS s ON s."SID" = i."SUCC" AND { leaf } | &&
              |WHERE i."HIESID" = ? AND i."SVER" = ? | &&
              |AND ( ( i."LISTNO" > 0 AND i."LISTNO" < { c_rest_listno } ) OR ( i."LISTNO" = 0 AND i."SUCC" = ? ) )|.
   ENDMETHOD.
