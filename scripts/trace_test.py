@@ -4,7 +4,8 @@ HTTP, as the trace page (web/schema/trace.js) calls it: switches the trace on fo
 Discover and an Execute, finds both in the trace with request, MDX and response (gzipped in the table, unzipped by
 the API, the query plan of the Execute and the phase and element of its statements), then switches it off (and on
 again if it was on); while it is off, an Execute with the header
-X-olap4abap-Trace (the MDX console's) is traced all the same and its answer names the call. The traced calls stay
+X-olap4abap-Trace (the MDX console's) is traced all the same and its answer names the call, and so is a check of
+BW's MDX (POST bw/check, method CHECK, with its SQL statements in the answer with sql=true). The traced calls stay
 (trace/clear would delete the user's other calls too).
 
     python scripts/trace_test.py
@@ -29,6 +30,8 @@ MDX = 'SELECT {[Measures].[Unit Sales]} ON COLUMNS\nFROM [ZFMSALES] -- traced & 
 EXECUTE = SOAP.format('<Execute xmlns="urn:schemas-microsoft-com:xml-analysis"><Command><Statement>{}</Statement>'
                       '</Command><Properties><PropertyList><Catalog>{}</Catalog><Format>Multidimensional</Format>'
                       '</PropertyList></Properties></Execute>')
+# one of the probe's statements in BW's names (reference/auth/statements.json), on the clinic demo's aDSO
+BW_MDX = 'SELECT {[Measures].[ZCLVISNO]} ON 0 FROM [$ZCLVISITA] WHERE ([ZCLDOC].[001], [ZCLDIAG].[A09])'
 
 
 def http(method, url, body=None, content_type="text/xml; charset=utf-8", headers=None):
@@ -137,6 +140,37 @@ def main():
         check("trace/entry?response=false: the SQL statements without the response", status == 200
               and entry.get("response") == "" and entry["responseLength"] == len(forced_response)
               and len(entry.get("sql") or []) == entry["sqlCount"] > 0, str(entry)[:300])
+
+    # a check of BW's MDX (POST bw/check, ZZXXMLA1_CL_BW_MDX_API) is traced as a call too: method CHECK, the user
+    # and key date checked as type, the statement as MDX, the JSON answer; with sql=true the answer has the statements
+    check_url = f"{args.url}/bw/check?" + urllib.parse.urlencode({"sap-client": args.client, "keyDate": "2024-06-15",
+                                                                   "sql": "true"})
+    status, text, headers = http("POST", check_url, BW_MDX, content_type="text/plain; charset=utf-8",
+                                 headers={"X-olap4abap-Trace": "true"})
+    answer = json.loads(text) if status == 200 else {}
+    traced_check = headers.get("x-olap4abap-trace-id", "")
+    check("bw/check: resolved, traced, the answer names the call", answer.get("status") == "RESOLVED"
+          and len(traced_check) == 32, text[:300])
+    check("bw/check?sql=true: the statements in the answer, read while resolving", answer.get("sql")
+          and all(s["phase"] == "Resolve" for s in answer["sql"]), str(answer.get("sql"))[:300])
+    if traced_check:
+        status, entry = api("GET", "trace/entry", id=traced_check)
+        check("trace/entry of a check: CHECK, user and key date, statement, answer", status == 200
+              and entry["method"] == "CHECK" and entry["type"] == f"{user} 2024-06-15" and entry["mdx"] == BW_MDX
+              and entry["request"] == BW_MDX and json.loads(entry["response"]) == answer and not entry["fault"],
+              str(entry)[:300])
+        check("trace/entry of a check: its statements as in the answer", [s["sql"] for s in entry.get("sql") or []]
+              == [s["sql"] for s in answer.get("sql") or []], str(entry.get("sql"))[:300])
+    status, text, headers = http("POST", f"{args.url}/bw/check?sap-client={args.client}",
+                                 BW_MDX.replace("[001]", "[999]"), content_type="text/plain; charset=utf-8",
+                                 headers={"X-olap4abap-Trace": "true"})
+    failed = headers.get("x-olap4abap-trace-id", "")
+    if failed:
+        status, entry = api("GET", "trace/entry", id=failed, response="false")
+        check("a check with status ERROR is a fault in the trace", entry.get("fault") is True, str(entry)[:300])
+    status, only = api("GET", "trace", filter=user, method="check,execute")
+    check("method=check,execute: only these calls", status == 200 and traced_check in [c["id"] for c in only["calls"]]
+          and {c["method"] for c in only["calls"]} <= {"CHECK", "EXECUTE"}, only.get("calls", only)[:2])
     if was_on:
         api("POST", "trace/on", user=user)
     check("trace/entry of an unknown id", api("GET", "trace/entry", id="0" * 32)[0] == 404)

@@ -26,6 +26,9 @@ CLASS ltc_bw_mdx_api DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION S
     METHODS unknown_name FOR TESTING.
     METHODS no_resource FOR TESTING.
     METHODS other_user_refused FOR TESTING.
+    METHODS describe_defaults FOR TESTING.
+    METHODS describe_given FOR TESTING.
+    METHODS with_sql FOR TESTING.
 ENDCLASS.
 
 CLASS ltc_bw_mdx_api IMPLEMENTATION.
@@ -72,6 +75,9 @@ CLASS ltc_bw_mdx_api IMPLEMENTATION.
     cl_abap_unit_assert=>assert_char_cp( act = result-body exp = `*"keyDate":"9999-12-31"*` ).
     " the members in olap4abap's names
     cl_abap_unit_assert=>assert_char_cp( act = result-body exp = `*"resolved":"*[ZCLDOC].[001]*[ZCLDIAG].[A09]*` ).
+    cl_abap_unit_assert=>assert_false( result-failed ).
+    " the statements only with sql=true
+    cl_abap_unit_assert=>assert_char_np( act = result-body exp = `*"sql":*` ).
   ENDMETHOD.
 
   METHOD unknown_name.
@@ -80,6 +86,7 @@ CLASS ltc_bw_mdx_api IMPLEMENTATION.
                               body   = `SELECT {[Measures].[ZCLVISNO]} ON 0 FROM [$ZCLVISITA] WHERE ([ZCLDOC].[999])` ) ).
     cl_abap_unit_assert=>assert_equals( act = result-status exp = 200 ).
     cl_abap_unit_assert=>assert_char_cp( act = result-body exp = `*"status":"ERROR"*not found*` ).
+    cl_abap_unit_assert=>assert_true( result-failed ).
   ENDMETHOD.
 
   METHOD no_resource.
@@ -96,6 +103,32 @@ CLASS ltc_bw_mdx_api IMPLEMENTATION.
                      VALUE #( method     = `POST` path = `/bw/check` body = c_statement
                               parameters = VALUE #( ( name = `user` value = `DDIC` ) ) ) ).
     cl_abap_unit_assert=>assert_equals( act = result-status exp = 403 ).
+  ENDMETHOD.
+
+  METHOD describe_defaults.
+    DATA(call) = zzxxmla1_cl_bw_mdx_api=>describe( VALUE #( method = `POST` path = `/bw/check` body = c_statement ) ).
+    cl_abap_unit_assert=>assert_equals( act = call-xmla_method exp = `CHECK` ).
+    cl_abap_unit_assert=>assert_equals( act = call-request_type exp = |{ sy-uname } 9999-12-31| ).
+    cl_abap_unit_assert=>assert_equals( act = call-mdx exp = c_statement ).
+  ENDMETHOD.
+
+  METHOD describe_given.
+    " as given, even where the check refuses them: the trace shows what was asked
+    DATA(call) = zzxxmla1_cl_bw_mdx_api=>describe(
+                   VALUE #( method     = `POST` path = `/bw/check` body = `<no XMLA`
+                            parameters = VALUE #( ( name = `user` value = `zzxxmla1_a01` )
+                                                  ( name = `keydate` value = `2024-06-15` ) ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = call-request_type exp = `ZZXXMLA1_A01 2024-06-15` ).
+    cl_abap_unit_assert=>assert_equals( act = call-mdx exp = `<no XMLA` ).
+  ENDMETHOD.
+
+  METHOD with_sql.
+    DATA(result) = NEW zzxxmla1_cl_bw_mdx_api( )->handle(
+                     VALUE #( method     = `POST` path = `/bw/check` body = c_statement
+                              parameters = VALUE #( ( name = `sql` value = `true` ) ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = result-status exp = 200 ).
+    " the members are read while the statement is resolved
+    cl_abap_unit_assert=>assert_char_cp( act = result-body exp = `*"sql":[{"sql":*"phase":"Resolve"}*` ).
   ENDMETHOD.
 
 ENDCLASS.

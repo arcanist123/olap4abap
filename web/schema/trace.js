@@ -2,7 +2,8 @@
 // api/trace/on, trace/off; switching on deletes the calls older than seven days), every call of a user with the trace on is listed with its SOAP request, the MDX statement of an Execute
 // and the SOAP response (GET api/trace/entry, the whole response as sent from api/trace/response), the SQL
 // statements the call ran with their rows, time, error, phase and element, and the query plan of an Execute: the same
-// views as the MDX console's (query-plan.js).
+// views as the MDX console's (query-plan.js). The checks of BW's MDX (POST bw/check, ZZXXMLA1_CL_BW_MDX_API) are
+// listed as calls too (method CHECK): the statement, the user and key date checked as type, the JSON answer.
 // No build step: Preact with htm, vendored as one ES module; this file is what the server serves.
 import { html, render, useState, useEffect, useRef } from './vendor/htm-preact-standalone.mjs';
 import { prettyXml, copyText, download } from './trace-text.js';
@@ -42,7 +43,16 @@ async function api(method, resource, params = {}) {
 
 const time = (iso) => iso ? new Date(iso).toLocaleString() : '';
 const size = (n) => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : n >= 1024 ? `${(n / 1024).toFixed(1)} KB` : `${n} B`;
-const what = (c) => c.method === 'EXECUTE' ? 'Execute' : c.method === 'DISCOVER' ? 'Discover' : '(no XMLA)';
+const KINDS = [['DISCOVER', 'Discover'], ['EXECUTE', 'Execute'], ['CHECK', 'Check']];
+const what = (c) => KINDS.find(([k]) => k === c.method)?.[1] || '(no XMLA)';
+const isCheck = (c) => c.method === 'CHECK';
+const prettyJson = (s) => {
+  try {
+    return JSON.stringify(JSON.parse(s), null, 2);
+  } catch {
+    return s;
+  }
+};
 const firstLine = (s) => s.replace(/\s+/g, ' ').trim();
 
 // the Catalog property of an Execute request, initial if it names none
@@ -53,9 +63,17 @@ function requestCatalog(xml) {
 }
 
 // the MDX console with a traced Execute: its statement and catalog in the editor, the call itself (answer, request,
-// query plan, SQL statements) as the result (console.js reads the fragment)
+// query plan, SQL statements) as the result (console.js reads the fragment); a check in the console's mode for BW's
+// MDX with its user and key date (the type: "USER YYYY-MM-DD")
 const consoleUrl = (entry) => {
   const fragment = new URLSearchParams({ statement: entry.mdx, trace: entry.id });
+  if (isCheck(entry)) {
+    const [user, keyDate] = entry.type.split(' ');
+    fragment.set('mode', 'bw');
+    fragment.set('user', user || '');
+    fragment.set('keyDate', keyDate || '');
+    return `console.html${location.search}#${fragment}`;
+  }
   const catalog = requestCatalog(entry.request);
   if (catalog) fragment.set('catalog', catalog);
   return `console.html${location.search}#${fragment}`;
@@ -126,15 +144,18 @@ function Detail({ id, onClose }) {
   };
   const view = tab === 'plan' || tab === 'sql';
   const raw = tab === 'mdx' ? entry.mdx : tab === 'request' ? entry.request : tab === 'response' ? entry.response : '';
-  const xml = tab === 'request' || tab === 'response';
-  const shown = !xml || !pretty ? raw : prettyXml(raw);
+  // a check's request is its statement, its response JSON
+  const xml = !isCheck(entry) && (tab === 'request' || tab === 'response');
+  const json = isCheck(entry) && tab === 'response';
+  const shown = !pretty ? raw : xml ? prettyXml(raw) : json ? prettyJson(raw) : raw;
+  const soap = isCheck(entry) ? '' : 'SOAP ';
   // what is shown (indented or not) is what is copied
   const copy = () => copyText(shown).then((ok) => setCopied(ok ? 'Copied' : 'Copy failed: select the text and press Ctrl+C'));
   const save = () => tab === 'response' && entry.responseTruncated
     ? window.open(apiUrl('trace/response', { id }), '_blank')
-    : download(raw, `${entry.id}-${tab}.${xml ? 'xml' : tab}`);
+    : download(raw, `${entry.id}-${tab}.${xml ? 'xml' : json ? 'json' : tab === 'request' ? 'mdx' : tab}`);
   return html`<section class="section detail">
-    <header><h2>${what(entry)}${entry.type && html` <span class="mono">${entry.type}</span>`}</h2>
+    <header><h2>${what(entry)}${entry.type && html`${isCheck(entry) ? ' for' : ''} <span class="mono">${entry.type}</span>`}</h2>
       <span class="muted small">${time(entry.at)} · ${entry.user} · ${entry.client}${entry.status ? ` · ${entry.runtimeMs} ms · ${entry.sqlCount} SQL statements, ${entry.sqlMs} ms` : ''}</span>
       <span class="spacer"></span>
       ${entry.mdx && html`<a class="button" href=${consoleUrl(entry)} target="_blank" rel="noopener"
@@ -144,8 +165,8 @@ function Detail({ id, onClose }) {
       ${entry.mdx && html`<button role="tab" class=${tab === 'mdx' ? 'active' : ''} onClick=${() => setTab('mdx')}>MDX statement</button>`}
       ${entry.method === 'EXECUTE' && html`<button role="tab" class=${tab === 'plan' ? 'active' : ''} onClick=${() => setTab('plan')}>Query plan
         <span class="muted small">${!entry.status ? 'none' : entry.explain ? '' : 'none'}</span></button>`}
-      <button role="tab" class=${tab === 'request' ? 'active' : ''} onClick=${() => setTab('request')}>SOAP request <span class="muted small">${size(entry.requestLength)}</span></button>
-      <button role="tab" class=${tab === 'response' ? 'active' : ''} onClick=${() => setTab('response')}>SOAP response <span class="muted small">${entry.status ? size(entry.responseLength) : 'none'}</span></button>
+      <button role="tab" class=${tab === 'request' ? 'active' : ''} onClick=${() => setTab('request')}>${soap}request <span class="muted small">${size(entry.requestLength)}</span></button>
+      <button role="tab" class=${tab === 'response' ? 'active' : ''} onClick=${() => setTab('response')}>${soap}response <span class="muted small">${entry.status ? size(entry.responseLength) : 'none'}</span></button>
       <button role="tab" class=${tab === 'sql' ? 'active' : ''} onClick=${() => setTab('sql')}>SQL statements <span class="muted small">${entry.status ? entry.sqlCount : 'none'}</span></button>
     </div>
     ${view ? html`<div class="body trace-view">
@@ -155,7 +176,7 @@ function Detail({ id, onClose }) {
         : html`<${SqlView} call=${entry} onNode=${(node) => show({ node })} onPhase=${(phase) => show({ phase })} />`}
     </div>` : html`<div class="body">
       <div class="row">
-        ${xml && html`<label class="inline"><input type="checkbox" checked=${pretty} onChange=${(e) => setPretty(e.target.checked)} /> Indent XML</label>`}
+        ${(xml || json) && html`<label class="inline"><input type="checkbox" checked=${pretty} onChange=${(e) => setPretty(e.target.checked)} /> Indent ${xml ? 'XML' : 'JSON'}</label>`}
         <span class="spacer"></span>
         ${copied && html`<span class=${`status ${copied === 'Copied' ? 'ok' : 'err'}`} role="status">${copied}</span>`}
         <button onClick=${copy} disabled=${!raw}>Copy</button>
@@ -163,7 +184,7 @@ function Detail({ id, onClose }) {
       </div>
       ${tab === 'response' && !entry.status && html`<div class="notice warn">No response: the call is still running, or it was aborted (a short dump, ST22).</div>`}
       ${tab === 'response' && entry.responseTruncated && html`<div class="notice warn">The response has ${size(entry.responseLength)}; the first million characters are shown, Download gives all of it.</div>`}
-      ${tab === 'response' && entry.fault && html`<div class="notice err">The answer is a SOAP fault.</div>`}
+      ${tab === 'response' && entry.fault && html`<div class="notice err">${isCheck(entry) ? "The check's status is ERROR." : 'The answer is a SOAP fault.'}</div>`}
       <textarea class="trace" readonly spellcheck="false" value=${shown} aria-label=${tab}></textarea>
       ${entry.userAgent && html`<div class="muted small">User-Agent: <span class="mono">${entry.userAgent}</span></div>`}
     </div>`}
@@ -173,7 +194,7 @@ function Detail({ id, onClose }) {
 function App() {
   const [state, setState] = useState(null);       // the answer of GET trace
   const [filter, setFilter] = useState('');
-  const [kinds, setKinds] = useState({ DISCOVER: true, EXECUTE: true });  // the toggles: which calls are listed
+  const [kinds, setKinds] = useState({ DISCOVER: true, EXECUTE: true, CHECK: true });  // the toggles: which calls are listed
   const [max, setMax] = useState(storedMax);
   const [selected, setSelected] = useState('');
   const [auto, setAuto] = useState(false);
@@ -181,8 +202,9 @@ function App() {
   const [error, setError] = useState('');
   const filterRef = useRef(filter);
   filterRef.current = filter;
-  // one toggle on: the server lists only that method (its newest 200); both on: every call; both off: none
-  const method = kinds.DISCOVER === kinds.EXECUTE ? '' : kinds.DISCOVER ? 'DISCOVER' : 'EXECUTE';
+  // the server lists the calls of the methods switched on (their newest N); all on: every call; all off: none
+  const on = KINDS.map(([k]) => k).filter((k) => kinds[k]);
+  const method = on.length === KINDS.length ? '' : on.join(',');
   const methodRef = useRef(method);
   methodRef.current = method;
   const maxRef = useRef(max);
@@ -191,7 +213,7 @@ function App() {
     setMax(n);
     try { localStorage.setItem(MAX_KEY, String(n)); } catch { /* not remembered */ }
   };
-  const none = !kinds.DISCOVER && !kinds.EXECUTE;
+  const none = !on.length;
 
   const load = (quiet) => {
     if (!quiet) setBusy('Reading the trace…');
@@ -235,7 +257,7 @@ function App() {
             ${userNames.map((u) => html`<option value=${u}>${u}</option>`)}
           </select>
           <div class="segmented" role="group" aria-label="Calls">
-            ${[['DISCOVER', 'Discover'], ['EXECUTE', 'Execute']].map(([k, label]) => html`<button
+            ${KINDS.map(([k, label]) => html`<button
               class=${kinds[k] ? 'active' : ''} aria-pressed=${kinds[k]} title=${`Show the ${label} calls`}
               onClick=${() => { setKinds((s) => ({ ...s, [k]: !s[k] })); setSelected(''); }}>${label}</button>`)}
           </div>
@@ -250,8 +272,8 @@ function App() {
           ${filter && html`<button class="danger" onClick=${() => clear(filter)} disabled=${!!busy || !state?.calls.length}>Delete ${filter}'s calls</button>`}
           <button class="danger" onClick=${() => clear('')} disabled=${!!busy}>Delete all</button></header>
         <div class="scroll-x">${!state ? html`<div class="body muted">${busy || 'No data.'}</div>`
-          : none ? html`<div class="body muted">Switch Discover or Execute on to list calls.</div>`
-          : !state.calls.length ? html`<div class="body muted">No traced ${method ? `${what({ method })} ` : ''}calls${filter ? ` of ${filter}` : ''}.</div>` : html`
+          : none ? html`<div class="body muted">Switch Discover, Execute or Check on to list calls.</div>`
+          : !state.calls.length ? html`<div class="body muted">No traced ${on.length === 1 ? `${what({ method })} ` : ''}calls${filter ? ` of ${filter}` : ''}.</div>` : html`
           <table>
             <thead><tr><th>Time</th><th class="wide-only">User</th><th>Call</th><th>Statement or rowset</th><th>Status</th>
               <th class="num">ms</th><th class="num" title="SQL statements and their milliseconds">SQL</th><th class="num">Response</th><th class="wide-only">Client</th></tr></thead>
@@ -262,7 +284,7 @@ function App() {
                 <td>${what(c)}</td>
                 <td class="mono small statement" title=${c.mdx}>${c.mdx ? firstLine(c.mdx) : c.type}</td>
                 <td>${!c.status ? html`<span class="status warn">no answer</span>`
-                  : c.fault ? html`<span class="status err">fault</span>`
+                  : c.fault ? html`<span class="status err">${isCheck(c) ? 'error' : 'fault'}</span>`
                   : c.status === 200 ? html`<span class="status ok">ok</span>` : html`<span class="status err">${c.status}</span>`}</td>
                 <td class="num">${c.status ? c.runtimeMs : ''}</td>
                 <td class="num" title="SQL statements, their milliseconds">${c.status ? `${c.sqlCount} · ${c.sqlMs}` : ''}</td>

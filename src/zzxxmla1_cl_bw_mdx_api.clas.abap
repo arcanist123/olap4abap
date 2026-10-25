@@ -11,12 +11,14 @@
 *----------------------------------------------------------------------------------------------------------------------*
 "! The endpoint for BW's MDX on InfoProviders below the ICF node, /bw/ (docs/next-steps.md, Next: BW's MDX on
 "! InfoProviders). It answers with the authorisation result of a user, never with data, so the user is a parameter:
-"! - POST check[?user=U][&keyDate=YYYY-MM-DD]: the body is a statement of BW's MDX (FROM [$ZCLVISITA]), plain or as an
+"! - POST check[?user=U][&keyDate=YYYY-MM-DD][&sql=true]: the body is a statement of BW's MDX (FROM [$ZCLVISITA]), plain or as an
 "!   XMLA Execute; U a test user of the scenarios (ZZXXMLA1_CL_BW_AUTH_GEN) or the caller (default; refused, 403, for
 "!   any other user, as GET auth/check of the schema API), the key date 9999-12-31 by default. The statement is parsed
 "!   and resolved in BW's names (ZZXXMLA1_CL_MDX_SCHEMA_READER=>for_bw_cube); the answer is the user, key date, the
-"!   status (RESOLVED, or ERROR with the fault's text as message) and the statement in olap4abap's names. The check of
-"!   the query's selection comes with step 3.
+"!   status (RESOLVED, or ERROR with the fault's text as message) and the statement in olap4abap's names; with sql=true
+"!   also the SQL statements the check ran (sql: text, rows, microseconds, error, phase). The check of the query's
+"!   selection comes with step 3.
+"! ZZXXMLA1_MAIN_ENDPOINT traces a check as it traces an XMLA call (ZZXXMLA1_CL_TRACE, described by describe).
 CLASS zzxxmla1_cl_bw_mdx_api DEFINITION
   PUBLIC
   FINAL
@@ -44,6 +46,7 @@ CLASS zzxxmla1_cl_bw_mdx_api DEFINITION
         content_type TYPE string,
         body         TYPE string,
         allow        TYPE string,  " the methods of the resource, for 405
+        failed       TYPE abap_bool,  " the check's status is ERROR (a fault in the trace)
       END OF ty_result.
 
     "! Whether the path (below the ICF node) is one of this endpoint: /bw and below.
@@ -53,16 +56,27 @@ CLASS zzxxmla1_cl_bw_mdx_api DEFINITION
     METHODS handle
       IMPORTING request       TYPE ty_request
       RETURNING VALUE(result) TYPE ty_result.
+    "! What a request asks, for its trace: method CHECK, the user and key date checked (as given, the defaults if
+    "! not), the statement (the body if it has none).
+    CLASS-METHODS describe
+      IMPORTING request       TYPE ty_request
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_trace=>ty_call.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
     CONSTANTS c_json TYPE string VALUE `application/json; charset=utf-8`.
+    "! the key date without parameter
+    CONSTANTS c_key_date TYPE d VALUE '99991231'.
 
     "! POST check: the statement resolved in BW's names for the user at the key date.
     METHODS check
       IMPORTING request       TYPE ty_request
-      RETURNING VALUE(result) TYPE string
+      RETURNING VALUE(result) TYPE ty_result
       RAISING   zzxxmla1_cx_api_refused.
+    "! The statements logged from the index first on (ZZXXMLA1_CL_SQL=>statement_log) as a JSON array.
+    CLASS-METHODS logged_json
+      IMPORTING !first        TYPE i
+      RETURNING VALUE(result) TYPE string.
     "! The MDX statement of a body: an XMLA Execute's (a body starting with <), else the body.
     CLASS-METHODS statement_of
       IMPORTING body          TYPE string
@@ -122,7 +136,7 @@ CLASS zzxxmla1_cl_bw_mdx_api IMPLEMENTATION.
       RETURN.
     ENDIF.
     TRY.
-        result = VALUE #( status = 200 content_type = c_json body = check( request ) ).
+        result = check( request ).
       CATCH zzxxmla1_cx_api_refused INTO DATA(refused).
         result = error_result( status = refused->status message = refused->message ).
       CATCH cx_root INTO DATA(error) ##CATCH_ALL.
@@ -132,7 +146,7 @@ CLASS zzxxmla1_cl_bw_mdx_api IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD check.
-    DATA(key_date) = CONV d( '99991231' ).
+    DATA(key_date) = c_key_date.
     DATA(date_text) = parameter( request = request name = `keydate` ).
     IF date_text IS NOT INITIAL.
       key_date = date_of( text = date_text name = `keyDate` ).
@@ -148,20 +162,60 @@ CLASS zzxxmla1_cl_bw_mdx_api IMPLEMENTATION.
       RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 400 message = `The statement is missing`.
     ENDIF.
 
+    " sql=true: the statements are logged while the check runs (they are already while the call is traced)
+    DATA(with_sql) = xsdbool( to_lower( parameter( request = request name = `sql` ) ) = `true` ).
+    DATA(was_logging) = zzxxmla1_cl_sql=>log_statements.
+    IF with_sql = abap_true.
+      zzxxmla1_cl_sql=>log_statements = abap_true.
+    ENDIF.
+    DATA(first_logged) = lines( zzxxmla1_cl_sql=>statement_log ) + 1.
+    DATA(phase) = zzxxmla1_cl_sql=>log_phase.
+
     DATA(status) = `RESOLVED`.
     DATA(message) = ``.
     DATA(statement) = ``.
     DATA(resolved) = ``.
     TRY.
         statement = statement_of( request-body ).
+        zzxxmla1_cl_sql=>log_phase = `Resolve`.
         resolved = resolve( statement ).
       CATCH zzxxmla1_cx_xmla INTO DATA(fault).
         status = `ERROR`.
         message = fault->description.
     ENDTRY.
-    result = |\{"user":{ json( |{ user }| ) },"keyDate":{ json( |{ key_date DATE = ISO }| ) },| &&
-             |"status":{ json( status ) },"message":{ json( message ) },| &&
-             |"statement":{ json( statement ) },"resolved":{ json( resolved ) }\}|.
+    zzxxmla1_cl_sql=>log_phase = phase.
+    zzxxmla1_cl_sql=>log_statements = was_logging.
+
+    DATA(body) = |\{"user":{ json( |{ user }| ) },"keyDate":{ json( |{ key_date DATE = ISO }| ) },| &&
+                 |"status":{ json( status ) },"message":{ json( message ) },| &&
+                 |"statement":{ json( statement ) },"resolved":{ json( resolved ) }|.
+    IF with_sql = abap_true.
+      body = |{ body },"sql":{ logged_json( first_logged ) }|.
+    ENDIF.
+    result = VALUE #( status = 200 content_type = c_json body = |{ body }\}| failed = xsdbool( status = `ERROR` ) ).
+  ENDMETHOD.
+
+  METHOD describe.
+    DATA(user) = to_upper( condense( parameter( request = request name = `user` ) ) ).
+    DATA(key_date) = condense( parameter( request = request name = `keydate` ) ).
+    TRY.
+        DATA(statement) = statement_of( request-body ).
+      CATCH zzxxmla1_cx_xmla.
+        statement = request-body.
+    ENDTRY.
+    result = VALUE #( xmla_method  = `CHECK`
+                      request_type = |{ COND #( WHEN user IS INITIAL THEN CONV string( sy-uname ) ELSE user ) } | &&
+                                     |{ COND #( WHEN key_date IS INITIAL THEN |{ c_key_date DATE = ISO }| ELSE key_date ) }|
+                      mdx          = statement ).
+  ENDMETHOD.
+
+  METHOD logged_json.
+    DATA statements TYPE string_table.
+    LOOP AT zzxxmla1_cl_sql=>statement_log INTO DATA(logged) FROM first.
+      APPEND |\{"sql":{ json( logged-sql ) },"rows":{ logged-rows },"us":{ logged-time },| &&
+             |"error":{ json( logged-error ) },"phase":{ json( logged-phase ) }\}| TO statements.
+    ENDLOOP.
+    result = |[{ concat_lines_of( table = statements sep = `,` ) }]|.
   ENDMETHOD.
 
   METHOD statement_of.

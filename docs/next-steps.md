@@ -475,6 +475,14 @@ compared, not only 9999-12-31.
    checked next to the caller), with its statement log, so the trace page's "SQL statements" (and "Open in MDX
    Console") shows what the check ran; with `?sql=true` the answer carries the statements too (text, rows, time,
    phase).
+   Built 2026-10-25, ahead of step 3 (asked by the user, so the check can be tried by hand): `ZZXXMLA1_MAIN_ENDPOINT`
+   traces `POST bw/check` with `ZZXXMLA1_CL_TRACE=>start`'s new `call` (`ZZXXMLA1_CL_BW_MDX_API=>describe`: method
+   `CHECK`, type `<user> <key date>` as given, the statement as MDX; no column added) and `finish`'s `failed` (status
+   ERROR is the call's fault); `GET trace?method=` takes a list (`check,execute`). So far the statements are the
+   resolution's, phase `Resolve`; step 3 adds `Authorisation`. The MDX console has a mode "BW's MDX" (user, key
+   date, BW's names with examples where the cube browser is, the answer's status and the statement in olap4abap's
+   names, SQL statements, response and request; statement and history kept per mode), the trace page lists checks
+   (toggle Check) and opens them in that mode (`scripts/trace_test.py`, `scripts/console_ui_test.py`).
 5. **The comparison:** `scripts/bw_auth_compare.py` sends every statement of `statements.json` for each test user
    at each key date to `/zzxxmla1/bw/check` and compares the status with `reference/auth/` (the logged-on answer at
    9999-12-31 where there is one, as `auth_check_test.py` does); `--sql` prints a statement's SQL.

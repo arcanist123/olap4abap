@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Drives the MDX console (/zzxxmla1/schema/console.html, web/schema/console.js) in a headless browser against SAP:
 the cube browser, a grid of two axes with its SOAP response, SQL statements (Trace SQL) and SOAP request, Format, a
-flat table of three, a statement without axes and an error, and a traced call opened from the trace page. Reads only
-(but for the console's traced calls).
+flat table of three, a statement without axes and an error, a traced call opened from the trace page, and the mode
+BW's MDX (a check of a statement in BW's names, its SQL statements, the traced check opened from the trace page).
+Reads only (but for the console's traced calls).
 
     pip install playwright && playwright install chromium-headless-shell
     python scripts/console_ui_test.py
@@ -18,6 +19,8 @@ from playwright.sync_api import sync_playwright
 import sap_auth
 
 RUN = 120000  # ms
+# one of the probe's statements in BW's names (reference/auth/statements.json), on the clinic demo's aDSO
+BW_MDX = 'SELECT {[Measures].[ZCLVISNO]} ON 0 FROM [$ZCLVISITA] WHERE ([ZCLDOC].[001], [ZCLDIAG].[A09])'
 
 
 def main():
@@ -150,7 +153,7 @@ def main():
         rows = table(page)
         check("flat header", rows[0] == ["Store", "Product", "Measures", "Value"], rows[:1])
         check("flat rows", len(rows) == 13 and ["USA", "Food", "Unit Sales", "191,940"] in rows, rows)
-        check("no grid toggle for three axes", page.locator(".segmented").count() == 0)
+        check("no grid toggle for three axes", page.locator(".result .segmented").count() == 0)
         shot(page, "3-flat")
 
         run(page, "select from [ZFMSALES]")
@@ -192,6 +195,62 @@ def main():
         handed.wait_for_selector(".plan-tree", timeout=RUN)
         check("console: the traced call's query plan", "[Product].[Product Family]" in handed.inner_text(".plan-tree"))
         shot(handed, "6-handed-over")
+
+        # the mode BW's MDX: a statement in BW's names checked at a key date (POST bw/check), its SQL statements
+        page.goto(f"{args.url}?sap-client={args.client}")
+        page.click(".topbar .segmented button:has-text(\"BW's MDX\")")
+        check("BW's MDX: no catalog, a user and a key date", page.locator(".topbar select").count() == 0
+              and page.input_value(".topbar input[type=date]") == "9999-12-31")
+        page.fill("textarea.mdx", "")
+        page.click(".browser .item:has(strong:text-is('Member'))")
+        check("BW's MDX: a click inserts BW's name", page.input_value("textarea.mdx") == "[ZCLDOC].[001]",
+              page.input_value("textarea.mdx"))
+        page.fill(".topbar input[type=date]", "2024-06-15")
+        page.fill("textarea.mdx", BW_MDX)
+        page.click(".query button:has-text('Check')")
+        page.wait_for_selector(".result .result-bar .status", timeout=RUN)
+        bar = page.inner_text(".result .result-bar")
+        check("BW's MDX: resolved at the key date", "RESOLVED" in bar and "2024-06-15" in bar, bar)
+        resolved = page.input_value(".result textarea.trace")
+        check("BW's MDX: the statement in olap4abap's names", "[ZCLDOC].[001]" in resolved
+              and "[ZCLDIAG].[A09]" in resolved, resolved)
+        check("BW's MDX: no query plan tab", page.locator(".result-tabs button:has-text('Query plan')").count() == 0)
+        page.click(".result-tabs button:has-text('SQL statements')")
+        page.wait_for_selector("table.sql-list, .result .notice.err", timeout=RUN)
+        statements = page.eval_on_selector_all("table.sql-list pre.sql", "e => e.map(x => x.textContent)")
+        check("BW's MDX: the SQL statements of the check", statements and all("SELECT" in x.upper() for x in statements),
+              statements[:2])
+        page.click(".result-tabs button:has-text('Response')")
+        check("BW's MDX: the JSON answer", '"status": "RESOLVED"' in page.input_value(".result textarea.trace"))
+        shot(page, "7-bw-check")
+        page.click(".result-tabs button:has-text('Result')")
+        page.fill("textarea.mdx", BW_MDX.replace("[001]", "[999]"))
+        page.click(".query button:has-text('Check')")
+        page.wait_for_selector(".result .result-bar .status", timeout=RUN)
+        check("BW's MDX: an unknown name is ERROR with the fault", "ERROR" in page.inner_text(".result .result-bar")
+              and "[999]" in page.inner_text(".result .notice.err"), page.inner_text(".result"))
+
+        # the check on the trace page, and opened from there in the console's mode for BW's MDX
+        page.goto(args.url.replace("console.html", "trace.html") + f"?sap-client={args.client}")
+        page.wait_for_selector("tr.clickable", timeout=60000)
+        page.click(".segmented button:has-text('Discover')")
+        page.click(".segmented button:has-text('Execute')")
+        page.wait_for_selector("tr.clickable:has-text('Check')", timeout=60000)
+        page.click("tr.clickable:has-text('[ZCLDOC].[001]') >> nth=0")
+        page.wait_for_selector(".detail header h2:has-text('2024-06-15')", timeout=60000)
+        with page.context.expect_page() as opened:
+            page.click(".detail a:has-text('Open in MDX Console')")
+        handed = opened.value
+        handed.on("pageerror", lambda e: errors.append(str(e)))
+        handed.wait_for_selector(".result .result-bar .status", timeout=RUN)
+        check("console: the traced check in the mode BW's MDX", handed.input_value("textarea.mdx") == BW_MDX
+              and handed.input_value(".topbar input[type=date]") == "2024-06-15"
+              and "RESOLVED" in handed.inner_text(".result .result-bar"), handed.inner_text(".result")[:300])
+        shot(handed, "8-check-handed-over")
+        # back to XMLA: the catalog again, the XMLA statement kept apart from BW's
+        handed.click(".topbar .segmented button:has-text('XMLA')")
+        handed.wait_for_selector(".topbar select", timeout=60000)
+        check("back to XMLA: its own statement", handed.input_value("textarea.mdx") != BW_MDX)
         browser.close()
 
     check("no script errors", not errors, errors)

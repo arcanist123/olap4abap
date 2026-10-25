@@ -20,7 +20,9 @@
 "! trace too, with status 0 and no response; the answer is added when it is there. A trace switches itself off
 "! c_active_hours after it was switched on (switching it on again starts the hours anew). A caller can also ask for
 "! the trace of one call whatever the user's trace (the MDX console does, to show the call's SQL statements: start
-"! with forced). Whenever a trace is switched
+"! with forced). The endpoint for BW's MDX (ZZXXMLA1_CL_BW_MDX_API) traces its checks as calls too: method CHECK, the
+"! user and key date checked as request type, the statement as MDX, the JSON answer as response. Whenever a trace is
+"! switched
 "! on, the calls older than c_retention_days and the switched-off users' rows are deleted. The trace page (web/schema/trace.js) reads and switches the trace through
 "! the schema API (GET trace, ...).
 CLASS zzxxmla1_cl_trace DEFINITION
@@ -48,7 +50,7 @@ CLASS zzxxmla1_cl_trace DEFINITION
       ty_t_user TYPE STANDARD TABLE OF ty_user WITH EMPTY KEY.
     TYPES:
       "! what a SOAP request asks: DISCOVER or EXECUTE (initial if it is no XMLA request), the rowset of a Discover,
-      "! the statement of an Execute
+      "! the statement of an Execute; of a check of BW's MDX: CHECK, the user and key date checked, the statement
       BEGIN OF ty_call,
         xmla_method  TYPE string,
         request_type TYPE string,
@@ -114,20 +116,22 @@ CLASS zzxxmla1_cl_trace DEFINITION
     "! Starts the trace of a call if the current user's calls are traced: its row is written and committed at once.
     "! @parameter request | the SOAP request
     "! @parameter forced | the call is traced even if the user's trace is off (the caller asked for it)
+    "! @parameter call | what the call asks, if it is no SOAP request (a check of BW's MDX); initial: describe
     "! @parameter result | the trace of the call, to finish when the answer is there; not bound if the trace is off
     CLASS-METHODS start
       IMPORTING request        TYPE string
                 client_address TYPE string
                 user_agent     TYPE string
                 forced         TYPE abap_bool DEFAULT abap_false
+                !call          TYPE ty_call OPTIONAL
       RETURNING VALUE(result)  TYPE REF TO zzxxmla1_cl_trace.
     "! The traced calls, newest first, without request and response.
     "! @parameter user_name | only this user's; initial: everyone's
-    "! @parameter xmla_method | only calls of this method (DISCOVER or EXECUTE); initial: all calls
+    "! @parameter xmla_methods | only calls of these methods (DISCOVER, EXECUTE, CHECK); initial: all calls
     "! @parameter max | at most this many
     CLASS-METHODS list
       IMPORTING user_name     TYPE syuname OPTIONAL
-                xmla_method   TYPE string OPTIONAL
+                xmla_methods  TYPE string_table OPTIONAL
                 !max          TYPE i DEFAULT 200
       RETURNING VALUE(result) TYPE ty_t_entry.
     "! A traced call with its request, its response and its SQL statements, unzipped; its trace_id is initial if
@@ -153,10 +157,12 @@ CLASS zzxxmla1_cl_trace DEFINITION
     "! @parameter status | the HTTP status
     "! @parameter response | the SOAP response
     "! @parameter parts | instead of response: the SOAP response in UTF-8 parts (an Execute's answer)
+    "! @parameter failed | the call failed though its answer is no SOAP fault (a check of BW's MDX with status ERROR)
     METHODS finish
       IMPORTING status   TYPE i
                 response TYPE string OPTIONAL
-                parts    TYPE ty_t_part OPTIONAL.
+                parts    TYPE ty_t_part OPTIONAL
+                failed   TYPE abap_bool DEFAULT abap_false.
   PROTECTED SECTION.
   PRIVATE SECTION.
     "! the length of the column USER_AGENT
@@ -260,11 +266,11 @@ CLASS zzxxmla1_cl_trace IMPLEMENTATION.
     zzxxmla1_cl_sql=>reset_statistics( ).
     zzxxmla1_cl_sql=>log_statements = abap_true.
     zzxxmla1_cl_mdx_explain=>clear( ).
-    DATA(call) = describe( request ).
+    DATA(asked) = COND ty_call( WHEN call IS INITIAL THEN describe( request ) ELSE call ).
     row-user_name = sy-uname.
-    row-xmla_method = call-xmla_method.
-    row-request_type = call-request_type.
-    row-mdx = call-mdx.
+    row-xmla_method = asked-xmla_method.
+    row-request_type = asked-request_type.
+    row-mdx = asked-mdx.
     row-client_address = client_address.
     row-user_agent = substring( val = user_agent len = nmin( val1 = strlen( user_agent ) val2 = c_user_agent_length ) ).
     row-request_length = strlen( request ).
@@ -279,7 +285,7 @@ CLASS zzxxmla1_cl_trace IMPLEMENTATION.
     GET RUN TIME FIELD DATA(now).
     DATA(runtime_ms) = ( now - started ) DIV 1000.
     IF parts IS INITIAL.
-      DATA(fault) = is_fault( response ).
+      DATA(fault) = xsdbool( failed = abap_true OR is_fault( response ) ).
       DATA(response_length) = strlen( response ).
       DATA(zipped) = compress( response ).
     ELSE.
@@ -316,9 +322,7 @@ CLASS zzxxmla1_cl_trace IMPLEMENTATION.
       users = VALUE #( ( sign = 'I' option = 'EQ' low = user_name ) ).
     ENDIF.
     DATA methods TYPE RANGE OF zzxxmla1_trace-xmla_method.
-    IF xmla_method IS NOT INITIAL.
-      methods = VALUE #( ( sign = 'I' option = 'EQ' low = xmla_method ) ).
-    ENDIF.
+    methods = VALUE #( FOR m IN xmla_methods ( sign = 'I' option = 'EQ' low = m ) ).
     SELECT trace_id, user_name, created_at, xmla_method, request_type, status, fault, runtime_ms, client_address,
            user_agent, request_length, response_length, sql_count, sql_ms, mdx
       FROM zzxxmla1_trace

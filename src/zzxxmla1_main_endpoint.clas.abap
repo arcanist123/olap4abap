@@ -143,7 +143,18 @@ CLASS zzxxmla1_main_endpoint IMPLEMENTATION.
     LOOP AT fields INTO DATA(field).
       APPEND VALUE #( name = to_lower( field-name ) value = field-value ) TO request-parameters.
     ENDLOOP.
+    " traced as an XMLA call is (method CHECK; the user's trace or the header X-olap4abap-Trace: true)
+    DATA(trace) = COND #( WHEN request-method = `POST` THEN zzxxmla1_cl_trace=>start(
+                            request        = request-body
+                            client_address = server->request->get_header_field( '~remote_addr' )
+                            user_agent     = server->request->get_header_field( 'user-agent' )
+                            forced         = xsdbool( to_lower( server->request->get_header_field( 'x-olap4abap-trace' ) ) = `true` )
+                            call           = zzxxmla1_cl_bw_mdx_api=>describe( request ) ) ).
     DATA(result) = NEW zzxxmla1_cl_bw_mdx_api( )->handle( request ).
+    IF trace IS BOUND.
+      trace->finish( status = result-status response = result-body failed = result-failed ).
+      server->response->set_header_field( name = 'X-olap4abap-Trace-Id' value = |{ trace->trace_id }| ).
+    ENDIF.
     server->response->set_status( code = result-status reason = SWITCH #( result-status
                                                                            WHEN 200 THEN `OK`
                                                                            WHEN 400 THEN `Bad Request`

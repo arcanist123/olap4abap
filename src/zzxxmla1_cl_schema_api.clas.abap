@@ -79,9 +79,9 @@
 "! - POST time/fill?from=...&to=...&characteristics=0CALMONTH,0CALYEAR: makes the SIDs of the interval's values and
 "!   writes the attribute rows and texts (without characteristics all of them), committed per characteristic. Answers
 "!   what was done and the state afterwards.
-"! - GET trace[?filter=U][&method=DISCOVER|EXECUTE][&max=N]: the trace of the XMLA endpoint (ZZXXMLA1_CL_TRACE): the
-"!   current user, the users with the trace on and the newest N traced calls (200 without max, at most 10,000; of user
-"!   U, of that method), newest first, without request and response;
+"! - GET trace[?filter=U][&method=M,...][&max=N]: the trace of the XMLA endpoint (ZZXXMLA1_CL_TRACE): the current
+"!   user, the users with the trace on and the newest N traced calls (200 without max, at most 10,000; of user U, of
+"!   the methods M: DISCOVER, EXECUTE, CHECK, the checks of BW's MDX), newest first, without request and response;
 "! - GET trace/entry?id=X: a traced call with its SOAP request, its MDX, its SOAP response (unzipped, the first
 "!   million characters; responseTruncated if there are more; none with response=false) and its SQL statements (sql:
 "!   text, rows, microseconds, error, the phase and the node of the explanation that ran it) and the explanation of an
@@ -315,7 +315,8 @@ CLASS zzxxmla1_cl_schema_api DEFINITION
       IMPORTING !values       TYPE string_table
       RETURNING VALUE(result) TYPE string.
     "! GET trace[?filter=U][&method=M][&max=N]: the current user, the users with the trace on and the newest N traced
-    "! calls (c_trace_max_default, 1 to c_trace_max; of U, of method M: DISCOVER or EXECUTE), newest first.
+    "! calls (c_trace_max_default, 1 to c_trace_max; of U, of the methods M, comma separated: DISCOVER, EXECUTE,
+    "! CHECK), newest first.
     METHODS trace_status
       IMPORTING request       TYPE ty_request
       RETURNING VALUE(result) TYPE string
@@ -1093,12 +1094,16 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
 
   METHOD trace_status.
     DATA(filter) = user_parameter( request = request name = `filter` ).
-    DATA(method) = to_upper( parameter( request = request name = `method` ) ).
-    IF method <> `` AND method <> `DISCOVER` AND method <> `EXECUTE`.
+    DATA(method_text) = to_upper( replace( val = parameter( request = request name = `method` ) sub = ` ` with = `` occ = 0 ) ).
+    DATA methods TYPE string_table.
+    IF method_text IS NOT INITIAL.
+      SPLIT method_text AT `,` INTO TABLE methods.
+    ENDIF.
+    LOOP AT methods INTO DATA(method) WHERE table_line <> `DISCOVER` AND table_line <> `EXECUTE` AND table_line <> `CHECK`.
       RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused
         EXPORTING status  = 400
-                  message = |method is DISCOVER or EXECUTE: { method }|.
-    ENDIF.
+                  message = |method is DISCOVER, EXECUTE or CHECK: { method }|.
+    ENDLOOP.
     DATA(max_text) = condense( parameter( request = request name = `max` ) ).
     DATA(max) = c_trace_max_default.
     IF max_text IS NOT INITIAL.
@@ -1119,7 +1124,7 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
              |"by":{ json( |{ user-changed_by }| ) },"until":{ json_timestamp( user-active_until ) }\}| TO users.
     ENDLOOP.
     DATA calls TYPE string_table.
-    LOOP AT zzxxmla1_cl_trace=>list( user_name = filter xmla_method = method max = max ) INTO DATA(entry).
+    LOOP AT zzxxmla1_cl_trace=>list( user_name = filter xmla_methods = methods max = max ) INTO DATA(entry).
       APPEND |\{{ trace_entry_json( entry ) }\}| TO calls.
     ENDLOOP.
     result = |\{"user":{ json( |{ sy-uname }| ) },"retentionDays":{ zzxxmla1_cl_trace=>c_retention_days },| &&

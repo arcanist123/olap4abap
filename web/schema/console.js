@@ -9,6 +9,9 @@
 // (header X-olap4abap-Trace), the answer names the traced call (X-olap4abap-Trace-Id) and its statements are read from
 // the trace (GET api/trace/entry, ZZXXMLA1_CL_TRACE), where the call is listed too. The trace page's "Open in MDX
 // Console" hands over a traced call: its statement and catalog, and the call as the result, as it was answered.
+// The mode "BW's MDX" sends the statement, in BW's names, to the endpoint for BW's MDX instead (POST bw/check with a
+// user and a key date, ZZXXMLA1_CL_BW_MDX_API): the answer is the check's status and the statement in olap4abap's
+// names, never data; traced as an Execute is, so its SQL statements are shown too.
 // No build step: Preact with htm, vendored as one ES module; this file is what the server serves.
 import { html, render, useState, useEffect, useRef, useCallback, useMemo } from './vendor/htm-preact-standalone.mjs';
 import { formatMdx } from './mdx-format.js';
@@ -89,7 +92,8 @@ async function tracedCall(id) {
 // it, GET api/trace/response), its request, query plan and SQL statements; nothing is run again
 async function tracedRun(id) {
   const trace = await tracedCall(id);
-  const exchange = { request: trace.request || '', raw: '', ms: null, traceId: id, mdx: trace.mdx || '', trace, fromTrace: true };
+  const exchange = { request: trace.request || '', raw: '', ms: null, traceId: id, mdx: trace.mdx || '', trace, fromTrace: true,
+    kind: trace.method === 'CHECK' ? 'bw' : 'xmla' };
   if (!trace.status) {
     return { ...exchange, state: 'err', message: 'The call has no answer: it is still running, or it was aborted (a short dump, ST22).' };
   }
@@ -98,6 +102,7 @@ async function tracedRun(id) {
   const response = await fetch(`api/trace/response?${query}`);
   const raw = await response.text();
   if (!response.ok) return { ...exchange, state: 'err', message: `The response could not be read: ${response.status} ${response.statusText}` };
+  if (exchange.kind === 'bw') return { ...exchange, raw, ...checkOf(raw, `HTTP ${trace.status}`) };
   try {
     return { ...exchange, raw, state: 'ok', result: parseCellset(answerOf(raw, `HTTP ${trace.status}`, {})) };
   } catch (e) {
@@ -120,6 +125,94 @@ function execute(statement, dataSource, catalog, traced) {
     + `<Properties><PropertyList>${propertyList({ DataSourceInfo: dataSource, Catalog: catalog, Format: 'Multidimensional',
       AxisFormat: 'TupleFormat', Content: 'Data' })}</PropertyList></Properties>`
     + '</Execute>', traced);
+}
+
+// ---------------------------------------------------------------------------------------------------- BW's MDX
+
+// POST bw/check?user=&keyDate= with the statement as body; the answer is the check's JSON (traced: as post)
+async function check(statement, user, keyDate, traced) {
+  const started = performance.now();
+  const query = new URLSearchParams();
+  if (user) query.set('user', user);
+  if (keyDate) query.set('keyDate', keyDate);
+  if (client) query.set('sap-client', client);
+  const response = await fetch(`${endpoint.replace(/\/$/, '')}/bw/check?${query}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain; charset=utf-8', ...(traced ? { 'X-olap4abap-Trace': 'true' } : {}) },
+    body: statement,
+  });
+  const raw = await response.text();
+  const exchange = { request: statement, raw, ms: performance.now() - started, traceId: response.headers.get('X-olap4abap-Trace-Id') || '' };
+  return { ...exchange, ...checkOf(raw, `${response.status} ${response.statusText}`) };
+}
+
+// the answer of a check as a run's state: ok with the check (its status may be ERROR), or err if it was refused
+function checkOf(raw, status) {
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return { state: 'err', message: `${status}: the answer is not JSON` };
+  }
+  if (data.error) return { state: 'err', message: data.error };
+  return { state: 'ok', check: data };
+}
+
+const prettyJson = (s) => {
+  try {
+    return JSON.stringify(JSON.parse(s), null, 2);
+  } catch {
+    return s;
+  }
+};
+
+const CHECK_STATUS = { RESOLVED: 'ok', OK: 'ok', EMPTY: 'warn', UNKNOWN: 'warn', 'NO AUTH': 'err', ERROR: 'err' };
+
+// the check's answer: its status, user and key date, BW's message or the fault, the statement in olap4abap's names
+function CheckView({ run }) {
+  const { check: c, trace } = run;
+  const [copy, copied] = useCopied();
+  const resolved = useMemo(() => (c.resolved ? formatMdx(c.resolved) : ''), [c.resolved]);
+  return html`
+    <div class="result-bar">
+      <span class=${`status ${CHECK_STATUS[c.status] || 'warn'}`}>${c.status}</span>
+      <span class="muted small">for <span class="mono">${c.user}</span> at ${c.keyDate}${run.ms != null ? ` · ${msText(run.ms)}` : ''}
+        ${trace && !trace.error && html`<span title="On the server: the call's runtime, its SQL statements and their time">${
+          ` · server ${msText(trace.runtimeMs)}, ${statementCount(trace.sqlCount)} ${msText(trace.sqlMs)}`}</span>`}</span>
+      <span class="spacer"></span>
+      ${copied}
+      <button disabled=${!resolved} onClick=${() => copy(resolved)} title="Copy the statement in olap4abap's names">Copy</button>
+    </div>
+    ${c.message && html`<div class=${`notice ${c.status === 'ERROR' ? 'err' : 'info'}`}>${c.message}</div>`}
+    ${resolved && html`<div class="muted small">The statement in olap4abap's names:</div>
+      <textarea class="trace" readonly spellcheck="false" value=${resolved} aria-label="The statement in olap4abap's names"></textarea>`}`;
+}
+
+// BW's names, as the endpoint for BW's MDX reads them; a click inserts the example
+const BW_NAMES = [
+  ['Cube', 'the InfoProvider after $', '[$ZCLVISITA]'],
+  ['Key figure', '', '[Measures].[ZCLVISNO]'],
+  ['Characteristic', 'its flat hierarchy', '[ZCLDIAG].Members'],
+  ['Member', 'by its key, NUMC with its zeros', '[ZCLDOC].[001]'],
+  ['Initial value', '', '[ZCLDIAG].[]'],
+  ['BW hierarchy', 'characteristic, name and version in fixed columns', '[ZCLDOC                        ZCLDOC_ORG                    001]'],
+  ['Level', 'of a BW hierarchy', 'LEVEL01'],
+  ['Node', 'name and InfoObject in fixed columns', '[CARD                            0HIER_NODE                    ]'],
+  ['Leaf', 'by its key, no path', '[ZCLDIAG   ZCLDIAG_ICD].[A09]'],
+];
+
+// the place of BW's names next to the editor, where the cube browser is in the XMLA mode
+function BwNames({ onInsert }) {
+  return html`<nav class="tree browser" aria-label="BW's names">
+    <div class="group"><h3>BW's names</h3></div>
+    ${BW_NAMES.map(([what, note, example]) => html`<button class="item" title=${`${example} – click to insert`}
+      onClick=${() => onInsert(example)}>
+      <span class="label"><strong>${what}</strong>${note && html` <span class="muted small">${note}</span>`}<br />
+        <span class="mono small">${example.replace(/ {2,}/g, (m) => '·'.repeat(m.length))}</span></span>
+    </button>`)}
+    <div class="muted small pad">Fixed columns are shown with dots for their blanks. The answer is the check's status for
+      the user at the key date, never data.</div>
+  </nav>`;
 }
 
 // ------------------------------------------------------------------------------------------------------ cellset
@@ -294,18 +387,19 @@ function Cells({ run, view, setView }) {
     </div>`;
 }
 
-// the SOAP request or response as sent, or indented for reading
+// the SOAP request or response as sent, or indented for reading (format: xml, json, or text shown as it is)
 // A browser cannot lay out a textarea of a hundred megabytes: of a larger text the first MAX_SHOWN_CHARS are shown
 // (as on the trace page); Download gives all of it.
-function Xml({ text, name, children: notices }) {
+function Xml({ text, name, format = 'xml', children: notices }) {
   const [pretty, setPretty] = useState(true);
   const [copy, copied] = useCopied();
   const cut = text.length > MAX_SHOWN_CHARS;
   const part = useMemo(() => (cut ? text.slice(0, MAX_SHOWN_CHARS) : text), [text]);
-  const shown = useMemo(() => (pretty ? prettyXml(part) : part), [part, pretty]);
+  const shown = useMemo(() => (!pretty ? part : format === 'xml' ? prettyXml(part) : format === 'json' ? prettyJson(part) : part),
+    [part, pretty, format]);
   return html`
     <div class="result-bar">
-      <label class="inline"><input type="checkbox" checked=${pretty} onChange=${(e) => setPretty(e.target.checked)} /> Indent XML</label>
+      ${format !== 'text' && html`<label class="inline"><input type="checkbox" checked=${pretty} onChange=${(e) => setPretty(e.target.checked)} /> Indent ${format.toUpperCase()}</label>`}
       <span class="muted small">${size(text.length)}</span>
       <span class="spacer"></span>
       ${copied}
@@ -352,10 +446,16 @@ function Result({ run, view, setView, tab, setTab, traced }) {
   const [selection, setSelection] = useState(null);  // the element ({node}) or phase ({phase}) of the query plan
   if (run.state === 'busy') return html`<div class="result-msg muted">${run.message || 'Running…'}</div>`;
   const { trace } = run;
+  const bw = run.kind === 'bw';
   const sqlLabel = !run.traceId ? 'off' : !trace ? '…' : trace.error ? '!' : `${trace.sqlCount} · ${msText(trace.sqlMs)}`;
   const planLabel = !run.traceId ? 'off' : !trace ? '…' : trace.error || !trace.explain ? 'none' : '';
-  const tabs = [['result', 'Result', run.state === 'err' ? 'error' : ''], ['plan', 'Query plan', planLabel],
-    ['sql', 'SQL statements', sqlLabel], ['response', 'SOAP response', size((run.raw || '').length)], ['request', 'SOAP request', '']];
+  // a check has no query plan; its request is the statement, its response JSON
+  const tabs = bw
+    ? [['result', 'Result', run.state === 'err' || run.check?.status === 'ERROR' ? 'error' : ''], ['sql', 'SQL statements', sqlLabel],
+      ['response', 'Response', size((run.raw || '').length)], ['request', 'Request', '']]
+    : [['result', 'Result', run.state === 'err' ? 'error' : ''], ['plan', 'Query plan', planLabel],
+      ['sql', 'SQL statements', sqlLabel], ['response', 'SOAP response', size((run.raw || '').length)], ['request', 'SOAP request', '']];
+  const shown = tabs.some(([key]) => key === tab) ? tab : 'result';
   // from a statement to its element or phase in the plan
   const show = (target) => {
     setSelection(target);
@@ -363,19 +463,20 @@ function Result({ run, view, setView, tab, setTab, traced }) {
   };
   return html`<div class="result">
     ${run.fromTrace && html`<div class="notice info small">The traced call of <span class="mono">${trace?.user}</span>${
-      trace?.at ? ` at ${new Date(trace.at).toLocaleString()}` : ''}, as it was answered; Run runs the statement again.</div>`}
+      trace?.at ? ` at ${new Date(trace.at).toLocaleString()}` : ''}, as it was answered; ${run.kind === 'bw' ? 'Check' : 'Run'} runs the statement again.</div>`}
     <div class="tabs result-tabs" role="tablist">
-      ${tabs.map(([key, label, note]) => html`<button role="tab" class=${tab === key ? 'active' : ''} aria-selected=${tab === key}
+      ${tabs.map(([key, label, note]) => html`<button role="tab" class=${shown === key ? 'active' : ''} aria-selected=${shown === key}
         onClick=${() => setTab(key)}>${label}${note && html` <span class="muted small">${note}</span>`}</button>`)}
     </div>
-    ${tab === 'response' ? html`<${Xml} text=${run.raw || ''} name="execute-response.xml">
-        ${run.state === 'err' && run.raw && html`<div class="notice err">The answer is a SOAP fault, or no XML.</div>`}
+    ${shown === 'response' ? html`<${Xml} text=${run.raw || ''} name=${bw ? 'check-response.json' : 'execute-response.xml'} format=${bw ? 'json' : 'xml'}>
+        ${run.state === 'err' && run.raw && html`<div class="notice err">${bw ? 'The check was refused.' : 'The answer is a SOAP fault, or no XML.'}</div>`}
         ${!run.raw && html`<div class="notice warn">No response: ${run.message}</div>`}
       <//>`
-      : tab === 'request' ? html`<${Xml} text=${run.request || ''} name="execute-request.xml" />`
-      : tab === 'sql' ? html`<${Sql} run=${run} traced=${traced} onNode=${(id) => show({ node: id })} onPhase=${(phase) => show({ phase })} />`
-      : tab === 'plan' ? html`<${Plan} run=${run} traced=${traced} selection=${selection} setSelection=${setSelection} />`
+      : shown === 'request' ? html`<${Xml} text=${run.request || ''} name=${bw ? 'check-request.mdx' : 'execute-request.xml'} format=${bw ? 'text' : 'xml'} />`
+      : shown === 'sql' ? html`<${Sql} run=${run} traced=${traced} onNode=${(id) => !bw && show({ node: id })} onPhase=${(phase) => !bw && show({ phase })} />`
+      : shown === 'plan' ? html`<${Plan} run=${run} traced=${traced} selection=${selection} setSelection=${setSelection} />`
       : run.state === 'err' ? html`<div class="notice err">${run.message}</div>`
+      : bw ? html`<${CheckView} run=${run} />`
       : html`<${Cells} run=${run} view=${view} setView=${setView} />`}
   </div>`;
 }
@@ -493,22 +594,31 @@ function save(key, value) {
 }
 
 // A statement handed over in the URL's fragment (#statement=...&catalog=...&trace=..., the trace page's "Open in MDX
-// Console"; trace the id of the traced call, shown as the result): read once, then removed from the address bar, so
-// a reload shows what was typed since. The fragment is not sent to the server, so a long statement fits.
+// Console"; trace the id of the traced call, shown as the result; a check with mode=bw, user and keyDate): read once,
+// then removed from the address bar, so a reload shows what was typed since. The fragment is not sent to the server,
+// so a long statement fits.
 function handedOver() {
   const params = new URLSearchParams(location.hash.slice(1));
   if (!params.has('statement')) return {};
   history.replaceState(null, '', location.pathname + location.search);
-  return { statement: params.get('statement'), catalog: params.get('catalog') || '', trace: params.get('trace') || '' };
+  return { statement: params.get('statement'), catalog: params.get('catalog') || '', trace: params.get('trace') || '',
+    mode: params.get('mode') === 'bw' ? 'bw' : '', user: params.get('user') || '', keyDate: params.get('keyDate') || '' };
 }
+
+const DEFAULT_KEY_DATE = '9999-12-31';
+// the statement and the history are kept per mode
+const modeKey = (mode, key) => (mode === 'bw' ? `bw.${key}` : key);
 
 function App() {
   const [handed] = useState(handedOver);
+  const [mode, setMode] = useState(() => (handed.statement != null ? handed.mode || 'xmla' : load('mode', 'xmla')));
+  const [user, setUser] = useState(() => (handed.mode ? handed.user : load('bw.user', '')));
+  const [keyDate, setKeyDate] = useState(() => (handed.mode ? handed.keyDate : load('bw.keyDate', DEFAULT_KEY_DATE)) || DEFAULT_KEY_DATE);
   const [sources, setSources] = useState(null);
   const [catalogs, setCatalogs] = useState([]);
   const [catalog, setCatalog] = useState(() => handed.catalog || load('catalog', ''));
-  const [statement, setStatement] = useState(() => handed.statement ?? load('statement', ''));
-  const [history, setHistory] = useState(load('history', []));
+  const [statement, setStatement] = useState(() => handed.statement ?? load(modeKey(mode, 'statement'), ''));
+  const [history, setHistory] = useState(() => load(modeKey(mode, 'history'), []));
   const [run, setRun] = useState(() => (handed.trace ? { state: 'busy', message: 'Reading the traced call…' } : null));
   const [view, setView] = useState('grid');
   const [tab, setTab] = useState('result');
@@ -540,23 +650,44 @@ function App() {
       .then((done) => number === runs.current && setRun(done));
   }, []);
   useEffect(() => save('catalog', catalog), [catalog]);
-  useEffect(() => save('statement', statement), [statement]);
+  useEffect(() => save(modeKey(mode, 'statement'), statement), [statement]);
   useEffect(() => save('trace', traced), [traced]);
+  useEffect(() => save('mode', mode), [mode]);
+  useEffect(() => save('bw.user', user), [user]);
+  useEffect(() => save('bw.keyDate', keyDate), [keyDate]);
+
+  // the other mode's statement and history; the result of this one goes
+  const switchMode = (next) => {
+    if (next === mode) return;
+    runs.current++;
+    setMode(next);
+    setStatement(load(modeKey(next, 'statement'), ''));
+    setHistory(load(modeKey(next, 'history'), []));
+    setRun(null);
+  };
 
   const runStatement = useCallback(async () => {
     const area = editor.current;
     const selected = area && area.selectionStart !== area.selectionEnd
       ? area.value.slice(area.selectionStart, area.selectionEnd) : statement;
     const mdx = selected.trim();
-    if (!mdx || !catalog) return;
+    if (!mdx || (mode === 'xmla' && !catalog)) return;
     const number = ++runs.current;
     setRun({ state: 'busy' });
     let done;
-    try {
-      const { doc, ms, raw, request, traceId } = await execute(mdx, dataSource, catalog, traced);
-      done = { state: 'ok', result: parseCellset(doc), ms, raw, request, traceId, mdx };
-    } catch (e) {
-      done = { state: 'err', message: e.message, ms: e.ms, raw: e.raw || '', request: e.request || '', traceId: e.traceId || '', mdx };
+    if (mode === 'bw') {
+      try {
+        done = { ...await check(mdx, user.trim().toUpperCase(), keyDate, traced), kind: 'bw', mdx };
+      } catch (e) {
+        done = { state: 'err', kind: 'bw', message: e.message, raw: '', request: mdx, traceId: '', mdx };
+      }
+    } else {
+      try {
+        const { doc, ms, raw, request, traceId } = await execute(mdx, dataSource, catalog, traced);
+        done = { state: 'ok', result: parseCellset(doc), ms, raw, request, traceId, mdx };
+      } catch (e) {
+        done = { state: 'err', message: e.message, ms: e.ms, raw: e.raw || '', request: e.request || '', traceId: e.traceId || '', mdx };
+      }
     }
     if (number !== runs.current) return;
     setRun(done);
@@ -566,10 +697,10 @@ function App() {
     }
     setHistory((h) => {
       const next = [mdx, ...h.filter((x) => x !== mdx)].slice(0, HISTORY_SIZE);
-      save('history', next);
+      save(modeKey(mode, 'history'), next);
       return next;
     });
-  }, [statement, catalog, dataSource, traced]);
+  }, [mode, statement, catalog, dataSource, traced, user, keyDate]);
 
   const insert = (piece) => {
     const area = editor.current;
@@ -604,12 +735,23 @@ function App() {
   return html`
     <div class="topbar">
       <div class="title"><h1>MDX Console</h1><span class="src">olap4abap</span></div>
-      <label class="inline">Catalog
+      <div class="segmented" role="group" aria-label="Mode">
+        <button class=${mode === 'xmla' ? 'active' : ''} aria-pressed=${mode === 'xmla'} onClick=${() => switchMode('xmla')}
+          title="Execute in olap4abap's names on a catalog of the XMLA endpoint">XMLA</button>
+        <button class=${mode === 'bw' ? 'active' : ''} aria-pressed=${mode === 'bw'} onClick=${() => switchMode('bw')}
+          title="Check a statement in BW's names for a user at a key date (the endpoint for BW's MDX; no data)">BW's MDX</button>
+      </div>
+      ${mode === 'xmla' ? html`<label class="inline">Catalog
         <select value=${catalog} onChange=${(e) => setCatalog(e.target.value)} disabled=${!catalogs.length}>
           ${!catalogs.length && html`<option value="">–</option>`}
           ${catalogs.map((c) => html`<option value=${c}>${c}</option>`)}
         </select>
+      </label>` : html`<label class="inline" title="A test user of the authorisation scenarios, or empty for your own">User
+        <input type="text" maxlength="12" size="13" placeholder="you" value=${user} onInput=${(e) => setUser(e.target.value)} />
       </label>
+      <label class="inline">Key date
+        <input type="date" value=${keyDate} onInput=${(e) => setKeyDate(e.target.value || DEFAULT_KEY_DATE)} />
+      </label>`}
       <span class="spacer"></span>
       <a href=${`./${location.search}`}>Schema Builder</a>
       <a href=${`time.html${location.search}`}>Time Master Data</a>
@@ -617,19 +759,23 @@ function App() {
     </div>
     ${error && html`<div class="banner" role="alert">${error}</div>`}
     <div class="editor console">
-      <${Browser} dataSource=${dataSource} catalog=${catalog} onInsert=${insert} />
+      ${mode === 'xmla' ? html`<${Browser} dataSource=${dataSource} catalog=${catalog} onInsert=${insert} />`
+        : html`<${BwNames} onInsert=${insert} />`}
       <main class="main console-main">
         <div class="query">
           <textarea ref=${editor} class="mdx" spellcheck="false" value=${statement} aria-label="MDX statement"
-            placeholder=${'SELECT {[Measures].Members} ON COLUMNS\nFROM [Cube]'}
+            placeholder=${mode === 'xmla' ? 'SELECT {[Measures].Members} ON COLUMNS\nFROM [Cube]'
+              : 'SELECT {[Measures].[ZCLVISNO]} ON COLUMNS\nFROM [$ZCLVISITA]\nWHERE ([ZCLDOC].[001])'}
             onInput=${(e) => setStatement(e.target.value)}
             onKeyDown=${(e) => {
               if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); runStatement(); }
               if (e.shiftKey && e.altKey && e.code === 'KeyF') { e.preventDefault(); format(); }
             }}></textarea>
           <div class="row">
-            <button class="primary" disabled=${busy || !catalog || !statement.trim()} onClick=${runStatement}
-              title="Run the statement, or the selected part of it (Ctrl+Enter)">${busy ? 'Running…' : 'Run'}</button>
+            <button class="primary" disabled=${busy || (mode === 'xmla' && !catalog) || !statement.trim()} onClick=${runStatement}
+              title=${mode === 'xmla' ? 'Run the statement, or the selected part of it (Ctrl+Enter)'
+                : 'Check the statement, or the selected part of it, for the user at the key date (Ctrl+Enter)'}>${
+                busy ? 'Running…' : mode === 'xmla' ? 'Run' : 'Check'}</button>
             <button disabled=${!statement.trim()} onClick=${format}
               title="Lay out the statement, or the selected part of it, for reading (Shift+Alt+F)">Format</button>
             <label class="inline" title="Trace the call: its SQL statements, their rows and time (the call is listed on the trace page too)">
@@ -646,7 +792,8 @@ function App() {
           </div>
         </div>
         ${run ? html`<${Result} run=${run} view=${view} setView=${setView} tab=${tab} setTab=${setTab} traced=${traced} />`
-          : html`<div class="result-msg muted">Write a statement and run it. Up to two axes show as a grid, more as a table.</div>`}
+          : html`<div class="result-msg muted">${mode === 'xmla' ? 'Write a statement and run it. Up to two axes show as a grid, more as a table.'
+            : 'Write a statement in BW\'s names and check it: the answer is its status for the user at the key date, never data.'}</div>`}
       </main>
     </div>`;
 }

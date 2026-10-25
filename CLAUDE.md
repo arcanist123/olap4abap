@@ -65,7 +65,8 @@ Read before designing anything:
   `ZZXXMLA1_CL_SCHEMA_API`, the rest of `/schema/...` to `ZZXXMLA1_CL_WEB_APP` (the schema builder's files, from the code),
   `/bw/...` to `ZZXXMLA1_CL_BW_MDX_API` (BW's MDX on InfoProviders, `POST bw/check?user=&keyDate=`: the
   authorisation result of a user for a statement in BW's names, never data; so far it resolves the statement,
-  `ZZXXMLA1_CL_MDX_SCHEMA_READER=>for_bw_cube`; `docs/next-steps.md`, Next: BW's MDX on InfoProviders); otherwise GET returns the start page (links to the schema builder, MDX console, time master data and trace, and the XMLA URL
+  `ZZXXMLA1_CL_MDX_SCHEMA_READER=>for_bw_cube`; traced as XMLA calls are, method `CHECK`, `sql=true` puts the SQL
+  statements in the answer; `docs/next-steps.md`, Next: BW's MDX on InfoProviders); otherwise GET returns the start page (links to the schema builder, MDX console, time master data and trace, and the XMLA URL
   with `sap-client` for clients), POST hands the SOAP body to `ZZXXMLA1_CL_XMLA_HANDLER` (string in, string out; so far only
   DISCOVER_DATASOURCES, anything else is a SOAP fault), other methods 405.
 - XMLA tests: `python scripts/xmla_test.py` replays `reference/<case>/` against SAP (see `docs/test-strategy.md`);
@@ -161,7 +162,9 @@ Read before designing anything:
   edits the schema XML as a DOM (rename, remove, time dimensions, user hierarchies with levels and member properties,
   measures, raw XML), lets the server `check` every change and accepts (`scripts/schema_ui_test.py`).
 - MDX console: `/zzxxmla1/schema/console.html` (`web/schema/console.js`, served from the same generated class as the schema builder)
-  sends Execute and Discover requests to the endpoint itself. A catalog's cubes, measures, hierarchies and levels are
+  sends Execute and Discover requests to the endpoint itself; its mode "BW's MDX" sends a statement in BW's names
+  with a user and a key date to `bw/check` instead and shows the check's status, the statement in olap4abap's names
+  and its SQL statements (statement and history kept per mode; the trace page opens a traced check in it). A catalog's cubes, measures, hierarchies and levels are
   listed from the schema rowsets (a click inserts the unique name); an answer of up to two axes is a grid (Axis0 the
   columns, Axis1 the rows, spanning headers), one of more axes a flat table (a column per hierarchy, highest axis first,
   a row per cell) (`scripts/console_ui_test.py`). Tabs next to the result show the SOAP response and request and,
@@ -189,7 +192,8 @@ Read before designing anything:
   see `docs/time-master-data.md`.
 - Trace: `/zzxxmla1/schema/trace.html` (`web/schema/trace.js`) switches the trace of XMLA calls on and off per SAP
   user (table `ZZXXMLA1_TRCUSR`) and lists the traced calls (table `ZZXXMLA1_TRACE`, `ZZXXMLA1_CL_TRACE`): per call
-  the SOAP request, Discover with its rowset or Execute with its MDX statement, status, fault, runtime, the SQL
+  the SOAP request, Discover with its rowset or Execute with its MDX statement (or a check of BW's MDX, method
+  `CHECK`, the user and key date checked as its type), status, fault, runtime, the SQL
   statements it ran and their time (`ZZXXMLA1_CL_SQL`'s statistics), client address and User-Agent, the SOAP
   response gzipped (`cl_abap_gzip`) and the statements themselves with their rows, time and error (`statement_log`,
   gzipped XML, the first 10,000, each with its phase and element) and an Execute's query plan
