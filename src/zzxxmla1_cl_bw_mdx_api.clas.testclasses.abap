@@ -23,6 +23,7 @@ CLASS ltc_bw_mdx_api DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION S
     METHODS execute_statement FOR TESTING RAISING zzxxmla1_cx_xmla.
     METHODS discover_refused FOR TESTING.
     METHODS resolved FOR TESTING.
+    METHODS checked_for_user FOR TESTING.
     METHODS unknown_name FOR TESTING.
     METHODS no_resource FOR TESTING.
     METHODS other_user_refused FOR TESTING.
@@ -68,16 +69,29 @@ CLASS ltc_bw_mdx_api IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD resolved.
+    " the caller has 0BI_ALL: allowed
     DATA(result) = NEW zzxxmla1_cl_bw_mdx_api( )->handle( VALUE #( method = `POST` path = `/bw/check`
                                                                   body   = c_statement ) ).
     cl_abap_unit_assert=>assert_equals( act = result-status exp = 200 ).
-    cl_abap_unit_assert=>assert_char_cp( act = result-body exp = `*"status":"RESOLVED"*` ).
+    cl_abap_unit_assert=>assert_char_cp( act = result-body exp = `*"status":"OK"*` ).
     cl_abap_unit_assert=>assert_char_cp( act = result-body exp = `*"keyDate":"9999-12-31"*` ).
-    " the members in olap4abap's names
+    " the members in olap4abap's names, the selection in BW's
     cl_abap_unit_assert=>assert_char_cp( act = result-body exp = `*"resolved":"*[ZCLDOC].[001]*[ZCLDIAG].[A09]*` ).
+    cl_abap_unit_assert=>assert_char_cp( act = result-body
+                                         exp = `*"name":"Slicer","count":1,"tuples":[["ZCLDOC '001'","ZCLDIAG 'A09'"]]*` ).
     cl_abap_unit_assert=>assert_false( result-failed ).
     " the statements only with sql=true
     cl_abap_unit_assert=>assert_char_np( act = result-body exp = `*"sql":*` ).
+  ENDMETHOD.
+
+  METHOD checked_for_user.
+    " the scenario NA (ZZXXMLA1_A09) has only the value not assigned of ZCLDOC: BW does not know 001 (reference/auth/)
+    DATA(result) = NEW zzxxmla1_cl_bw_mdx_api( )->handle(
+                     VALUE #( method     = `POST` path = `/bw/check` body = c_statement
+                              parameters = VALUE #( ( name = `user` value = `ZZXXMLA1_A09` ) ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = result-status exp = 200 ).
+    cl_abap_unit_assert=>assert_char_cp( act = result-body exp = `*"status":"UNKNOWN","reason":"VALUE"*` ).
+    cl_abap_unit_assert=>assert_false( result-failed ).
   ENDMETHOD.
 
   METHOD unknown_name.

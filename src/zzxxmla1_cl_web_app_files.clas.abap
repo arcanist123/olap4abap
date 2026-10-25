@@ -165,52 +165,53 @@ CLASS zzxxmla1_cl_web_app_files IMPLEMENTATION.
     APPEND |er > header \{ display: flex; align-items: center; gap: 8px; padding: 8px 10px; flex-wrap: wrap; border-bottom: 1px solid var(--line); \}\n.hier > .body \{ padding: 10px; display: | TO parts.
     APPEND |flex; flex-direction: column; gap: 8px; \}\n.props \{ padding: 4px 0 4px 24px; display: flex; flex-direction: column; gap: 4px; \}\n.props select, .props input[type=text] \{ width:| TO parts.
     APPEND | auto; \}\n\n.notice \{ border-radius: var(--radius); padding: 8px 12px; \}\n.notice.err \{ background: var(--err-soft); color: var(--err); white-space: pre-wrap; \}\n.notice.warn | TO parts.
-    APPEND |\{ background: var(--warn-soft); color: var(--warn); \}\n.notice.ok \{ background: var(--ok-soft); color: var(--ok); \}\n.notice.info \{ background: var(--sunken); color: var(--tex| TO parts.
-    APPEND |t); \}\nul.plain \{ margin: 0; padding-left: 18px; \}\n\ntextarea.xml \{ width: 100%; min-height: calc(100vh - 230px); font-family: var(--mono); font-size: 12.5px; line-height: 1.5| TO parts.
-    APPEND |;\n  white-space: pre; tab-size: 2; resize: vertical; \}\n\n/* dialog */\n.backdrop \{ position: fixed; inset: 0; background: rgba(0, 0, 0, .35); display: flex; align-items: center| TO parts.
-    APPEND |; justify-content: center; padding: 16px; z-index: 20; \}\n.dialog \{ background: var(--panel); border: 1px solid var(--line); border-radius: 8px; width: min(560px, 100%); max-heig| TO parts.
-    APPEND |ht: 90vh; overflow: auto;\n  box-shadow: 0 12px 40px rgba(0, 0, 0, .25); \}\n.dialog > header \{ padding: 14px 16px 0; \}\n.dialog > .body \{ padding: 12px 16px; display: flex; fle| TO parts.
-    APPEND |x-direction: column; gap: 10px; \}\n.dialog > footer \{ padding: 0 16px 14px; display: flex; justify-content: flex-end; gap: 8px; \}\n\n/* MDX console (console.html): the cube brow| TO parts.
-    APPEND |ser on the left, the statement above the result */\n.console \{ grid-template-columns: 280px minmax(0, 1fr); \}\n.console-main \{ display: flex; flex-direction: column; overflow: h| TO parts.
-    APPEND |idden; \}\n.query \{ padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid var(--line); background: var(--panel); \}\ntextarea.mdx \{ width:| TO parts.
-    APPEND | 100%; height: 170px; min-height: 80px; font-family: var(--mono); font-size: 13px; line-height: 1.5;\n  white-space: pre; tab-size: 2; resize: vertical; \}\n.browser .item \{ gap: | TO parts.
-    APPEND |4px; \}\n.browser .item .label \{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; \}\n.browser .twisty \{ width: 12px; color: var(--muted); flex: none; \}\n.browser| TO parts.
-    APPEND | .pad \{ padding: 4px 14px; \}\n.glyph \{ width: 9px; height: 9px; border-radius: 2px; flex: none; margin-right: 3px; background: var(--muted); \}\n.glyph.cube \{ background: var(-| TO parts.
-    APPEND |-accent); \}\n.glyph.folder, .glyph.dimension \{ background: transparent; border: 1.5px solid var(--muted); \}\n.glyph.measure \{ background: var(--ok); border-radius: 50%; \}\n.gl| TO parts.
-    APPEND |yph.hierarchy \{ background: var(--warn); \}\n.glyph.level \{ background: var(--line); border: 1px solid var(--muted); \}\n.result \{ flex: 1; min-height: 0; display: flex; flex-di| TO parts.
-    APPEND |rection: column; gap: 8px; padding: 10px 16px 16px; \}\n.result-msg \{ padding: 16px; \}\n.result-bar \{ display: flex; align-items: center; gap: 10px; flex-wrap: wrap; \}\n.result| TO parts.
-    APPEND |-bar .spacer \{ flex: 1; \}\n.result-table \{ flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); \}\n.se| TO parts.
-    APPEND |gmented \{ display: inline-flex; \}\n.segmented button \{ border-radius: 0; \}\n.segmented button:first-child \{ border-radius: var(--radius) 0 0 var(--radius); \}\n.segmented butt| TO parts.
-    APPEND |on:last-child \{ border-radius: 0 var(--radius) var(--radius) 0; \}\n.segmented button + button \{ margin-left: -1px; \}\n.segmented.mixed button \{ color: var(--muted); background| TO parts.
-    APPEND |: var(--sunken); \}\n.segmented button.active \{ background: var(--accent-soft); color: var(--accent); border-color: var(--accent); position: relative; \}\ntable.grid \{ width: aut| TO parts.
-    APPEND |o; min-width: 100%; font-variant-numeric: tabular-nums; \}\ntable.grid th, table.grid td \{ border: 1px solid var(--line); padding: 3px 8px; white-space: nowrap; \}\ntable.grid th | TO parts.
-    APPEND |\{ position: static; background: var(--sunken); color: var(--text); font-size: 12.5px; \}\ntable.grid th.corner \{ color: var(--muted); font-weight: 600; \}\ntable.grid th.member | TO parts.
-    APPEND |\{ font-weight: 500; \}\ntable.grid th.col-head \{ text-align: center; \}\ntable.grid th.row-head \{ vertical-align: top; \}\ntable.grid td.num \{ text-align: right; \}\ntable.grid| TO parts.
-    APPEND | td.cell-err \{ color: var(--err); cursor: help; \}\ntable.grid tbody tr:hover td \{ background: var(--accent-soft); \}\ntable.flat thead th \{ position: sticky; top: 0; z-index: 1| TO parts.
-    APPEND |; \}\n/* the axis as generated content, so Copy (innerText) leaves it out */\ntable.flat th[data-axis]::after \{ content: attr(data-axis); margin-left: 6px; font-size: 10.5px; colo| TO parts.
-    APPEND |r: var(--muted); font-weight: 400; \}\ntable.flat th.num \{ text-align: right; \}\n/* the result's tabs: cells, SOAP response, SQL statements, SOAP request */\n.result-tabs \{ padd| TO parts.
-    APPEND |ing: 0; background: none; flex: none; \}\n.result textarea.trace \{ flex: 1; min-height: 200px; resize: none; \}\ntable.sql-list td \{ vertical-align: top; white-space: normal; \}| TO parts.
-    APPEND |\ntable.sql-list thead th \{ position: sticky; top: 0; z-index: 1; \}\npre.sql \{ margin: 0; font-family: var(--mono); font-size: 12px; line-height: 1.45; white-space: pre-wrap; wo| TO parts.
-    APPEND |rd-break: break-word;\n  max-height: 12em; overflow: auto; \}\n/* the query plan: the resolved tree on the left, the statements of the selected element or phase on the right */\n.p| TO parts.
-    APPEND |lan \{ flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 12px; \}\n.plan-tree \{ overflow: auto; border: 1px solid var(--line); bo| TO parts.
-    APPEND |rder-radius: var(--radius); background: var(--panel); padding: 4px 0; \}\n.plan-sql \{ min-height: 0; display: flex; flex-direction: column; gap: 8px; \}\n.plan-summary \{ padding:| TO parts.
-    APPEND | 6px 8px 8px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; \}\n.plan-part \{ padding: 8px 8px 2px; font-size: 11.5px; font-w| TO parts.
-    APPEND |eight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); \}\n.plan-node \{ display: flex; align-items: center; gap: 6px; padding: 2px 8px; cursor: pointer| TO parts.
-    APPEND |; white-space: nowrap; \}\n.plan-node:hover \{ background: var(--sunken); \}\n.plan-node.selected \{ background: var(--accent-soft); \}\n.plan-node .twisty \{ width: 12px; color: v| TO parts.
-    APPEND |ar(--muted); flex: none; \}\n.plan-node .spacer \{ flex: 1; \}\n.plan-label \{ overflow: hidden; text-overflow: ellipsis; \}\n.plan-label.phase \{ flex: none; \}\n.plan-desc \{ min| TO parts.
-    APPEND |-width: 0; overflow: hidden; text-overflow: ellipsis; \}\n.plan-node .mark, .plan-node .sql-badge \{ flex: none; \}\n.mark \{ font-size: 10.5px; border-radius: 999px; padding: 0 7p| TO parts.
-    APPEND |x; background: var(--sunken); color: var(--muted); \}\n.mark.relational \{ background: var(--ok-soft); color: var(--ok); \}\n.mark.computed \{ background: var(--warn-soft); color: | TO parts.
-    APPEND |var(--warn); \}\n.sql-badge \{ font-size: 11px; font-variant-numeric: tabular-nums; border-radius: 4px; padding: 0 6px; background: var(--accent-soft); color: var(--accent); \}\npr| TO parts.
-    APPEND |e.plan-mdx \{ padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--sunken); max-height: 6em; \}\n@media (max-width: 760px) \{ .console-m| TO parts.
-    APPEND |ain \{ overflow: visible; \} .result textarea.trace \{ min-height: 360px; \}\n  .plan \{ grid-template-columns: minmax(0, 1fr); \} .plan-tree \{ max-height: 420px; \} \}\n\n/* trac| TO parts.
-    APPEND |e */\ntr.selected td \{ background: var(--accent-soft); \}\ntd.statement \{ max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; \}\ntextarea.trace \{ | TO parts.
-    APPEND |width: 100%; min-height: 420px; font-family: var(--mono); font-size: 12.5px; line-height: 1.5;\n  white-space: pre; tab-size: 2; resize: vertical; \}\n.pane.wide \{ max-width: none| TO parts.
-    APPEND |; \}\n/* a selected call is shown next to the list, which then leaves out user and client */\n.trace-split \{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); g| TO parts.
-    APPEND |ap: 16px; align-items: start; \}\n.trace-split .wide-only \{ display: none; \}\n.trace-split td.statement \{ max-width: 260px; \}\n.trace-split > .detail \{ position: sticky; top: | TO parts.
-    APPEND |8px; \}\n.trace-split textarea.trace \{ min-height: calc(100vh - 280px); \}\n/* the query plan and the SQL statements of a call (query-plan.js), as in the MDX console */\n.trace-vi| TO parts.
-    APPEND |ew \{ display: flex; flex-direction: column; gap: 8px; height: calc(100vh - 240px); min-height: 480px; \}\n.trace-split .trace-view .plan \{ grid-template-columns: minmax(0, 1fr); | TO parts.
-    APPEND |grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); \}\n@media (max-width: 1000px) \{\n  .trace-split \{ grid-template-columns: minmax(0, 1fr); \}\n  .trace-split .wide-only \{ disp| TO parts.
-    APPEND |lay: table-cell; \}\n  .trace-split > .detail \{ position: static; \}\n\}\n| TO parts.
+    APPEND |\{ background: var(--warn-soft); color: var(--warn); \}\nul.selection \{ margin: 0; padding-left: 18px; max-height: 12em; overflow: auto; overflow-wrap: anywhere; \}\n.notice.ok \{| TO parts.
+    APPEND | background: var(--ok-soft); color: var(--ok); \}\n.notice.info \{ background: var(--sunken); color: var(--text); \}\nul.plain \{ margin: 0; padding-left: 18px; \}\n\ntextarea.xml | TO parts.
+    APPEND |\{ width: 100%; min-height: calc(100vh - 230px); font-family: var(--mono); font-size: 12.5px; line-height: 1.5;\n  white-space: pre; tab-size: 2; resize: vertical; \}\n\n/* dialog | TO parts.
+    APPEND |*/\n.backdrop \{ position: fixed; inset: 0; background: rgba(0, 0, 0, .35); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 20; \}\n.dialog \{ | TO parts.
+    APPEND |background: var(--panel); border: 1px solid var(--line); border-radius: 8px; width: min(560px, 100%); max-height: 90vh; overflow: auto;\n  box-shadow: 0 12px 40px rgba(0, 0, 0, .25| TO parts.
+    APPEND |); \}\n.dialog > header \{ padding: 14px 16px 0; \}\n.dialog > .body \{ padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; \}\n.dialog > footer \{ padding: 0 16p| TO parts.
+    APPEND |x 14px; display: flex; justify-content: flex-end; gap: 8px; \}\n\n/* MDX console (console.html): the cube browser on the left, the statement above the result */\n.console \{ grid-t| TO parts.
+    APPEND |emplate-columns: 280px minmax(0, 1fr); \}\n.console-main \{ display: flex; flex-direction: column; overflow: hidden; \}\n.query \{ padding: 12px 16px; display: flex; flex-direction| TO parts.
+    APPEND |: column; gap: 8px; border-bottom: 1px solid var(--line); background: var(--panel); \}\ntextarea.mdx \{ width: 100%; height: 170px; min-height: 80px; font-family: var(--mono); font| TO parts.
+    APPEND |-size: 13px; line-height: 1.5;\n  white-space: pre; tab-size: 2; resize: vertical; \}\n.browser .item \{ gap: 4px; \}\n.browser .item .label \{ overflow: hidden; text-overflow: ell| TO parts.
+    APPEND |ipsis; white-space: nowrap; \}\n.browser .twisty \{ width: 12px; color: var(--muted); flex: none; \}\n.browser .pad \{ padding: 4px 14px; \}\n.glyph \{ width: 9px; height: 9px; bor| TO parts.
+    APPEND |der-radius: 2px; flex: none; margin-right: 3px; background: var(--muted); \}\n.glyph.cube \{ background: var(--accent); \}\n.glyph.folder, .glyph.dimension \{ background: transpare| TO parts.
+    APPEND |nt; border: 1.5px solid var(--muted); \}\n.glyph.measure \{ background: var(--ok); border-radius: 50%; \}\n.glyph.hierarchy \{ background: var(--warn); \}\n.glyph.level \{ backgrou| TO parts.
+    APPEND |nd: var(--line); border: 1px solid var(--muted); \}\n.result \{ flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 10px 16px 16px; \}\n.result-msg \{| TO parts.
+    APPEND | padding: 16px; \}\n.result-bar \{ display: flex; align-items: center; gap: 10px; flex-wrap: wrap; \}\n.result-bar .spacer \{ flex: 1; \}\n.result-table \{ flex: 1; min-height: 0; | TO parts.
+    APPEND |overflow: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); \}\n.segmented \{ display: inline-flex; \}\n.segmented button \{ border-radiu| TO parts.
+    APPEND |s: 0; \}\n.segmented button:first-child \{ border-radius: var(--radius) 0 0 var(--radius); \}\n.segmented button:last-child \{ border-radius: 0 var(--radius) var(--radius) 0; \}\n.| TO parts.
+    APPEND |segmented button + button \{ margin-left: -1px; \}\n.segmented.mixed button \{ color: var(--muted); background: var(--sunken); \}\n.segmented button.active \{ background: var(--acc| TO parts.
+    APPEND |ent-soft); color: var(--accent); border-color: var(--accent); position: relative; \}\ntable.grid \{ width: auto; min-width: 100%; font-variant-numeric: tabular-nums; \}\ntable.grid| TO parts.
+    APPEND | th, table.grid td \{ border: 1px solid var(--line); padding: 3px 8px; white-space: nowrap; \}\ntable.grid th \{ position: static; background: var(--sunken); color: var(--text); fo| TO parts.
+    APPEND |nt-size: 12.5px; \}\ntable.grid th.corner \{ color: var(--muted); font-weight: 600; \}\ntable.grid th.member \{ font-weight: 500; \}\ntable.grid th.col-head \{ text-align: center; | TO parts.
+    APPEND |\}\ntable.grid th.row-head \{ vertical-align: top; \}\ntable.grid td.num \{ text-align: right; \}\ntable.grid td.cell-err \{ color: var(--err); cursor: help; \}\ntable.grid tbody t| TO parts.
+    APPEND |r:hover td \{ background: var(--accent-soft); \}\ntable.flat thead th \{ position: sticky; top: 0; z-index: 1; \}\n/* the axis as generated content, so Copy (innerText) leaves it o| TO parts.
+    APPEND |ut */\ntable.flat th[data-axis]::after \{ content: attr(data-axis); margin-left: 6px; font-size: 10.5px; color: var(--muted); font-weight: 400; \}\ntable.flat th.num \{ text-align:| TO parts.
+    APPEND | right; \}\n/* the result's tabs: cells, SOAP response, SQL statements, SOAP request */\n.result-tabs \{ padding: 0; background: none; flex: none; \}\n.result textarea.trace \{ fle| TO parts.
+    APPEND |x: 1; min-height: 200px; resize: none; \}\ntable.sql-list td \{ vertical-align: top; white-space: normal; \}\ntable.sql-list thead th \{ position: sticky; top: 0; z-index: 1; \}\np| TO parts.
+    APPEND |re.sql \{ margin: 0; font-family: var(--mono); font-size: 12px; line-height: 1.45; white-space: pre-wrap; word-break: break-word;\n  max-height: 12em; overflow: auto; \}\n/* the qu| TO parts.
+    APPEND |ery plan: the resolved tree on the left, the statements of the selected element or phase on the right */\n.plan \{ flex: 1; min-height: 0; display: grid; grid-template-columns: min| TO parts.
+    APPEND |max(0, 1fr) minmax(0, 1.3fr); gap: 12px; \}\n.plan-tree \{ overflow: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); padding: 4px 0; \}| TO parts.
+    APPEND |\n.plan-sql \{ min-height: 0; display: flex; flex-direction: column; gap: 8px; \}\n.plan-summary \{ padding: 6px 8px 8px; border-bottom: 1px solid var(--line); display: flex; flex-| TO parts.
+    APPEND |wrap: wrap; gap: 6px; align-items: center; \}\n.plan-part \{ padding: 8px 8px 2px; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var| TO parts.
+    APPEND |(--muted); \}\n.plan-node \{ display: flex; align-items: center; gap: 6px; padding: 2px 8px; cursor: pointer; white-space: nowrap; \}\n.plan-node:hover \{ background: var(--sunken)| TO parts.
+    APPEND |; \}\n.plan-node.selected \{ background: var(--accent-soft); \}\n.plan-node .twisty \{ width: 12px; color: var(--muted); flex: none; \}\n.plan-node .spacer \{ flex: 1; \}\n.plan-la| TO parts.
+    APPEND |bel \{ overflow: hidden; text-overflow: ellipsis; \}\n.plan-label.phase \{ flex: none; \}\n.plan-desc \{ min-width: 0; overflow: hidden; text-overflow: ellipsis; \}\n.plan-node .ma| TO parts.
+    APPEND |rk, .plan-node .sql-badge \{ flex: none; \}\n.mark \{ font-size: 10.5px; border-radius: 999px; padding: 0 7px; background: var(--sunken); color: var(--muted); \}\n.mark.relational | TO parts.
+    APPEND |\{ background: var(--ok-soft); color: var(--ok); \}\n.mark.computed \{ background: var(--warn-soft); color: var(--warn); \}\n.sql-badge \{ font-size: 11px; font-variant-numeric: ta| TO parts.
+    APPEND |bular-nums; border-radius: 4px; padding: 0 6px; background: var(--accent-soft); color: var(--accent); \}\npre.plan-mdx \{ padding: 6px 8px; border: 1px solid var(--line); border-ra| TO parts.
+    APPEND |dius: var(--radius); background: var(--sunken); max-height: 6em; \}\n@media (max-width: 760px) \{ .console-main \{ overflow: visible; \} .result textarea.trace \{ min-height: 360px| TO parts.
+    APPEND |; \}\n  .plan \{ grid-template-columns: minmax(0, 1fr); \} .plan-tree \{ max-height: 420px; \} \}\n\n/* trace */\ntr.selected td \{ background: var(--accent-soft); \}\ntd.statement| TO parts.
+    APPEND | \{ max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; \}\ntextarea.trace \{ width: 100%; min-height: 420px; font-family: var(--mono); font-size: 12.| TO parts.
+    APPEND |5px; line-height: 1.5;\n  white-space: pre; tab-size: 2; resize: vertical; \}\n.pane.wide \{ max-width: none; \}\n/* a selected call is shown next to the list, which then leaves ou| TO parts.
+    APPEND |t user and client */\n.trace-split \{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; \}\n.trace-split .wide-only \{ display: no| TO parts.
+    APPEND |ne; \}\n.trace-split td.statement \{ max-width: 260px; \}\n.trace-split > .detail \{ position: sticky; top: 8px; \}\n.trace-split textarea.trace \{ min-height: calc(100vh - 280px);| TO parts.
+    APPEND | \}\n/* the query plan and the SQL statements of a call (query-plan.js), as in the MDX console */\n.trace-view \{ display: flex; flex-direction: column; gap: 8px; height: calc(100v| TO parts.
+    APPEND |h - 240px); min-height: 480px; \}\n.trace-split .trace-view .plan \{ grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); \}\n@media (max-width| TO parts.
+    APPEND |: 1000px) \{\n  .trace-split \{ grid-template-columns: minmax(0, 1fr); \}\n  .trace-split .wide-only \{ display: table-cell; \}\n  .trace-split > .detail \{ position: static; \}\n| TO parts.
+    APPEND |\}\n| TO parts.
     result = concat_lines_of( parts ).
   ENDMETHOD.
 
@@ -867,24 +868,30 @@ CLASS zzxxmla1_cl_web_app_files IMPLEMENTATION.
     APPEND |et('X-olap4abap-Trace-Id') \|\| '' \};\n  return \{ ...exchange, ...checkOf(raw, `$\{response.status\} $\{response.statusText\}`) \};\n\}\n\n// the answer of a check as a run's sta| TO parts.
     APPEND |te: ok with the check (its status may be ERROR), or err if it was refused\nfunction checkOf(raw, status) \{\n  let data;\n  try \{\n    data = JSON.parse(raw);\n  \} catch \{\n    | TO parts.
     APPEND |return \{ state: 'err', message: `$\{status\}: the answer is not JSON` \};\n  \}\n  if (data.error) return \{ state: 'err', message: data.error \};\n  return \{ state: 'ok', check:| TO parts.
-    APPEND | data \};\n\}\n\nconst prettyJson = (s) => \{\n  try \{\n    return JSON.stringify(JSON.parse(s), null, 2);\n  \} catch \{\n    return s;\n  \}\n\};\n\nconst CHECK_STATUS = \{ RESO| TO parts.
-    APPEND |LVED: 'ok', OK: 'ok', EMPTY: 'warn', UNKNOWN: 'warn', 'NO AUTH': 'err', ERROR: 'err' \};\n\n// the check's answer: its status, user and key date, BW's message or the fault, the sta| TO parts.
-    APPEND |tement in olap4abap's names\nfunction CheckView(\{ run \}) \{\n  const \{ check: c, trace \} = run;\n  const [copy, copied] = useCopied();\n  const resolved = useMemo(() => (c.reso| TO parts.
-    APPEND |lved ? formatMdx(c.resolved) : ''), [c.resolved]);\n  return html`\n    <div class="result-bar">\n      <span class=$\{`status $\{CHECK_STATUS[c.status] \|\| 'warn'\}`\}>$\{c.statu| TO parts.
-    APPEND |s\}</span>\n      <span class="muted small">for <span class="mono">$\{c.user\}</span> at $\{c.keyDate\}$\{run.ms != null ? ` { cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{msText(run.ms| TO parts.
-    APPEND |)\}` : ''\}\n        $\{trace && !trace.error && html`<span title="On the server: the call's runtime, its SQL statements and their time">$\{\n          ` | TO parts.
-    APPEND |{ cl_abap_conv_in_ce=>uccp( '00B7' ) } server $\{msText(trace.runtimeMs)\}, $\{statementCount(trace.sqlCount)\} $\{msText(trace.sqlMs)\}`\}</span>`\}</span>\n      <span class="spa| TO parts.
-    APPEND |cer"></span>\n      $\{copied\}\n      <button disabled=$\{!resolved\} onClick=$\{() => copy(resolved)\} title="Copy the statement in olap4abap's names">Copy</button>\n    </div>\n| TO parts.
-    APPEND |    $\{c.message && html`<div class=$\{`notice $\{c.status === 'ERROR' ? 'err' : 'info'\}`\}>$\{c.message\}</div>`\}\n    $\{resolved && html`<div class="muted small">The statement| TO parts.
-    APPEND | in olap4abap's names:</div>\n      <textarea class="trace" readonly spellcheck="false" value=$\{resolved\} aria-label="The statement in olap4abap's names"></textarea>`\}`;\n\}\n\n| TO parts.
-    APPEND |// BW's names, as the endpoint for BW's MDX reads them; a click inserts the example\nconst BW_NAMES = [\n  ['Cube', 'the InfoProvider after $', '[$ZCLVISITA]'],\n  ['Key figure', '| TO parts.
-    APPEND |', '[Measures].[ZCLVISNO]'],\n  ['Characteristic', 'its flat hierarchy', '[ZCLDIAG].Members'],\n  ['Member', 'by its key, NUMC with its zeros', '[ZCLDOC].[001]'],\n  ['Initial valu| TO parts.
-    APPEND |e', '', '[ZCLDIAG].[]'],\n  ['BW hierarchy', 'characteristic, name and version in fixed columns', '[ZCLDOC                        ZCLDOC_ORG                    001]'],\n  ['Level',| TO parts.
-    APPEND | 'of a BW hierarchy', 'LEVEL01'],\n  ['Node', 'name and InfoObject in fixed columns', '[CARD                            0HIER_NODE                    ]'],\n  ['Leaf', 'by its key, | TO parts.
-    APPEND |no path', '[ZCLDIAG   ZCLDIAG_ICD].[A09]'],\n];\n\n// the place of BW's names next to the editor, where the cube browser is in the XMLA mode\nfunction BwNames(\{ onInsert \}) \{\n | TO parts.
-    APPEND | return html`<nav class="tree browser" aria-label="BW's names">\n    <div class="group"><h3>BW's names</h3></div>\n    $\{BW_NAMES.map(([what, note, example]) => html`<button class| TO parts.
-    APPEND |="item" title=$\{`$\{example\} { cl_abap_conv_in_ce=>uccp( '2013' ) } click to insert`\}\n      onClick=$\{() => onInsert(example)\}>\n      <span class="label"><strong>$\{what\}</| TO parts.
-    APPEND |strong>$\{note && html` <span class="muted small">$\{note\}</span>`\}<br />\n        <span class="mono small">$\{example.replace(/ \{2,\}/g, (m) => '| TO parts.
+    APPEND | data \};\n\}\n\nconst prettyJson = (s) => \{\n  try \{\n    return JSON.stringify(JSON.parse(s), null, 2);\n  \} catch \{\n    return s;\n  \}\n\};\n\nconst CHECK_STATUS = \{ OK: | TO parts.
+    APPEND |'ok', EMPTY: 'warn', UNKNOWN: 'warn', 'NO AUTH': 'err', ERROR: 'err' \};\n\n// the selection the check was given: per factor (slicer, axes, subselects) its tuples, the members the | TO parts.
+    APPEND |query names\nfunction SelectionView(\{ selection \}) \{\n  if (!selection \|\| !(selection.factors \|\| []).length) return null;\n  return html`\n    <div class="muted small">The s| TO parts.
+    APPEND |election checked (a tuple of the query is one tuple of each):</div>\n    <ul class="small selection">\n      $\{selection.factors.map((f) => html`<li><strong>$\{f.name\}</strong>: | TO parts.
+    APPEND |$\{f.count\} $\{f.count === 1 ? 'tuple' : 'tuples'\}$\{\n        f.tuples.length ? ' { cl_abap_conv_in_ce=>uccp( '00B7' ) } ' : ''\}<span class="mono">$\{f.tuples.map((t) => `($\{t| TO parts.
+    APPEND |.join(', ')\})`).join(' ')\}</span>$\{\n        f.count > f.tuples.length ? ' { cl_abap_conv_in_ce=>uccp( '2026' ) }' : ''\}</li>`)\}\n      $\{(selection.named \|\| []).length > 0| TO parts.
+    APPEND | && html`<li><strong>Named</strong>: <span class="mono">$\{selection.named.join(', ')\}</span></li>`\}\n    </ul>`;\n\}\n\n// the check's answer: its status, user and key date, BW'| TO parts.
+    APPEND |s message or the fault, the selection and the statement in\n// olap4abap's names\nfunction CheckView(\{ run \}) \{\n  const \{ check: c, trace \} = run;\n  const [copy, copied] = u| TO parts.
+    APPEND |seCopied();\n  const resolved = useMemo(() => (c.resolved ? formatMdx(c.resolved) : ''), [c.resolved]);\n  return html`\n    <div class="result-bar">\n      <span class=$\{`status | TO parts.
+    APPEND |$\{CHECK_STATUS[c.status] \|\| 'warn'\}`\}>$\{c.status\}</span>\n      $\{c.reason && html`<span class="muted small mono" title="Why the check refuses">$\{c.reason\}</span>`\}\n   | TO parts.
+    APPEND |   <span class="muted small">for <span class="mono">$\{c.user\}</span> at $\{c.keyDate\}$\{run.ms != null ? ` { cl_abap_conv_in_ce=>uccp( '00B7' ) } $\{msText(run.ms)\}` : ''\}\n  | TO parts.
+    APPEND |      $\{trace && !trace.error && html`<span title="On the server: the call's runtime, its SQL statements and their time">$\{\n          ` { cl_abap_conv_in_ce=>uccp( '00B7' ) } se| TO parts.
+    APPEND |rver $\{msText(trace.runtimeMs)\}, $\{statementCount(trace.sqlCount)\} $\{msText(trace.sqlMs)\}`\}</span>`\}</span>\n      <span class="spacer"></span>\n      $\{copied\}\n      <b| TO parts.
+    APPEND |utton disabled=$\{!resolved\} onClick=$\{() => copy(resolved)\} title="Copy the statement in olap4abap's names">Copy</button>\n    </div>\n    $\{c.message && html`<div class=$\{`n| TO parts.
+    APPEND |otice $\{c.status === 'ERROR' ? 'err' : 'info'\}`\}>$\{c.message\}</div>`\}\n    <$\{SelectionView\} selection=$\{c.selection\} />\n    $\{resolved && html`<div class="muted small"| TO parts.
+    APPEND |>The statement in olap4abap's names:</div>\n      <textarea class="trace" readonly spellcheck="false" value=$\{resolved\} aria-label="The statement in olap4abap's names"></textarea| TO parts.
+    APPEND |>`\}`;\n\}\n\n// BW's names, as the endpoint for BW's MDX reads them; a click inserts the example\nconst BW_NAMES = [\n  ['Cube', 'the InfoProvider after $', '[$ZCLVISITA]'],\n  ['| TO parts.
+    APPEND |Key figure', '', '[Measures].[ZCLVISNO]'],\n  ['Characteristic', 'its flat hierarchy', '[ZCLDIAG].Members'],\n  ['Member', 'by its key, NUMC with its zeros', '[ZCLDOC].[001]'],\n  | TO parts.
+    APPEND |['Initial value', '', '[ZCLDIAG].[]'],\n  ['BW hierarchy', 'characteristic, name and version in fixed columns', '[ZCLDOC                        ZCLDOC_ORG                    001]']| TO parts.
+    APPEND |,\n  ['Level', 'of a BW hierarchy', 'LEVEL01'],\n  ['Node', 'name and InfoObject in fixed columns', '[CARD                            0HIER_NODE                    ]'],\n  ['Leaf',| TO parts.
+    APPEND | 'by its key, no path', '[ZCLDIAG   ZCLDIAG_ICD].[A09]'],\n];\n\n// the place of BW's names next to the editor, where the cube browser is in the XMLA mode\nfunction BwNames(\{ onIn| TO parts.
+    APPEND |sert \}) \{\n  return html`<nav class="tree browser" aria-label="BW's names">\n    <div class="group"><h3>BW's names</h3></div>\n    $\{BW_NAMES.map(([what, note, example]) => html| TO parts.
+    APPEND |`<button class="item" title=$\{`$\{example\} { cl_abap_conv_in_ce=>uccp( '2013' ) } click to insert`\}\n      onClick=$\{() => onInsert(example)\}>\n      <span class="label"><stro| TO parts.
+    APPEND |ng>$\{what\}</strong>$\{note && html` <span class="muted small">$\{note\}</span>`\}<br />\n        <span class="mono small">$\{example.replace(/ \{2,\}/g, (m) => '| TO parts.
     APPEND |{ cl_abap_conv_in_ce=>uccp( '00B7' ) }'.repeat(m.length))\}</span></span>\n    </button>`)\}\n    <div class="muted small pad">Fixed columns are shown with dots for their blanks. T| TO parts.
     APPEND |he answer is the check's status for\n      the user at the key date, never data.</div>\n  </nav>`;\n\}\n\n// -----------------------------------------------------------------------| TO parts.
     APPEND |------------------------------- cellset\n\n// The answer of an Execute as plain data: the axes (Axis0, Axis1, ... in order), the slicer and the cells by ordinal.\nfunction parseCel| TO parts.

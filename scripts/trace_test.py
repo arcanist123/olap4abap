@@ -149,10 +149,10 @@ def main():
                                  headers={"X-olap4abap-Trace": "true"})
     answer = json.loads(text) if status == 200 else {}
     traced_check = headers.get("x-olap4abap-trace-id", "")
-    check("bw/check: resolved, traced, the answer names the call", answer.get("status") == "RESOLVED"
+    check("bw/check: allowed, traced, the answer names the call", answer.get("status") == "OK"
           and len(traced_check) == 32, text[:300])
     check("bw/check?sql=true: the statements in the answer, read while resolving", answer.get("sql")
-          and all(s["phase"] == "Resolve" for s in answer["sql"]), str(answer.get("sql"))[:300])
+          and answer["sql"][0]["phase"] == "Resolve", str(answer.get("sql"))[:300])
     if traced_check:
         status, entry = api("GET", "trace/entry", id=traced_check)
         check("trace/entry of a check: CHECK, user and key date, statement, answer", status == 200

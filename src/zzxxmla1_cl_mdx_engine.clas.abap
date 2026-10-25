@@ -89,6 +89,20 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
       END OF ty_cell,
       ty_t_cell TYPE STANDARD TABLE OF ty_cell WITH EMPTY KEY.
     TYPES ty_t_cell_ref TYPE STANDARD TABLE OF i WITH EMPTY KEY.
+    TYPES ty_t_tuple_list TYPE STANDARD TABLE OF ty_t_tuple WITH EMPTY KEY.
+    TYPES:
+      "! The members of a query without its cells (members): the resolved query, the tuples of its slicer (none
+      "! without one), of each axis and of each axis of its subselects, the members it names by an identifier, and the
+      "! schema reader they come from.
+      BEGIN OF ty_members,
+        query         TYPE zzxxmla1_cl_mdx_parser=>ty_query,
+        has_slicer    TYPE abap_bool,
+        slicer        TYPE ty_t_tuple,
+        axes          TYPE ty_t_tuple_list,
+        subcubes      TYPE ty_t_tuple_list,
+        named         TYPE ty_t_member,
+        schema_reader TYPE REF TO zzxxmla1_cl_mdx_schema_reader,
+      END OF ty_members.
     TYPES:
       BEGIN OF ty_result,
         cube_name   TYPE string,
@@ -117,8 +131,19 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
     CLASS-DATA planning TYPE abap_bool VALUE abap_true.
 
     "! @parameter catalog | the catalog (InfoArea) the query runs in; empty: any
+    "! @parameter bw_names | the query is in BW's names, its cube an InfoProvider
+    "!                       (ZZXXMLA1_CL_MDX_SCHEMA_READER=>for_bw_cube)
     METHODS constructor
-      IMPORTING catalog TYPE string.
+      IMPORTING catalog  TYPE string
+                bw_names TYPE abap_bool DEFAULT abap_false.
+    "! The members of a query as execute evaluates them, without its cells, for the check of BW's analysis
+    "! authorizations (docs/next-steps.md, Next: BW's MDX on InfoProviders, step 3): the slicer, the axes and the
+    "! subselects' axes, these in the default context; every axis without NON EMPTY (the authorizations are checked on
+    "! the selection, before any fact is read), so no fact is read for the axes.
+    METHODS members
+      IMPORTING query         TYPE zzxxmla1_cl_mdx_parser=>ty_query
+      RETURNING VALUE(result) TYPE ty_members
+      RAISING   zzxxmla1_cx_xmla.
     METHODS execute
       IMPORTING query         TYPE zzxxmla1_cl_mdx_parser=>ty_query
       RETURNING VALUE(result) TYPE ty_result
@@ -191,7 +216,16 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
     TYPES ty_t_member_lists TYPE STANDARD TABLE OF ty_t_member WITH EMPTY KEY.
 
     DATA catalog       TYPE string.
+    DATA bw_names      TYPE abap_bool.
     DATA schema_reader TYPE REF TO zzxxmla1_cl_mdx_schema_reader.
+    "! execute for members: no plan, no cells; the resolved query and the subselects' tuples kept in members_result
+    DATA members_only   TYPE abap_bool.
+    DATA members_result TYPE ty_members.
+    "! The members a resolved expression names by an identifier, the named sets' expressions too (added to members).
+    METHODS add_named_members
+      IMPORTING !node   TYPE ty_node
+      CHANGING  members TYPE ty_t_member
+                seen    TYPE string_table.
     "! the root evaluator of the query being executed (RolapEvaluatorRoot): it keeps the calculations of their own of
     "! the members made while the query runs (compound slicer placeholders, visual totals)
     DATA root_evaluator TYPE REF TO zzxxmla1_cl_mdx_evaluator.
@@ -1909,6 +1943,59 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
 
   METHOD constructor.
     me->catalog = catalog.
+    me->bw_names = bw_names.
+  ENDMETHOD.
+
+  METHOD members.
+    DATA(query_without_non_empty) = query.
+    LOOP AT query_without_non_empty-axes ASSIGNING FIELD-SYMBOL(<axis>).
+      <axis>-non_empty = abap_false.
+    ENDLOOP.
+    CLEAR members_result.
+    members_only = abap_true.
+    TRY.
+        DATA(executed) = execute( query_without_non_empty ).
+      CLEANUP.
+        members_only = abap_false.
+    ENDTRY.
+    members_only = abap_false.
+    result = members_result.
+    result-has_slicer = executed-has_slicer.
+    result-slicer = executed-slicer.
+    result-axes = VALUE #( FOR a IN executed-axes ( a-tuples ) ).
+    result-schema_reader = schema_reader.
+    DATA(seen) = VALUE string_table( ).
+    LOOP AT result-query-axes INTO DATA(axis).
+      add_named_members( EXPORTING node = axis-expression CHANGING members = result-named seen = seen ).
+    ENDLOOP.
+    add_named_members( EXPORTING node = result-query-slicer CHANGING members = result-named seen = seen ).
+    LOOP AT result-query-subcubes INTO DATA(subcube).
+      LOOP AT subcube-axes INTO axis.
+        add_named_members( EXPORTING node = axis-expression CHANGING members = result-named seen = seen ).
+      ENDLOOP.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD add_named_members.
+    IF node IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    CASE node->kind.
+      WHEN zzxxmla1_cl_mdx_node=>c_kind-member.
+        DATA(member) = CORRESPONDING ty_member( node->element-member ).
+        IF NOT line_exists( members[ unique_name = member-unique_name ] ).
+          APPEND member TO members.
+        ENDIF.
+      WHEN zzxxmla1_cl_mdx_node=>c_kind-named_set.
+        IF NOT line_exists( seen[ table_line = node->set_key ] ).
+          APPEND node->set_key TO seen.
+          add_named_members( EXPORTING node = node->set_expression CHANGING members = members seen = seen ).
+        ENDIF.
+      WHEN OTHERS.
+        LOOP AT node->args INTO DATA(arg).
+          add_named_members( EXPORTING node = arg CHANGING members = members seen = seen ).
+        ENDLOOP.
+    ENDCASE.
   ENDMETHOD.
 
   METHOD execute.
@@ -1917,7 +2004,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       zzxxmla1_cl_sql=>log_phase = `Resolve`.
       zzxxmla1_cl_sql=>log_node = 0.
     ENDIF.
-    schema_reader = zzxxmla1_cl_mdx_schema_reader=>for_cube( catalog = catalog name = query-cube ).
+    schema_reader = COND #( WHEN bw_names = abap_true THEN zzxxmla1_cl_mdx_schema_reader=>for_bw_cube( query-cube )
+                            ELSE zzxxmla1_cl_mdx_schema_reader=>for_cube( catalog = catalog name = query-cube ) ).
     DATA(cube) = schema_reader->cube.
     " the schema's calculated members are not implemented: a query that cannot see them would answer without them
     IF cube-calculated_members IS NOT INITIAL.
@@ -1937,7 +2025,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     IF planning = abap_true OR zzxxmla1_cl_sql=>log_statements = abap_true.
       plan = planner->plan( resolved ).
     ENDIF.
-    IF planning = abap_true.
+    IF planning = abap_true AND members_only = abap_false.
       relational = xsdbool( plan-query = zzxxmla1_cl_mdx_planner=>c_mark-relational ).
     ENDIF.
     " while statements are logged (a traced call): the resolved tree, and each statement names its phase and node
@@ -1959,6 +2047,26 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
     DATA attempt TYPE i.
 
     DATA(non_all_members) = load_special_members( evaluator ).
+
+    " members only: the resolved query, and the subselects' axes in the default context
+    IF members_only = abap_true.
+      members_result-query = resolved.
+      LOOP AT resolved-subcubes INTO DATA(members_subcube).
+        LOOP AT members_subcube-axes INTO DATA(members_subcube_axis).
+          set_phase( `Subselect` ).
+          attempt = 0.
+          DO.
+            DATA(subcube_tuples) = execute_axis( evaluator  = evaluator
+                                                 expression = members_subcube_axis-expression
+                                                 non_empty  = abap_false ).
+            IF phase( CHANGING attempt = attempt ) = abap_false.
+              EXIT.
+            ENDIF.
+          ENDDO.
+          APPEND subcube_tuples TO members_result-subcubes.
+        ENDLOOP.
+      ENDLOOP.
+    ENDIF.
 
     " the slicer, in the default context; its members are then the context of the axes and of the cells. Its members
     " replace the root members of their hierarchies (Determine Slicer), then it is executed (Execute Slicer).
@@ -2149,7 +2257,8 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
 
     " one cell per combination of the axes' tuples; no axis is one cell, an empty axis none (executeBody); again until
     " no cell is missed, the final cells kept
-    IF cells_needed( result = result non_empty = xsdbool( line_exists( query_axes[ non_empty = abap_true ] ) ) )
+    IF members_only = abap_false
+       AND cells_needed( result = result non_empty = xsdbool( line_exists( query_axes[ non_empty = abap_true ] ) ) )
        = abap_true.
       set_phase( `Cells` ).
       count_members = stored_members( result-axes ).

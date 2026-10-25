@@ -166,9 +166,23 @@ const prettyJson = (s) => {
   }
 };
 
-const CHECK_STATUS = { RESOLVED: 'ok', OK: 'ok', EMPTY: 'warn', UNKNOWN: 'warn', 'NO AUTH': 'err', ERROR: 'err' };
+const CHECK_STATUS = { OK: 'ok', EMPTY: 'warn', UNKNOWN: 'warn', 'NO AUTH': 'err', ERROR: 'err' };
 
-// the check's answer: its status, user and key date, BW's message or the fault, the statement in olap4abap's names
+// the selection the check was given: per factor (slicer, axes, subselects) its tuples, the members the query names
+function SelectionView({ selection }) {
+  if (!selection || !(selection.factors || []).length) return null;
+  return html`
+    <div class="muted small">The selection checked (a tuple of the query is one tuple of each):</div>
+    <ul class="small selection">
+      ${selection.factors.map((f) => html`<li><strong>${f.name}</strong>: ${f.count} ${f.count === 1 ? 'tuple' : 'tuples'}${
+        f.tuples.length ? ' · ' : ''}<span class="mono">${f.tuples.map((t) => `(${t.join(', ')})`).join(' ')}</span>${
+        f.count > f.tuples.length ? ' …' : ''}</li>`)}
+      ${(selection.named || []).length > 0 && html`<li><strong>Named</strong>: <span class="mono">${selection.named.join(', ')}</span></li>`}
+    </ul>`;
+}
+
+// the check's answer: its status, user and key date, BW's message or the fault, the selection and the statement in
+// olap4abap's names
 function CheckView({ run }) {
   const { check: c, trace } = run;
   const [copy, copied] = useCopied();
@@ -176,6 +190,7 @@ function CheckView({ run }) {
   return html`
     <div class="result-bar">
       <span class=${`status ${CHECK_STATUS[c.status] || 'warn'}`}>${c.status}</span>
+      ${c.reason && html`<span class="muted small mono" title="Why the check refuses">${c.reason}</span>`}
       <span class="muted small">for <span class="mono">${c.user}</span> at ${c.keyDate}${run.ms != null ? ` · ${msText(run.ms)}` : ''}
         ${trace && !trace.error && html`<span title="On the server: the call's runtime, its SQL statements and their time">${
           ` · server ${msText(trace.runtimeMs)}, ${statementCount(trace.sqlCount)} ${msText(trace.sqlMs)}`}</span>`}</span>
@@ -184,6 +199,7 @@ function CheckView({ run }) {
       <button disabled=${!resolved} onClick=${() => copy(resolved)} title="Copy the statement in olap4abap's names">Copy</button>
     </div>
     ${c.message && html`<div class=${`notice ${c.status === 'ERROR' ? 'err' : 'info'}`}>${c.message}</div>`}
+    <${SelectionView} selection=${c.selection} />
     ${resolved && html`<div class="muted small">The statement in olap4abap's names:</div>
       <textarea class="trace" readonly spellcheck="false" value=${resolved} aria-label="The statement in olap4abap's names"></textarea>`}`;
 }

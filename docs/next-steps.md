@@ -471,6 +471,25 @@ compared, not only 9999-12-31.
    `ZZXXMLA1_CL_BW_AUTH_SQL=>check` (and `check_members` for EMPTY) for the user at the key date. The check's
    statements run under `ZZXXMLA1_CL_SQL=>log_phase` `Authorisation`. The selection is the piece 5a reuses when the
    engine enforces; nothing is enforced on `/zzxxmla1` by this step.
+   Built 2026-10-25: `ZZXXMLA1_CL_MDX_ENGINE=>members` (execute with the reader in BW's names, `bw_names`, without
+   plan, cells and NON EMPTY: the slicer, the axes and the subselects' axes in the default context, and the members
+   the query names by an identifier, named sets' expressions included), `ZZXXMLA1_CL_BW_AUTH_SELECTION` (a factor per
+   slicer, axis and subselect axis; a member is a flat value by its key, the All member the aggregate, or a node or
+   leaf of a BW hierarchy by name and InfoObject, `ZZXXMLA1_CL_MDX_SCHEMA_READER=>bw_member`; a tuple with a BW
+   hierarchy's All member is left out, BW's hierarchies have none) and `ZZXXMLA1_CL_BW_AUTH_SQL=>check_query` (the
+   named members first, also those no tuple shows, the node of a `Children`, then the product of the factors). The
+   answer: OK, EMPTY (allowed, a factor without tuple), NO AUTH, UNKNOWN, ERROR, with the reason, BW's message and
+   the selection (per factor its first 100 tuples). The lookup was corrected on the way: `LEVELnn` of a BW hierarchy
+   is depth nn below the All level (`LEVEL00` the roots, as BW shows them; BW's hierarchies have no All member).
+   What does not agree yet is the restriction of a hierarchy's members to what the user may see (the
+   authorisations' step 5b): `.Members`, `LEVELnn`, `Children` and `Parent` of a hierarchy the user has a line on
+   show BW the visible, re-rooted subtree, and a level of a hierarchy without a line shows nothing (EMPTY); the
+   endpoint evaluates them unrestricted, so the check refuses a node BW never shows. Measured with
+   `scripts/bw_auth_compare.py` (step 5's script, built with it) at 9999-12-31: EQ 1,265 of 1,282 agree, CROSS
+   1,261, H1 1,189; every difference is the restriction (EQ, CROSS: `LEVELnn` of the hierarchies without a line;
+   H1 also `.Members`, `Parent` of the top node, the crossjoin and the combined queries of `ZCLDOC_ORG 001`). So
+   the endpoint needs 5b before step 5 can be done. A full run is long: every call reads the schema and the profile
+   again (one call per statement, user and key date).
 4. **The trace:** the call is a row of `ZZXXMLA1_TRACE` as an XMLA call is (method `Check`, the statement, the user
    checked next to the caller), with its statement log, so the trace page's "SQL statements" (and "Open in MDX
    Console") shows what the check ran; with `?sql=true` the answer carries the statements too (text, rows, time,

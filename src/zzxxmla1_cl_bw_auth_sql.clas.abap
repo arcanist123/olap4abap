@@ -86,6 +86,12 @@ CLASS zzxxmla1_cl_bw_auth_sql DEFINITION
     METHODS check_product
       IMPORTING factors       TYPE ty_factors
       RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_auth=>ty_check.
+    "! The check of a query: the members it names, also those its tuples do not show (the node of a Children), then
+    "! its tuples, a tuple of each factor; members only if a factor has no tuple.
+    METHODS check_query
+      IMPORTING factors       TYPE ty_factors
+                members       TYPE zzxxmla1_cl_bw_auth=>ty_tuple
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_auth=>ty_check.
     "! The check of members without their tuples (ZZXXMLA1_CL_BW_AUTH's check_members).
     METHODS check_members
       IMPORTING members       TYPE zzxxmla1_cl_bw_auth=>ty_tuple
@@ -276,6 +282,10 @@ CLASS zzxxmla1_cl_bw_auth_sql IMPLEMENTATION.
 
   METHOD check_members.
     result = answered( request( characteristics = profile-characteristics members = members ) ).
+  ENDMETHOD.
+
+  METHOD check_query.
+    result = answered( request( characteristics = profile-characteristics factors = factors members = members ) ).
   ENDMETHOD.
 
   METHOD answered.

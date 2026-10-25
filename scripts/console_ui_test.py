@@ -210,10 +210,12 @@ def main():
         page.click(".query button:has-text('Check')")
         page.wait_for_selector(".result .result-bar .status", timeout=RUN)
         bar = page.inner_text(".result .result-bar")
-        check("BW's MDX: resolved at the key date", "RESOLVED" in bar and "2024-06-15" in bar, bar)
+        check("BW's MDX: allowed at the key date", "OK" in bar and "2024-06-15" in bar, bar)
         resolved = page.input_value(".result textarea.trace")
         check("BW's MDX: the statement in olap4abap's names", "[ZCLDOC].[001]" in resolved
               and "[ZCLDIAG].[A09]" in resolved, resolved)
+        selection = page.inner_text(".result ul.selection")
+        check("BW's MDX: the selection checked", "Slicer" in selection and "ZCLDOC '001'" in selection, selection)
         check("BW's MDX: no query plan tab", page.locator(".result-tabs button:has-text('Query plan')").count() == 0)
         page.click(".result-tabs button:has-text('SQL statements')")
         page.wait_for_selector("table.sql-list, .result .notice.err", timeout=RUN)
@@ -221,7 +223,7 @@ def main():
         check("BW's MDX: the SQL statements of the check", statements and all("SELECT" in x.upper() for x in statements),
               statements[:2])
         page.click(".result-tabs button:has-text('Response')")
-        check("BW's MDX: the JSON answer", '"status": "RESOLVED"' in page.input_value(".result textarea.trace"))
+        check("BW's MDX: the JSON answer", '"status": "OK"' in page.input_value(".result textarea.trace"))
         shot(page, "7-bw-check")
         page.click(".result-tabs button:has-text('Result')")
         page.fill("textarea.mdx", BW_MDX.replace("[001]", "[999]"))
@@ -245,7 +247,7 @@ def main():
         handed.wait_for_selector(".result .result-bar .status", timeout=RUN)
         check("console: the traced check in the mode BW's MDX", handed.input_value("textarea.mdx") == BW_MDX
               and handed.input_value(".topbar input[type=date]") == "2024-06-15"
-              and "RESOLVED" in handed.inner_text(".result .result-bar"), handed.inner_text(".result")[:300])
+              and "OK" in handed.inner_text(".result .result-bar"), handed.inner_text(".result")[:300])
         shot(handed, "8-check-handed-over")
         # back to XMLA: the catalog again, the XMLA statement kept apart from BW's
         handed.click(".topbar .segmented button:has-text('XMLA')")

@@ -64,9 +64,13 @@ Read before designing anything:
 - `ZZXXMLA1_MAIN_ENDPOINT` - `IF_HTTP_EXTENSION` handler behind ICF service `/zzxxmla1`: `/schema/api/...` goes to
   `ZZXXMLA1_CL_SCHEMA_API`, the rest of `/schema/...` to `ZZXXMLA1_CL_WEB_APP` (the schema builder's files, from the code),
   `/bw/...` to `ZZXXMLA1_CL_BW_MDX_API` (BW's MDX on InfoProviders, `POST bw/check?user=&keyDate=`: the
-  authorisation result of a user for a statement in BW's names, never data; so far it resolves the statement,
-  `ZZXXMLA1_CL_MDX_SCHEMA_READER=>for_bw_cube`; traced as XMLA calls are, method `CHECK`, `sql=true` puts the SQL
-  statements in the answer; `docs/next-steps.md`, Next: BW's MDX on InfoProviders); otherwise GET returns the start page (links to the schema builder, MDX console, time master data and trace, and the XMLA URL
+  authorisation result of a user for a statement in BW's names, never data: OK, EMPTY, NO AUTH, UNKNOWN or ERROR as
+  the probe classifies BW's, with the reason, BW's message and the selection checked; the statement resolved in BW's
+  names, `ZZXXMLA1_CL_MDX_SCHEMA_READER=>for_bw_cube`, its slicer, axes and subselects evaluated without cells and
+  NON EMPTY, `ZZXXMLA1_CL_MDX_ENGINE=>members`, their selection, `ZZXXMLA1_CL_BW_AUTH_SELECTION`, checked in HANA,
+  `ZZXXMLA1_CL_BW_AUTH_SQL=>check_query`, phase `Authorisation`; members of hierarchies not yet restricted, step 5b;
+  `python scripts/bw_auth_compare.py` compares with `reference/auth/`; traced as XMLA calls are, method `CHECK`,
+  `sql=true` puts the SQL statements in the answer; `docs/next-steps.md`, Next: BW's MDX on InfoProviders); otherwise GET returns the start page (links to the schema builder, MDX console, time master data and trace, and the XMLA URL
   with `sap-client` for clients), POST hands the SOAP body to `ZZXXMLA1_CL_XMLA_HANDLER` (string in, string out; so far only
   DISCOVER_DATASOURCES, anything else is a SOAP fault), other methods 405.
 - XMLA tests: `python scripts/xmla_test.py` replays `reference/<case>/` against SAP (see `docs/test-strategy.md`);
@@ -163,8 +167,8 @@ Read before designing anything:
   measures, raw XML), lets the server `check` every change and accepts (`scripts/schema_ui_test.py`).
 - MDX console: `/zzxxmla1/schema/console.html` (`web/schema/console.js`, served from the same generated class as the schema builder)
   sends Execute and Discover requests to the endpoint itself; its mode "BW's MDX" sends a statement in BW's names
-  with a user and a key date to `bw/check` instead and shows the check's status, the statement in olap4abap's names
-  and its SQL statements (statement and history kept per mode; the trace page opens a traced check in it). A catalog's cubes, measures, hierarchies and levels are
+  with a user and a key date to `bw/check` instead and shows the check's status and reason, the selection checked, the
+  statement in olap4abap's names and its SQL statements (statement and history kept per mode; the trace page opens a traced check in it). A catalog's cubes, measures, hierarchies and levels are
   listed from the schema rowsets (a click inserts the unique name); an answer of up to two axes is a grid (Axis0 the
   columns, Axis1 the rows, spanning headers), one of more axes a flat table (a column per hierarchy, highest axis first,
   a row per cell) (`scripts/console_ui_test.py`). Tabs next to the result show the SOAP response and request and,

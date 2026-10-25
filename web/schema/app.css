@@ -172,6 +172,7 @@ table.selection td input[type=text] { width: auto; }
 .notice { border-radius: var(--radius); padding: 8px 12px; }
 .notice.err { background: var(--err-soft); color: var(--err); white-space: pre-wrap; }
 .notice.warn { background: var(--warn-soft); color: var(--warn); }
+ul.selection { margin: 0; padding-left: 18px; max-height: 12em; overflow: auto; overflow-wrap: anywhere; }
 .notice.ok { background: var(--ok-soft); color: var(--ok); }
 .notice.info { background: var(--sunken); color: var(--text); }
 ul.plain { margin: 0; padding-left: 18px; }

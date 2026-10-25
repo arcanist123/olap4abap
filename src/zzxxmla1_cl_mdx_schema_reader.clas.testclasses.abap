@@ -263,6 +263,7 @@ CLASS ltc_bw_names DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHO
     METHODS bw_hierarchies FOR TESTING.
     METHODS levels FOR TESTING.
     METHODS nodes_and_leaves FOR TESTING.
+    METHODS bw_members FOR TESTING RAISING zzxxmla1_cx_xmla.
     METHODS not_found FOR TESTING.
     METHODS unknown_cube FOR TESTING.
 ENDCLASS.
@@ -380,11 +381,40 @@ CLASS ltc_bw_names IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD levels.
-    " LEVEL00 is the All level
+    " LEVEL00 is the All level; of a BW hierarchy the roots (BW's hierarchies have no All member)
     assert_lookup( segments = VALUE #( ( `ZCLDIAG` ) ( `LEVEL00` ) ) kind = `LEVEL` name = `[ZCLDIAG].[(All)]` ).
     DATA(icd) = hierarchy( characteristic = `ZCLDIAG` name = `ZCLDIAG_ICD` ).
-    assert_lookup( segments = VALUE #( ( icd ) ( `LEVEL00` ) ) kind = `LEVEL` name = `[ZCLDIAG.ZCLDIAG_ICD].[(All)]` ).
-    assert_lookup( segments = VALUE #( ( icd ) ( `LEVEL02` ) ) kind = `LEVEL` name = `[ZCLDIAG.ZCLDIAG_ICD].[Level 02]` ).
+    assert_lookup( segments = VALUE #( ( icd ) ( `LEVEL00` ) ) kind = `LEVEL` name = `[ZCLDIAG.ZCLDIAG_ICD].[Level 01]` ).
+    assert_lookup( segments = VALUE #( ( icd ) ( `LEVEL02` ) ) kind = `LEVEL` name = `[ZCLDIAG.ZCLDIAG_ICD].[Level 03]` ).
+  ENDMETHOD.
+
+  METHOD bw_members.
+    DATA(element) = reader->lookup_compound( zzxxmla1_cl_mdx_parser=>parse_expression( `[ZCLDIAG].[A09]` )->segments ).
+    cl_abap_unit_assert=>assert_equals( act = reader->bw_member( element-member )
+                                        exp = VALUE zzxxmla1_cl_mdx_schema_reader=>ty_bw_member(
+                                                characteristic = `ZCLDIAG` name = `A09` ) ).
+    " the All member of the hierarchy
+    DATA(hierarchy) = reader->get_hierarchy( element-member-hier_id ).
+    element = reader->lookup_compound(
+      zzxxmla1_cl_mdx_parser=>parse_expression( |{ hierarchy-unique_name }.[{ hierarchy-all_member_name }]| )->segments ).
+    cl_abap_unit_assert=>assert_equals( act = reader->bw_member( element-member )
+                                        exp = VALUE zzxxmla1_cl_mdx_schema_reader=>ty_bw_member(
+                                                characteristic = `ZCLDIAG` all = abap_true ) ).
+    DATA(org) = |[{ hierarchy( characteristic = `ZCLDOC` name = `ZCLDOC_ORG` version = `001` ) }]|.
+    element = reader->lookup_compound( zzxxmla1_cl_mdx_parser=>parse_expression( |{ org }.[{ node( `CARD` ) }]| )->segments ).
+    cl_abap_unit_assert=>assert_equals( act = reader->bw_member( element-member )
+                                        exp = VALUE zzxxmla1_cl_mdx_schema_reader=>ty_bw_member(
+                                                characteristic = `ZCLDOC` hierarchy = `ZCLDOC_ORG` version = `001`
+                                                iobj = `0HIER_NODE` name = `CARD` ) ).
+    " a leaf: the characteristic and its key
+    element = reader->lookup_compound( zzxxmla1_cl_mdx_parser=>parse_expression( |{ org }.[009]| )->segments ).
+    cl_abap_unit_assert=>assert_equals( act = reader->bw_member( element-member )
+                                        exp = VALUE zzxxmla1_cl_mdx_schema_reader=>ty_bw_member(
+                                                characteristic = `ZCLDOC` hierarchy = `ZCLDOC_ORG` version = `001`
+                                                iobj = `ZCLDOC` name = `009` ) ).
+    " Measures is no characteristic
+    element = reader->lookup_compound( zzxxmla1_cl_mdx_parser=>parse_expression( `[Measures].[ZCLVISNO]` )->segments ).
+    cl_abap_unit_assert=>assert_initial( reader->bw_member( element-member ) ).
   ENDMETHOD.
 
   METHOD nodes_and_leaves.

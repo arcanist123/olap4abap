@@ -14,10 +14,14 @@
 "! - POST check[?user=U][&keyDate=YYYY-MM-DD][&sql=true]: the body is a statement of BW's MDX (FROM [$ZCLVISITA]), plain or as an
 "!   XMLA Execute; U a test user of the scenarios (ZZXXMLA1_CL_BW_AUTH_GEN) or the caller (default; refused, 403, for
 "!   any other user, as GET auth/check of the schema API), the key date 9999-12-31 by default. The statement is parsed
-"!   and resolved in BW's names (ZZXXMLA1_CL_MDX_SCHEMA_READER=>for_bw_cube); the answer is the user, key date, the
-"!   status (RESOLVED, or ERROR with the fault's text as message) and the statement in olap4abap's names; with sql=true
-"!   also the SQL statements the check ran (sql: text, rows, microseconds, error, phase). The check of the query's
-"!   selection comes with step 3.
+"!   and resolved in BW's names (ZZXXMLA1_CL_MDX_SCHEMA_READER=>for_bw_cube), its slicer, axes and subselects
+"!   evaluated without cells (ZZXXMLA1_CL_MDX_ENGINE=>members), and their selection (ZZXXMLA1_CL_BW_AUTH_SELECTION)
+"!   checked for the user at the key date in HANA (ZZXXMLA1_CL_BW_AUTH_SQL, phase Authorisation). The answer is the
+"!   user, key date, the status as the probe classifies BW's (OK, EMPTY: allowed but an axis has no tuple, NO AUTH,
+"!   UNKNOWN: a value the user may not see at all, ERROR: the fault's text as message), the check's reason and BW's
+"!   message, the statement in olap4abap's names and the selection; with sql=true also the SQL statements the check
+"!   ran (sql: text, rows, microseconds, error, phase). Nothing is enforced: the members of a hierarchy are not yet
+"!   restricted to what the user may see (docs/next-steps.md, the authorisations' step 5b).
 "! ZZXXMLA1_MAIN_ENDPOINT traces a check as it traces an XMLA call (ZZXXMLA1_CL_TRACE, described by describe).
 CLASS zzxxmla1_cl_bw_mdx_api DEFINITION
   PUBLIC
@@ -82,12 +86,18 @@ CLASS zzxxmla1_cl_bw_mdx_api DEFINITION
       IMPORTING body          TYPE string
       RETURNING VALUE(result) TYPE string
       RAISING   zzxxmla1_cx_xmla.
-    "! The statement resolved in BW's names, as MDX in olap4abap's names; a fault of the parser or validator if it
-    "! is none.
-    CLASS-METHODS resolve
+    "! the tuples of a factor the answer lists
+    CONSTANTS c_max_tuples TYPE i VALUE 100.
+    "! The members of a statement in BW's names (ZZXXMLA1_CL_MDX_ENGINE=>members, no cells); a fault of the parser,
+    "! validator or engine if it has none.
+    CLASS-METHODS members_of
       IMPORTING statement     TYPE string
-      RETURNING VALUE(result) TYPE string
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_mdx_engine=>ty_members
       RAISING   zzxxmla1_cx_xmla.
+    "! The selection as JSON: per factor its name, number of tuples and the first c_max_tuples, the named members.
+    CLASS-METHODS selection_json
+      IMPORTING selection     TYPE zzxxmla1_cl_bw_auth_selection=>ty_selection
+      RETURNING VALUE(result) TYPE string.
     CLASS-METHODS parameter
       IMPORTING request       TYPE ty_request
                 !name         TYPE string
@@ -171,24 +181,41 @@ CLASS zzxxmla1_cl_bw_mdx_api IMPLEMENTATION.
     DATA(first_logged) = lines( zzxxmla1_cl_sql=>statement_log ) + 1.
     DATA(phase) = zzxxmla1_cl_sql=>log_phase.
 
-    DATA(status) = `RESOLVED`.
+    DATA(status) = `ERROR`.
+    DATA(reason) = ``.
     DATA(message) = ``.
     DATA(statement) = ``.
     DATA(resolved) = ``.
+    DATA selection TYPE zzxxmla1_cl_bw_auth_selection=>ty_selection.
     TRY.
         statement = statement_of( request-body ).
         zzxxmla1_cl_sql=>log_phase = `Resolve`.
-        resolved = resolve( statement ).
+        DATA(members) = members_of( statement ).
+        resolved = zzxxmla1_cl_mdx_parser=>to_mdx( VALUE #( kind = `SELECT` query = members-query ) ).
+        selection = zzxxmla1_cl_bw_auth_selection=>of_members( members ).
+        zzxxmla1_cl_sql=>log_phase = `Authorisation`.
+        zzxxmla1_cl_sql=>log_node = 0.
+        DATA(provider) = to_upper( substring( val = members-query-cube off = 1 ) ).
+        DATA(checked) = zzxxmla1_cl_bw_auth_sql=>read( user = user provider = provider key_date = key_date
+                                                     )->check_query( factors = selection-factors
+                                                                     members = selection-named ).
+        status = COND #( WHEN checked-status <> zzxxmla1_cl_bw_auth=>c_status-allowed THEN condense( checked-status )
+                         WHEN selection-empty = abap_true THEN `EMPTY`
+                         ELSE `OK` ).
+        reason = condense( checked-reason ).
+        message = checked-message.
       CATCH zzxxmla1_cx_xmla INTO DATA(fault).
-        status = `ERROR`.
         message = fault->description.
+      CATCH zzxxmla1_cx_bw_provider zzxxmla1_cx_bw_hierarchy zzxxmla1_cx_sql INTO DATA(error).
+        message = error->get_text( ).
     ENDTRY.
     zzxxmla1_cl_sql=>log_phase = phase.
     zzxxmla1_cl_sql=>log_statements = was_logging.
 
     DATA(body) = |\{"user":{ json( |{ user }| ) },"keyDate":{ json( |{ key_date DATE = ISO }| ) },| &&
-                 |"status":{ json( status ) },"message":{ json( message ) },| &&
-                 |"statement":{ json( statement ) },"resolved":{ json( resolved ) }|.
+                 |"status":{ json( status ) },"reason":{ json( reason ) },"message":{ json( message ) },| &&
+                 |"statement":{ json( statement ) },"resolved":{ json( resolved ) },| &&
+                 |"selection":{ selection_json( selection ) }|.
     IF with_sql = abap_true.
       body = |{ body },"sql":{ logged_json( first_logged ) }|.
     ENDIF.
@@ -232,16 +259,32 @@ CLASS zzxxmla1_cl_bw_mdx_api IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
-  METHOD resolve.
+  METHOD members_of.
     DATA(parsed) = zzxxmla1_cl_mdx_parser=>parse( statement ).
     IF parsed-kind <> `SELECT`.
       zzxxmla1_cx_xmla=>raise_code( kind = `Server` code = `00HSBB01` text = `XMLA SOAP Body processing error`
                                     description = |olap4abap Error:{ parsed-kind } statements are not supported| ).
     ENDIF.
-    DATA(query) = parsed-query.
-    DATA(reader) = zzxxmla1_cl_mdx_schema_reader=>for_bw_cube( query-cube ).
-    NEW zzxxmla1_cl_mdx_validator( reader )->resolve_query( CHANGING query = query ).
-    result = zzxxmla1_cl_mdx_parser=>to_mdx( VALUE #( kind = `SELECT` query = query ) ).
+    result = NEW zzxxmla1_cl_mdx_engine( catalog = `` bw_names = abap_true )->members( parsed-query ).
+  ENDMETHOD.
+
+  METHOD selection_json.
+    DATA factors TYPE string_table.
+    LOOP AT selection-factors INTO DATA(factor).
+      DATA(index) = sy-tabix.
+      DATA(tuples) = VALUE string_table( ).
+      LOOP AT factor INTO DATA(tuple) TO c_max_tuples.
+        APPEND |[{ concat_lines_of( table = VALUE string_table(
+                     FOR m IN tuple ( json( zzxxmla1_cl_bw_auth_selection=>member_text( m ) ) ) ) sep = `,` ) }]|
+          TO tuples.
+      ENDLOOP.
+      APPEND |\{"name":{ json( selection-names[ index ] ) },"count":{ lines( factor ) },| &&
+             |"tuples":[{ concat_lines_of( table = tuples sep = `,` ) }]\}| TO factors.
+    ENDLOOP.
+    DATA(named) = VALUE string_table( FOR n IN selection-named
+                                      ( json( zzxxmla1_cl_bw_auth_selection=>member_text( n ) ) ) ).
+    result = |\{"factors":[{ concat_lines_of( table = factors sep = `,` ) }],| &&
+             |"named":[{ concat_lines_of( table = named sep = `,` ) }]\}|.
   ENDMETHOD.
 
   METHOD parameter.
