@@ -173,6 +173,23 @@ Decisions taken by the project owner on 2026-10-02, with reasons.
   (`mondrian.server.Session`, `IdleOrphanSessionTimeout`). The code to change is
   `ZZXXMLA1_CL_XMLA_REQUEST=>CHECK_HEADER` and `ZZXXMLA1_CL_XMLA_HANDLER->WITH_SESSION`.
 
+## BW MDX decision (2026-10-25)
+
+- **BW's own MDX on InfoProviders is in scope** (decided with the user): a client written for BW's XMLA service
+  (`/sap/bw/xml/soap/xmla`, catalog and cube `$<InfoProvider>`) gets BW's answer from a separate endpoint of
+  olap4abap: the statements as BW accepts them (`FROM [$ZCLVISITA]`, `[ZCLDOC   ZCLDOC_ORG   001]`, `LEVEL01`,
+  `[CARD   0HIER_NODE   ]`), BW's names in the answer and the rowsets, BW's values, and the analysis authorisations
+  as BW checks them. olap4abap's engine runs them, BW's engine stays unused (Architecture decision): it is a naming of
+  the same model and engine, not a second engine or a second schema (`next-steps.md`, Next: BW's MDX on InfoProviders).
+  The first goal is narrower: BW's statements on a separate endpoint of ours (`/zzxxmla1/bw`) with the user and key
+  date as parameters, answered with the authorisation result only, never data (so the user need not log on),
+  compared with BW's per test user and key date, and the check's SQL statements in the trace.
+- **Out of scope:** MDX on BEx queries (cube `[<InfoProvider>/<query>]`: structures, restricted and calculated key
+  figures, query filters and defaults; too much re-engineering), `SAP VARIABLES` and BW's variable rowsets, and
+  providers without an accepted catalog of olap4abap (the naming needs the generated views).
+- **The engine stays a superset:** a statement in BW's names may use every function the engine knows; BW's refusals
+  of modern MDX are not imitated.
+
 ## In scope (MVP)
 
 - Cubes over HANA-optimised InfoCubes / aDSOs (see `bw-to-schema-mapping.md`).

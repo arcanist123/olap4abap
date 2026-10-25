@@ -399,6 +399,68 @@ key figure authorisations (`0TCAKYFNM`), filling variables (a user with one is n
 queries, and what Discover's
 cardinalities (`level_cardinality`) tell a restricted user.
 
+## Next: BW's MDX on InfoProviders
+
+Planned with the user 2026-10-25 (`mvp-scope.md`, BW MDX decision), narrowed the same day to a first goal: **send a
+statement of BW's MDX with a user and a key date to an endpoint of ours, get the authorisation result (no data) and
+compare it with BW's, and see the SQL statements the check ran in the trace.** Not MDX on BEx queries, not `SAP VARIABLES`; BW's names in the
+answers and rowsets, BW's Discover and the values of restricted hierarchies come later (below).
+
+The statements are the probe's (`reference/auth/statements.json`, 13 shapes: TOTAL, MEMBERS, CHILDREN, PARENT, ROWS,
+SLICER, LEVEL, PAIR, CROSSJOIN, COMBINED, each with and without NON EMPTY where it has one), in BW's names:
+
+- the cube is `$<InfoProvider>` (`[$ZCLVISITA]`);
+- a characteristic is its flat hierarchy of the same name (`[ZCLDIAG].Members`), a member named by its key
+  (`[ZCLDOC].[001]`, NUMC with its zeros);
+- a BW hierarchy is named by itself, not under its dimension: characteristic, name and version in fixed width
+  columns (`[ZCLDOC                        ZCLDOC_ORG                    001]`), levels `LEVEL00`, `LEVEL01`, ...;
+- a node is its name and InfoObject in fixed width (`[CARD                            0HIER_NODE                    ]`),
+  a leaf its key (`[ZCLDIAG   ZCLDIAG_ICD].[A09]`), with no path;
+- key figures are `[Measures].[<key figure>]`.
+
+The parser needs nothing (bracketed identifiers); the lookup does. BW's answers are recorded: `reference/auth/` per
+test user, the logged-on answer of BW's XMLA service at 9999-12-31 (`loggedOn`) where it differs from the switch's.
+
+### Steps
+
+The endpoint shows no data, only the check's result, so the user is a parameter (decided with the user 2026-10-25),
+as for `GET auth/check` and the probe: no logon as each test user, and every key date of `reference/auth/` can be
+compared, not only 9999-12-31.
+
+1. **A separate endpoint for BW's MDX:** a path below the existing node, `/zzxxmla1/bw` (no new ICF node, which the
+   sync does not cover; `ZZXXMLA1_MAIN_ENDPOINT` dispatches it as `/schema/`), `POST check?user=...&keyDate=...`
+   with the statement as body (plain MDX, or an XMLA Execute whose statement and catalog it takes). The catalog
+   `$<provider>` is the accepted catalog whose cube reads that provider (`ZCLVISITA`, `ZCLVISIT`). The answer (JSON)
+   is the status as the probe classifies it (OK, EMPTY, NO AUTH, UNKNOWN, ERROR), BW's message, the selection that was
+   checked (per characteristic its members, named or not, or aggregated), never a cell. The caller needs the
+   authority BW asks for "Execute as Other User" (the probe's question too; until it is known, the one `GET
+   auth/probe` asks).
+2. **BW's names in the lookup, for the probe's shapes:** a naming of the loaded catalog (Mondrian's or BW's) that
+   `ZZXXMLA1_CL_MDX_SCHEMA_READER` asks: the cube `$<provider>`, a characteristic's hierarchy by the characteristic of
+   its dimension's view (`characteristic_of_view`, not the schema's name), a BW hierarchy by characteristic, name
+   and version (`ZCLDOC_ORG_001`), `LEVELnn`, a node by name and InfoObject on the copy's path table (`NODE_NAME`,
+   `NODE_IOBJ`; the first occurrence where it is shared), a leaf and a flat member by key. Unit tests on the schema
+   reader; done when every statement of `statements.json` resolves on `$ZCLVISITA`.
+3. **The query's selection and the check:** parse, `resolve_query` and the axes' members (no cells), the selection
+   from the axes, slicer and subcube as the authorisations' step 5a needs it, then
+   `ZZXXMLA1_CL_BW_AUTH_SQL=>check` (and `check_members` for EMPTY) for the user at the key date. The check's
+   statements run under `ZZXXMLA1_CL_SQL=>log_phase` `Authorisation`. The selection is the piece 5a reuses when the
+   engine enforces; nothing is enforced on `/zzxxmla1` by this step.
+4. **The trace:** the call is a row of `ZZXXMLA1_TRACE` as an XMLA call is (method `Check`, the statement, the user
+   checked next to the caller), with its statement log, so the trace page's "SQL statements" (and "Open in MDX
+   Console") shows what the check ran; with `?sql=true` the answer carries the statements too (text, rows, time,
+   phase).
+5. **The comparison:** `scripts/bw_auth_compare.py` sends every statement of `statements.json` for each test user
+   at each key date to `/zzxxmla1/bw/check` and compares the status with `reference/auth/` (the logged-on answer at
+   9999-12-31 where there is one, as `auth_check_test.py` does); `--sql` prints a statement's SQL.
+
+Done when every test user's status agrees at every key date. Later, when BW's MDX is to return data: the engine
+enforces (the authorisations' step 5a with this selection, 5b the restriction of a hierarchy's members), Execute on
+the endpoint with the logged-on user, BW's names in the answers and rowsets, BW's Discover, the data source
+`default`, a capture of BW's XMLA answers as cases (`reference/bw/`) and a replay test; open then: which objects a BW
+catalog shows (BW's provider against the schema's selections and user hierarchies), the key date of BW's XMLA
+service (today) and formatted values.
+
 ## Now: texts and captions
 
 Decided with the user 2026-10-16: the texts are the active work again, ahead of the rest of the BW hierarchies,
