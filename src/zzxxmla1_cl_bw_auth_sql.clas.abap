@@ -99,6 +99,12 @@ CLASS zzxxmla1_cl_bw_auth_sql DEFINITION
     "! The authorizations that apply to the provider.
     METHODS applying
       RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_auth=>ty_auths.
+    "! What the user may see of the hierarchies of each authorization-relevant characteristic, by which the members of
+    "! a BW hierarchy are restricted (step 5b): all where an applying authorization has all values of it, else the
+    "! hierarchy lines of the applying authorizations on it (as ZZXXMLA1_CL_BW_AUTH's hierarchy_access, by name); none
+    "! for an unrestricted user and where no authorization applies (every selection is refused then).
+    METHODS visibles
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_hierarchy_copy=>ty_t_visible.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -270,6 +276,28 @@ CLASS zzxxmla1_cl_bw_auth_sql IMPLEMENTATION.
 
   METHOD applying.
     result = region->applying( ).
+  ENDMETHOD.
+
+  METHOD visibles.
+    IF region->provider_refusal( ) IS NOT INITIAL OR region->unrestricted( ) = abap_true.
+      RETURN.
+    ENDIF.
+    LOOP AT profile-characteristics INTO DATA(characteristic).
+      DATA(visible) = VALUE zzxxmla1_cl_bw_hierarchy_copy=>ty_visible(
+        characteristic = characteristic
+        all            = xsdbool( line_exists( profile-flats[ iobjnm = characteristic all = abap_true ] ) ) ).
+      IF visible-all = abap_false.
+        LOOP AT profile-lines INTO DATA(line) WHERE line-iobjnm = characteristic.
+          DATA(visible_line) = VALUE zzxxmla1_cl_bw_hierarchy_copy=>ty_visible_line(
+            name = line-line-hienm version = line-line-version node_iobj = line-line-node_iobjnm
+            node = line-line-node type = line-line-type level = line-line-level ).
+          IF NOT line_exists( visible-lines[ table_line = visible_line ] ).
+            APPEND visible_line TO visible-lines.
+          ENDIF.
+        ENDLOOP.
+      ENDIF.
+      APPEND visible TO result.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD check.

@@ -371,8 +371,8 @@ CLASS zzxxmla1_cl_bw_auth IMPLEMENTATION.
     lines-today = today.
 
     " the provider's authorization-relevant characteristics, and the special ones that are
-    DATA(metadata) = NEW zzxxmla1_cl_bw_provider( )->read( provider ).
-    DATA(names) = VALUE ty_iobjnm_range( FOR c IN metadata-characteristics ( sign = 'I' option = 'EQ' low = c-iobjnm ) ).
+    DATA(names) = VALUE ty_iobjnm_range( FOR c IN NEW zzxxmla1_cl_bw_provider( )->characteristic_names( provider )
+                                         ( sign = 'I' option = 'EQ' low = c ) ).
     IF names IS NOT INITIAL.
       SELECT chanm FROM rsdcha
         WHERE objvers = 'A'

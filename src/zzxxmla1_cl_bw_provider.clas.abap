@@ -55,6 +55,7 @@ CLASS zzxxmla1_cl_bw_provider DEFINITION
         reason TYPE string,
       END OF ty_note,
       ty_t_note TYPE STANDARD TABLE OF ty_note WITH EMPTY KEY.
+    TYPES ty_t_iobjnm TYPE STANDARD TABLE OF rsiobjnm WITH EMPTY KEY.
     TYPES:
       "! a column of a table or view: name and DDIC type
       BEGIN OF ty_column,
@@ -138,6 +139,14 @@ CLASS zzxxmla1_cl_bw_provider DEFINITION
       IMPORTING name          TYPE csequence
                 selection     TYPE zzxxmla1_cl_bw_view_gen=>ty_t_selection OPTIONAL
       RETURNING VALUE(result) TYPE ty_provider
+      RAISING   zzxxmla1_cx_bw_provider.
+    "! The characteristics of an InfoCube or aDSO, from BW's InfoObject lists only (RSDDIMEIOBJ, the aDSO's objects),
+    "! without their tables, views and texts: for callers that need the names only (the authorisation profile,
+    "! ZZXXMLA1_CL_BW_AUTH=>read), which read would cost the metadata of every characteristic; refused as read refuses
+    "! a provider.
+    METHODS characteristic_names
+      IMPORTING name          TYPE csequence
+      RETURNING VALUE(result) TYPE ty_t_iobjnm
       RAISING   zzxxmla1_cx_bw_provider.
     "! Refuses the selection of a provider read with it: each characteristic must be one of the provider with a SID
     "! table, not referenced by another characteristic of the provider (which shares its view), with rows the
@@ -286,6 +295,57 @@ CLASS zzxxmla1_cl_bw_provider IMPLEMENTATION.
     ENDIF.
     result-selection = selection.
     APPEND LINES OF notes TO result-notes.
+  ENDMETHOD.
+
+  METHOD characteristic_names.
+    DATA(upper) = to_upper( name ).
+    DATA cube TYPE rsinfocube.
+    DATA adso TYPE rsoadsonm.
+    cube = upper.
+    adso = upper.
+    SELECT SINGLE infocube FROM rsdcube
+      WHERE infocube = @cube AND objvers = 'A' AND cubetype = 'B' AND cubesubtype = 'F'
+      INTO @DATA(found_cube) ##NEEDED.
+    IF sy-subrc = 0.
+      SELECT d~iobjnm FROM rsddimeiobj AS d
+        INNER JOIN rsdiobj AS o ON o~iobjnm = d~iobjnm AND o~objvers = 'A'
+        WHERE d~infocube = @cube AND d~objvers = 'A' AND o~iobjtp IN ('CHA', 'TIM')
+        ORDER BY d~dimension ASCENDING, d~posit ASCENDING
+        INTO TABLE @result.
+      RETURN.
+    ENDIF.
+    SELECT SINGLE adsonm FROM rsoadso
+      WHERE adsonm = @adso AND objvers = 'A' AND activate_data = 'X' AND cubedeltaonly = 'X'
+      INTO @DATA(found_adso) ##NEEDED.
+    IF sy-subrc <> 0.
+      fail( |{ upper } is neither an active HANA-optimised InfoCube nor an active cube-type aDSO| ).
+    ENDIF.
+    DATA objects TYPE cl_rso_adso_api=>tn_t_object.
+    TRY.
+        cl_rso_adso_api=>read( EXPORTING i_adsonm               = adso
+                                         i_with_enqueue         = abap_false
+                                         i_with_authority_check = abap_false
+                               IMPORTING e_t_object             = objects ).
+      CATCH cx_rs_all_msg INTO DATA(error).
+        RAISE EXCEPTION TYPE zzxxmla1_cx_bw_provider
+          EXPORTING error_message = |aDSO { adso }: { error->get_text( ) }|
+                    previous      = error.
+    ENDTRY.
+    TYPES ty_iobjnm_range TYPE RANGE OF rsiobjnm.
+    DATA(names) = VALUE ty_iobjnm_range( FOR o IN objects WHERE ( iobjnm IS NOT INITIAL )
+                                         ( sign = 'I' option = 'EQ' low = o-iobjnm ) ).
+    IF names IS INITIAL.
+      RETURN.
+    ENDIF.
+    SELECT iobjnm FROM rsdiobj
+      WHERE iobjnm IN @names AND objvers = 'A' AND iobjtp IN ('CHA', 'TIM')
+      INTO TABLE @DATA(characteristics).
+    " in the aDSO's order
+    LOOP AT objects INTO DATA(object) WHERE iobjnm IS NOT INITIAL.
+      IF line_exists( characteristics[ iobjnm = object-iobjnm ] ).
+        APPEND object-iobjnm TO result.
+      ENDIF.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD check_selection.

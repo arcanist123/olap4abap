@@ -151,10 +151,18 @@ CLASS zzxxmla1_cl_mdx_schema_reader DEFINITION
     "! member), LEVEL01, ..., a member of a BW hierarchy a node by its
     "! name and InfoObject (bw_member_name) or a leaf by its key, the first occurrence where it is shared. The members
     "! keep olap4abap's unique names.
+    "! @parameter visibles | what a user may see of the BW hierarchies (BW's analysis authorizations): their members
+    "!                      are restricted to it (ZZXXMLA1_CL_BW_HIERARCHY_COPY=>restriction), re-rooted at the user's
+    "!                      top nodes; a member the query names is found also where the user may not see it, so that
+    "!                      the check refuses it
     CLASS-METHODS for_bw_cube
       IMPORTING name          TYPE string
+                visibles      TYPE zzxxmla1_cl_bw_hierarchy_copy=>ty_t_visible OPTIONAL
       RETURNING VALUE(result) TYPE REF TO zzxxmla1_cl_mdx_schema_reader
       RAISING   zzxxmla1_cx_xmla.
+    "! The hierarchies whose members a query asked for as a whole (get_hierarchy_members, Hierarchy.Members), by id.
+    METHODS whole_hierarchies
+      RETURNING VALUE(result) TYPE int4_table.
     "! BW's name of a BW hierarchy split into characteristic, name and version, 30 characters each and the version the
     "! rest ([ZCLDOC                        ZCLDOC_ORG                    001]); all initial for a name of one word (a
     "! characteristic, Measures).
@@ -422,6 +430,8 @@ CLASS zzxxmla1_cl_mdx_schema_reader DEFINITION
     "! in BW's names: per model hierarchy (by its id) the characteristic it is of: of a BW hierarchy its copy's, else
     "! the one of its dimension's table (ZZXXMLA1_CL_BW_VIEW_GEN=>characteristic_of_view), initial for another table
     DATA bw_characteristics TYPE string_table.
+    "! the hierarchies get_hierarchy_members read, by id
+    DATA hierarchies_read_whole TYPE int4_table.
 
     METHODS build
       RAISING zzxxmla1_cx_xmla.
@@ -430,6 +440,8 @@ CLASS zzxxmla1_cl_mdx_schema_reader DEFINITION
     "! @parameter level_no | the level in the model, from 1
     "! with_facts: the condition selects members with facts only, so the members are read from the dimension table
     "! without the restriction to the members with facts (ZZXXMLA1_CL_MODEL=>MEMBER_TABLE)
+    "! unrestricted: a BW hierarchy's members read whole, not only those the user may see (for_bw_cube's visibles)
+    "! occurrences: a BW hierarchy's members read only of these occurrences (ZZXXMLA1_CL_MODEL=>bw_occurrences)
     METHODS read
       IMPORTING hierarchy     TYPE i
                 level_no      TYPE i
@@ -438,6 +450,8 @@ CLASS zzxxmla1_cl_mdx_schema_reader DEFINITION
                 !limit        TYPE i DEFAULT 0
                 !offset       TYPE i DEFAULT 0
                 with_facts    TYPE abap_bool DEFAULT abap_false
+                unrestricted  TYPE abap_bool DEFAULT abap_false
+                occurrences   TYPE string OPTIONAL
       RETURNING VALUE(result) TYPE ty_t_member.
     "! Keeps a member read from the model (a member read before is the one kept) and gives it.
     METHODS remember
@@ -616,6 +630,21 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
       ENDIF.
       APPEND known-characteristic TO result->bw_characteristics.
     ENDLOOP.
+    IF visibles IS INITIAL.
+      RETURN.
+    ENDIF.
+    " the user's restriction of each BW hierarchy; nothing of it was read yet but default members, none of which is of
+    " a BW hierarchy
+    LOOP AT result->model_hierarchies ASSIGNING FIELD-SYMBOL(<model>) WHERE bw_hierarchy-characteristic IS NOT INITIAL.
+      DATA(index) = sy-tabix.
+      <model>-bw_restriction = zzxxmla1_cl_bw_hierarchy_copy=>restriction( hierarchy = <model>-bw_hierarchy
+                                                                            visibles  = visibles ).
+      result->hierarchies[ index + 1 ]-model-bw_restriction = <model>-bw_restriction.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD whole_hierarchies.
+    result = hierarchies_read_whole.
   ENDMETHOD.
 
   METHOD bw_hierarchy_name.
@@ -760,7 +789,8 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
 
   METHOD read.
     " a query asked before (a range or Lag in a calculation evaluated per cell) is answered from what it read
-    DATA(key) = |{ hierarchy }/{ level_no }/{ descending }/{ limit }/{ offset }/{ condition }|.
+    DATA(key) = |{ hierarchy }/{ level_no }/{ descending }/{ limit }/{ offset }/{ unrestricted }/{ condition }| &&
+                |/{ occurrences }|.
     READ TABLE queries ASSIGNING FIELD-SYMBOL(<query>) WITH TABLE KEY key = key.
     IF sy-subrc = 0.
       result = <query>-members.
@@ -770,6 +800,10 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
     IF with_facts = abap_true.
       model-members_with_facts = abap_false.
     ENDIF.
+    IF unrestricted = abap_true.
+      CLEAR model-bw_restriction.
+    ENDIF.
+    model-bw_occurrences = occurrences.
     zzxxmla1_cl_model=>read_members( EXPORTING hierarchy  = model
                                                level_no   = level_no
                                                condition  = condition
@@ -1113,6 +1147,9 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
         APPEND measure_member( sy-index ) TO result.
       ENDDO.
       RETURN.
+    ENDIF.
+    IF NOT line_exists( hierarchies_read_whole[ table_line = hierarchy ] ).
+      APPEND hierarchy TO hierarchies_read_whole.
     ENDIF.
     LOOP AT hierarchies[ hierarchy + 1 ]-levels INTO DATA(level).
       APPEND LINES OF get_level_members( level ) TO result.
@@ -1603,22 +1640,40 @@ CLASS zzxxmla1_cl_mdx_schema_reader IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD lookup_bw_occurrence.
+    " the occurrences of the name first, from the copy's path table: the levels they are on, the reads of these levels
+    " limited to them, so that the texts are joined to them only
     DATA(model) = model_hierarchies[ hierarchy ].
-    LOOP AT hierarchies[ hierarchy + 1 ]-levels INTO DATA(level_id).
-      DATA(level_no) = levels[ level_id ]-key_level.
-      IF level_no = 0.
-        CONTINUE.
+    DATA(deepest) = lines( model-levels ).
+    DATA(unrestricted) = abap_false.
+    DO 2 TIMES.
+      IF sy-index = 2.
+        " a member the user may not see is still named by the query: found in the whole hierarchy, the check refuses it
+        IF model-bw_restriction-restricted = abap_false.
+          RETURN.
+        ENDIF.
+        CLEAR model-bw_restriction.
+        unrestricted = abap_true.
       ENDIF.
-      DATA(iobj_column) = zzxxmla1_cl_sql=>quote( zzxxmla1_cl_model=>bw_iobj_column( level_no ) ).
-      DATA(name_column) = zzxxmla1_cl_sql=>quote( model-levels[ level_no ]-name_column ).
-      DATA(condition) = |{ zzxxmla1_cl_sql=>key_condition( column = iobj_column key = iobj ) } AND | &&
-                        zzxxmla1_cl_sql=>key_condition( column = name_column key = name ).
-      DATA(found) = read( hierarchy = hierarchy level_no = level_no limit = 1 condition = condition ).
-      IF found IS NOT INITIAL.
-        result = VALUE #( kind = c_element-member id = found[ 1 ]-level member = found[ 1 ] ).
-        RETURN.
-      ENDIF.
-    ENDLOOP.
+      zzxxmla1_cl_model=>bw_occurrences( EXPORTING hierarchy = model
+                                                   iobj      = iobj
+                                                   name      = name
+                                         IMPORTING condition = DATA(occurrences)
+                                                   level_nos = DATA(level_nos) ).
+      LOOP AT level_nos INTO DATA(level_no) WHERE table_line BETWEEN 1 AND deepest.
+        DATA(condition) = |{ zzxxmla1_cl_sql=>key_condition(
+                               column = zzxxmla1_cl_sql=>quote( zzxxmla1_cl_model=>bw_iobj_column( level_no ) )
+                               key    = iobj ) } | &&
+                          |AND { zzxxmla1_cl_sql=>key_condition(
+                                   column = zzxxmla1_cl_sql=>quote( model-levels[ level_no ]-name_column )
+                                   key    = name ) }|.
+        DATA(found) = read( hierarchy = hierarchy level_no = level_no limit = 1 condition = condition
+                            unrestricted = unrestricted occurrences = occurrences ).
+        IF found IS NOT INITIAL.
+          result = VALUE #( kind = c_element-member id = found[ 1 ]-level member = found[ 1 ] ).
+          RETURN.
+        ENDIF.
+      ENDLOOP.
+    ENDDO.
   ENDMETHOD.
 
   METHOD lookup_child_of_dimension.

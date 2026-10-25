@@ -143,8 +143,8 @@ CLASS zzxxmla1_main_endpoint IMPLEMENTATION.
     LOOP AT fields INTO DATA(field).
       APPEND VALUE #( name = to_lower( field-name ) value = field-value ) TO request-parameters.
     ENDLOOP.
-    " traced as an XMLA call is (method CHECK; the user's trace or the header X-olap4abap-Trace: true)
-    DATA(trace) = COND #( WHEN request-method = `POST` THEN zzxxmla1_cl_trace=>start(
+    " traced as an XMLA call is (method CHECK; the user's trace or the header X-olap4abap-Trace: true); a batch is not
+    DATA(trace) = COND #( WHEN zzxxmla1_cl_bw_mdx_api=>traced( request ) = abap_true THEN zzxxmla1_cl_trace=>start(
                             request        = request-body
                             client_address = server->request->get_header_field( '~remote_addr' )
                             user_agent     = server->request->get_header_field( 'user-agent' )

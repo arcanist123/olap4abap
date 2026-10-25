@@ -133,9 +133,11 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
     "! @parameter catalog | the catalog (InfoArea) the query runs in; empty: any
     "! @parameter bw_names | the query is in BW's names, its cube an InfoProvider
     "!                       (ZZXXMLA1_CL_MDX_SCHEMA_READER=>for_bw_cube)
+    "! @parameter bw_visibles | in BW's names: what the user may see of the BW hierarchies (for_bw_cube)
     METHODS constructor
-      IMPORTING catalog  TYPE string
-                bw_names TYPE abap_bool DEFAULT abap_false.
+      IMPORTING catalog     TYPE string
+                bw_names    TYPE abap_bool DEFAULT abap_false
+                bw_visibles TYPE zzxxmla1_cl_bw_hierarchy_copy=>ty_t_visible OPTIONAL.
     "! The members of a query as execute evaluates them, without its cells, for the check of BW's analysis
     "! authorizations (docs/next-steps.md, Next: BW's MDX on InfoProviders, step 3): the slicer, the axes and the
     "! subselects' axes, these in the default context; every axis without NON EMPTY (the authorizations are checked on
@@ -217,6 +219,7 @@ CLASS zzxxmla1_cl_mdx_engine DEFINITION
 
     DATA catalog       TYPE string.
     DATA bw_names      TYPE abap_bool.
+    DATA bw_visibles   TYPE zzxxmla1_cl_bw_hierarchy_copy=>ty_t_visible.
     DATA schema_reader TYPE REF TO zzxxmla1_cl_mdx_schema_reader.
     "! execute for members: no plan, no cells; the resolved query and the subselects' tuples kept in members_result
     DATA members_only   TYPE abap_bool.
@@ -1944,6 +1947,7 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
   METHOD constructor.
     me->catalog = catalog.
     me->bw_names = bw_names.
+    me->bw_visibles = bw_visibles.
   ENDMETHOD.
 
   METHOD members.
@@ -2004,7 +2008,9 @@ CLASS zzxxmla1_cl_mdx_engine IMPLEMENTATION.
       zzxxmla1_cl_sql=>log_phase = `Resolve`.
       zzxxmla1_cl_sql=>log_node = 0.
     ENDIF.
-    schema_reader = COND #( WHEN bw_names = abap_true THEN zzxxmla1_cl_mdx_schema_reader=>for_bw_cube( query-cube )
+    schema_reader = COND #( WHEN bw_names = abap_true
+                            THEN zzxxmla1_cl_mdx_schema_reader=>for_bw_cube( name     = query-cube
+                                                                            visibles = bw_visibles )
                             ELSE zzxxmla1_cl_mdx_schema_reader=>for_cube( catalog = catalog name = query-cube ) ).
     DATA(cube) = schema_reader->cube.
     " the schema's calculated members are not implemented: a query that cannot see them would answer without them

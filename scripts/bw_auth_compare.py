@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Compares the check of BW's MDX on our endpoint with BW's answers (docs/next-steps.md, Next: BW's MDX on
 InfoProviders, step 5): every statement of reference/auth/statements.json, in BW's names, sent for each test user at
-each key date to POST /zzxxmla1/bw/check (ZZXXMLA1_CL_BW_MDX_API: the statement's members without cells, their
-selection checked in HANA) and its status compared with the probe's row of reference/auth/ as auth_check_test.py
+each key date to POST /zzxxmla1/bw/checks, BATCH statements per call (ZZXXMLA1_CL_BW_MDX_API: the statement's
+members without cells, their selection checked in HANA; the user's profile read once per call) and its status compared with the probe's row of reference/auth/ as auth_check_test.py
 compares the check's (the logged-on answer where the file has one, an EMPTY of the switch at the other key dates):
 - OK: BW answers OK (EMPTY too for a NON EMPTY query, whose members may have no facts);
 - EMPTY, NO AUTH, UNKNOWN: BW gives the same;
@@ -35,6 +35,23 @@ def check(api, user, key_date, statement, sql=False):
     if status != 200:
         return {"status": "ERROR", "reason": "", "message": f"HTTP {status}: {answer.get('error', answer)}"}
     return answer
+
+
+BATCH = 200
+
+
+def check_batch(api, user, key_date, statements):
+    """The answers of POST bw/checks, one per statement; an ERROR answer for each if the call fails."""
+    status, text = api.open("/bw/checks", {"user": user, "keyDate": key_date}, json.dumps(statements),
+                            {"Content-Type": "application/json; charset=utf-8"})
+    try:
+        answer = json.loads(text)
+    except ValueError:
+        answer = {"error": text[:300]}
+    if status != 200 or len(answer.get("results", [])) != len(statements):
+        failure = {"status": "ERROR", "reason": "", "message": f"HTTP {status}: {answer.get('error', answer)}"}
+        return [failure] * len(statements)
+    return answer["results"]
 
 
 def compare(bw, answer):
@@ -83,7 +100,7 @@ def main():
         failed = 0
         for document in documents:
             for key_date in [k for k in document["keyDates"] if not args.key_date or k in args.key_date]:
-                counts, differences = {"agree": 0, "switch": 0}, []
+                counts, differences, asked = {"agree": 0, "switch": 0}, [], []
                 for bw in document["results"]:
                     if bw["keyDate"] != key_date or bw["test"] == "HIERARCHIES" \
                             or (args.test and bw["test"] not in args.test):
@@ -92,7 +109,12 @@ def main():
                     if not statement:
                         differences.append((bw, "no statement in statements.json", None))
                         continue
-                    answer = check(api, document["user"], key_date, statement)
+                    asked.append((bw, statement))
+                answers = []
+                for start in range(0, len(asked), BATCH):
+                    answers += check_batch(api, document["user"], key_date,
+                                           [statement for _, statement in asked[start:start + BATCH]])
+                for (bw, _), answer in zip(asked, answers):
                     difference = compare(bw, answer)
                     if difference is None:
                         counts["agree"] += 1

@@ -70,7 +70,8 @@ Read before designing anything:
   NON EMPTY, `ZZXXMLA1_CL_MDX_ENGINE=>members`, their selection, `ZZXXMLA1_CL_BW_AUTH_SELECTION`, checked in HANA,
   `ZZXXMLA1_CL_BW_AUTH_SQL=>check_query`, phase `Authorisation`; members of hierarchies not yet restricted, step 5b;
   `python scripts/bw_auth_compare.py` compares with `reference/auth/`; traced as XMLA calls are, method `CHECK`,
-  `sql=true` puts the SQL statements in the answer; `docs/next-steps.md`, Next: BW's MDX on InfoProviders); otherwise GET returns the start page (links to the schema builder, MDX console, time master data and trace, and the XMLA URL
+  `sql=true` puts the SQL statements in the answer; `POST bw/checks` checks a JSON array of statements for one user
+  and key date, the profile read once per provider, not traced; `docs/next-steps.md`, Next: BW's MDX on InfoProviders); otherwise GET returns the start page (links to the schema builder, MDX console, time master data and trace, and the XMLA URL
   with `sap-client` for clients), POST hands the SOAP body to `ZZXXMLA1_CL_XMLA_HANDLER` (string in, string out; so far only
   DISCOVER_DATASOURCES, anything else is a SOAP fault), other methods 405.
 - XMLA tests: `python scripts/xmla_test.py` replays `reference/<case>/` against SAP (see `docs/test-strategy.md`);

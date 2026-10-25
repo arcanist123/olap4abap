@@ -50,6 +50,16 @@ CLASS ltc_bw_hierarchy_copy DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DUR
     "! its latest slice (the version added where two versions have the same text); none with a time-dependent
     "! structure; its Hierarchy is named by the name and the version
     METHODS offered_slices FOR TESTING.
+    "! a hierarchy is restricted by the user's lines on its name and version; not where the characteristic is not
+    "! authorization relevant or an authorization has all its values; without a line restricted to nothing
+    METHODS restriction_of_lines FOR TESTING.
+    "! restricted, the members are the occurrences the lines cover, their levels counted from the highest level they
+    "! are covered from (the user's top node a root, the virtual root its parent); REST_H only for type 3
+    METHODS restricted_levels FOR TESTING.
+    "! a lookup by BW's name reads only the occurrences of that name, chosen on the path table before the texts are
+    "! joined: a node by InfoObject and node name (an external characteristic's by InfoObject), a leaf by the view's
+    "! SIDs of the name or its SID; REST_H as without it
+    METHODS named_occurrences FOR TESTING.
     METHODS params
       IMPORTING statement     TYPE zzxxmla1_cl_bw_hierarchy_copy=>ty_statement
       RETURNING VALUE(result) TYPE string_table.
@@ -386,6 +396,123 @@ CLASS ltc_bw_hierarchy_copy IMPLEMENTATION.
     cl_abap_unit_assert=>assert_char_cp( act = sql exp = `*CASE WHEN p."SID" < 0 THEN TO_NVARCHAR( p."NODE_NAME" ) ELSE *` ).
     " the not-assigned node captioned as BW's MDX captions it, named REST_H
     cl_abap_unit_assert=>assert_char_cp( act = sql exp = `*SELECT -35, 'REST_H', *, 'Not Assigned Service''s (s)', '1HIER_REST'*` ).
+  ENDMETHOD.
+
+  METHOD restriction_of_lines.
+    DATA(hierarchy) = services( abap_true ).
+    DATA(line) = VALUE zzxxmla1_cl_bw_hierarchy_copy=>ty_visible_line(
+      name = 'COPY_OF_ZCLSERV_CAT' node_iobj = '0HIER_NODE' node = `LAB` type = '1' ).
+    DATA(visibles) = VALUE zzxxmla1_cl_bw_hierarchy_copy=>ty_t_visible(
+      ( characteristic = 'ZCLSERV' lines = VALUE #( ( line ) ( line ) ( name = 'OTHER' node = `X` type = '1' ) ) ) ).
+    DATA(restriction) = zzxxmla1_cl_bw_hierarchy_copy=>restriction( hierarchy = hierarchy visibles = visibles ).
+    cl_abap_unit_assert=>assert_true( restriction-restricted ).
+    cl_abap_unit_assert=>assert_equals( act = restriction-lines exp = VALUE zzxxmla1_cl_bw_hierarchy_copy=>ty_t_visible_line( ( line ) ) ).
+    " of another version: no line, nothing to see
+    hierarchy-version = '002'.
+    restriction = zzxxmla1_cl_bw_hierarchy_copy=>restriction( hierarchy = hierarchy visibles = visibles ).
+    cl_abap_unit_assert=>assert_true( restriction-restricted ).
+    cl_abap_unit_assert=>assert_initial( restriction-lines ).
+    visibles[ 1 ]-all = abap_true.
+    cl_abap_unit_assert=>assert_initial( zzxxmla1_cl_bw_hierarchy_copy=>restriction( hierarchy = hierarchy
+                                                                                     visibles  = visibles ) ).
+    visibles[ 1 ]-characteristic = 'ZCLDOC'.
+    visibles[ 1 ]-all = abap_false.
+    cl_abap_unit_assert=>assert_initial( zzxxmla1_cl_bw_hierarchy_copy=>restriction( hierarchy = hierarchy
+                                                                                     visibles  = visibles ) ).
+  ENDMETHOD.
+
+  METHOD restricted_levels.
+    DATA(restriction) = VALUE zzxxmla1_cl_bw_hierarchy_copy=>ty_restriction(
+      restricted = abap_true
+      lines      = VALUE #( ( node_iobj = '0HIER_NODE' node = `LAB` type = '1' )
+                            ( node_iobj = '0HIER_NODE' node = `X'Y` type = '0' )
+                            ( node_iobj = '0HIER_NODE' node = `IMG` type = '2' level = 3 ) ) ).
+    DATA(sql) = zzxxmla1_cl_bw_hierarchy_copy=>levels_sql( hierarchy   = services( abap_true )
+                                                           depth       = 3
+                                                           value_table = `ZZXXMLA1V0000001`
+                                                           sid_column  = `SID`
+                                                           name_column = `ZCLSERV`
+                                                           restriction = restriction ).
+    cl_abap_unit_assert=>assert_char_cp(
+      act = sql
+      exp = `*FROM "ZZXXMLA1P0000001" AS p INNER JOIN ( SELECT s."POS", MIN( s."TLEVEL" ) AS "TOP" ` &&
+            `FROM "ZZXXMLA1P0000001" AS s WHERE s."HIESID" = 246 AND s."SVER" = '3' ` &&
+            `AND ( ( s."NODE_IOBJ" = '0HIER_NODE' AND s."NODE_NAME" = 'LAB' ) ` &&
+            `OR ( s."NODE_IOBJ" = '0HIER_NODE' AND s."NODE_NAME" = 'X''Y' AND s."TLEVEL" = s."DEPTH" ) ` &&
+            `OR ( s."NODE_IOBJ" = '0HIER_NODE' AND s."NODE_NAME" = 'IMG' ` &&
+            `AND ( s."DEPTH" <= 3 OR s."TLEVEL" = s."DEPTH" ) ) ) GROUP BY s."POS" ) AS r ` &&
+            `ON r."POS" = p."POS" AND p."TLEVEL" >= r."TOP" LEFT OUTER JOIN "ZZXXMLA1V0000001" AS v *` ).
+    cl_abap_unit_assert=>assert_char_cp(
+      act = sql
+      exp = `*SELECT p."POS", p."TLEVEL" - r."TOP" + 1 AS "TLEVEL", p."DEPTH" - r."TOP" + 1 AS "DEPTH", p."OWN_SID", ` &&
+            `CASE WHEN p."DEPTH" = r."TOP" THEN -19 ELSE p."PARENT_SID" END AS "PARENT_SID", p."SID", *` ).
+    cl_abap_unit_assert=>assert_char_np( act = sql exp = `*REST_H*` ).
+
+    " the complete hierarchy: every occurrence from the roots, REST_H too
+    restriction-lines = VALUE #( ( type = '3' ) ).
+    sql = zzxxmla1_cl_bw_hierarchy_copy=>levels_sql( hierarchy   = services( abap_true )
+                                                     depth       = 3
+                                                     value_table = `ZZXXMLA1V0000001`
+                                                     sid_column  = `SID`
+                                                     name_column = `ZCLSERV`
+                                                     restriction = restriction ).
+    cl_abap_unit_assert=>assert_char_cp( act = sql exp = `*AND ( s."TLEVEL" = 1 ) GROUP BY s."POS"*` ).
+    cl_abap_unit_assert=>assert_char_cp( act = sql exp = `*'REST_H'*` ).
+
+    " no line: no member
+    CLEAR restriction-lines.
+    sql = zzxxmla1_cl_bw_hierarchy_copy=>levels_sql( hierarchy   = services( abap_true )
+                                                     depth       = 3
+                                                     value_table = `ZZXXMLA1V0000001`
+                                                     sid_column  = `SID`
+                                                     name_column = `ZCLSERV`
+                                                     restriction = restriction ).
+    cl_abap_unit_assert=>assert_char_cp( act = sql exp = `*AND ( 1 = 0 ) GROUP BY s."POS"*` ).
+    cl_abap_unit_assert=>assert_char_np( act = sql exp = `*REST_H*` ).
+  ENDMETHOD.
+
+  METHOD named_occurrences.
+    DATA(hierarchy) = services( abap_true ).
+    cl_abap_unit_assert=>assert_equals(
+      act = zzxxmla1_cl_bw_hierarchy_copy=>occurrences_condition( hierarchy   = hierarchy
+                                                                   value_table = `ZZXXMLA1V0000001`
+                                                                   sid_column  = `SID`
+                                                                   name_column = `ZCLSERV`
+                                                                   iobj        = `0HIER_NODE`
+                                                                   name        = `LAB` )
+      exp = `( o."SID" < 0 AND o."NODE_IOBJ" = '0HIER_NODE' AND o."NODE_NAME" = 'LAB' )` ).
+    cl_abap_unit_assert=>assert_equals(
+      act = zzxxmla1_cl_bw_hierarchy_copy=>occurrences_condition( hierarchy   = hierarchy
+                                                                   value_table = `ZZXXMLA1V0000001`
+                                                                   sid_column  = `SID`
+                                                                   name_column = `ZCLSERV`
+                                                                   iobj        = `ZCLSERV`
+                                                                   name        = `013` )
+      exp = `( o."SID" < 0 AND o."NODE_IOBJ" = 'ZCLSERV' AND o."NODE_NAME" = '013' ) ` &&
+            `OR ( o."SID" >= 0 AND ( o."SID" IN ( SELECT w."SID" FROM "ZZXXMLA1V0000001" AS w ` &&
+            `WHERE w."ZCLSERV" = '013' ) OR o."SID" = 13 ) )` ).
+    " an external characteristic's node is named by its view: any node of the InfoObject
+    hierarchy-externals = VALUE #( ( iobjnm = 'ZCLSITE' view = 'ZZXXMLA1V0000002' name_column = `KEY_NAME` ) ).
+    DATA(condition) = zzxxmla1_cl_bw_hierarchy_copy=>occurrences_condition( hierarchy   = hierarchy
+                                                                             value_table = `ZZXXMLA1V0000001`
+                                                                             sid_column  = `SID`
+                                                                             name_column = `ZCLSERV`
+                                                                             iobj        = `ZCLSITE`
+                                                                             name        = `NORTH` ).
+    cl_abap_unit_assert=>assert_equals( act = condition exp = `( o."SID" < 0 AND o."NODE_IOBJ" = 'ZCLSITE' )` ).
+
+    DATA(sql) = zzxxmla1_cl_bw_hierarchy_copy=>levels_sql( hierarchy   = hierarchy
+                                                           depth       = 3
+                                                           value_table = `ZZXXMLA1V0000001`
+                                                           sid_column  = `SID`
+                                                           name_column = `ZCLSERV`
+                                                           occurrences = condition ).
+    cl_abap_unit_assert=>assert_char_cp(
+      act = sql
+      exp = `*AND p."DEPTH" BETWEEN 1 AND 3 AND p."POS" IN ( SELECT o."POS" FROM "ZZXXMLA1P0000001" AS o ` &&
+            `WHERE o."HIESID" = 246 AND o."SVER" = '3' AND o."TLEVEL" = o."DEPTH" ` &&
+            `AND ( ( o."SID" < 0 AND o."NODE_IOBJ" = 'ZCLSITE' ) ) ) ) AS e *` ).
+    cl_abap_unit_assert=>assert_char_cp( act = sql exp = `*'REST_H'*` ).
   ENDMETHOD.
 
 ENDCLASS.

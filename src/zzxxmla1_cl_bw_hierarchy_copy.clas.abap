@@ -168,6 +168,34 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
         repeated       TYPE int4_table,
       END OF ty_hierarchy.
     TYPES:
+      "! a hierarchy line of a user's analysis authorizations as the members of a hierarchy are restricted by it: the
+      "! hierarchy (name, version), the node by InfoObject and name (a leaf by the characteristic and its key), its
+      "! node type (0 the node, 1 its subtree, 2 its subtree down to the level, 3 and 4 the complete hierarchy)
+      BEGIN OF ty_visible_line,
+        name      TYPE rshienm,
+        version   TYPE rshiedir-version,
+        node_iobj TYPE rsiobjnm,
+        node      TYPE string,
+        type      TYPE c LENGTH 1,
+        level     TYPE i,
+      END OF ty_visible_line,
+      ty_t_visible_line TYPE STANDARD TABLE OF ty_visible_line WITH EMPTY KEY.
+    TYPES:
+      "! what a user may see of the hierarchies of an authorization-relevant characteristic: all of them (an applying
+      "! authorization has all its values), else what the lines show (none: nothing of a hierarchy without a line)
+      BEGIN OF ty_visible,
+        characteristic TYPE rsiobjnm,
+        all            TYPE abap_bool,
+        lines          TYPE ty_t_visible_line,
+      END OF ty_visible,
+      ty_t_visible TYPE STANDARD TABLE OF ty_visible WITH EMPTY KEY.
+    TYPES:
+      "! the restriction of a hierarchy's members to what a user may see (restriction): restricted, by the lines on it
+      BEGIN OF ty_restriction,
+        restricted TYPE abap_bool,
+        lines      TYPE ty_t_visible_line,
+      END OF ty_restriction.
+    TYPES:
       "! a statement and the values of its parameters
       BEGIN OF ty_statement,
         sql    TYPE string,
@@ -305,6 +333,10 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
     "! @parameter sid_column | its SID column
     "! @parameter name_column | its column of the value's name (the level's nameColumn over the key attribute)
     "! @parameter caption_column | its column of the value's caption (the key attribute's NameColumn), if any
+    "! @parameter restriction | what a user may see (restriction): only the occurrences the lines show, re-rooted
+    "!                         (visible_sql), REST_H only for a line of the complete hierarchy
+    "! @parameter occurrences | a condition of occurrences: only the occurrences it holds for, read before the texts
+    "!                         are joined; REST_H and its values as without it
     CLASS-METHODS levels_sql
       IMPORTING hierarchy      TYPE ty_hierarchy
                 depth          TYPE i
@@ -312,7 +344,42 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
                 sid_column     TYPE string
                 name_column    TYPE string
                 caption_column TYPE string OPTIONAL
+                restriction    TYPE ty_restriction OPTIONAL
+                occurrences    TYPE string OPTIONAL
       RETURNING VALUE(result)  TYPE string.
+    "! The occurrences of a member of a copy looked up by BW's name, its InfoObject and name as levels_sql gives a
+    "! member's IOBJ and NAME (a lookup in BW's names, one statement whatever the depth): a condition on the path
+    "! table's row o of an occurrence's own level (TLEVEL = DEPTH) that holds for every occurrence of that name and for
+    "! few others, for levels_sql (occurrences), and the depths these are on as levels_sql counts them (re-rooted by a
+    "! restriction), ascending, REST_H's (1) and its values' (2) where levels_sql reads them. A node by its InfoObject
+    "! and node name (an external characteristic's by its InfoObject: its view names it), a leaf by the SIDs of the
+    "! view's rows of that name or by its SID as text (levels_sql's name of a SID without row in the view).
+    "! @parameter value_table | as of levels_sql
+    "! @parameter sid_column | as of levels_sql
+    "! @parameter name_column | as of levels_sql
+    CLASS-METHODS occurrences
+      IMPORTING hierarchy   TYPE ty_hierarchy
+                restriction TYPE ty_restriction OPTIONAL
+                value_table TYPE string
+                sid_column  TYPE string
+                name_column TYPE string
+                iobj        TYPE string
+                !name       TYPE string
+      EXPORTING !condition  TYPE string
+                depths      TYPE int4_table.
+    "! The restriction of a hierarchy's members for a user (docs/next-steps.md, Now: analysis authorisations, step 5b):
+    "! none if its characteristic is not authorization relevant or the user may see all its values, else the user's
+    "! lines on the hierarchy (its name and version), none for a hierarchy without a line (no member).
+    CLASS-METHODS restriction
+      IMPORTING hierarchy     TYPE ty_hierarchy
+                visibles      TYPE ty_t_visible
+      RETURNING VALUE(result) TYPE ty_restriction.
+    "! Whether a restriction hides children of a node it shows (a node of type 0, a level limit of type 2): BW refuses
+    "! the hierarchy's members then (Hierarchy.Members), a level's members are its visible ones.
+    CLASS-METHODS truncated
+      IMPORTING hierarchy     TYPE ty_hierarchy
+                restriction   TYPE ty_restriction
+      RETURNING VALUE(result) TYPE abap_bool.
     "! Creates the objects of each characteristic and copies each of its hierarchies, per name and version the slice
     "! valid to 9999-12-31 (program ZZXXMLA1_HIERARCHY_COPY, the class run for scripts/hierarchy_copy_test.py).
     METHODS run
@@ -451,6 +518,29 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
     CLASS-METHODS rest_caption
       IMPORTING characteristic TYPE rsiobjnm
       RETURNING VALUE(result)  TYPE string.
+    "! The occurrences a restriction shows, columns POS and TOP: a query over the path table of the occurrences a line
+    "! covers (as ZZXXMLA1_CL_BW_AUTH_SQL expands a line: the path rows whose level member is the line's node, the
+    "! node's own row for type 0, down to the line's level for type 2, the roots' rows for type 3 and 4), each with
+    "! the highest level it is covered from, where the user's hierarchy is rooted (BW's top node).
+    CLASS-METHODS visible_sql
+      IMPORTING hierarchy     TYPE ty_hierarchy
+                restriction   TYPE ty_restriction
+      RETURNING VALUE(result) TYPE string.
+    "! Whether levels_sql reads REST_H and its values: the hierarchy shows the not-assigned node and a restriction has
+    "! a line of the complete hierarchy.
+    CLASS-METHODS rest_read
+      IMPORTING hierarchy     TYPE ty_hierarchy
+                restriction   TYPE ty_restriction
+      RETURNING VALUE(result) TYPE abap_bool.
+    "! The condition of occurrences.
+    CLASS-METHODS occurrences_condition
+      IMPORTING hierarchy     TYPE ty_hierarchy
+                value_table   TYPE string
+                sid_column    TYPE string
+                name_column   TYPE string
+                iobj          TYPE string
+                !name         TYPE string
+      RETURNING VALUE(result) TYPE string.
     "! The hierarchy as a query reads it from its directory row.
     CLASS-METHODS hierarchy_of
       IMPORTING directory     TYPE ty_directory
@@ -1209,7 +1299,15 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
                                    ELSE |COALESCE( { node_names }TO_NVARCHAR( p."NODE_NAME" ) )| ).
     DATA(value_name) = |COALESCE( TO_NVARCHAR( v.{ quote( name_column ) } ), TO_NVARCHAR( p."SID" ) )|.
     DATA(value_iobj) = zzxxmla1_cl_sql=>literal( CONV string( hierarchy-characteristic ) ).
-    DATA(member) = |p."POS", p."TLEVEL", p."DEPTH", p."OWN_SID", p."PARENT_SID", p."SID", p."LEVEL_POS", | &&
+    DATA(path_levels) = |p."TLEVEL", p."DEPTH", p."OWN_SID", p."PARENT_SID"|.
+    IF restriction-restricted = abap_true.
+      " the visible occurrences from their top node down, the levels counted from it, a top node a root
+      joins = |INNER JOIN ( { visible_sql( hierarchy = hierarchy restriction = restriction ) } ) AS r | &&
+              |ON r."POS" = p."POS" AND p."TLEVEL" >= r."TOP" { joins }|.
+      path_levels = |p."TLEVEL" - r."TOP" + 1 AS "TLEVEL", p."DEPTH" - r."TOP" + 1 AS "DEPTH", p."OWN_SID", | &&
+                    |CASE WHEN p."DEPTH" = r."TOP" THEN { hierarchy-root_sid } ELSE p."PARENT_SID" END AS "PARENT_SID"|.
+    ENDIF.
+    DATA(member) = |p."POS", { path_levels }, p."SID", p."LEVEL_POS", | &&
                    |CASE WHEN p."SID" < 0 THEN { node_name } ELSE { value_name } END AS "NAME", | &&
                    |CASE WHEN p."SID" < 0 THEN TO_NVARCHAR( p."NODE_IOBJ" ) ELSE { value_iobj } END AS "IOBJ"|.
     IF caption_column IS NOT INITIAL.
@@ -1236,11 +1334,16 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
     APPEND |e."OWN_SID" AS { quote( c_member_column-sid ) }| TO columns.
     APPEND |e."DEPTH" AS { quote( c_member_column-depth ) }| TO columns.
     APPEND |e."PARENT_SID" AS { quote( c_member_column-parent ) }| TO columns.
+    DATA(only) = COND string( WHEN occurrences IS NOT INITIAL
+                              THEN | AND p."POS" IN ( SELECT o."POS" FROM { quote( hierarchy-path_table ) } AS o | &&
+                                   |WHERE o."HIESID" = { hierarchy-hiesid } AND o."SVER" = { sver } | &&
+                                   |AND o."TLEVEL" = o."DEPTH" AND ( { occurrences } ) )| ).
     result = |SELECT { concat_lines_of( table = columns sep = `, ` ) } | &&
              |FROM ( SELECT { member } FROM { quote( hierarchy-path_table ) } AS p { joins } | &&
-             |WHERE p."HIESID" = { hierarchy-hiesid } AND p."SVER" = { sver } AND p."DEPTH" BETWEEN 1 AND { depth } ) AS e | &&
+             |WHERE p."HIESID" = { hierarchy-hiesid } AND p."SVER" = { sver } AND p."DEPTH" BETWEEN 1 AND { depth }| &&
+             |{ only } ) AS e | &&
              |GROUP BY e."POS", e."DEPTH", e."OWN_SID", e."PARENT_SID"|.
-    IF hierarchy-rest_shown = abap_false.
+    IF rest_read( hierarchy = hierarchy restriction = restriction ) = abap_false.
       RETURN.
     ENDIF.
 
@@ -1270,6 +1373,118 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
              |LEFT OUTER JOIN { quote( value_table ) } AS v ON v.{ quote( sid_column ) } = r."SID" | &&
              |WHERE r."HIESID" = { hierarchy-hiesid } AND r."SVER" = { sver } | &&
              |AND r."ANCESTOR_SID" = { hierarchy-rest_top_sid }|.
+  ENDMETHOD.
+
+  METHOD rest_read.
+    result = xsdbool( hierarchy-rest_shown = abap_true AND ( restriction-restricted = abap_false
+                                                             OR line_exists( restriction-lines[ type = '3' ] )
+                                                             OR line_exists( restriction-lines[ type = '4' ] ) ) ).
+  ENDMETHOD.
+
+  METHOD occurrences_condition.
+    DATA(nodes) = |o."SID" < 0 AND o."NODE_IOBJ" = { zzxxmla1_cl_sql=>literal( iobj ) }|.
+    IF NOT line_exists( hierarchy-externals[ iobjnm = iobj ] ).
+      nodes = |{ nodes } AND { zzxxmla1_cl_sql=>key_condition( column = `o."NODE_NAME"` key = name ) }|.
+    ENDIF.
+    result = |( { nodes } )|.
+    IF iobj = hierarchy-characteristic.
+      DATA(leaves) = |o."SID" IN ( SELECT w.{ quote( sid_column ) } FROM { quote( value_table ) } AS w | &&
+                     |WHERE { zzxxmla1_cl_sql=>key_condition( column = |w.{ quote( name_column ) }| key = name ) } )|.
+      IF matches( val = name regex = `\d{1,9}` ).
+        leaves = |{ leaves } OR o."SID" = { CONV i( name ) }|.
+      ENDIF.
+      result = |{ result } OR ( o."SID" >= 0 AND ( { leaves } ) )|.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD occurrences.
+    CLEAR depths.
+    condition = occurrences_condition( hierarchy   = hierarchy
+                                       value_table = value_table
+                                       sid_column  = sid_column
+                                       name_column = name_column
+                                       iobj        = iobj
+                                       name        = name ).
+    DATA(sver) = zzxxmla1_cl_sql=>literal( CONV string( hierarchy-sver ) ).
+    DATA(depth) = `o."DEPTH"`.
+    DATA(visible) = ``.
+    IF restriction-restricted = abap_true.
+      " counted from the top node, as levels_sql counts them
+      depth = `o."DEPTH" - r."TOP" + 1`.
+      visible = |INNER JOIN ( { visible_sql( hierarchy = hierarchy restriction = restriction ) } ) AS r | &&
+                |ON r."POS" = o."POS" |.
+    ENDIF.
+    DATA(rows) = zzxxmla1_cl_sql=>query(
+      sql     = |SELECT DISTINCT { depth } FROM { quote( hierarchy-path_table ) } AS o { visible }| &&
+                |WHERE o."HIESID" = { hierarchy-hiesid } AND o."SVER" = { sver } AND o."TLEVEL" = o."DEPTH" | &&
+                |AND ( { condition } )|
+      columns = 1 ).
+    LOOP AT rows INTO DATA(row).
+      APPEND CONV i( row[ 1 ] ) TO depths.
+    ENDLOOP.
+    IF rest_read( hierarchy = hierarchy restriction = restriction ) = abap_true.
+      IF iobj = c_rest_iobj.
+        APPEND 1 TO depths.
+      ELSEIF iobj = hierarchy-characteristic.
+        APPEND 2 TO depths.
+      ENDIF.
+    ENDIF.
+    SORT depths.
+    DELETE ADJACENT DUPLICATES FROM depths.
+  ENDMETHOD.
+
+  METHOD restriction.
+    READ TABLE visibles INTO DATA(visible) WITH KEY characteristic = hierarchy-characteristic.
+    IF sy-subrc <> 0 OR visible-all = abap_true.
+      RETURN.
+    ENDIF.
+    result-restricted = abap_true.
+    LOOP AT visible-lines INTO DATA(line) WHERE name = hierarchy-name AND version = hierarchy-version.
+      IF NOT line_exists( result-lines[ table_line = line ] ).
+        APPEND line TO result-lines.
+      ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD visible_sql.
+    DATA(conditions) = VALUE string_table( ).
+    LOOP AT restriction-lines INTO DATA(line).
+      IF line-type = '3' OR line-type = '4'.
+        APPEND |s."TLEVEL" = 1| TO conditions.
+        CONTINUE.
+      ENDIF.
+      DATA(condition) = |s."NODE_IOBJ" = { zzxxmla1_cl_sql=>literal( CONV string( line-node_iobj ) ) } | &&
+                        |AND s."NODE_NAME" = { zzxxmla1_cl_sql=>literal( line-node ) }|.
+      IF line-type = '0'.
+        condition = |{ condition } AND s."TLEVEL" = s."DEPTH"|.
+      ELSEIF line-type = '2'.
+        condition = |{ condition } AND ( s."DEPTH" <= { line-level } OR s."TLEVEL" = s."DEPTH" )|.
+      ENDIF.
+      APPEND |( { condition } )| TO conditions.
+    ENDLOOP.
+    IF conditions IS INITIAL.
+      APPEND `1 = 0` TO conditions.
+    ENDIF.
+    result = |SELECT s."POS", MIN( s."TLEVEL" ) AS "TOP" FROM { quote( hierarchy-path_table ) } AS s | &&
+             |WHERE s."HIESID" = { hierarchy-hiesid } | &&
+             |AND s."SVER" = { zzxxmla1_cl_sql=>literal( CONV string( hierarchy-sver ) ) } | &&
+             |AND ( { concat_lines_of( table = conditions sep = ` OR ` ) } ) GROUP BY s."POS"|.
+  ENDMETHOD.
+
+  METHOD truncated.
+    IF restriction-restricted = abap_false.
+      RETURN.
+    ENDIF.
+    " an occurrence that is not visible below one that is: its row on its parent's level names the parent (LEVEL_POS)
+    DATA(visible) = visible_sql( hierarchy = hierarchy restriction = restriction ).
+    DATA(rows) = zzxxmla1_cl_sql=>query(
+      sql     = |SELECT COUNT(*) FROM ( SELECT 1 FROM { quote( hierarchy-path_table ) } AS c | &&
+                |WHERE c."HIESID" = { hierarchy-hiesid } | &&
+                |AND c."SVER" = { zzxxmla1_cl_sql=>literal( CONV string( hierarchy-sver ) ) } | &&
+                |AND c."TLEVEL" = c."DEPTH" - 1 AND c."LEVEL_POS" IN ( SELECT v1."POS" FROM ( { visible } ) AS v1 ) | &&
+                |AND c."POS" NOT IN ( SELECT v2."POS" FROM ( { visible } ) AS v2 ) LIMIT 1 ) AS t|
+      columns = 1 ).
+    result = xsdbool( rows IS NOT INITIAL AND CONV i( rows[ 1 ][ 1 ] ) > 0 ).
   ENDMETHOD.
 
   METHOD lock.

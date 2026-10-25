@@ -47,6 +47,12 @@ CLASS zzxxmla1_cl_model DEFINITION
         bw_value_name   TYPE string,
         "! of a BW hierarchy: the column of the dimension table that captions a leaf; empty when the name is the caption
         bw_value_caption TYPE string,
+        "! of a BW hierarchy: its members restricted to what the user may see (BW's analysis authorizations), set by
+        "! the schema reader for a request (ZZXXMLA1_CL_BW_HIERARCHY_COPY=>restriction); initial: all of them
+        bw_restriction  TYPE zzxxmla1_cl_bw_hierarchy_copy=>ty_restriction,
+        "! of a BW hierarchy: its members limited to some occurrences, a condition of bw_occurrences, set by the schema
+        "! reader for a lookup by BW's name; initial: all of them
+        bw_occurrences  TYPE string,
       END OF ty_hierarchy,
       ty_t_hierarchy TYPE STANDARD TABLE OF ty_hierarchy WITH EMPTY KEY.
     TYPES:
@@ -270,6 +276,14 @@ CLASS zzxxmla1_cl_model DEFINITION
     CLASS-METHODS bw_iobj_column
       IMPORTING level_no      TYPE i
       RETURNING VALUE(result) TYPE string.
+    "! Of a BW hierarchy: the occurrences of a member by BW's name, its InfoObject and name, as the user may see them
+    "! (ZZXXMLA1_CL_BW_HIERARCHY_COPY=>occurrences): the condition for bw_occurrences and the levels they are on.
+    CLASS-METHODS bw_occurrences
+      IMPORTING hierarchy  TYPE ty_hierarchy
+                iobj       TYPE string
+                !name      TYPE string
+      EXPORTING !condition TYPE string
+                level_nos  TYPE int4_table.
     "! The columns members_of_rows reads of the levels 1 to level_no, each qualified by the alias, without the aliases
     "! level_columns gives a column read again: a select list of grouped facts that makes members of its groups.
     CLASS-METHODS member_columns
@@ -458,7 +472,21 @@ CLASS zzxxmla1_cl_model IMPLEMENTATION.
                                                               value_table = hierarchy-dim_table
                                                               sid_column  = zzxxmla1_cl_schema=>c_sid_column
                                                               name_column = hierarchy-bw_value_name
-                                                              caption_column = hierarchy-bw_value_caption ) } )|.
+                                                              caption_column = hierarchy-bw_value_caption
+                                                              restriction = hierarchy-bw_restriction
+                                                              occurrences = hierarchy-bw_occurrences ) } )|.
+  ENDMETHOD.
+
+  METHOD bw_occurrences.
+    zzxxmla1_cl_bw_hierarchy_copy=>occurrences( EXPORTING hierarchy   = hierarchy-bw_hierarchy
+                                                          restriction = hierarchy-bw_restriction
+                                                          value_table = hierarchy-dim_table
+                                                          sid_column  = zzxxmla1_cl_schema=>c_sid_column
+                                                          name_column = hierarchy-bw_value_name
+                                                          iobj        = iobj
+                                                          name        = name
+                                                IMPORTING condition   = condition
+                                                          depths      = level_nos ).
   ENDMETHOD.
 
   METHOD bw_member_condition.

@@ -503,8 +503,14 @@ compared, not only 9999-12-31.
    names, SQL statements, response and request; statement and history kept per mode), the trace page lists checks
    (toggle Check) and opens them in that mode (`scripts/trace_test.py`, `scripts/console_ui_test.py`).
 5. **The comparison:** `scripts/bw_auth_compare.py` sends every statement of `statements.json` for each test user
-   at each key date to `/zzxxmla1/bw/check` and compares the status with `reference/auth/` (the logged-on answer at
-   9999-12-31 where there is one, as `auth_check_test.py` does); `--sql` prints a statement's SQL.
+   at each key date to `/zzxxmla1/bw/checks`, 200 per call, and compares the status with `reference/auth/` (the
+   logged-on answer at 9999-12-31 where there is one, as `auth_check_test.py` does); `--sql` prints a statement's
+   SQL. A batch reads the user's profile once per provider (`ZZXXMLA1_CL_BW_AUTH_SQL=>read`), and the profile takes
+   only the names of the provider's characteristics (`ZZXXMLA1_CL_BW_PROVIDER=>characteristic_names`, not `read`'s
+   metadata), so a call's cost is the statements' own. A BW hierarchy member named in BW's names is looked up from
+   its occurrences: one statement on the copy's path table gives the depths of the occurrences of that InfoObject
+   and name (`ZZXXMLA1_CL_BW_HIERARCHY_COPY=>occurrences`), and the read of such a depth takes only these
+   occurrences before the texts are joined (`levels_sql`'s `occurrences`), not one read of the whole level per depth.
 
 Done when every test user's status agrees at every key date. Later, when BW's MDX is to return data: the engine
 enforces (the authorisations' step 5a with this selection, 5b the restriction of a hierarchy's members), Execute on
