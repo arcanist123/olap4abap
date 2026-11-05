@@ -728,7 +728,9 @@ category > interval of codes: overlapping intervals, a linked text node with its
 BW's tables (looked at on `ZCLDIAG`): `/BIC/H<char>` is the node tree (`NODEID`, `PARENTID`, `CHILDID`, `NEXTID`,
 `TLEVEL`, `LINK`); `/BIC/I<char>` (SID structure, written by BW on activation) has a row per node with its parent's
 SID (`PRED`), its own (`SUCC`), its position in depth-first order (`LISTNO`), `TLEVEL`, the node type (`NTYPEID`:
-5 a text node, else the characteristic's) and `FACTOR` (sign reversal), and the not-assigned node (`LISTNO`
+the SID of the node's InfoObject in `/BI0/SIOBJNM`, which differs between systems: `0HIER_NODE`'s for a text node,
+the characteristic's for a value, a postable node too; the root row and the not-assigned node's rows have values
+`/BI0/SIOBJNM` does not have; checked on `ZCLDIAG` and `ZCLDOC` 2026-11-05) and `FACTOR` (sign reversal), and the not-assigned node (`LISTNO`
 999999998, 999999999). Neither holds ancestor and descendant pairs. Looked at on the clinic demo 2026-10-15:
 `/BIC/I` holds every occurrence, the linked subtrees expanded; an interval is no row of its own but its values, each a
 row directly under the interval's parent with the interval's `LISTNO` (so a `LISTNO` is unique per node but not per
@@ -928,10 +930,10 @@ node is shown, the view's not-assigned ones):
   | HIESID | SVER | LISTNO    | PRED        | SUCC | TLEVEL | NTYPEID              |
   |-------:|------|----------:|------------:|-----:|-------:|----------------------|
   |     10 | 1    |         0 | -2000000101 |   -2 |     00 | (root)               |
-  |     10 | 1    |         1 |          -2 |   -4 |     01 | 5 (text node)        |
+  |     10 | 1    |         1 |          -2 |   -4 |     01 | `0HIER_NODE`'s       |
   |     10 | 1    |         2 |          -4 |    1 |     02 | `ZTEST`'s            |
   |     11 | 1    |         0 | -2000000101 |   -6 |     00 | (root)               |
-  |     11 | 1    |         1 |          -6 |   -8 |     01 | 5 (text node)        |
+  |     11 | 1    |         1 |          -6 |   -8 |     01 | `0HIER_NODE`'s       |
   |     11 | 1    |         2 |          -8 |    1 |     02 | `ZTEST`'s            |
   |     11 | 1    | 999999998 |          -6 |   -9 |     01 | (not assigned)       |
 
