@@ -1,0 +1,1025 @@
+"! <p class="shorttext synchronized">REST service: SE37 function module test cases (CRUD)</p>
+"!
+"! ICF handler (attach to an SICF node). Routes below the node:
+"! <ul>
+"! <li>GET    /{fm}/interface         input parameters of the function module</li>
+"! <li>GET    /{fm}/testcases         list of test cases</li>
+"! <li>POST   /{fm}/testcases         create  -> 201, Location</li>
+"! <li>GET    /{fm}/testcases/{id}    read</li>
+"! <li>PUT    /{fm}/testcases/{id}    update, only the keys sent (PATCH works the same)</li>
+"! <li>DELETE /{fm}/testcases/{id}    delete  -> 204</li>
+"! </ul>
+"! Body: {"TITLE":"...","PARAMS":{"I_INFOPROV":"...","I_T_SFC":[{"CHANM":"..."}]}}
+"! JSON keys are the ABAP names (upper case).
+"!
+"! Errors: one exception type, CX_BAL_EXCEPTION, carrying a T100 message
+"! (message class ZFM_TESTCASE or a forwarded SAP message). Only
+"! HANDLE_REQUEST maps it to an HTTP status and an error body.
+"!
+"! Storage is the SE37 test data directory: EUFUNC(FL), dataid 999 is the
+"! directory, 1..998 are test cases written/read through the generated
+"! test frame {fm}=====...FT (globals %_I/%_O/%_V + parameter name).
+CLASS zcl_fm_testcase_http DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC.
+
+  PUBLIC SECTION.
+    INTERFACES if_http_extension.
+
+  PRIVATE SECTION.
+    CONSTANTS c_msgid        TYPE symsgid VALUE 'ZFM_TESTCASE'.
+    CONSTANTS c_relid        TYPE eufunc-relid VALUE 'FL'.
+    CONSTANTS c_dir_dataid   TYPE eufunc-nummer VALUE '999'.
+    CONSTANTS c_max_id       TYPE i VALUE 998.
+    CONSTANTS c_stepid       TYPE c LENGTH 3 VALUE 'PBO'.
+    CONSTANTS c_data_version TYPE i VALUE 1.
+
+    TYPES ty_id    TYPE i.
+    TYPES ty_title TYPE c LENGTH 40.
+
+    TYPES: BEGIN OF ty_param,
+             name  TYPE fupararef-parameter,
+             kind  TYPE fupararef-paramtype,   " I importing, C changing, T tables
+             value TYPE REF TO data,
+           END OF ty_param,
+           ty_params TYPE STANDARD TABLE OF ty_param WITH KEY name.
+
+    TYPES: BEGIN OF ty_header,
+             id    TYPE ty_id,
+             title TYPE ty_title,
+             date  TYPE d,
+             time  TYPE t,
+           END OF ty_header,
+           ty_headers TYPE STANDARD TABLE OF ty_header WITH KEY id.
+
+    TYPES: BEGIN OF ty_testcase,
+             header TYPE ty_header,
+             params TYPE ty_params,
+           END OF ty_testcase.
+
+    TYPES: BEGIN OF ty_response,
+             status   TYPE i,
+             body     TYPE string,
+             location TYPE string,      " relative to the SICF node
+           END OF ty_response.
+
+    TYPES: BEGIN OF ty_message,
+             type    TYPE symsgty,
+             id      TYPE symsgid,
+             number  TYPE c LENGTH 3,      " not NUMC: keep "009" a JSON string
+             message TYPE string,
+           END OF ty_message,
+           ty_messages TYPE STANDARD TABLE OF ty_message WITH DEFAULT KEY.
+    TYPES: BEGIN OF ty_error.
+        INCLUDE TYPE ty_message.
+    TYPES: causes TYPE ty_messages,
+           END OF ty_error.
+
+    " Layouts as declared in LSEUJTOP - the cluster is imported by name
+    " and layout, so these must stay byte compatible with SE37
+    TYPES: BEGIN OF ty_datadir,
+             dataid TYPE eufunc-nummer,
+             stepid TYPE c LENGTH 3,
+             seqid  TYPE eufunc-seqid,
+             datum  TYPE sy-datum,
+             uzeit  TYPE sy-uzeit,
+             title  TYPE c LENGTH 40,
+           END OF ty_datadir,
+           ty_datadirs TYPE STANDARD TABLE OF ty_datadir WITH DEFAULT KEY.
+    TYPES: BEGIN OF ty_fdesc,
+             name    TYPE c LENGTH 30,
+             table   TYPE c LENGTH 40,
+             type    TYPE c LENGTH 1,
+             length  TYPE c LENGTH 5,
+             ilength TYPE c LENGTH 5,
+             hlength TYPE p LENGTH 8 DECIMALS 0,
+             ftype   TYPE c LENGTH 3,
+             number  TYPE i,
+           END OF ty_fdesc,
+           BEGIN OF ty_fdesc_copy,
+             line TYPE ty_fdesc,
+           END OF ty_fdesc_copy,
+           ty_fdesc_copies TYPE STANDARD TABLE OF ty_fdesc_copy WITH DEFAULT KEY.
+    TYPES: BEGIN OF ty_directory,
+             entries TYPE ty_datadirs,
+             fdesc   TYPE ty_fdesc_copies,
+             struc   TYPE nf2ty_struc_info_table,
+             no_save TYPE c LENGTH 1,
+             fname   TYPE rs38l_fnam,
+           END OF ty_directory.
+
+    DATA mv_funcname   TYPE rs38l_fnam.
+    DATA mv_area       TYPE eufunc-gruppe.
+    DATA mv_frameprog  TYPE trdir-name.
+    DATA mt_interface  TYPE ty_params.
+    DATA mo_input_type TYPE REF TO cl_abap_structdescr.
+
+    "-- REST layer ---------------------------------------------------------
+    METHODS dispatch
+      IMPORTING iv_method          TYPE string
+                iv_path            TYPE string
+                iv_body            TYPE string
+      RETURNING VALUE(rs_response) TYPE ty_response
+      RAISING   cx_bal_exception.
+    METHODS parse_body
+      IMPORTING iv_json      TYPE string
+      EXPORTING ev_title     TYPE ty_title
+                ev_set_title TYPE abap_bool
+                et_params    TYPE ty_params
+      RAISING   cx_bal_exception.
+    METHODS testcase_json
+      IMPORTING iv_id          TYPE ty_id
+      RETURNING VALUE(rv_json) TYPE string
+      RAISING   cx_bal_exception.
+    METHODS interface_json
+      RETURNING VALUE(rv_json) TYPE string
+      RAISING   cx_bal_exception.
+    METHODS to_json
+      IMPORTING ig_data        TYPE any
+                iv_compress    TYPE abap_bool DEFAULT abap_false
+      RETURNING VALUE(rv_json) TYPE string.
+    METHODS status_for
+      IMPORTING ix_error         TYPE REF TO cx_root
+      RETURNING VALUE(rv_status) TYPE i.
+    METHODS error_json
+      IMPORTING ix_error       TYPE REF TO cx_root
+      RETURNING VALUE(rv_json) TYPE string.
+    METHODS to_message
+      IMPORTING ix_error          TYPE REF TO cx_root
+      RETURNING VALUE(rs_message) TYPE ty_message.
+
+    "-- Test case repository -----------------------------------------------
+    METHODS select_function
+      IMPORTING iv_funcname TYPE csequence
+      RAISING   cx_bal_exception.
+    METHODS get_input_type
+      RETURNING VALUE(ro_type) TYPE REF TO cl_abap_structdescr
+      RAISING   cx_bal_exception.
+    METHODS list
+      RETURNING VALUE(rt_headers) TYPE ty_headers
+      RAISING   cx_bal_exception.
+    METHODS create
+      IMPORTING iv_title     TYPE ty_title
+                it_params    TYPE ty_params
+      RETURNING VALUE(rv_id) TYPE ty_id
+      RAISING   cx_bal_exception.
+    METHODS read
+      IMPORTING iv_id              TYPE ty_id
+      RETURNING VALUE(rs_testcase) TYPE ty_testcase
+      RAISING   cx_bal_exception.
+    METHODS update
+      IMPORTING iv_id        TYPE ty_id
+                it_params    TYPE ty_params OPTIONAL
+                iv_title     TYPE ty_title OPTIONAL
+                iv_set_title TYPE abap_bool DEFAULT abap_false
+      RAISING   cx_bal_exception.
+    METHODS delete
+      IMPORTING iv_id TYPE ty_id
+      RAISING   cx_bal_exception.
+
+    METHODS load_directory
+      RETURNING VALUE(rs_dir) TYPE ty_directory
+      RAISING   cx_bal_exception.
+    METHODS save_directory
+      IMPORTING is_dir TYPE ty_directory.
+    METHODS directory_key
+      RETURNING VALUE(rs_key) TYPE functdir.
+    METHODS to_dataid
+      IMPORTING iv_id            TYPE ty_id
+      RETURNING VALUE(rv_dataid) TYPE eufunc-nummer.
+    METHODS next_free_id
+      IMPORTING is_dir       TYPE ty_directory
+      RETURNING VALUE(rv_id) TYPE ty_id
+      RAISING   cx_bal_exception.
+    METHODS find_entry
+      IMPORTING is_dir          TYPE ty_directory
+                iv_id           TYPE ty_id
+      RETURNING VALUE(rv_index) TYPE i
+      RAISING   cx_bal_exception.
+    METHODS ensure_frame
+      RAISING cx_bal_exception.
+    METHODS clear_frame.
+    METHODS load_frame
+      IMPORTING iv_id TYPE ty_id
+      RAISING   cx_bal_exception.
+    METHODS write_frame
+      IMPORTING iv_id TYPE ty_id
+      RAISING   cx_bal_exception.
+    METHODS fill_frame
+      IMPORTING it_params TYPE ty_params
+      RAISING   cx_bal_exception.
+    METHODS frame_input
+      IMPORTING is_param      TYPE ty_param
+      RETURNING VALUE(rr_ref) TYPE REF TO data
+      RAISING   cx_bal_exception.
+    "! SAP message in SY-MSG* as exception (to pass on as PREVIOUS)
+    METHODS sy_message
+      RETURNING VALUE(rx_message) TYPE REF TO cx_bal_exception.
+ENDCLASS.
+
+
+
+CLASS ZCL_FM_TESTCASE_HTTP IMPLEMENTATION.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method ZCL_FM_TESTCASE_HTTP->IF_HTTP_EXTENSION~HANDLE_REQUEST
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] SERVER                         TYPE REF TO IF_HTTP_SERVER
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD if_http_extension~handle_request.
+    DATA ls_response TYPE ty_response.
+    DATA(lv_method) = to_upper( server->request->get_header_field( '~request_method' ) ).
+
+    TRY.
+        ls_response = dispatch( iv_method = lv_method
+                                iv_path   = server->request->get_header_field( '~path_info' )
+                                iv_body   = server->request->get_cdata( ) ).
+        IF lv_method <> 'GET'.
+          COMMIT WORK.
+        ENDIF.
+      CATCH cx_root INTO DATA(lx_error).
+        ROLLBACK WORK.
+        ls_response = VALUE #( status = status_for( lx_error )
+                               body   = error_json( lx_error ) ).
+    ENDTRY.
+
+    server->response->set_status( code = ls_response-status reason = `` ).
+    IF ls_response-location IS NOT INITIAL.
+      server->response->set_header_field(
+        name  = 'Location'
+        value = |{ server->request->get_header_field( '~script_name' ) }/{ ls_response-location }| ).
+    ENDIF.
+    IF ls_response-body IS NOT INITIAL.
+      server->response->set_content_type( 'application/json; charset=utf-8' ).
+      server->response->set_cdata( ls_response-body ).
+    ENDIF.
+    if_http_extension~flow_rc = if_http_extension=>co_flow_ok.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->DISPATCH
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_METHOD                      TYPE        STRING
+* | [--->] IV_PATH                        TYPE        STRING
+* | [--->] IV_BODY                        TYPE        STRING
+* | [<-()] RS_RESPONSE                    TYPE        TY_RESPONSE
+* | [!CX!] CX_BAL_EXCEPTION
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD dispatch.
+    DATA lt_segments TYPE string_table.
+    DATA lv_title    TYPE ty_title.
+    DATA lv_set      TYPE abap_bool.
+    DATA lt_params   TYPE ty_params.
+
+    SPLIT iv_path AT '/' INTO TABLE lt_segments.
+    DELETE lt_segments WHERE table_line IS INITIAL.
+    IF lines( lt_segments ) < 2 OR lines( lt_segments ) > 3.
+      RAISE EXCEPTION TYPE cx_bal_exception MESSAGE e007(zfm_testcase) WITH iv_method iv_path.
+    ENDIF.
+
+    select_function( cl_http_utility=>unescape_url( lt_segments[ 1 ] ) ).
+    DATA(lv_resource) = to_lower( lt_segments[ 2 ] ).
+
+    IF lines( lt_segments ) = 2.
+      DATA(lv_route) = |{ lv_resource } { iv_method }|.
+      CASE lv_route.
+        WHEN `interface GET`.
+          rs_response = VALUE #( status = 200 body = interface_json( ) ).
+        WHEN `testcases GET`.
+          rs_response = VALUE #( status = 200 body = to_json( list( ) ) ).
+        WHEN `testcases POST`.
+          parse_body( EXPORTING iv_json   = iv_body
+                      IMPORTING ev_title  = lv_title
+                                et_params = lt_params ).
+          DATA(lv_new_id) = create( iv_title = lv_title it_params = lt_params ).
+          rs_response = VALUE #( status   = 201
+                                 body     = testcase_json( lv_new_id )
+                                 location = |{ lt_segments[ 1 ] }/testcases/{ lv_new_id }| ).
+        WHEN OTHERS.
+          RAISE EXCEPTION TYPE cx_bal_exception MESSAGE e007(zfm_testcase) WITH iv_method iv_path.
+      ENDCASE.
+      RETURN.
+    ENDIF.
+
+    " /{fm}/testcases/{id}
+    DATA(lv_id_text) = lt_segments[ 3 ].
+    IF lv_resource <> `testcases`.
+      RAISE EXCEPTION TYPE cx_bal_exception MESSAGE e007(zfm_testcase) WITH iv_method iv_path.
+    ENDIF.
+    IF lv_id_text CN '0123456789' OR strlen( lv_id_text ) > 3.
+      RAISE EXCEPTION TYPE cx_bal_exception MESSAGE e002(zfm_testcase) WITH lv_id_text mv_funcname.
+    ENDIF.
+    DATA(lv_id) = CONV ty_id( lv_id_text ).
+
+    CASE iv_method.
+      WHEN `GET`.
+        rs_response = VALUE #( status = 200 body = testcase_json( lv_id ) ).
+      WHEN `PUT` OR `PATCH`.
+        parse_body( EXPORTING iv_json      = iv_body
+                    IMPORTING ev_title     = lv_title
+                              ev_set_title = lv_set
+                              et_params    = lt_params ).
+        update( iv_id = lv_id it_params = lt_params iv_title = lv_title iv_set_title = lv_set ).
+        rs_response = VALUE #( status = 200 body = testcase_json( lv_id ) ).
+      WHEN `DELETE`.
+        delete( lv_id ).
+        rs_response = VALUE #( status = 204 ).
+      WHEN OTHERS.
+        RAISE EXCEPTION TYPE cx_bal_exception MESSAGE e007(zfm_testcase) WITH iv_method iv_path.
+    ENDCASE.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->PARSE_BODY
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_JSON                        TYPE        STRING
+* | [<---] EV_TITLE                       TYPE        TY_TITLE
+* | [<---] EV_SET_TITLE                   TYPE        ABAP_BOOL
+* | [<---] ET_PARAMS                      TYPE        TY_PARAMS
+* | [!CX!] CX_BAL_EXCEPTION
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD parse_body.
+    DATA lt_top    TYPE string_table.
+    DATA lt_names  TYPE string_table.
+    DATA lv_depth  TYPE i.
+    DATA lv_in_params TYPE abap_bool.
+    FIELD-SYMBOLS <ls_body>   TYPE any.
+    FIELD-SYMBOLS <lv_title>  TYPE any.
+    FIELD-SYMBOLS <ls_params> TYPE any.
+
+    CLEAR: ev_title, ev_set_title, et_params.
+    IF iv_json IS INITIAL.
+      RAISE EXCEPTION TYPE cx_bal_exception MESSAGE e006(zfm_testcase).
+    ENDIF.
+
+    " 1. Which keys were sent? (deserialize alone cannot tell "absent"
+    "    from "initial", and partial updates depend on it)
+    TRY.
+        DATA(lo_reader) = cl_sxml_string_reader=>create( cl_abap_codepage=>convert_to( iv_json ) ).
+        DO.
+          DATA(lo_node) = lo_reader->read_next_node( ).
+          IF lo_node IS NOT BOUND.
+            EXIT.
+          ENDIF.
+          CASE lo_node->type.
+            WHEN if_sxml_node=>co_nt_element_open.
+              lv_depth = lv_depth + 1.
+              DATA(lo_open) = CAST if_sxml_open_element( lo_node ).
+              IF lv_depth = 1 AND lo_open->qname-name <> 'object'.
+                RAISE EXCEPTION TYPE cx_bal_exception MESSAGE e006(zfm_testcase).
+              ENDIF.
+              DATA(lo_name) = lo_open->get_attribute_value( 'name' ).
+              DATA(lv_name) = COND string( WHEN lo_name IS BOUND THEN to_upper( lo_name->get_value( ) ) ).
+              IF lv_depth = 2.
+                APPEND lv_name TO lt_top.
+                lv_in_params = xsdbool( lv_name = `PARAMS` ).
+              ELSEIF lv_depth = 3 AND lv_in_params = abap_true.
+                APPEND lv_name TO lt_names.
+              ENDIF.
+            WHEN if_sxml_node=>co_nt_element_close.
+              lv_depth = lv_depth - 1.
+          ENDCASE.
+        ENDDO.
+      CATCH cx_sxml_error INTO DATA(lx_parse).
+        RAISE EXCEPTION TYPE cx_bal_exception MESSAGE e006(zfm_testcase)
+          EXPORTING previous = lx_parse.
+    ENDTRY.
+
+    LOOP AT lt_names INTO lv_name.
+      IF NOT line_exists( mt_interface[ name = lv_name ] ).
+        RAISE EXCEPTION TYPE cx_bal_exception MESSAGE e003(zfm_testcase) WITH lv_name mv_funcname.
+      ENDIF.
+    ENDLOOP.
+
+    " 2. Typed values: deserialize into {TITLE, PARAMS: <input structure>}
+    DATA(lo_body_type) = cl_abap_structdescr=>create( VALUE #(
+      ( name = 'TITLE'  type = CAST #( cl_abap_typedescr=>describe_by_name( 'STRING' ) ) )
+      ( name = 'PARAMS' type = get_input_type( ) ) ) ).
+    DATA lr_body TYPE REF TO data.
+    CREATE DATA lr_body TYPE HANDLE lo_body_type.
+    ASSIGN lr_body->* TO <ls_body>.
+    TRY.
+        /ui2/cl_json=>deserialize( EXPORTING json        = iv_json
+                                             pretty_name = /ui2/cl_json=>pretty_mode-none
+                                   CHANGING  data        = <ls_body> ).
+      CATCH cx_root INTO DATA(lx_json).
+        RAISE EXCEPTION TYPE cx_bal_exception MESSAGE e006(zfm_testcase)
+          EXPORTING previous = lx_json.
+    ENDTRY.
+
+    ASSIGN COMPONENT 'TITLE' OF STRUCTURE <ls_body> TO <lv_title>.
+    ev_title     = <lv_title>.
+    ev_set_title = xsdbool( line_exists( lt_top[ table_line = `TITLE` ] ) ).
+
+    ASSIGN COMPONENT 'PARAMS' OF STRUCTURE <ls_body> TO <ls_params>.
+    LOOP AT lt_names INTO lv_name.
+      ASSIGN COMPONENT lv_name OF STRUCTURE <ls_params> TO FIELD-SYMBOL(<lv_value>).
+      APPEND VALUE #( name  = lv_name
+                      kind  = mt_interface[ name = lv_name ]-kind
+                      value = REF #( <lv_value> ) ) TO et_params.
+    ENDLOOP.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->TESTCASE_JSON
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_ID                          TYPE        TY_ID
+* | [<-()] RV_JSON                        TYPE        STRING
+* | [!CX!] CX_BAL_EXCEPTION
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD testcase_json.
+    DATA lr_params TYPE REF TO data.
+    FIELD-SYMBOLS <ls_params> TYPE any.
+
+    DATA(ls_testcase) = read( iv_id ).
+    DATA(lo_type) = get_input_type( ).
+    CREATE DATA lr_params TYPE HANDLE lo_type.
+    ASSIGN lr_params->* TO <ls_params>.
+    LOOP AT ls_testcase-params INTO DATA(ls_param).
+      ASSIGN COMPONENT ls_param-name OF STRUCTURE <ls_params> TO FIELD-SYMBOL(<lv_target>).
+      ASSIGN ls_param-value->* TO FIELD-SYMBOL(<lv_source>).
+      <lv_target> = <lv_source>.
+    ENDLOOP.
+
+    " {"ID":..,"TITLE":..,"DATE":..,"TIME":..,"PARAMS":{ only non-initial }}
+    DATA(lv_header) = to_json( ls_testcase-header ).
+    rv_json = substring( val = lv_header len = strlen( lv_header ) - 1 )
+           && `,"PARAMS":` && to_json( ig_data = <ls_params> iv_compress = abap_true ) && `}`.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->INTERFACE_JSON
+* +-------------------------------------------------------------------------------------------------+
+* | [<-()] RV_JSON                        TYPE        STRING
+* | [!CX!] CX_BAL_EXCEPTION
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD interface_json.
+    TYPES: BEGIN OF ty_entry,
+             name TYPE fupararef-parameter,
+             kind TYPE fupararef-paramtype,
+             type TYPE string,
+           END OF ty_entry.
+    DATA lt_entries TYPE STANDARD TABLE OF ty_entry WITH DEFAULT KEY.
+
+    LOOP AT mt_interface INTO DATA(ls_param).
+      DATA(lr_frame) = frame_input( ls_param ).
+      APPEND VALUE #( name = ls_param-name
+                      kind = ls_param-kind
+                      type = cl_abap_typedescr=>describe_by_data_ref( lr_frame )->get_relative_name( ) )
+        TO lt_entries.
+    ENDLOOP.
+    rv_json = to_json( lt_entries ).
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->TO_JSON
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IG_DATA                        TYPE        ANY
+* | [--->] IV_COMPRESS                    TYPE        ABAP_BOOL (default =ABAP_FALSE)
+* | [<-()] RV_JSON                        TYPE        STRING
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD to_json.
+    rv_json = /ui2/cl_json=>serialize( data        = ig_data
+                                       compress    = iv_compress
+                                       pretty_name = /ui2/cl_json=>pretty_mode-none ).
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->STATUS_FOR
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IX_ERROR                       TYPE REF TO CX_ROOT
+* | [<-()] RV_STATUS                      TYPE        I
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD status_for.
+    " The only place that knows about HTTP status codes
+    rv_status = 500.
+    IF ix_error IS NOT INSTANCE OF if_t100_message.
+      RETURN.
+    ENDIF.
+    DATA(ls_key) = CAST if_t100_message( ix_error )->t100key.
+    IF ls_key-msgid <> c_msgid.
+      RETURN.                                 " forwarded SAP message
+    ENDIF.
+    CASE ls_key-msgno.
+      WHEN '001' OR '002'.
+        rv_status = 404.
+      WHEN '003' OR '004' OR '005' OR '006' OR '007'.
+        rv_status = 400.
+      WHEN '008'.
+        rv_status = 409.
+      WHEN OTHERS.
+        rv_status = 500.
+    ENDCASE.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->ERROR_JSON
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IX_ERROR                       TYPE REF TO CX_ROOT
+* | [<-()] RV_JSON                        TYPE        STRING
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD error_json.
+    DATA ls_error TYPE ty_error.
+    DATA(ls_main) = to_message( ix_error ).
+    MOVE-CORRESPONDING ls_main TO ls_error.
+    DATA(lx_cause) = ix_error->previous.
+    WHILE lx_cause IS BOUND.
+      APPEND to_message( lx_cause ) TO ls_error-causes.
+      lx_cause = lx_cause->previous.
+    ENDWHILE.
+    rv_json = to_json( ls_error ).
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->TO_MESSAGE
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IX_ERROR                       TYPE REF TO CX_ROOT
+* | [<-()] RS_MESSAGE                     TYPE        TY_MESSAGE
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD to_message.
+    rs_message-type    = 'E'.
+    rs_message-message = ix_error->get_text( ).
+    IF ix_error IS INSTANCE OF if_t100_message.
+      DATA(ls_key) = CAST if_t100_message( ix_error )->t100key.
+      rs_message-id     = ls_key-msgid.
+      rs_message-number = ls_key-msgno.
+    ENDIF.
+    IF ix_error IS INSTANCE OF if_t100_dyn_msg.
+      DATA(lv_msgty) = CAST if_t100_dyn_msg( ix_error )->msgty.
+      IF lv_msgty IS NOT INITIAL.
+        rs_message-type = lv_msgty.
+      ENDIF.
+    ENDIF.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->SELECT_FUNCTION
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_FUNCNAME                    TYPE        CSEQUENCE
+* | [!CX!] CX_BAL_EXCEPTION
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD select_function.
+    CLEAR: mv_area, mt_interface, mo_input_type.
+    mv_funcname = to_upper( iv_funcname ).
+
+    SELECT SINGLE area FROM enlfdir
+      WHERE funcname = @mv_funcname
+      INTO @mv_area.
+    IF sy-subrc <> 0.
+      RAISE EXCEPTION TYPE cx_bal_exception MESSAGE e001(zfm_testcase) WITH mv_funcname.
+    ENDIF.
+
+    " Name of the generated test frame, same rule as SFCS_FA_* (LSEUJ)
+    mv_frameprog = mv_funcname.
+    TRANSLATE mv_frameprog USING ' ='.
+    mv_frameprog+30 = 'FT'.
+
+    " Input side: IMPORTING, CHANGING, TABLES; the frame skips REF TO too
+    SELECT parameter AS name, paramtype AS kind
+      FROM fupararef
+      WHERE funcname  = @mv_funcname
+        AND r3state   = 'A'
+        AND paramtype IN ( 'I', 'C', 'T' )
+        AND ref_class = @space
+      ORDER BY pposition
+      INTO CORRESPONDING FIELDS OF TABLE @mt_interface.
+
+    ensure_frame( ).
+    clear_frame( ).
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->GET_INPUT_TYPE
+* +-------------------------------------------------------------------------------------------------+
+* | [<-()] RO_TYPE                        TYPE REF TO CL_ABAP_STRUCTDESCR
+* | [!CX!] CX_BAL_EXCEPTION
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD get_input_type.
+    DATA lt_components TYPE cl_abap_structdescr=>component_table.
+    IF mo_input_type IS NOT BOUND.
+      LOOP AT mt_interface INTO DATA(ls_param).
+        APPEND VALUE #( name = ls_param-name
+                        type = CAST #( cl_abap_typedescr=>describe_by_data_ref( frame_input( ls_param ) ) ) )
+          TO lt_components.
+      ENDLOOP.
+      mo_input_type = cl_abap_structdescr=>create( lt_components ).
+    ENDIF.
+    ro_type = mo_input_type.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->LIST
+* +-------------------------------------------------------------------------------------------------+
+* | [<-()] RT_HEADERS                     TYPE        TY_HEADERS
+* | [!CX!] CX_BAL_EXCEPTION
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD list.
+    DATA(ls_dir) = load_directory( ).
+    LOOP AT ls_dir-entries INTO DATA(ls_entry) WHERE seqid IS INITIAL.
+      APPEND VALUE #( id    = CONV i( ls_entry-dataid )
+                      title = ls_entry-title
+                      date  = ls_entry-datum
+                      time  = ls_entry-uzeit ) TO rt_headers.
+    ENDLOOP.
+    SORT rt_headers BY id.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->CREATE
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_TITLE                       TYPE        TY_TITLE
+* | [--->] IT_PARAMS                      TYPE        TY_PARAMS
+* | [<-()] RV_ID                          TYPE        TY_ID
+* | [!CX!] CX_BAL_EXCEPTION
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD create.
+    DATA(ls_dir) = load_directory( ).
+    rv_id = next_free_id( ls_dir ).
+
+    clear_frame( ).
+    fill_frame( it_params ).
+    write_frame( rv_id ).
+
+    APPEND VALUE #( dataid = to_dataid( rv_id )
+                    stepid = c_stepid
+                    datum  = sy-datum
+                    uzeit  = sy-uzeit
+                    title  = iv_title ) TO ls_dir-entries.
+    SORT ls_dir-entries BY dataid.
+    save_directory( ls_dir ).
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->READ
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_ID                          TYPE        TY_ID
+* | [<-()] RS_TESTCASE                    TYPE        TY_TESTCASE
+* | [!CX!] CX_BAL_EXCEPTION
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD read.
+    DATA(ls_dir) = load_directory( ).
+    DATA(ls_entry) = ls_dir-entries[ find_entry( is_dir = ls_dir iv_id = iv_id ) ].
+
+    rs_testcase-header = VALUE #( id    = iv_id
+                                  title = ls_entry-title
+                                  date  = ls_entry-datum
+                                  time  = ls_entry-uzeit ).
+
+    load_frame( iv_id ).
+    LOOP AT mt_interface INTO DATA(ls_param).
+      DATA(lr_frame) = frame_input( ls_param ).
+      ASSIGN lr_frame->* TO FIELD-SYMBOL(<lv_frame>).
+      CREATE DATA ls_param-value LIKE <lv_frame>.
+      ASSIGN ls_param-value->* TO FIELD-SYMBOL(<lv_copy>).
+      <lv_copy> = <lv_frame>.
+      APPEND ls_param TO rs_testcase-params.
+    ENDLOOP.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->UPDATE
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_ID                          TYPE        TY_ID
+* | [--->] IT_PARAMS                      TYPE        TY_PARAMS(optional)
+* | [--->] IV_TITLE                       TYPE        TY_TITLE(optional)
+* | [--->] IV_SET_TITLE                   TYPE        ABAP_BOOL (default =ABAP_FALSE)
+* | [!CX!] CX_BAL_EXCEPTION
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD update.
+    DATA(ls_dir) = load_directory( ).
+    DATA(lv_index) = find_entry( is_dir = ls_dir iv_id = iv_id ).
+
+    IF it_params IS NOT INITIAL.
+      " Start from the stored values (inputs and saved results),
+      " overlay the passed parameters, write back under the same id
+      load_frame( iv_id ).
+      fill_frame( it_params ).
+      write_frame( iv_id ).
+    ENDIF.
+
+    ASSIGN ls_dir-entries[ lv_index ] TO FIELD-SYMBOL(<ls_entry>).
+    IF iv_set_title = abap_true.
+      <ls_entry>-title = iv_title.
+    ENDIF.
+    <ls_entry>-datum = sy-datum.
+    <ls_entry>-uzeit = sy-uzeit.
+    save_directory( ls_dir ).
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->DELETE
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_ID                          TYPE        TY_ID
+* | [!CX!] CX_BAL_EXCEPTION
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD delete.
+    DATA(ls_dir) = load_directory( ).
+    DATA(lv_index) = find_entry( is_dir = ls_dir iv_id = iv_id ).
+    DATA(lv_dataid) = to_dataid( iv_id ).
+
+    " Same statement as form DB_DELETE_TESTDATA in LSEUJFDB
+    DELETE FROM eufunc WHERE relid  = @c_relid
+                         AND gruppe = @mv_area
+                         AND name   = @mv_funcname
+                         AND nummer = @lv_dataid
+                         AND seqid  = @space.
+
+    DELETE ls_dir-entries INDEX lv_index.
+    save_directory( ls_dir ).
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->LOAD_DIRECTORY
+* +-------------------------------------------------------------------------------------------------+
+* | [<-()] RS_DIR                         TYPE        TY_DIRECTORY
+* | [!CX!] CX_BAL_EXCEPTION
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD load_directory.
+    DATA(ls_key) = directory_key( ).
+    TRY.
+        IMPORT te_datadir            = rs_dir-entries
+               fdesc_copy            = rs_dir-fdesc
+               struc_info_table_copy = rs_dir-struc
+               g_no_save             = rs_dir-no_save
+               d102_fname            = rs_dir-fname
+          FROM DATABASE eufunc(fl) ID ls_key.
+      CATCH cx_sy_import_mismatch_error INTO DATA(lx_import).
+        RAISE EXCEPTION TYPE cx_bal_exception MESSAGE e012(zfm_testcase) WITH mv_funcname
+          EXPORTING previous = lx_import.
+    ENDTRY.
+
+    IF sy-subrc <> 0.
+      " No test case yet: start an empty directory
+      CLEAR rs_dir.
+      rs_dir-fname = mv_funcname.
+    ELSEIF rs_dir-fname <> mv_funcname.
+      RAISE EXCEPTION TYPE cx_bal_exception MESSAGE e012(zfm_testcase) WITH mv_funcname.
+    ENDIF.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->SAVE_DIRECTORY
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IS_DIR                         TYPE        TY_DIRECTORY
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD save_directory.
+    DATA(ls_key) = directory_key( ).
+    " Same administrative fields as form DB_EXPORT_DATADIR
+    DATA(ls_wa) = VALUE eufunc( datum   = sy-datum
+                                zeit    = sy-uzeit
+                                autor   = sy-uname
+                                version = c_data_version ).
+    EXPORT te_datadir            = is_dir-entries
+           fdesc_copy            = is_dir-fdesc
+           struc_info_table_copy = is_dir-struc
+           g_no_save             = is_dir-no_save
+           d102_fname            = mv_funcname
+      TO DATABASE eufunc(fl) FROM ls_wa ID ls_key.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->DIRECTORY_KEY
+* +-------------------------------------------------------------------------------------------------+
+* | [<-()] RS_KEY                         TYPE        FUNCTDIR
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD directory_key.
+    rs_key = VALUE #( area   = mv_area
+                      progid = mv_funcname
+                      dataid = c_dir_dataid ).
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->TO_DATAID
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_ID                          TYPE        TY_ID
+* | [<-()] RV_DATAID                      TYPE        EUFUNC-NUMMER
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD to_dataid.
+    " SE37 moves a number into the CHAR30 key (SFCS_FA_PARAMETER_WRITE:
+    " l_key-dataid = l_int) -> right-aligned. Same conversion here.
+    rv_dataid = iv_id.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->NEXT_FREE_ID
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IS_DIR                         TYPE        TY_DIRECTORY
+* | [<-()] RV_ID                          TYPE        TY_ID
+* | [!CX!] CX_BAL_EXCEPTION
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD next_free_id.
+    DATA lt_used TYPE SORTED TABLE OF i WITH UNIQUE KEY table_line.
+    LOOP AT is_dir-entries INTO DATA(ls_entry).
+      INSERT CONV i( ls_entry-dataid ) INTO TABLE lt_used.
+    ENDLOOP.
+    DO c_max_id TIMES.
+      IF NOT line_exists( lt_used[ table_line = sy-index ] ).
+        rv_id = sy-index.
+        RETURN.
+      ENDIF.
+    ENDDO.
+    RAISE EXCEPTION TYPE cx_bal_exception MESSAGE e008(zfm_testcase) WITH mv_funcname.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->FIND_ENTRY
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IS_DIR                         TYPE        TY_DIRECTORY
+* | [--->] IV_ID                          TYPE        TY_ID
+* | [<-()] RV_INDEX                       TYPE        I
+* | [!CX!] CX_BAL_EXCEPTION
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD find_entry.
+    LOOP AT is_dir-entries INTO DATA(ls_entry) WHERE seqid IS INITIAL.
+      IF CONV i( ls_entry-dataid ) = iv_id.
+        rv_index = sy-tabix.
+        RETURN.
+      ENDIF.
+    ENDLOOP.
+    RAISE EXCEPTION TYPE cx_bal_exception MESSAGE e002(zfm_testcase) WITH iv_id mv_funcname.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->ENSURE_FRAME
+* +-------------------------------------------------------------------------------------------------+
+* | [!CX!] CX_BAL_EXCEPTION
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD ensure_frame.
+    " Every SFCS_FA_* call first runs CHECK_REPORT_GENERATE (LSEUJF02),
+    " which generates the frame when it is missing or outdated. This call
+    " does nothing else (no parameter name) but - unlike SFCS_FA_CLEAR_FRAME -
+    " declares GENERATION_ERROR, so a failing generation becomes an
+    " exception instead of a short dump.
+    CLEAR sy-msgid.
+    CALL FUNCTION 'SFCS_FA_PARAMETER_GET'
+      EXPORTING
+        function         = mv_funcname
+        parameter        = space
+      EXCEPTIONS
+        generation_error = 1
+        error_message    = 2
+        OTHERS           = 3.
+    IF sy-subrc <> 0.
+      RAISE EXCEPTION TYPE cx_bal_exception MESSAGE e009(zfm_testcase) WITH mv_funcname
+        EXPORTING previous = sy_message( ).
+    ENDIF.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->CLEAR_FRAME
+* +-------------------------------------------------------------------------------------------------+
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD clear_frame.
+    CALL FUNCTION 'SFCS_FA_CLEAR_FRAME'
+      EXPORTING
+        function = mv_funcname.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->LOAD_FRAME
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_ID                          TYPE        TY_ID
+* | [!CX!] CX_BAL_EXCEPTION
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD load_frame.
+    clear_frame( ).
+    " PARAMETER = space: imports all inputs ('II') and results ('IV')
+    CLEAR sy-msgid.
+    CALL FUNCTION 'SFCS_FA_PARAMETER_READ'
+      EXPORTING
+        function         = mv_funcname
+        parameter        = space
+        dataset          = to_dataid( iv_id )
+        sfilename        = mv_area
+      EXCEPTIONS
+        generation_error = 1
+        error_message    = 2
+        OTHERS           = 3.
+    IF sy-subrc <> 0.
+      RAISE EXCEPTION TYPE cx_bal_exception MESSAGE e010(zfm_testcase) WITH iv_id mv_funcname
+        EXPORTING previous = sy_message( ).
+    ENDIF.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->WRITE_FRAME
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_ID                          TYPE        TY_ID
+* | [!CX!] CX_BAL_EXCEPTION
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD write_frame.
+    DATA lv_no_export_import TYPE c LENGTH 1.
+    " Exports inputs + results of the frame ('IO') under the given id
+    CLEAR sy-msgid.
+    CALL FUNCTION 'SFCS_FA_PARAMETER_WRITE'
+      EXPORTING
+        function         = mv_funcname
+        dataset          = to_dataid( iv_id )
+        sfilename        = mv_area
+      IMPORTING
+        no_export_import = lv_no_export_import
+      EXCEPTIONS
+        generation_error = 1
+        error_message    = 2
+        OTHERS           = 3.
+    IF sy-subrc <> 0 OR lv_no_export_import IS NOT INITIAL.
+      RAISE EXCEPTION TYPE cx_bal_exception MESSAGE e011(zfm_testcase) WITH iv_id mv_funcname
+        EXPORTING previous = sy_message( ).
+    ENDIF.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->FILL_FRAME
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IT_PARAMS                      TYPE        TY_PARAMS
+* | [!CX!] CX_BAL_EXCEPTION
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD fill_frame.
+    LOOP AT it_params INTO DATA(ls_param).
+      DATA(lv_name) = to_upper( ls_param-name ).
+      READ TABLE mt_interface INTO DATA(ls_interface) WITH KEY name = lv_name.
+      IF sy-subrc <> 0.
+        RAISE EXCEPTION TYPE cx_bal_exception MESSAGE e003(zfm_testcase) WITH lv_name mv_funcname.
+      ENDIF.
+      IF ls_param-value IS NOT BOUND.
+        RAISE EXCEPTION TYPE cx_bal_exception MESSAGE e004(zfm_testcase) WITH lv_name.
+      ENDIF.
+
+      DATA(lr_frame) = frame_input( ls_interface ).
+      ASSIGN lr_frame->* TO FIELD-SYMBOL(<lv_frame>).
+      ASSIGN ls_param-value->* TO FIELD-SYMBOL(<lv_value>).
+      TRY.
+          <lv_frame> = <lv_value>.
+        CATCH cx_sy_conversion_error cx_sy_move_cast_error INTO DATA(lx_move).
+          RAISE EXCEPTION TYPE cx_bal_exception MESSAGE e005(zfm_testcase) WITH lv_name
+            EXPORTING previous = lx_move.
+      ENDTRY.
+    ENDLOOP.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->FRAME_INPUT
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IS_PARAM                       TYPE        TY_PARAM
+* | [<-()] RR_REF                         TYPE REF TO DATA
+* | [!CX!] CX_BAL_EXCEPTION
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD frame_input.
+    " Input copy of a parameter in the test frame: %_I<name>,
+    " the body ([]) for TABLES parameters (they have a header line)
+    DATA(lv_global) = |({ mv_frameprog })%_I{ is_param-name }|.
+    IF is_param-kind = 'T'.
+      lv_global = lv_global && '[]'.
+    ENDIF.
+    ASSIGN (lv_global) TO FIELD-SYMBOL(<lv_global>).
+    IF sy-subrc <> 0.
+      RAISE EXCEPTION TYPE cx_bal_exception MESSAGE e013(zfm_testcase) WITH is_param-name mv_frameprog.
+    ENDIF.
+    GET REFERENCE OF <lv_global> INTO rr_ref.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method ZCL_FM_TESTCASE_HTTP->SY_MESSAGE
+* +-------------------------------------------------------------------------------------------------+
+* | [<-()] RX_MESSAGE                     TYPE REF TO CX_BAL_EXCEPTION
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD sy_message.
+    IF sy-msgid IS INITIAL.
+      RETURN.
+    ENDIF.
+    TRY.
+        RAISE EXCEPTION TYPE cx_bal_exception USING MESSAGE.
+      CATCH cx_bal_exception INTO rx_message.
+    ENDTRY.
+  ENDMETHOD.
+ENDCLASS.
