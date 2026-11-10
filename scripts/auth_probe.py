@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Records BW's answers for the analysis authorization scenarios (docs/clinic-demo.md, Authorization scenarios): runs
 the probe (GET auth/probe of the schema API, ZZXXMLA1_CL_BW_AUTH_PROBE: BW's own MDX on $ZCLVISITA) with the
-analysis authorizations of each test user ZZXXMLA1_A01 ... A21 at each key date, one request per key date and kind of
+analysis authorizations of each test user ZZXXMLA1_A01 ... A38 at each key date, one request per key date and kind of
 query, and writes reference/auth/<scenario>.json, the oracle of olap4abap's authorization check (docs/next-steps.md,
 Now: analysis authorisations, step 2).
 
@@ -126,6 +126,38 @@ def compact(row):
     return entry
 
 
+# the hierarchies (name, version) a request is split into when it runs longer than the ICM allows: BW's own check is
+# slow where it refuses many queries (HDATE's parent test); the probe's filter restricts the hierarchies only, so the
+# flat queries come with every part and are kept once
+SPLIT = [("ZCLDOC_ORG", "001"), ("ZCLDOC_ORG", "002"), ("ZCLDOC_SITE", "001"), ("ZCLDOC_SITE", "002"),
+         ("ZCLDIAG_ICD", "")]
+
+
+def probe_request(api, user, params):
+    """The rows of one request of the probe; split by hierarchy (SPLIT) if it times out in the ICM."""
+    status, body = api.get_json("/schema/api/auth/probe", params)
+    if status == 200:
+        if body["user"] != user:
+            raise RuntimeError(f"probed as {body['user']}, not {user}")
+        return body["authorizations"], body["results"]
+    if "ICMETIMEOUT" not in str(body.get("error", "")) or "hierarchies" in params:
+        raise RuntimeError(f"{user} {params['keyDates']} {params['tests']}: {status} {body.get('error', body)}")
+    print(f"  {params['keyDates']} {params['tests']}: timed out, split by hierarchy", flush=True)
+    authorizations, rows, keys = None, [], set()
+    for name, version in SPLIT:
+        part = {**params, "hierarchies": name, **({"versions": version} if version else {})}
+        authorizations, part_rows = probe_request(api, user, part)
+        for row in part_rows:
+            # the hierarchies BW lists (no statement) are those of the part only
+            if not row["mdx"]:
+                raise RuntimeError(f"{params['tests']}: a row without statement cannot be split")
+            key = statement_key(row)
+            if key not in keys:
+                keys.add(key)
+                rows.append(row)
+    return authorizations, rows
+
+
 def probe(api, user, key_dates):
     """The probe with the user's authorizations: per key date and kind of query one request; the authorizations of
     the first."""
@@ -135,16 +167,12 @@ def probe(api, user, key_dates):
             params = {"user": user, "keyDates": key_date, "tests": test}
             if test == "pairs":
                 params["pairs"] = ",".join(PAIRS)
-            status, body = api.get_json("/schema/api/auth/probe", params)
-            if status != 200:
-                raise RuntimeError(f"{user} {key_date} {test}: {status} {body.get('error', body)}")
-            if body["user"] != user:
-                raise RuntimeError(f"probed as {body['user']}, not {user}")
+            listed, rows = probe_request(api, user, params)
             if authorizations is None:
-                authorizations = body["authorizations"]
-            results.extend(compact(row) for row in body["results"])
+                authorizations = listed
+            results.extend(compact(row) for row in rows)
             counts = {}
-            for row in body["results"]:
+            for row in rows:
                 counts[row["status"]] = counts.get(row["status"], 0) + 1
             print(f"  {key_date} {test}: {counts}", flush=True)
     return authorizations, results

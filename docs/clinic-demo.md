@@ -151,10 +151,15 @@ authorisations). It writes them with BW's API (`RSEC_CREATE_AUTHORIZATION_API`, 
 `ZCLA_*` and every `ZZXXMLA1_A<two digits>` user first.
 
 - Every authorization has the special characteristics BW requires: `0TCAIPROV` `CP ZCLVISIT*` (both providers),
-  `0TCAACTVT` `EQ 03`, `0TCAVALID` `CP *`; and `ZCLDIAG` `CP *` where the scenario restricts only the physician.
+  `0TCAACTVT` `EQ 03`, `0TCAVALID` `CP *` (but PROV, ACTVT and VALID, which restrict one of them; all three are
+  authorization relevant); and `ZCLDIAG` `CP *` where the scenario restricts only the physician.
 - Hierarchy lines have the validity "Name and Version Identical" (`TCTACOMPM` 1), the matching olap4abap supports
-  (`mvp-scope.md`, Authorisation decision). BW resolves each to the slice of its name and version valid at the line's
-  date (9999-12-31) and keeps its `HIESID`; a clinic run deletes the authorizations with the hierarchies.
+  (`mvp-scope.md`, Authorisation decision), but HVAL0, HVAL2 and HVAL3, one per other validity. A line names the slice
+  of its hierarchy valid to 9999-12-31 (its date `TCTHIEDATE`, the API's `DATETO`), but HDATE and HVAL0, which name
+  the one valid to 2024-12-31. BW keeps the slice's `HIESID`; a clinic run deletes the authorizations with the
+  hierarchies.
+- The users have their authorizations directly (`RSEC_ASSIGN_USER_AUTH_API`), but ROLE, which has them through
+  `S_RS_AUTH` of the profile `ZZXXMLA1_RSA`, and BIALL, which has BW's `0BI_ALL`.
 - The users are service users (type `S`: the password never has to be changed, HTTP basic logons work) with the profile
   `ZZXXMLA1_REP` (`S_RS_COMP` and `S_RS_COMP1` display and execute of every query component, `S_RFC` of every function
   group), written with `SUSR_INTERFACE_PROF`. With the setup's password field empty they get a generated password
@@ -200,12 +205,32 @@ only.
 | `ZZXXMLA1_A19` | 2HIE | `ZCLA_2HIE` | `ZCLDOC_ORG` `001` `CARD` and `ZCLDOC_SITE` `001` `RIVER`, type 1 |
 | `ZZXXMLA1_A20` | COMB | `ZCLA_COMB` | `ZCLDOC_ORG` `001` `PULM` and `ZCLDIAG_ICD` `RESPIRATORY`, type 1 (no `ZCLDIAG` `*`) |
 | `ZZXXMLA1_A21` | CROSS | `ZCLA_X1`, `ZCLA_X2` | `ZCLDOC` `009` with `ZCLDIAG` `I10`, and `012` with `J45`: OR of the two sub-cubes |
+| `ZZXXMLA1_A22` | HDATE | `ZCLA_HDATE` | `ZCLDOC_ORG` `001`: node `GP`, type 1, of the slice valid to 2024-12-31 (the line's date; `008` is not below `GP` there) |
+| `ZZXXMLA1_A23` | HNEW | `ZCLA_HNEW` | `ZCLDOC_ORG` `001`: node `INTMED`, type 1 (a node of the slice from 2025 only) |
+| `ZZXXMLA1_A24` | HMULTI | `ZCLA_HMULTI` | `ZCLDOC_ORG` `001`: nodes `GP` and `CARD`, type 1 (two lines on one hierarchy) |
+| `ZZXXMLA1_A25` | HFLAT | `ZCLA_HFLAT` | `ZCLDOC_ORG` `001`: node `GP`, type 1, and the flat value `EQ 012` (hierarchy and flat lines in one authorization) |
+| `ZZXXMLA1_A26` | H2LEAF | `ZCLA_H2LEAF` | `ZCLDOC_ORG` `001`: node `CLINIC`, type 2 to level 4 (the leaves in 2024; Cardiology's and Pulmonology's are on level 5 from 2025) |
+| `ZZXXMLA1_A27` | HVAL0 | `ZCLA_HVAL0` | as HDATE, validity 0 "Name, Version Identical and Key Date Less Than or Equal to" |
+| `ZZXXMLA1_A28` | HVAL2 | `ZCLA_HVAL2` | `ZCLDOC_ORG` `001`: node `GP`, type 1, validity 2 "Name Identical" (version `002` too) |
+| `ZZXXMLA1_A29` | HVAL3 | `ZCLA_HVAL3` | `ZCLDOC_ORG` `001`: the leaf `008`, type 0, validity 3 "All Hierarchies" (`ZCLDOC_SITE` too) |
+| `ZZXXMLA1_A30` | TWOAUTH | `ZCLA_H1`, `ZCLA_EQ` | the authorizations of H1 and EQ: OR of a hierarchy and flat values |
+| `ZZXXMLA1_A31` | DIAG_H | `ZCLA_DIAG_H` | `ZCLDOC` `*`; `ZCLDIAG_ICD`: node `RESPIRATORY`, type 1 (the plain hierarchy alone) |
+| `ZZXXMLA1_A32` | DIAG_FLAT | `ZCLA_DIAGF` | `ZCLDOC` `*`; `ZCLDIAG` `CP J*`, `BT A00 B99`, `EQ I10` (character keys) |
+| `ZZXXMLA1_A33` | MISS | `ZCLA_MISS` | `ZCLDOC` `EQ 001` and no line on `ZCLDIAG`: the authorization does not apply |
+| `ZZXXMLA1_A34` | PROV | `ZCLA_PROV` | everything, but `0TCAIPROV` `EQ ZCLVISIT` (the InfoCube; the probe asks the aDSO) |
+| `ZZXXMLA1_A35` | ACTVT | `ZCLA_ACTVT` | everything, but `0TCAACTVT` `EQ 02` (change, no display) |
+| `ZZXXMLA1_A36` | VALID | `ZCLA_VALID` | everything, but `0TCAVALID` `BT 20200101 20231231` (expired) |
+| `ZZXXMLA1_A37` | ROLE | through `S_RS_AUTH` | `ZCLA_BT` and `ZCLA_BT_AGG` through `S_RS_AUTH` `BIAUTH` `ZCLA_BT*` of the profile `ZZXXMLA1_RSA` (no direct assignment) |
+| `ZZXXMLA1_A38` | BIALL | `0BI_ALL` | BW's `0BI_ALL`, assigned directly |
 
 No scenario has a variable or a relative level: BW takes a `$` value only if a customer exit variable of that name
 exists for the characteristic (the API leaves the line out, message RSEC 189), and corrects node type 4 (relative
 level) to 3 (complete hierarchy) without a node variable (a warning "Hierarchy corrected"). olap4abap supports no
 variables (`mvp-scope.md`), so neither has a BW answer to compare with; the check's refusal of a `$` value is tested on
-made-up lines.
+made-up lines. Nor does any have a value line BW refuses: the API deletes it as a "Non-correctable interval" (message
+`[E]`, the authorization is created without it): sign `E` (excluding), the options `LE` and `GE`, and `CP` with a
+pattern that is not a prefix and `*` (`0+2`, `*5`) (observed 2026-11-10). So flat values are `EQ`, `BT` and `CP`
+with a prefix, `*`, `:` and `#`.
 
 ## The hierarchy of the diagnoses
 

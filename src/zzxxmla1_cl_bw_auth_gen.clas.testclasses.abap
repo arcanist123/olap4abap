@@ -33,10 +33,20 @@ CLASS ltc_bw_auth_gen IMPLEMENTATION.
                                         msg = |{ scenario-user }| ).
       DATA(count) = REDUCE i( INIT n = 0 FOR s IN scenarios WHERE ( user = scenario-user ) NEXT n = n + 1 ).
       cl_abap_unit_assert=>assert_equals( act = count exp = 1 msg = |{ scenario-user } twice| ).
-      LOOP AT scenario-auths INTO DATA(auth).
+      " BW's own 0BI_ALL is assigned, not created
+      LOOP AT scenario-auths INTO DATA(auth) WHERE table_line <> '0BI_ALL'.
         cl_abap_unit_assert=>assert_true( act = xsdbool( line_exists( authorizations[ name = auth ] ) )
                                           msg = |{ scenario-name }: { auth } missing| ).
       ENDLOOP.
+      " a scenario has its authorizations directly or through S_RS_AUTH, whose pattern names one at least
+      IF scenario-s_rs_auth IS NOT INITIAL.
+        cl_abap_unit_assert=>assert_initial( act = scenario-auths msg = |{ scenario-name }: both| ).
+        DATA(pattern) = scenario-s_rs_auth.
+        cl_abap_unit_assert=>assert_true(
+          act = xsdbool( line_exists( authorizations[ name = pattern ] )
+                         OR REDUCE i( INIT n = 0 FOR a IN authorizations WHERE ( name CP pattern ) NEXT n = n + 1 ) > 0 )
+          msg = |{ scenario-name }: { pattern } names none| ).
+      ENDIF.
     ENDLOOP.
   ENDMETHOD.
 

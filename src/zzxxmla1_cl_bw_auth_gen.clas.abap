@@ -23,6 +23,8 @@
 "! No scenario has a variable ($ value) or a relative level (node type 4): BW accepts a variable only if it exists as
 "! a customer exit variable of the characteristic (the API leaves the line out otherwise), and corrects type 4 to the
 "! complete hierarchy (3) without a node variable; olap4abap does not support variables (docs/mvp-scope.md).
+"! Nor a value line BW refuses ("Non-correctable interval ... deleted", the API leaves it out): sign E, the options LE
+"! and GE, and CP with a pattern other than a prefix and * (0+2, *5) (observed 2026-11-10).
 "! A run deletes the test users and every analysis authorization ZCLA_* and creates them again; the profile is created
 "! or changed. The clinic generator deletes them with the demo (they name its characteristics and hierarchies). Run
 "! with program ZZXXMLA1_SETUP (with a password) or sapcli class execute (without).
@@ -35,24 +37,30 @@ CLASS zzxxmla1_cl_bw_auth_gen DEFINITION
     INTERFACES if_oo_adt_classrun.
 
     TYPES ty_auths TYPE STANDARD TABLE OF rsauth WITH EMPTY KEY.
-    "! a test user and the analysis authorizations it has
+    "! a test user and the analysis authorizations it has: assigned directly (auths), or through the value of
+    "! S_RS_AUTH-BIAUTH of the profile c_profile_rs_auth (s_rs_auth, a pattern)
     TYPES: BEGIN OF ty_scenario,
              name        TYPE string,
              user        TYPE xubname,
              auths       TYPE ty_auths,
              description TYPE string,
+             s_rs_auth   TYPE string,
            END OF ty_scenario.
     TYPES ty_scenarios TYPE STANDARD TABLE OF ty_scenario WITH EMPTY KEY.
-    "! an analysis authorization: flat values and hierarchy nodes, without the special characteristics
+    "! an analysis authorization: flat values and hierarchy nodes; the special characteristics are special_ranges
+    "! unless specials gives them
     TYPES: BEGIN OF ty_authorization,
              name        TYPE rsauth,
              text        TYPE rstxt20,
              ranges      TYPE rsec_t_range_api,
              hierarchies TYPE rsec_t_hierarchy_api,
+             specials    TYPE rsec_t_range_api,
            END OF ty_authorization.
     TYPES ty_authorizations TYPE STANDARD TABLE OF ty_authorization WITH EMPTY KEY.
 
     CONSTANTS c_profile TYPE xuprofile VALUE 'ZZXXMLA1_REP'.
+    "! the profile that assigns analysis authorizations through S_RS_AUTH (scenario ROLE)
+    CONSTANTS c_profile_rs_auth TYPE xuprofile VALUE 'ZZXXMLA1_RSA'.
     CONSTANTS c_user_prefix TYPE string VALUE `ZZXXMLA1_A`.
     CONSTANTS c_auth_prefix TYPE string VALUE `ZCLA_`.
     CONSTANTS c_physician TYPE rsiobjnm VALUE 'ZCLDOC'.
@@ -85,8 +93,16 @@ CLASS zzxxmla1_cl_bw_auth_gen DEFINITION
                  to_level TYPE rssauthhiertype VALUE '2',
                  complete TYPE rssauthhiertype VALUE '3',
                END OF c_node_type.
-    "! validity of a hierarchy line: Name and Version Identical
-    CONSTANTS c_name_and_version TYPE rssbcompmode VALUE '1'.
+    "! validity of a hierarchy line (RSSBCOMPMODE)
+    CONSTANTS: BEGIN OF c_validity,
+                 key_date_before  TYPE rssbcompmode VALUE '0',  " name, version identical, key date less or equal
+                 name_and_version TYPE rssbcompmode VALUE '1',  " name and version identical
+                 name             TYPE rssbcompmode VALUE '2',  " name identical
+                 all              TYPE rssbcompmode VALUE '3',  " all hierarchies
+               END OF c_validity.
+    "! the slice of a time-dependent hierarchy a line names: the one valid to 9999-12-31, or the old one
+    CONSTANTS c_valid_to TYPE d VALUE '99991231'.
+    CONSTANTS c_old_slice TYPE d VALUE '20241231'.
 
     DATA log TYPE string_table.
 
@@ -97,7 +113,8 @@ CLASS zzxxmla1_cl_bw_auth_gen DEFINITION
                 low           TYPE csequence
                 high          TYPE csequence OPTIONAL
       RETURNING VALUE(result) TYPE rsec_s_auth_values_range.
-    "! a hierarchy line: a node (a text node, or a value of the characteristic with iobjnm = node_iobjnm)
+    "! a hierarchy line: a node (a text node, or a value of the characteristic with iobjnm = node_iobjnm) of the
+    "! hierarchy's slice valid to slice_to, with its validity
     CLASS-METHODS node
       IMPORTING iobjnm        TYPE rsiobjnm DEFAULT c_physician
                 hierarchy     TYPE rshienm DEFAULT c_org
@@ -106,6 +123,8 @@ CLASS zzxxmla1_cl_bw_auth_gen DEFINITION
                 node          TYPE csequence
                 type          TYPE rssauthhiertype DEFAULT c_node_type-subtree
                 level         TYPE rssbtlevel DEFAULT '00'
+                slice_to      TYPE d DEFAULT c_valid_to
+                validity      TYPE rssbcompmode DEFAULT c_validity-name_and_version
       RETURNING VALUE(result) TYPE rsec_s_auth_values_hierarchy.
     "! the user name of the scenario number: ZZXXMLA1_A and the number in two digits
     CLASS-METHODS user IMPORTING number TYPE i RETURNING VALUE(result) TYPE xubname.
@@ -118,7 +137,13 @@ CLASS zzxxmla1_cl_bw_auth_gen DEFINITION
     METHODS write_return IMPORTING return TYPE STANDARD TABLE.
     METHODS write_messages IMPORTING messages TYPE rs_t_msg.
     METHODS delete_all.
-    METHODS create_profile.
+    "! creates or changes a profile of the given fields (object, field, value; an authorization per object, named by
+    "! auth_names in the order of the objects)
+    METHODS create_profile
+      IMPORTING profile    TYPE xuprofile
+                text       TYPE csequence
+                fields     TYPE string_table
+                auth_names TYPE string_table.
     METHODS create_authorization IMPORTING authorization TYPE ty_authorization.
     METHODS create_user
       IMPORTING scenario TYPE ty_scenario
@@ -180,7 +205,41 @@ CLASS zzxxmla1_cl_bw_auth_gen IMPLEMENTATION.
       ( name = `COMB` user = user( 20 ) auths = VALUE #( ( 'ZCLA_COMB' ) )
         description = `ZCLDOC_ORG 001 PULM with ZCLDIAG_ICD RESPIRATORY` )
       ( name = `CROSS` user = user( 21 ) auths = VALUE #( ( 'ZCLA_X1' ) ( 'ZCLA_X2' ) )
-        description = `009 with I10, and 012 with J45` ) ).
+        description = `009 with I10, and 012 with J45` )
+      ( name = `HDATE` user = user( 22 ) auths = VALUE #( ( 'ZCLA_HDATE' ) )
+        description = `ZCLDOC_ORG 001: the subtree of GP of the slice valid to 2024-12-31 (without 008)` )
+      ( name = `HNEW` user = user( 23 ) auths = VALUE #( ( 'ZCLA_HNEW' ) )
+        description = `ZCLDOC_ORG 001: the subtree of INTMED, a node of the slice from 2025 only` )
+      ( name = `HMULTI` user = user( 24 ) auths = VALUE #( ( 'ZCLA_HMULTI' ) )
+        description = `ZCLDOC_ORG 001: the subtrees of GP and CARD (two lines on one hierarchy)` )
+      ( name = `HFLAT` user = user( 25 ) auths = VALUE #( ( 'ZCLA_HFLAT' ) )
+        description = `ZCLDOC_ORG 001: the subtree of GP, and the flat value 012` )
+      ( name = `H2LEAF` user = user( 26 ) auths = VALUE #( ( 'ZCLA_H2LEAF' ) )
+        description = `ZCLDOC_ORG 001: CLINIC to level 4 (the leaves in 2024, not Cardiology's from 2025)` )
+      ( name = `HVAL0` user = user( 27 ) auths = VALUE #( ( 'ZCLA_HVAL0' ) )
+        description = `ZCLDOC_ORG 001: GP of the slice to 2024-12-31, validity key date less or equal` )
+      ( name = `HVAL2` user = user( 28 ) auths = VALUE #( ( 'ZCLA_HVAL2' ) )
+        description = `ZCLDOC_ORG 001: the subtree of GP, validity name identical (every version)` )
+      ( name = `HVAL3` user = user( 29 ) auths = VALUE #( ( 'ZCLA_HVAL3' ) )
+        description = `ZCLDOC_ORG 001: the leaf 008, validity all hierarchies` )
+      ( name = `TWOAUTH` user = user( 30 ) auths = VALUE #( ( 'ZCLA_H1' ) ( 'ZCLA_EQ' ) )
+        description = `the authorizations of H1 and EQ: a hierarchy or flat values` )
+      ( name = `DIAG_H` user = user( 31 ) auths = VALUE #( ( 'ZCLA_DIAG_H' ) )
+        description = `every physician; ZCLDIAG_ICD: the subtree of RESPIRATORY` )
+      ( name = `DIAG_FLAT` user = user( 32 ) auths = VALUE #( ( 'ZCLA_DIAGF' ) )
+        description = `every physician; diagnoses CP J*, BT A00 B99 and EQ I10 (character keys)` )
+      ( name = `MISS` user = user( 33 ) auths = VALUE #( ( 'ZCLA_MISS' ) )
+        description = `physician 001 and no line on ZCLDIAG (the authorization does not apply)` )
+      ( name = `PROV` user = user( 34 ) auths = VALUE #( ( 'ZCLA_PROV' ) )
+        description = `everything, but on the InfoCube ZCLVISIT only` )
+      ( name = `ACTVT` user = user( 35 ) auths = VALUE #( ( 'ZCLA_ACTVT' ) )
+        description = `everything, but for change (02) only` )
+      ( name = `VALID` user = user( 36 ) auths = VALUE #( ( 'ZCLA_VALID' ) )
+        description = `everything, but valid 2020 to 2023 only` )
+      ( name = `ROLE` user = user( 37 ) s_rs_auth = `ZCLA_BT*`
+        description = `ZCLA_BT and ZCLA_BT_AGG through S_RS_AUTH ZCLA_BT* (no direct assignment)` )
+      ( name = `BIALL` user = user( 38 ) auths = VALUE #( ( '0BI_ALL' ) )
+        description = `0BI_ALL assigned directly` ) ).
   ENDMETHOD.
 
   METHOD authorizations.
@@ -196,6 +255,7 @@ CLASS zzxxmla1_cl_bw_auth_gen IMPLEMENTATION.
                                             ( all_diagnoses ) ).
     DATA(not_assigned) = VALUE rsec_t_range_api( ( range_line( iobjnm = c_physician low = `#` ) ) ( all_diagnoses ) ).
     DATA(gp) = node( node = `GP` ).
+    DATA(every_physician) = range_line( iobjnm = c_physician option = 'CP' low = `*` ).
 
     result = VALUE #(
       ( name = 'ZCLA_FULL' text = 'All physicians'
@@ -238,7 +298,55 @@ CLASS zzxxmla1_cl_bw_auth_gen IMPLEMENTATION.
                           ( range_line( iobjnm = c_diagnosis low = `I10` ) ) ) )
       ( name = 'ZCLA_X2' text = '012 with J45'
         ranges = VALUE #( ( range_line( iobjnm = c_physician low = `012` ) )
-                          ( range_line( iobjnm = c_diagnosis low = `J45` ) ) ) ) ).
+                          ( range_line( iobjnm = c_diagnosis low = `J45` ) ) ) )
+      ( name = 'ZCLA_HDATE' text = 'ORG 001 GP of 2024'
+        ranges = VALUE #( ( all_diagnoses ) )
+        hierarchies = VALUE #( ( node( node = `GP` slice_to = c_old_slice ) ) ) )
+      ( name = 'ZCLA_HNEW' text = 'ORG 001 INTMED'
+        ranges = VALUE #( ( all_diagnoses ) ) hierarchies = VALUE #( ( node( node = `INTMED` ) ) ) )
+      ( name = 'ZCLA_HMULTI' text = 'ORG 001 GP and CARD'
+        ranges = VALUE #( ( all_diagnoses ) ) hierarchies = VALUE #( ( gp ) ( node( node = `CARD` ) ) ) )
+      ( name = 'ZCLA_HFLAT' text = 'ORG 001 GP, 012'
+        ranges = VALUE #( ( range_line( iobjnm = c_physician low = `012` ) ) ( all_diagnoses ) )
+        hierarchies = VALUE #( ( gp ) ) )
+      ( name = 'ZCLA_H2LEAF' text = 'ORG 001 CLINIC to 4'
+        ranges = VALUE #( ( all_diagnoses ) )
+        hierarchies = VALUE #( ( node( node = `CLINIC` type = c_node_type-to_level level = '04' ) ) ) )
+      ( name = 'ZCLA_HVAL0' text = 'ORG 001 GP, date <='
+        ranges = VALUE #( ( all_diagnoses ) )
+        hierarchies = VALUE #( ( node( node = `GP` slice_to = c_old_slice validity = c_validity-key_date_before ) ) ) )
+      ( name = 'ZCLA_HVAL2' text = 'ORG 001 GP, name'
+        ranges = VALUE #( ( all_diagnoses ) )
+        hierarchies = VALUE #( ( node( node = `GP` validity = c_validity-name ) ) ) )
+      ( name = 'ZCLA_HVAL3' text = 'ORG 001 008, all'
+        ranges = VALUE #( ( all_diagnoses ) )
+        hierarchies = VALUE #( ( node( node_iobjnm = c_physician node = `008` type = c_node_type-node
+                                       validity = c_validity-all ) ) ) )
+      ( name = 'ZCLA_DIAG_H' text = 'All, RESPIRATORY'
+        ranges = VALUE #( ( every_physician ) )
+        hierarchies = VALUE #( ( node( iobjnm = c_diagnosis hierarchy = c_icd version = '' node = `RESPIRATORY` ) ) ) )
+      ( name = 'ZCLA_DIAGF' text = 'J*, A00-B99, I10'
+        ranges = VALUE #( ( every_physician )
+                          ( range_line( iobjnm = c_diagnosis option = 'CP' low = `J*` ) )
+                          ( range_line( iobjnm = c_diagnosis option = 'BT' low = `A00` high = `B99` ) )
+                          ( range_line( iobjnm = c_diagnosis low = `I10` ) ) ) )
+      ( name = 'ZCLA_MISS' text = '001, no diagnosis'
+        ranges = VALUE #( ( range_line( iobjnm = c_physician low = `001` ) ) ) )
+      ( name = 'ZCLA_PROV' text = 'All on ZCLVISIT'
+        ranges = VALUE #( ( every_physician ) ( all_diagnoses ) )
+        specials = VALUE #( ( range_line( iobjnm = '0TCAIPROV' low = `ZCLVISIT` ) )
+                            ( range_line( iobjnm = '0TCAACTVT' low = `03` ) )
+                            ( range_line( iobjnm = '0TCAVALID' option = 'CP' low = `*` ) ) ) )
+      ( name = 'ZCLA_ACTVT' text = 'All, change only'
+        ranges = VALUE #( ( every_physician ) ( all_diagnoses ) )
+        specials = VALUE #( ( range_line( iobjnm = '0TCAIPROV' option = 'CP' low = c_infoproviders ) )
+                            ( range_line( iobjnm = '0TCAACTVT' low = `02` ) )
+                            ( range_line( iobjnm = '0TCAVALID' option = 'CP' low = `*` ) ) ) )
+      ( name = 'ZCLA_VALID' text = 'All, 2020 to 2023'
+        ranges = VALUE #( ( every_physician ) ( all_diagnoses ) )
+        specials = VALUE #( ( range_line( iobjnm = '0TCAIPROV' option = 'CP' low = c_infoproviders ) )
+                            ( range_line( iobjnm = '0TCAACTVT' low = `03` ) )
+                            ( range_line( iobjnm = '0TCAVALID' option = 'BT' low = `20200101` high = `20231231` ) ) ) ) ).
   ENDMETHOD.
 
   METHOD range_line.
@@ -249,11 +357,11 @@ CLASS zzxxmla1_cl_bw_auth_gen IMPLEMENTATION.
     result = VALUE #( iobjnm   = iobjnm
                       hienm    = hierarchy
                       version  = version
-                      dateto   = '99991231'
+                      dateto   = slice_to
                       niobjnm  = node_iobjnm
                       node     = node
                       authtype = type
-                      compmode = c_name_and_version
+                      compmode = validity
                       tlevel   = level ).
   ENDMETHOD.
 
@@ -277,7 +385,26 @@ CLASS zzxxmla1_cl_bw_auth_gen IMPLEMENTATION.
   METHOD run.
     CLEAR log.
     delete_all( ).
-    create_profile( ).
+    " display and execute of every query component, RFC calls of the reporting function groups
+    create_profile( profile    = c_profile
+                    text       = 'olap4abap: BW reporting of the test users'
+                    fields     = VALUE #( ( `S_RS_COMP RSINFOAREA *` ) ( `S_RS_COMP RSINFOCUBE *` )
+                                          ( `S_RS_COMP RSZCOMPTP *` ) ( `S_RS_COMP RSZCOMPID *` )
+                                          ( `S_RS_COMP ACTVT 03` ) ( `S_RS_COMP ACTVT 16` )
+                                          ( `S_RS_COMP1 RSZCOMPID *` ) ( `S_RS_COMP1 RSZCOMPTP *` )
+                                          ( `S_RS_COMP1 RSZOWNER *` ) ( `S_RS_COMP1 ACTVT 03` )
+                                          ( `S_RS_COMP1 ACTVT 16` )
+                                          ( `S_RFC RFC_TYPE FUGR` ) ( `S_RFC RFC_NAME *` ) ( `S_RFC ACTVT 16` ) )
+                    auth_names = VALUE #( ( `ZZXXMLA1_R01` ) ( `ZZXXMLA1_R02` ) ( `ZZXXMLA1_R03` ) ) ).
+    " the analysis authorizations of the scenarios that have them through S_RS_AUTH
+    DATA(rs_auth) = VALUE string_table( FOR s IN scenarios( ) WHERE ( s_rs_auth IS NOT INITIAL )
+                                        ( |S_RS_AUTH BIAUTH { s-s_rs_auth }| ) ).
+    IF rs_auth IS NOT INITIAL.
+      create_profile( profile    = c_profile_rs_auth
+                      text       = 'olap4abap: analysis authorizations of a test user'
+                      fields     = rs_auth
+                      auth_names = VALUE #( ( `ZZXXMLA1_R04` ) ) ).
+    ENDIF.
     LOOP AT authorizations( ) INTO DATA(authorization).
       create_authorization( authorization ).
     ENDLOOP.
@@ -316,20 +443,16 @@ CLASS zzxxmla1_cl_bw_auth_gen IMPLEMENTATION.
     DATA auths TYPE STANDARD TABLE OF usaut.
     DATA return TYPE bapirettab.
     DATA pstate TYPE xuaktpas.
-    " display and execute of every query component, RFC calls of the reporting function groups
-    DATA(fields) = VALUE string_table( ( `S_RS_COMP RSINFOAREA *` ) ( `S_RS_COMP RSINFOCUBE *` )
-                                       ( `S_RS_COMP RSZCOMPTP *` ) ( `S_RS_COMP RSZCOMPID *` )
-                                       ( `S_RS_COMP ACTVT 03` ) ( `S_RS_COMP ACTVT 16` )
-                                       ( `S_RS_COMP1 RSZCOMPID *` ) ( `S_RS_COMP1 RSZCOMPTP *` )
-                                       ( `S_RS_COMP1 RSZOWNER *` ) ( `S_RS_COMP1 ACTVT 03` ) ( `S_RS_COMP1 ACTVT 16` )
-                                       ( `S_RFC RFC_TYPE FUGR` ) ( `S_RFC RFC_NAME *` ) ( `S_RFC ACTVT 16` ) ).
-    SELECT SINGLE profn FROM usr10 WHERE profn = @c_profile INTO @DATA(found).
+    DATA objects TYPE string_table.
+    SELECT SINGLE profn FROM usr10 WHERE profn = @profile INTO @DATA(found).
     DATA(action) = COND activ_auth( WHEN sy-subrc = 0 THEN '02' ELSE '01' ).
     LOOP AT fields INTO DATA(field).
       SPLIT field AT ` ` INTO DATA(object) DATA(name) DATA(low).
-      DATA(auth) = SWITCH xuauth( object WHEN 'S_RS_COMP' THEN 'ZZXXMLA1_R01'
-                                         WHEN 'S_RS_COMP1' THEN 'ZZXXMLA1_R02'
-                                         ELSE 'ZZXXMLA1_R03' ).
+      IF NOT line_exists( objects[ table_line = object ] ).
+        APPEND object TO objects.
+      ENDIF.
+      DATA(index) = line_index( objects[ table_line = object ] ).
+      DATA(auth) = CONV xuauth( auth_names[ index ] ).
       APPEND VALUE #( objct = object auth = auth sfield = name von = low ) TO values.
       IF NOT line_exists( auths[ auth = auth ] ).
         APPEND VALUE #( action = action objct = object auth = auth atext = 'olap4abap test users' ) TO auths.
@@ -337,8 +460,8 @@ CLASS zzxxmla1_cl_bw_auth_gen IMPLEMENTATION.
     ENDLOOP.
     CALL FUNCTION 'SUSR_INTERFACE_PROF'
       EXPORTING
-        profile                    = c_profile
-        ptext                      = 'olap4abap: BW reporting of the test users'
+        profile                    = profile
+        ptext                      = text
         ptype                      = 'S'
         action                     = action
         dialog                     = ' '
@@ -363,17 +486,18 @@ CLASS zzxxmla1_cl_bw_auth_gen IMPLEMENTATION.
         OTHERS                     = 12.
     IF sy-subrc = 0.
       COMMIT WORK AND WAIT.
-      write( |{ COND string( WHEN found IS INITIAL THEN `create` ELSE `change` ) } profile { c_profile }: done| ).
+      write( |{ COND string( WHEN found IS INITIAL THEN `create` ELSE `change` ) } profile { profile }: done| ).
     ELSE.
       ROLLBACK WORK.
-      write( |create profile { c_profile }: FAILED, subrc { sy-subrc }| ).
+      write( |create profile { profile }: FAILED, subrc { sy-subrc }| ).
     ENDIF.
     write_return( return ).
   ENDMETHOD.
 
   METHOD create_authorization.
     DATA messages TYPE rs_t_msg.
-    DATA(ranges) = special_ranges( ).
+    DATA(ranges) = COND rsec_t_range_api( WHEN authorization-specials IS NOT INITIAL THEN authorization-specials
+                                          ELSE special_ranges( ) ).
     APPEND LINES OF authorization-ranges TO ranges.
     CALL FUNCTION 'RSEC_CREATE_AUTHORIZATION_API'
       EXPORTING
@@ -433,6 +557,9 @@ CLASS zzxxmla1_cl_bw_auth_gen IMPLEMENTATION.
     CLEAR generated.
     CLEAR return.
     profiles = VALUE #( ( bapiprof = c_profile ) ).
+    IF scenario-s_rs_auth IS NOT INITIAL.
+      APPEND VALUE #( bapiprof = c_profile_rs_auth ) TO profiles.
+    ENDIF.
     CALL FUNCTION 'BAPI_USER_PROFILES_ASSIGN'
       EXPORTING
         username = scenario-user
@@ -467,7 +594,9 @@ CLASS zzxxmla1_cl_bw_auth_gen IMPLEMENTATION.
         RETURN.
       ENDIF.
     ENDIF.
-    DATA(auths) = REDUCE string( INIT s = `` FOR a IN scenario-auths NEXT s = |{ s } { a }| ).
+    DATA(auths) = REDUCE string( INIT s = COND #( WHEN scenario-s_rs_auth IS NOT INITIAL
+                                                  THEN | S_RS_AUTH { scenario-s_rs_auth }| )
+                                 FOR a IN scenario-auths NEXT s = |{ s } { a }| ).
     write( |create user { scenario-user } { scenario-name }:{ COND string( WHEN auths IS INITIAL THEN ` -`
                                                                          ELSE auths ) }| ).
   ENDMETHOD.
