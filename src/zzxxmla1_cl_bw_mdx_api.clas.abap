@@ -16,7 +16,9 @@
 "!   any other user, as GET auth/check of the schema API), the key date 9999-12-31 by default. The statement is parsed
 "!   and resolved in BW's names (ZZXXMLA1_CL_MDX_SCHEMA_READER=>for_bw_cube), its slicer, axes and subselects
 "!   evaluated without cells (ZZXXMLA1_CL_MDX_ENGINE=>members), and their selection (ZZXXMLA1_CL_BW_AUTH_SELECTION)
-"!   checked for the user at the key date in HANA (ZZXXMLA1_CL_BW_AUTH_SQL, phase Authorisation). The answer is the
+"!   checked for the user at the key date in HANA (ZZXXMLA1_CL_BW_AUTH_SQL, phase Authorisation); the BW hierarchies
+"!   are the slices valid at the key date (ZZXXMLA1_CL_SCHEMA=>set_key_date), a hierarchy without one is not
+"!   there. The answer is the
 "!   user, key date, the status as the probe classifies BW's (OK, EMPTY: allowed but an axis has no tuple, NO AUTH,
 "!   UNKNOWN: a value the user may not see at all, ERROR: the fault's text as message), the check's reason and BW's
 "!   message, the statement in olap4abap's names and the selection; with sql=true also the SQL statements the check
@@ -221,6 +223,8 @@ CLASS zzxxmla1_cl_bw_mdx_api IMPLEMENTATION.
         " a JSON error rather than a dump the caller cannot read
         result = error_result( status = 500 message = error->get_text( ) ).
     ENDTRY.
+    " the queries of XMLA read the BW hierarchies valid to 9999-12-31
+    zzxxmla1_cl_schema=>set_key_date( c_key_date ).
   ENDMETHOD.
 
   METHOD check.
@@ -289,6 +293,9 @@ CLASS zzxxmla1_cl_bw_mdx_api IMPLEMENTATION.
         EXPORTING status  = 403
                   message = |The check runs for a test user of the scenarios only, not for { user }|.
     ENDIF.
+    " the statement is resolved in the BW hierarchies' slices valid at the key date, as BW's MDX at that key date
+    " resolves it; handle sets 9999-12-31 again
+    zzxxmla1_cl_schema=>set_key_date( key_date ).
   ENDMETHOD.
 
   METHOD check_statement.

@@ -24,7 +24,8 @@
 "! (RolapLevel, RolapDimension); without a type the first level decides.
 "! A Hierarchy annotated c_bw_hierarchy (our extension) is a BW hierarchy of the dimension's characteristic, served
 "! from its copy (ZZXXMLA1_CL_BW_HIERARCHY_COPY) at BW's current version, of the version c_bw_hierarchy_version names
-"! and the slice valid to 9999-12-31 where BW's hierarchies are version or time dependent: it has no levels in the schema, they are
+"! and the slice valid at the key date where BW's hierarchies are version or time dependent (9999-12-31; the check
+"! of BW's analysis authorisations serves them at the date it checks, set_key_date): it has no levels in the schema, they are
 "! Level 01 to Level nn, nn the copy's depth, a member on the level of its depth as SSAS serves a parent-child
 "! hierarchy (docs/next-steps.md, Reference scenario, decided 2026-10-16), on the columns of the copy's members as a
 "! level hierarchy (ZZXXMLA1_CL_BW_HIERARCHY_COPY=>levels_sql).
@@ -182,6 +183,12 @@ CLASS zzxxmla1_cl_schema DEFINITION
     CLASS-METHODS get
       RETURNING VALUE(result) TYPE REF TO zzxxmla1_cl_schema
       RAISING   zzxxmla1_cx_xmla.
+    "! The date get serves the BW hierarchies at: the slice of a time-dependent hierarchy valid then, a hierarchy BW has
+    "! no slice of at a date other than 9999-12-31 left out. 9999-12-31 unless set; the queries of XMLA use that, the
+    "! check of BW's analysis authorisations sets the date it checks at (ZZXXMLA1_CL_BW_MDX_API), as BW's key date.
+    "! Another date than get's instance has drops it, so that the next get reads the catalogs again.
+    CLASS-METHODS set_key_date
+      IMPORTING key_date TYPE d.
     "! The schemas of the given catalogs, all loaded unless loaded is false.
     CLASS-METHODS of_catalogs
       IMPORTING catalogs      TYPE ty_t_catalog
@@ -229,6 +236,10 @@ CLASS zzxxmla1_cl_schema DEFINITION
   PROTECTED SECTION.
   PRIVATE SECTION.
     CLASS-DATA instance TYPE REF TO zzxxmla1_cl_schema.
+    "! the date set_key_date set, the one get's instance serves
+    CLASS-DATA served_key_date TYPE d VALUE '99991231'.
+    "! the date the BW hierarchies of this instance are served at
+    DATA bw_key_date   TYPE d VALUE '99991231'.
     DATA catalog_names TYPE string_table.
     "! the catalogs not loaded yet
     DATA unloaded      TYPE ty_t_catalog.
@@ -394,11 +405,20 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
     IF instance IS NOT BOUND.
       DATA(catalogs) = find_catalogs( ).
       instance = NEW #( ).
+      instance->bw_key_date = served_key_date.
       instance->unloaded = catalogs.
       instance->catalog_names = VALUE #( FOR c IN catalogs ( c-name ) ).
       SORT instance->catalog_names ASCENDING.
     ENDIF.
     result = instance.
+  ENDMETHOD.
+
+  METHOD set_key_date.
+    IF served_key_date = key_date.
+      RETURN.
+    ENDIF.
+    served_key_date = key_date.
+    CLEAR instance.
   ENDMETHOD.
 
   METHOD of_catalogs.
@@ -830,11 +850,20 @@ CLASS zzxxmla1_cl_schema IMPLEMENTATION.
     IF key-key_column IS NOT BOUND.
       fail( |{ where }: the BW hierarchy { bw_name } needs the dimension's key attribute with a KeyColumn| ).
     ENDIF.
+    " at another date than 9999-12-31 a hierarchy BW has no slice of is not there, as in BW's queries at that key date
+    IF bw_key_date <> zzxxmla1_cl_bw_hierarchy_copy=>c_valid_to
+       AND zzxxmla1_cl_bw_hierarchy_copy=>has_slice( characteristic = CONV #( characteristic )
+                                                     name           = CONV #( bw_name )
+                                                     version        = CONV #( bw_version )
+                                                     key_date       = bw_key_date ) = abap_false.
+      RETURN.
+    ENDIF.
     DATA(row) = hier.
     TRY.
         row-bw_hierarchy = NEW zzxxmla1_cl_bw_hierarchy_copy( )->current( characteristic = CONV #( characteristic )
                                                                           name           = CONV #( bw_name )
-                                                                          version        = CONV #( bw_version ) ).
+                                                                          version        = CONV #( bw_version )
+                                                                          key_date       = bw_key_date ).
         DATA(depth) = zzxxmla1_cl_bw_hierarchy_copy=>depth( row-bw_hierarchy ).
         DATA(repeated) = zzxxmla1_cl_bw_hierarchy_copy=>repeated_levels( row-bw_hierarchy ).
       CATCH zzxxmla1_cx_bw_hierarchy INTO DATA(error).

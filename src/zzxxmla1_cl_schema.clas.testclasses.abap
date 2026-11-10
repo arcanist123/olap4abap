@@ -45,6 +45,8 @@ CLASS ltc_schema DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT
     METHODS bw_hierarchy_refused FOR TESTING.
     "! a catalog is loaded when asked for, once; one that fails to load leaves none of its cubes and fails again
     METHODS load_on_demand FOR TESTING RAISING cx_static_check.
+    "! a key date other than the instance's drops it, the same keeps it; 9999-12-31 is set again afterwards
+    METHODS key_date FOR TESTING RAISING cx_static_check.
     METHODS read
       IMPORTING xml           TYPE string
       RETURNING VALUE(result) TYPE REF TO zzxxmla1_cl_schema
@@ -328,6 +330,19 @@ CLASS ltc_schema IMPLEMENTATION.
                                             exp = |olap4abap Error:Error while loading catalog 'TEST': In Schema: In Cube: | &&
                                                   |Attribute 'name' is unset and has no default value.| ).
     ENDTRY.
+  ENDMETHOD.
+
+  METHOD key_date.
+    DATA(served) = zzxxmla1_cl_schema=>get( ).
+    zzxxmla1_cl_schema=>set_key_date( '99991231' ).
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_schema=>get( ) exp = served ).
+    zzxxmla1_cl_schema=>set_key_date( '20240615' ).
+    DATA(dated) = zzxxmla1_cl_schema=>get( ).
+    zzxxmla1_cl_schema=>set_key_date( '99991231' ).
+    DATA(again) = zzxxmla1_cl_schema=>get( ).
+    cl_abap_unit_assert=>assert_false( xsdbool( dated = served ) ).
+    cl_abap_unit_assert=>assert_equals( act = zzxxmla1_cl_schema=>get( ) exp = again ).
+    cl_abap_unit_assert=>assert_false( xsdbool( again = dated ) ).
   ENDMETHOD.
 
   METHOD foodmart_catalog.

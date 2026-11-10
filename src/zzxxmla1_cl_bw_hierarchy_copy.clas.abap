@@ -278,6 +278,14 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
                 version        TYPE rshiedir-version OPTIONAL
                 key_date       TYPE d DEFAULT c_valid_to
       RETURNING VALUE(result)  TYPE ty_hierarchy.
+    "! Whether BW has an active slice of a hierarchy of a characteristic by name and version valid at the key date
+    "! (RSHIEDIR); current refuses one without.
+    CLASS-METHODS has_slice
+      IMPORTING characteristic TYPE rsiobjnm
+                name           TYPE rshienm
+                version        TYPE rshiedir-version OPTIONAL
+                key_date       TYPE d
+      RETURNING VALUE(result)  TYPE abap_bool.
     "! The name of a hierarchy's Hierarchy in a schema: BW's name, followed by _ and the version where it has one
     "! (ZCLDOC_ORG_001).
     CLASS-METHODS hierarchy_name
@@ -1038,6 +1046,13 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
     IF result-rest_shown = abap_true.
       result-rest_caption = rest_caption( characteristic ).
     ENDIF.
+  ENDMETHOD.
+
+  METHOD has_slice.
+    SELECT SINGLE @abap_true FROM rshiedir
+      WHERE iobjnm = @characteristic AND hienm = @name AND version = @version AND objvers = 'A'
+        AND datefrom <= @key_date AND dateto >= @key_date
+      INTO @result.
   ENDMETHOD.
 
   METHOD rest_caption.
