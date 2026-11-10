@@ -86,8 +86,10 @@ user works on the dev container). The password reaches vsp and sapcli through th
   the developer edition from GitHub) and vsp's `ZADT_VSP` (`InstallZADTVSP`, package `$ZADT_VSP`) with its APC/SICF
   setup. vsp v2.61.0's installer fails on `ZCL_VSP_GIT_SERVICE` (its description is longer than 60 characters).
 - `push`: `package create ... --record-changes --no-error-existing` (sapcli passes the `recordChanges` parameter the
-  ABAP FS tool lacks, so it may be able to create packages where ABAP FS cannot), then `checkin package` from `src/`.
-  **Not yet tested.** abapGit (an offline zip of `src/` and `.abapgit.xml`) imports everything, tables too.
+  ABAP FS tool lacks, so it may be able to create packages where ABAP FS cannot), then `checkin package` from a copy
+  of `src/` without the tables, to which it adds the `package.devc.xml` vsp does not export (sapcli's checkin refuses
+  a folder without one). Tested 2026-11-10: it imports and activates the package, once the tables the code uses exist
+  (`ZZXXMLA1_HIEDIR` and `ZZXXMLA1_HIETAB` were missing then and were created with sapcli as below). abapGit (an offline zip of `src/` and `.abapgit.xml`) imports everything, tables too.
 - Not covered by `push`: the **ICF service `/zzxxmla1`** (create it in SICF with handler `ZZXXMLA1_MAIN_ENDPOINT` and
   logon data, see below), **DDIC tables** (`ZZXXMLA1_FILE`,
   `ZZXXMLA1_VIEW`, `ZZXXMLA1_TRACE`, `ZZXXMLA1_TRCUSR`, `ZZXXMLA1_DSCACHE`, `ZZXXMLA1_HIEDIR` and `ZZXXMLA1_HIETAB` are in `src/` as abapGit's `.tabl.xml`, pulled by vsp and left out by `push`: a new system gets

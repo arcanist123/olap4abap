@@ -88,6 +88,19 @@ cmd_push() {
   cp "$ROOT/.abapgit.xml" "$tmp/"
   cp -r "$ROOT/$SRC_DIR" "$tmp/$SRC_DIR"
   rm -f "$tmp/$SRC_DIR"/*.tabl.xml
+  # sapcli's checkin needs the package's own file, which vsp does not export: write abapGit's in the copy
+  [ -f "$tmp/$SRC_DIR/package.devc.xml" ] || cat > "$tmp/$SRC_DIR/package.devc.xml" <<'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<abapGit version="v1.0.0" serializer="LCL_OBJECT_DEVC" serializer_version="v1.0.0">
+ <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+  <asx:values>
+   <DEVC>
+    <CTEXT>olap4abap: XMLA server with an MDX engine</CTEXT>
+   </DEVC>
+  </asx:values>
+ </asx:abap>
+</abapGit>
+EOF
   (cd "$tmp" && "${SAPCLI[@]}" checkin package "$PACKAGE" ${1:+"$1"} --software-component "$SOFTWARE_COMPONENT"     --starting-folder "$SRC_DIR")
   echo "imported $SRC_DIR/ into $PACKAGE"
 }
