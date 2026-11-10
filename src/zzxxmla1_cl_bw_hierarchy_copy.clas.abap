@@ -374,6 +374,14 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
       IMPORTING hierarchy     TYPE ty_hierarchy
                 visibles      TYPE ty_t_visible
       RETURNING VALUE(result) TYPE ty_restriction.
+    "! The members of a copy's not-assigned node as the check of a user's authorizations names them
+    "! (ZZXXMLA1_CL_BW_AUTH_SQL: a line of the complete hierarchy shows them, as levels_sql reads them for it): REST_H
+    "! by its InfoObject 1HIER_REST, its values by the characteristic and their key, as the refill names a leaf; a
+    "! query of the columns NODE_IOBJ, NODE_NAME and LEAF (1 for a value), initial where the hierarchy does not show
+    "! the node (the closure read is then the table, which has none of its rows).
+    CLASS-METHODS rest_members_sql
+      IMPORTING hierarchy     TYPE ty_hierarchy
+      RETURNING VALUE(result) TYPE string.
     "! Whether a restriction hides children of a node it shows (a node of type 0, a level limit of type 2): BW refuses
     "! the hierarchy's members then (Hierarchy.Members), a level's members are its visible ones.
     CLASS-METHODS truncated
@@ -525,6 +533,13 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
     CLASS-METHODS visible_sql
       IMPORTING hierarchy     TYPE ty_hierarchy
                 restriction   TYPE ty_restriction
+      RETURNING VALUE(result) TYPE string.
+    "! rest_members_sql over the SID table that names the values (BW's /BIC/S) and the expression of a key there
+    "! (leaf_name; SID 0 the key '', as levels_sql names it)
+    CLASS-METHODS rest_members_of
+      IMPORTING hierarchy     TYPE ty_hierarchy
+                sid_table     TYPE tabname
+                leaf_name     TYPE string
       RETURNING VALUE(result) TYPE string.
     "! Whether levels_sql reads REST_H and its values: the hierarchy shows the not-assigned node and a restriction has
     "! a line of the complete hierarchy.
@@ -1371,6 +1386,30 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
              | UNION ALL SELECT { rest }, { value }{ below }, r."SID", 2, { hierarchy-rest_top_sid } | &&
              |FROM { quote( hierarchy-closure ) } AS r | &&
              |LEFT OUTER JOIN { quote( value_table ) } AS v ON v.{ quote( sid_column ) } = r."SID" | &&
+             |WHERE r."HIESID" = { hierarchy-hiesid } AND r."SVER" = { sver } | &&
+             |AND r."ANCESTOR_SID" = { hierarchy-rest_top_sid }|.
+  ENDMETHOD.
+
+  METHOD rest_members_sql.
+    IF hierarchy-rest_shown = abap_false.
+      RETURN.
+    ENDIF.
+    DATA(metadata) = NEW zzxxmla1_cl_bw_view_gen( )->metadata( hierarchy-characteristic ).
+    DATA(leaf) = leaf_name( metadata ).
+    IF metadata-tables-sids IS INITIAL OR leaf IS INITIAL.
+      refuse( |BW has no SID table of { hierarchy-characteristic }| ).
+    ENDIF.
+    result = rest_members_of( hierarchy = hierarchy sid_table = metadata-tables-sids leaf_name = leaf ).
+  ENDMETHOD.
+
+  METHOD rest_members_of.
+    " REST_H, then its values: the closure's rows under it (the not-assigned view's), named by their key
+    DATA(sver) = zzxxmla1_cl_sql=>literal( CONV string( hierarchy-sver ) ).
+    result = |SELECT CAST( '{ c_rest_iobj }' AS NVARCHAR( 30 ) ) AS "NODE_IOBJ", | &&
+             |CAST( '{ c_rest_node_name }' AS NVARCHAR( 250 ) ) AS "NODE_NAME", 0 AS "LEAF" FROM DUMMY | &&
+             |UNION ALL SELECT DISTINCT CAST( { zzxxmla1_cl_sql=>literal( CONV string( hierarchy-characteristic ) ) } | &&
+             |AS NVARCHAR( 30 ) ), CAST( CASE WHEN r."SID" = 0 THEN '' ELSE { leaf_name } END AS NVARCHAR( 250 ) ), 1 | &&
+             |FROM { quote( hierarchy-closure ) } AS r INNER JOIN { quote( sid_table ) } AS s ON s."SID" = r."SID" | &&
              |WHERE r."HIESID" = { hierarchy-hiesid } AND r."SVER" = { sver } | &&
              |AND r."ANCESTOR_SID" = { hierarchy-rest_top_sid }|.
   ENDMETHOD.

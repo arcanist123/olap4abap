@@ -487,9 +487,8 @@ compared, not only 9999-12-31.
    endpoint evaluates them unrestricted, so the check refuses a node BW never shows. Measured with
    `scripts/bw_auth_compare.py` (step 5's script, built with it) at 9999-12-31: EQ 1,265 of 1,282 agree, CROSS
    1,261, H1 1,189; every difference is the restriction (EQ, CROSS: `LEVELnn` of the hierarchies without a line;
-   H1 also `.Members`, `Parent` of the top node, the crossjoin and the combined queries of `ZCLDOC_ORG 001`). So
-   the endpoint needs 5b before step 5 can be done. A full run is long: every call reads the schema and the profile
-   again (one call per statement, user and key date).
+   H1 also `.Members`, `Parent` of the top node, the crossjoin and the combined queries of `ZCLDOC_ORG 001`). The
+   endpoint has 5b since 2026-10-25 (`ZZXXMLA1_CL_BW_HIERARCHY_COPY=>restriction`, step 5).
 4. **The trace:** the call is a row of `ZZXXMLA1_TRACE` as an XMLA call is (method `Check`, the statement, the user
    checked next to the caller), with its statement log, so the trace page's "SQL statements" (and "Open in MDX
    Console") shows what the check ran; with `?sql=true` the answer carries the statements too (text, rows, time,
@@ -511,6 +510,14 @@ compared, not only 9999-12-31.
    its occurrences: one statement on the copy's path table gives the depths of the occurrences of that InfoObject
    and name (`ZZXXMLA1_CL_BW_HIERARCHY_COPY=>occurrences`), and the read of such a depth takes only these
    occurrences before the texts are joined (`levels_sql`'s `occurrences`), not one read of the whole level per depth.
+   A type 3 or 4 line (the complete hierarchy) covers the not-assigned node `REST_H` and the values below it where
+   the hierarchy shows it, as the restriction shows them: the key date's copy adds them from its not-assigned view
+   (`ZZXXMLA1_CL_BW_HIERARCHY_COPY=>rest_members_sql`, CTE `q_n` of `ZZXXMLA1_CL_BW_AUTH_SQL`), as nodes, not as
+   the line's flat values (2026-11-10). State of 2026-11-10: 71,040 agree, 393 differ; 9999-12-31 and 2025-06-15
+   agree in every scenario, every difference is at 2024-06-15, where the members are resolved on the slice valid to
+   9999-12-31 (the 7 statements naming `EMERGENCY` of `ZCLDOC_ORG 002` in every scenario, nodes of
+   `ZCLDOC_ORG 001` in H1, H1_AGG, H2, H3 and 2HIE). Left: the reader takes the key date's slice of a BW hierarchy
+   (`ZZXXMLA1_CL_BW_HIERARCHY_COPY=>current` with the key date, step 2).
 
 Done when every test user's status agrees at every key date. Later, when BW's MDX is to return data: the engine
 enforces (the authorisations' step 5a with this selection, 5b the restriction of a hierarchy's members), Execute on

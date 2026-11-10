@@ -34,6 +34,9 @@ CLASS ltc_bw_auth_sql DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION 
     METHODS members_only FOR TESTING.
     "! the statement's first row is the refusal, with BW's message of the member's reason
     METHODS answers FOR TESTING.
+    "! a line of the complete hierarchy shows the not-assigned node and its values of its key date's copy (q_n) as
+    "! nodes, once per copy; without such a copy q_n is empty
+    METHODS complete_hierarchy_rest FOR TESTING.
 
     METHODS profile
       RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_auth_sql=>ty_profile.
@@ -142,6 +145,34 @@ CLASS ltc_bw_auth_sql IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( exp = 0 act = count( val = sql sub = `q_t1` ) ).
     cl_abap_unit_assert=>assert_char_cp( act = sql exp = `*q_x AS ( SELECT CAST( NULL AS NVARCHAR( 30 ) ) AS "IOBJ", *WHERE 1 = 0 )*` ).
     cl_abap_unit_assert=>assert_char_cp( act = sql exp = `*q_h AS ( SELECT CAST( NULL AS NVARCHAR( 30 ) ) AS "A", *WHERE 1 = 0 )*` ).
+    cl_abap_unit_assert=>assert_char_cp( act = sql exp = `*q_n AS ( SELECT CAST( NULL AS NVARCHAR( 30 ) ) AS "IOBJ", *WHERE 1 = 0 )*` ).
+  ENDMETHOD.
+
+  METHOD complete_hierarchy_rest.
+    DATA(rest) = `SELECT 'REST' AS "NODE_IOBJ", 'R' AS "NODE_NAME", 0 AS "LEAF" FROM DUMMY`.
+    DATA(complete) = VALUE zzxxmla1_cl_bw_auth_sql=>ty_line(
+      line       = VALUE #( auth = 'ZB' iobjnm = c_doc hienm = 'ZCLDOC_ORG' version = '001' node_iobjnm = '0HIER_NODE'
+                            node = `CLINIC` type = '3' date = '20250101' )
+      key_copy   = VALUE #( hiesid = 41 sver = `1` path = 'ZZXXMLA1P0000003' rest = rest )
+      value_copy = VALUE #( hiesid = 40 sver = `2` path = 'ZZXXMLA1P0000003' ) ).
+    DATA(profile) = profile( ).
+    APPEND complete TO profile-lines.
+    complete-line-auth = 'ZC'.
+    APPEND complete TO profile-lines.
+    DATA(request) = zzxxmla1_cl_bw_auth_sql=>request( characteristics = profile-characteristics
+                                                      members         = VALUE #( ( value( `001` ) ) ) ).
+    DATA(sql) = zzxxmla1_cl_bw_auth_sql=>check_statement( profile = profile request = request )-sql.
+    " the copy's members once, though two lines read it
+    cl_abap_unit_assert=>assert_char_cp(
+      act = sql
+      exp = `*q_n AS ( SELECT 'ZCLDOC' AS "IOBJ", 41 AS "HIESID", '1' AS "SVER", n."NODE_IOBJ", n."NODE_NAME", ` &&
+            `n."LEAF" FROM ( SELECT 'REST' AS "NODE_IOBJ", 'R' AS "NODE_NAME", 0 AS "LEAF" FROM DUMMY ) AS n )*` ).
+    cl_abap_unit_assert=>assert_equals( exp = 1 act = count( val = sql sub = rest ) ).
+    " in the cover of a complete line, as nodes it shows (the key date's copy)
+    cl_abap_unit_assert=>assert_char_cp(
+      act = sql
+      exp = `*q_c AS ( SELECT DISTINCT *UNION ALL SELECT DISTINCT h."A", *INNER JOIN q_n AS n ON n."IOBJ" = h."IOBJ" ` &&
+            `AND n."HIESID" = h."HIESID" AND n."SVER" = h."SVER" WHERE h."TYPE" IN ( '3', '4' ) AND h."WHICH" = 'K' )*` ).
   ENDMETHOD.
 
   METHOD answers.

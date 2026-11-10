@@ -20,7 +20,8 @@
 "! A line is expanded on the path table of its copy: its node's occurrences are the path rows whose level member has
 "! the line's node name and InfoObject, the occurrence's own row (TLEVEL = DEPTH) names what the line shows; type 0 the
 "! node itself, 1 its subtree, 2 its subtree down to the line's level, 3 (and 4) every occurrence (the roots' rows,
-"! TLEVEL 1). A leaf of the copy is named by the characteristic and its key, so a line on a leaf matches by name too,
+"! TLEVEL 1) and, where the hierarchy shows it, the not-assigned node REST_H with its values, which are no path rows
+"! (ZZXXMLA1_CL_BW_HIERARCHY_COPY=>rest_members_sql, as the restricted members show them). A leaf of the copy is named by the characteristic and its key, so a line on a leaf matches by name too,
 "! and the values a line authorizes are its leaves' keys.
 "! The request is the query's members (a value by its key, a node by its hierarchy, name and InfoObject, the
 "! aggregate) and its tuples as factors: a tuple of the query is one tuple of each factor (an axis, the slicer), so a
@@ -39,11 +40,14 @@ CLASS zzxxmla1_cl_bw_auth_sql DEFINITION
   PUBLIC SECTION.
     "! the factors of a query's selection: per factor its tuples; a tuple of the query is one of each
     TYPES ty_factors TYPE STANDARD TABLE OF zzxxmla1_cl_bw_auth=>ty_selection WITH EMPTY KEY.
-    "! a copy of a hierarchy slice as the statement reads it; hiesid 0: the slice has none (no slice at the date)
+    "! a copy of a hierarchy slice as the statement reads it; hiesid 0: the slice has none (no slice at the date);
+    "! rest: the members of its not-assigned node, which a line of the complete hierarchy shows
+    "! (ZZXXMLA1_CL_BW_HIERARCHY_COPY=>rest_members_sql; the key date's copy only, none where the node is not shown)
     TYPES: BEGIN OF ty_copy,
              hiesid TYPE i,
              sver   TYPE string,
              path   TYPE tabname,
+             rest   TYPE string,
            END OF ty_copy.
     "! a hierarchy line with the copy of the slice at the key date and the one at its own date
     TYPES: BEGIN OF ty_line,
@@ -156,11 +160,13 @@ CLASS zzxxmla1_cl_bw_auth_sql DEFINITION
     CLASS-METHODS basic_of
       IMPORTING iobjnm        TYPE rsiobjnm
       RETURNING VALUE(result) TYPE rsiobjnm.
-    "! the copy of the slice of a line's hierarchy valid at the date, initial if BW has none then
+    "! the copy of the slice of a line's hierarchy valid at the date, initial if BW has none then; with rest the
+    "! members of its not-assigned node too
     CLASS-METHODS copy_of
       IMPORTING copies        TYPE REF TO zzxxmla1_cl_bw_hierarchy_copy
                 !line         TYPE zzxxmla1_cl_bw_auth=>ty_hierarchy_line
                 !date         TYPE d
+                rest          TYPE abap_bool DEFAULT abap_false
       RETURNING VALUE(result) TYPE ty_copy.
     "! the request of the factors' tuples, or of members alone
     CLASS-METHODS request
@@ -185,6 +191,11 @@ CLASS zzxxmla1_cl_bw_auth_sql DEFINITION
       IMPORTING !lines        TYPE ty_lines
       RETURNING VALUE(result) TYPE string.
     "! the condition that the key expression is in the flat range of alias f
+    "! the members of the not-assigned nodes of the key date's copies (q_n): per copy IOBJ, HIESID, SVER, NODE_IOBJ,
+    "! NODE_NAME, LEAF
+    CLASS-METHODS rests_sql
+      IMPORTING !lines        TYPE ty_lines
+      RETURNING VALUE(result) TYPE string.
     CLASS-METHODS range_condition
       IMPORTING !key          TYPE string
       RETURNING VALUE(result) TYPE string.
@@ -232,7 +243,8 @@ CLASS zzxxmla1_cl_bw_auth_sql IMPLEMENTATION.
       ENDLOOP.
       LOOP AT base-hierarchies INTO line.
         APPEND VALUE #( line       = line
-                        key_copy   = copy_of( copies = copies line = line date = key_date )
+                        key_copy   = copy_of( copies = copies line = line date = key_date
+                                              rest = xsdbool( line-type = '3' OR line-type = '4' ) )
                         value_copy = copy_of( copies = copies line = line date = line-date ) ) TO profile-lines.
       ENDLOOP.
     ENDIF.
@@ -272,6 +284,9 @@ CLASS zzxxmla1_cl_bw_auth_sql IMPLEMENTATION.
                                        key_date       = date ).
     result = VALUE #( hiesid = hierarchy-hiesid sver = condense( CONV string( hierarchy-sver ) )
                       path = hierarchy-path_table ).
+    IF rest = abap_true.
+      result-rest = zzxxmla1_cl_bw_hierarchy_copy=>rest_members_sql( hierarchy ).
+    ENDIF.
   ENDMETHOD.
 
   METHOD applying.
@@ -510,7 +525,8 @@ CLASS zzxxmla1_cl_bw_auth_sql IMPLEMENTATION.
                                         CHANGING  params  = params ).
 
     " what each line shows: the occurrences of its node by type, each by its own row; a leaf (OWN_SID from 0) is a
-    " value it authorizes
+    " value it authorizes; the complete hierarchy shows its not-assigned node with its values too (no path rows, q_n),
+    " as nodes it shows, not as values it authorizes (BW's flat values of a line are the hierarchy's leaves)
     DATA(cover) =
       |SELECT DISTINCT h."A", h."IOBJ", h."HIENM", h."VERSION", h."WHICH", o."NODE_IOBJ", o."NODE_NAME" AS "NODE", | &&
       |CASE WHEN o."OWN_SID" >= 0 THEN 1 ELSE 0 END AS "LEAF" FROM q_h AS h | &&
@@ -520,7 +536,11 @@ CLASS zzxxmla1_cl_bw_auth_sql IMPLEMENTATION.
       |WHERE ( h."TYPE" IN ( '3', '4' ) AND s."TLEVEL" = 1 ) | &&
       |OR ( h."TYPE" NOT IN ( '3', '4' ) AND s."NODE_IOBJ" = h."NODE_IOBJ" AND s."NODE_NAME" = h."NODE" | &&
       |AND ( h."TYPE" <> '0' OR s."TLEVEL" = s."DEPTH" ) | &&
-      |AND ( h."TYPE" <> '2' OR s."DEPTH" <= h."LVL" OR s."TLEVEL" = s."DEPTH" ) )|.
+      |AND ( h."TYPE" <> '2' OR s."DEPTH" <= h."LVL" OR s."TLEVEL" = s."DEPTH" ) )| &&
+      | UNION ALL SELECT DISTINCT h."A", h."IOBJ", h."HIENM", h."VERSION", h."WHICH", n."NODE_IOBJ", | &&
+      |n."NODE_NAME" AS "NODE", n."LEAF" FROM q_h AS h | &&
+      |INNER JOIN q_n AS n ON n."IOBJ" = h."IOBJ" AND n."HIESID" = h."HIESID" AND n."SVER" = h."SVER" | &&
+      |WHERE h."TYPE" IN ( '3', '4' ) AND h."WHICH" = '{ c_key_copy }'|.
 
     " the authorizations that admit a member: all values, the aggregate, a value in an including range or among a
     " line's leaves and in no excluding range, a node a line shows of its hierarchy
@@ -555,6 +575,7 @@ CLASS zzxxmla1_cl_bw_auth_sql IMPLEMENTATION.
     DATA(ctes) = VALUE string_table(
       ( |q_m AS ( { members } )| ) ( |q_p AS ( { parts } )| ) ( |q_f AS ( { ranges } )| )
       ( |q_h AS ( { hierarchy_lines } )| ) ( |q_x AS ( { paths_sql( profile-lines ) } )| )
+      ( |q_n AS ( { rests_sql( profile-lines ) } )| )
       ( |q_c AS ( { cover } )| ) ( |q_o AS ( { admitted } )| )
       ( |q_a AS ( SELECT "A", SUM( CASE WHEN "AGG" = 1 THEN "BIT" ELSE 0 END ) AS "AGG" FROM q_p GROUP BY "A" )| ) ).
     DATA(branches) = VALUE string_table( ( |SELECT * FROM ( { refused_member } ) AS r1| ) ).
@@ -645,6 +666,29 @@ CLASS zzxxmla1_cl_bw_auth_sql IMPLEMENTATION.
                |CAST( NULL AS INTEGER ) AS "TLEVEL", CAST( NULL AS INTEGER ) AS "DEPTH", | &&
                |CAST( NULL AS INTEGER ) AS "OWN_SID", CAST( NULL AS NVARCHAR( 30 ) ) AS "NODE_IOBJ", | &&
                |CAST( NULL AS NVARCHAR( 250 ) ) AS "NODE_NAME" FROM DUMMY WHERE 1 = 0|.
+      RETURN.
+    ENDIF.
+    result = concat_lines_of( table = selects sep = ` UNION ALL ` ).
+  ENDMETHOD.
+
+  METHOD rests_sql.
+    " per key date's copy that shows its not-assigned node, its members
+    DATA selects TYPE string_table.
+    DATA keys TYPE string_table.
+    LOOP AT lines INTO DATA(entry) WHERE key_copy-rest IS NOT INITIAL.
+      DATA(key) = |{ entry-line-iobjnm } { entry-key_copy-hiesid } { entry-key_copy-sver }|.
+      IF line_exists( keys[ table_line = key ] ).
+        CONTINUE.
+      ENDIF.
+      APPEND key TO keys.
+      APPEND |SELECT { zzxxmla1_cl_sql=>literal( CONV string( entry-line-iobjnm ) ) } AS "IOBJ", | &&
+             |{ entry-key_copy-hiesid } AS "HIESID", { zzxxmla1_cl_sql=>literal( entry-key_copy-sver ) } AS "SVER", | &&
+             |n."NODE_IOBJ", n."NODE_NAME", n."LEAF" FROM ( { entry-key_copy-rest } ) AS n| TO selects.
+    ENDLOOP.
+    IF selects IS INITIAL.
+      result = |SELECT CAST( NULL AS NVARCHAR( 30 ) ) AS "IOBJ", CAST( NULL AS INTEGER ) AS "HIESID", | &&
+               |CAST( NULL AS NVARCHAR( 10 ) ) AS "SVER", CAST( NULL AS NVARCHAR( 30 ) ) AS "NODE_IOBJ", | &&
+               |CAST( NULL AS NVARCHAR( 250 ) ) AS "NODE_NAME", CAST( NULL AS INTEGER ) AS "LEAF" FROM DUMMY WHERE 1 = 0|.
       RETURN.
     ENDIF.
     result = concat_lines_of( table = selects sep = ` UNION ALL ` ).

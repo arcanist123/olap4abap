@@ -60,6 +60,9 @@ CLASS ltc_bw_hierarchy_copy DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DUR
     "! joined: a node by InfoObject and node name (an external characteristic's by InfoObject), a leaf by the view's
     "! SIDs of the name or its SID; REST_H as without it
     METHODS named_occurrences FOR TESTING.
+    "! the not-assigned node's members for the check: REST_H by 1HIER_REST, its values (the not-assigned view's rows
+    "! under it) by the characteristic and their key, SID 0 as ''; none where the hierarchy does not show the node
+    METHODS rest_members FOR TESTING.
     METHODS params
       IMPORTING statement     TYPE zzxxmla1_cl_bw_hierarchy_copy=>ty_statement
       RETURNING VALUE(result) TYPE string_table.
@@ -111,6 +114,23 @@ CLASS ltc_bw_hierarchy_copy IMPLEMENTATION.
     cl_abap_unit_assert=>assert_false( xsdbool( line_exists( offered[ supported = abap_true ] ) ) ).
     cl_abap_unit_assert=>assert_equals( exp = `ZCLDIAG_ICD`
                                         act = zzxxmla1_cl_bw_hierarchy_copy=>hierarchy_name( name = 'ZCLDIAG_ICD' ) ).
+  ENDMETHOD.
+
+  METHOD rest_members.
+    cl_abap_unit_assert=>assert_initial( zzxxmla1_cl_bw_hierarchy_copy=>rest_members_sql( services( abap_false ) ) ).
+    DATA(sql) = zzxxmla1_cl_bw_hierarchy_copy=>rest_members_of( hierarchy = services( abap_true )
+                                                                 sid_table = '/BIC/SZCLSERV'
+                                                                 leaf_name = `s."/BIC/ZCLSERV"` ).
+    cl_abap_unit_assert=>assert_char_cp(
+      act = sql
+      exp = `SELECT CAST( '1HIER_REST' AS NVARCHAR( 30 ) ) AS "NODE_IOBJ", ` &&
+            `CAST( 'REST_H' AS NVARCHAR( 250 ) ) AS "NODE_NAME", 0 AS "LEAF" FROM DUMMY UNION ALL *` ).
+    cl_abap_unit_assert=>assert_char_cp(
+      act = sql
+      exp = `*SELECT DISTINCT CAST( 'ZCLSERV' AS NVARCHAR( 30 ) ), ` &&
+            `CAST( CASE WHEN r."SID" = 0 THEN '' ELSE s."/BIC/ZCLSERV" END AS NVARCHAR( 250 ) ), 1 ` &&
+            `FROM "ZZXXMLA1R0000001" AS r INNER JOIN "/BIC/SZCLSERV" AS s ON s."SID" = r."SID" ` &&
+            `WHERE r."HIESID" = 246 AND r."SVER" = '3' AND r."ANCESTOR_SID" = -35` ).
   ENDMETHOD.
 
   METHOD params.
