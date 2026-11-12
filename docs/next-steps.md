@@ -411,6 +411,90 @@ Decided with the user 2026-10-24, after an evaluation of the user's proposal: st
    `0BI_ALL` or what its callers may see; authorisations need a personal logon), `known-issues.md` (what differs),
    `CLAUDE.md`.
 
+### The check for other callers (planned with the user 2026-11-12)
+
+An external caller wants to know whether a given user may see a combination of nodes and leaves of a provider. Two
+ways in, the second first:
+
+1. **An authorisation object for checking other users (to be decided later).** `POST bw/check`, `bw/checks` and
+   `GET auth/check` take `user` only for the caller itself or a test user of the scenarios (403 otherwise). An
+   authorisation object of ours (named `ZZXXMLA1_...`, created in SU21) is to allow the check for other users; the
+   endpoints check it when `user` is not the caller, instead of the list of test users. Open, decided later: its
+   fields (activity; the checked user's user group, `USR02-CLASS`, or none), whether the test users stay allowed
+   without it, how it relates to the authority BW asks for "Execute as Other User" (`RSUDO`), and whether the probe
+   (`GET auth/probe`, which switches the user) takes it too. Nothing of this is built before that decision.
+2. **An ABAP API of the check, without MDX.** For ABAP callers: an interface `ZZXXMLA1_IF_BW_AUTH_CHECK` and its
+   class `ZZXXMLA1_CL_BW_AUTH_CHECK`, over the SQL check (`ZZXXMLA1_CL_BW_AUTH_SQL`). It **checks no authority of the
+   caller**: who may ask about which user is the caller's responsibility (stated in the interface's documentation),
+   so it needs neither the object of point 1 nor its decision. No statement is parsed: the question is internal
+   tables of the interface's own types (no type of another class, `cyclic_oo`):
+   - `for( user, provider, key_date DEFAULT 9999-12-31 )` returns the check of a user on an InfoProvider (InfoCube or
+     aDSO, BW's name, no catalog or schema needed) at a key date: the profile is read once
+     (`ZZXXMLA1_CL_BW_AUTH_SQL=>read`), every later call asks only its statement. A provider that does not exist or
+     a characteristic it does not have is an exception of the API.
+   - `check( request )`: the request is a cartesian product, per characteristic a set of members (every combination
+     of one member of each set is asked, as a crossjoin of named members). The request names every
+     authorisation-relevant characteristic of the provider: the aggregate is asked explicitly as the member `:`
+     (BW's authorisation value for it), never implied by leaving the characteristic out; a request without one of
+     them is an `ERROR` naming it (nothing is aggregated silently). A characteristic that is not authorisation
+     relevant is not checked. Answer: `ALLOWED`
+     when every combination is authorised, else `NO AUTH` or `UNKNOWN` with BW's reason and message, a combination
+     that fails (one member per characteristic), the members no authorisation admits at all, and the part of the
+     product that is not authorised as sub-products (below); `ERROR` where the request names something the provider
+     does not have (a hierarchy, version, node or value not in the slice at the key date).
+   - **How the product is checked (proposed by the user 2026-11-12):** neither a statement per tuple (1,000 x 1,000
+     members are a million checks) nor the authorised space materialised in HANA (too big for wide authorisations).
+     An authorisation is a sub-cube, AND of its characteristics, so per authorisation and characteristic it is
+     enough to know which requested members it admits; the request is authorised when the union of the
+     authorisations' sub-products covers the requested product. The cover is decided without building either
+     product, by classes:
+     1. One statement: per characteristic, per requested member, the applying authorisations that admit it (the
+        line covers and flat ranges of `ZZXXMLA1_CL_BW_AUTH_SQL`, the members as a derived table), aggregated to a
+        bit mask of the authorisations per member (`BITOR` of `2^n` over a numbering of the applying
+        authorisations, one `BIGINT`).
+        Only the authorisations relevant to the provider are numbered: those that apply to it as `read` decides
+        today (the special characteristics `0TCAIPROV`, `0TCAACTVT`, `0TCAVALID` admit the provider, display and the
+        current date, and the authorisation has a line for every authorisation-relevant characteristic of the
+        provider). A user's authorisations for other providers, or that do not apply for another reason, are left out
+        before the numbering and do not count. At most 63 relevant authorisations are supported (decided with the
+        user 2026-11-12): a user with more on the provider is a fault (`ERROR` of the API, a fault of the query in the
+        engine), raised when the profile is read, before any statement.
+     2. A member with mask 0 is in no authorisation: refused at once (`UNKNOWN` for a value no authorisation
+        names, `NO AUTH` else, BW's reasons in `check`'s order).
+     3. Members of one characteristic with the same mask are interchangeable: they form a class. The product is
+        covered exactly when every combination of classes (one per characteristic) has a common authorisation,
+        `BITAND` of their masks not 0. The classes per characteristic are at most the distinct masks, few in
+        practice (bounded by the number of applying authorisations, not by the members), so their combinations
+        are checked in ABAP or one more statement, whatever the request's size.
+     4. A combination of classes with `BITAND` 0 is a sub-product that is not authorised (the members of each
+        class): the answer lists these, and its failing combination is the first member of each.
+     The same method can replace the combination part of `check_product` in the engine (5a), where the factors are
+     axes; whether it does is decided when 5a is wired.
+   - The member structure expresses both kinds of base members, nothing else:
+     - `characteristic`: the InfoObject (`ZCLDOC`);
+     - `kind`: `V` a value (a flat member or a leaf), `N` a hierarchy node, `A` the aggregate;
+     - `value`: the key of a value, NUMC with its zeros, `#` (or `''`) the not-assigned one; the name of a node;
+       `:` for the aggregate (kind `A`, no hierarchy), which the request has to name where it asks for totals;
+     - `hierarchy`, `version`: the BW hierarchy a leaf or node is asked in (`ZCLDOC_ORG`, `001`); blank for a flat
+       value. A leaf is a value with its hierarchy (matched by the characteristic and the key, as the copies name
+       leaves); BW checks it on that hierarchy's lines, a flat value on the flat ranges;
+     - `node_iobjnm`: a node's InfoObject (`0HIER_NODE` for a text node, an external characteristic such as
+       `ZCLSITE`).
+     The caller names base members only, by name, never an occurrence: links and duplicate leaves are one member,
+     as the oracle asks them (`auth/statements.json`) and as the check matches them (a node by name and InfoObject on
+     every occurrence, a leaf by key).
+   - A question that is not one product (a list of unrelated tuples) is several products, one call each; a call
+     taking a table of products can be added if a caller needs it.
+   - Reading the profile can create the copy tables of a characteristic (`create_tables`, a DDIC activation that
+     commits) and refill copies (under `ENQUEUE_E_TABLE`): `for` documents that it may commit, so a caller does not
+     call it inside its own update LUW; `check` reads only.
+   - Tests: unit tests of the classes and the cover (made-up masks: covered, one hole, two authorisations that
+     cover only together, a member in none) and of the errors; against the oracle, the probe's rows whose
+     selection is a product of members it names (TOTAL, SLICER, PAIR, and crossjoins of such sets, not the
+     restricted members of a hierarchy, 5b) of every scenario and key date, a characteristic the query aggregates
+     asked as `:`, answered through the API (`GET auth/check?...&engine=api`, `auth_check_test.py --engine api`), which must agree
+     as the other engines do.
+
 Not in this step (noted for `mvp-scope.md`): authorisation-relevant navigation attributes (`RSDBCHATR-AUTHRELFL`),
 key figure authorisations (`0TCAKYFNM`), filling variables (a user with one is not authorised), key dates in
 queries, and what Discover's

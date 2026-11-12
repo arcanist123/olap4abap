@@ -220,6 +220,14 @@ Decisions taken by the project owner on 2026-10-02, with reasons.
   - **Variables are not supported** (decided with the user 2026-10-23): olap4abap does not fill them (`$` values,
     filled by a customer exit at query time). A user with an authorisation with a variable that applies to the
     query's provider is not authorised: the query is a fault (no authorisation), whatever else the user has.
+  - **At most 63 relevant authorisations per user and provider** (decided with the user 2026-11-12): the check of a
+    cartesian product numbers the user's authorisations and keeps per requested member a bit mask of those that
+    admit it in one `BIGINT` (`next-steps.md`, The check for other callers). Only the authorisations relevant to the
+    query's provider count: those that apply to it (`0TCAIPROV`, `0TCAACTVT`, `0TCAVALID` admit the provider,
+    display and today, and it has a line for every authorisation-relevant characteristic of the provider);
+    authorisations for other providers are left out before the numbering. A user with more than 63 relevant
+    authorisations is not supported: every query on that provider is a fault (an `ERROR` of the ABAP API), raised
+    when the profile is read.
 - **Identity is not olap4abap's:** the user is managed on the SICF node; olap4abap takes `sy-uname` as given and
   checks the authorisations of that user. It reads the user with BW's released `RSEC_GET_USERNAME` (the user of
   `sy-uname`, or under BW's "Execute as Other User" the user being tested, as BW's own checks do), so that a check run
