@@ -91,7 +91,8 @@
 "!   C_RETENTION_DAYS), trace/off?user=U (without user the current one), trace/clear[?user=U] (without user everyone's
 "!   calls): committed, answered as GET trace.
 "! - GET auth/probe[?user=U][&keyDates=YYYY-MM-DD,...][&tests=flat,members,...][&hierarchies=H,...][&versions=V,...]
-"!   [&pairs=v1:w1,...] (the value pairs of the test pairs, a ZCLDOC value and a ZCLDIAG value):
+"!   [&pairs=v1:w1,...] (the value pairs of the test pairs, a ZCLDOC value and a ZCLDIAG value)
+"!   [&mdx=statements, one per line: these instead of the kinds of query, at each key date, test MDX):
 "!   BW's own MDX on the clinic demo's aDSO (ZZXXMLA1_CL_BW_AUTH_PROBE, docs/clinic-demo.md) with the analysis
 "!   authorizations of U, a test user of the scenarios (ZZXXMLA1_CL_BW_AUTH_GEN; refused, 403, for any other user),
 "!   as BW's "Execute as Other User" runs it; without user of the current user. Answers the user, its scenario (null
@@ -100,10 +101,11 @@
 "!   9999-12-31; tests are the components of the probe's ty_tests, without tests all but combine_leaves. Nothing is
 "!   written;
 "! - GET auth/scenarios: the analysis authorization scenarios and their test users (ZZXXMLA1_CL_BW_AUTH_GEN).
-"! - GET auth/check[?user=U][&keyDate=YYYY-MM-DD][&pairs=v1:w1,...][&engine=abap|sql]: the probe's queries answered
+"! - GET auth/check[?user=U][&keyDate=YYYY-MM-DD][&pairs=v1:w1,...][&engine=abap|sql|api]: the probe's queries answered
 "!   by olap4abap's authorization check for U at the key date (ZZXXMLA1_CL_BW_AUTH_QUERIES; U as for auth/probe,
 "!   without keyDate 9999-12-31; engine sql the check in HANA, ZZXXMLA1_CL_BW_AUTH_SQL, which makes the copies of the
-"!   slices it needs, else the one in ABAP): the authorizations that apply to the clinic demo's aDSO and per query its fields as auth/probe names
+"!   slices it needs, engine api the ABAP API, ZZXXMLA1_IF_BW_AUTH_CHECK, for the queries whose selection is a
+"!   product, SKIPPED the others, else the one in ABAP): the authorizations that apply to the clinic demo's aDSO and per query its fields as auth/probe names
 "!   them, the check's status (ALLOWED, EMPTY, NO AUTH, UNKNOWN), reason and message, the members a restricted
 "!   hierarchy shows (null if not restricted) and the hierarchies listed (test HIERARCHIES). Nothing is written;
 "! It runs as the XMLA endpoint does (the anonymous logon of the node), accept included, for now.
@@ -1319,11 +1321,22 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
         TO authorizations.
     ENDLOOP.
     DATA results TYPE string_table.
-    LOOP AT probe->run( key_dates   = key_dates
-                        hierarchies = hierarchies
-                        versions    = versions
-                        tests       = tests
-                        pairs       = pairs ) INTO DATA(row).
+    " given statements (mdx, one per line) instead of the kinds of query, at each key date
+    DATA rows TYPE zzxxmla1_cl_bw_auth_probe=>ty_results.
+    SPLIT parameter( request = request name = `mdx` ) AT cl_abap_char_utilities=>newline INTO TABLE DATA(statements).
+    DELETE statements WHERE table_line IS INITIAL.
+    IF statements IS NOT INITIAL.
+      LOOP AT key_dates INTO DATA(key_date).
+        APPEND LINES OF probe->run_statements( key_date = key_date statements = statements ) TO rows.
+      ENDLOOP.
+    ELSE.
+      rows = probe->run( key_dates   = key_dates
+                         hierarchies = hierarchies
+                         versions    = versions
+                         tests       = tests
+                         pairs       = pairs ).
+    ENDIF.
+    LOOP AT rows INTO DATA(row).
       DATA(cells) = VALUE string_table(
         FOR cell IN row-cells
         ( |\{"members":{ json_array( VALUE #( FOR m IN cell-members ( json( m ) ) ) ) },| &&
@@ -1371,12 +1384,20 @@ CLASS zzxxmla1_cl_schema_api IMPLEMENTATION.
     ENDLOOP.
 
     DATA(engine) = parameter( request = request name = `engine` ).
-    IF engine IS NOT INITIAL AND engine <> `abap` AND engine <> `sql`.
+    IF engine IS NOT INITIAL AND engine <> `abap` AND engine <> `sql` AND engine <> `api`.
       RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused
         EXPORTING status  = 400
-                  message = |The engine is abap or sql, not { engine }|.
+                  message = |The engine is abap, sql or api, not { engine }|.
     ENDIF.
-    DATA(queries) = zzxxmla1_cl_bw_auth_queries=>read( user = user key_date = key_date sql = xsdbool( engine = `sql` ) ).
+    DATA queries TYPE REF TO zzxxmla1_cl_bw_auth_queries.
+    TRY.
+        queries = zzxxmla1_cl_bw_auth_queries=>read( user     = user
+                                                     key_date = key_date
+                                                     sql      = xsdbool( engine = `sql` )
+                                                     api      = xsdbool( engine = `api` ) ).
+      CATCH zzxxmla1_cx_bw_auth_check INTO DATA(check_error).
+        RAISE EXCEPTION TYPE zzxxmla1_cx_api_refused EXPORTING status = 500 message = check_error->get_text( ).
+    ENDTRY.
     DATA results TYPE string_table.
     LOOP AT queries->run( pairs ) INTO DATA(row).
       APPEND |\{"characteristic":{ json( |{ row-characteristic }| ) },"hierarchy":{ json( row-hierarchy ) },| &&

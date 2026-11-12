@@ -8,7 +8,6 @@
     <TABCLASS>TRANSP</TABCLASS>
     <DDTEXT>olap4abap copies of BW hierarchies</DDTEXT>
     <MASTERLANG>E</MASTERLANG>
-    <MAINFLAG>X</MAINFLAG>
     <CONTFLAG>A</CONTFLAG>
     <EXCLASS>1</EXCLASS>
    </DD02V>

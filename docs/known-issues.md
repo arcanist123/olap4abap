@@ -90,3 +90,27 @@ Known faults of the reference server (eMondrian); its answer is not the oracle t
   - Excel's Top 10 value filter is refused ("MDX object '[XL_Filter_Set_0]' not found");
   - a label filter on an upper level (contains `RESP` on `ZCLDIAG_ICD`'s `Level 02`, in a subselect) leaves every
     cell empty, the All member's too (olap4abap's answer: deliberate deviations above).
+
+## BW's wrong answers
+
+BW is the oracle of the analysis authorisations (`reference/auth/`, `mvp-scope.md`, BW's rules); where it answers
+against its own rules, olap4abap does not follow it.
+
+- **Leaves under a level-limited hierarchy line** (type 0 or 2; scenario H2LEAF, `CLINIC` to level 4; observed
+  2026-11-12 with `scripts/auth_ask.py`, decided with the user the same day). BW refuses at reading the cells (with
+  NON EMPTY or `Order` at the axis; "EYE 007 You do not have sufficient authorization") two kinds of query whose
+  members are all inside the line:
+  - an expansion that ends on leaves only: `GP.Children`, `Descendants(PRIMARY, 2)`, `Hierarchize` and `Order` of
+    them, unions with them, at every key date (GP's physicians are at level 4, every one of them authorised as a
+    node and as a value), while expansions whose target level holds nodes too pass (`INTMED.Children`,
+    `Descendants(CLINIC, 3)` at 9999-12-31, `{GP.Children, INTMED.Children}`);
+  - at a key date whose slice has a leaf inside the line that the slice of the line's date has below it, a set of
+    two or more leaves containing it (2024-06-15: `{009, 010}`, `{001, 009}`, `Head(CARD.Children, 2)`), while the
+    leaf alone passes (`{009}` on rows, `WHERE (009)`).
+
+  The same members pass written otherwise: `Head(GP.Children, 6)`, `Filter(GP.Children, 1 = 1)`, `001.Siblings` and
+  the explicit set give the six physicians with the same values. Under a type 1 or type 3 line nothing of this is
+  refused (H1, HDATE, H3). olap4abap checks every member as a node of the key date's slice at its own depth, the
+  rule BW applies to a single member and to every member under an unlimited line, so it allows these queries.
+  `auth_check_test.py` and `bw_auth_compare.py` count such rows apart ("widened by BW": BW refuses at the cells or
+  the axis, olap4abap allows, the user has a type 0 or 2 line on the row's hierarchy).

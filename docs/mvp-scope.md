@@ -265,6 +265,12 @@ selection BW does not allow is refused or unknown, never filtered silently; wher
   slice or the line's date: the scenarios cannot tell them apart (step 4 takes the line's date); type 0 (H0) and type 2
   (H2, to a level above the leaves) give no leaf, so no value. Several lines of one authorisation add up (2HIE: the
   leaves of `CARD` and of `RIVER`).
+- **A leaf in the hierarchy is a node of the key date's slice, not a value** (decided 2026-11-12, H2LEAF and
+  HDATE): a leaf the query names or shows in a hierarchy is allowed where a line shows it in the slice of the key
+  date, at its own depth, whether or not it is a flat value of the line (HDATE at 9999-12-31: `008` is below `GP`
+  there, but no value of the line's slice to 2024-12-31; BW allows it alone and in every set). Under a type 0 or 2
+  line BW refuses some sets of such leaves and expansions that end on leaves; olap4abap does not
+  (`known-issues.md`, BW's wrong answers).
 - **A hierarchy is restricted, not refused, where the user has a line on it**: its members are the authorised
   subtree only, re-rooted (H1: `[ZCLDOC_ORG 001].Members` is GP and its six physicians, `LEVEL00` is GP, `LEVEL01` the
   physicians; GP has no parent: `.Parent` is empty), its ancestors refused as slicer or on rows, a visible node's

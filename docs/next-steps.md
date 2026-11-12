@@ -227,6 +227,16 @@ three key dates are in `reference/auth/` (`scripts/auth_probe.py`), BW's rules r
 (`scripts/auth_check_test.py`); the same check in HANA (`ZZXXMLA1_CL_BW_AUTH_SQL`) agrees too (2026-10-25,
 `--engine sql`); nothing is enforced yet (step 5).
 
+State on 2026-11-12: the 17 further scenarios (`ZZXXMLA1_A22` to `A38`, `clinic-demo.md`) are recorded at the three
+key dates, without `--verify`: no logon is needed, the switch's answer is enough, the comparison scripts take a
+row without logged-on answer as the switch's at every key date (`without_logon`: its EMPTY of a hierarchy without
+a line counts as refused). `scripts/auth_ask.py` asks BW's MDX any statement as a test user
+(`GET auth/probe?mdx=...`, `ZZXXMLA1_CL_BW_AUTH_PROBE=>run_statements`). H2LEAF showed BW refusing sets of leaves and
+expansions to leaves under a level-limited line, which olap4abap allows (`known-issues.md`, BW's wrong answers;
+`mvp-scope.md`, a leaf is a node of the key date's slice). Open from the comparison of the further scenarios: HNEW
+at 2024-06-15 (BW lists no hierarchy when the line's node is not in the key date's slice; the checks list it,
+`hierarchy_access`) and HVAL0, HVAL2, HVAL3 (the validity of a line), which differ in all three checks.
+
 ### Decisions answered by step 2
 
 - **Refuse or restrict: both, per case** (`mvp-scope.md`, BW's rules). BW refuses a flat selection that is not
@@ -494,6 +504,16 @@ ways in, the second first:
      restricted members of a hierarchy, 5b) of every scenario and key date, a characteristic the query aggregates
      asked as `:`, answered through the API (`GET auth/check?...&engine=api`, `auth_check_test.py --engine api`), which must agree
      as the other engines do.
+   Built 2026-11-12: `ZZXXMLA1_IF_BW_AUTH_CHECK`, `ZZXXMLA1_CL_BW_AUTH_CHECK` (exception `ZZXXMLA1_CX_BW_AUTH_CHECK`),
+   over `ZZXXMLA1_CL_BW_AUTH_SQL=>admissions` (the check's tables as `common_tables`, per member the applying
+   authorizations that admit it). The request is a flat table of members, the product taken over the characteristics
+   they name; `check` answers ERROR for a malformed request, a missing authorisation-relevant characteristic, a
+   hierarchy without a slice at the key date and a node, leaf or value the provider does not have (BW's hierarchy
+   table, the SID table; a leaf's `#` is its blank key). A refusal names the first refused member BW meets walking the
+   product (the last characteristic fastest), a member before an aggregate; the holes are at most 100 sub-products.
+   11 unit tests on made-up masks. `auth_check_test.py --engine api` agrees with BW for all 21 scenarios of step 1 at
+   the three key dates; the queries that are no product (a restricted hierarchy's members, children, parents, about a
+   quarter) are SKIPPED.
 
 Not in this step (noted for `mvp-scope.md`): authorisation-relevant navigation attributes (`RSDBCHATR-AUTHRELFL`),
 key figure authorisations (`0TCAKYFNM`), filling variables (a user with one is not authorised), key dates in

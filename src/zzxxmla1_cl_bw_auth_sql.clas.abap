@@ -67,6 +67,13 @@ CLASS zzxxmla1_cl_bw_auth_sql DEFINITION
              sql    TYPE string,
              params TYPE zzxxmla1_cl_sql=>ty_t_param,
            END OF ty_statement.
+    "! an applying authorization that admits a member, or (auth initial) the reason no authorization admits it
+    TYPES: BEGIN OF ty_admission,
+             member TYPE zzxxmla1_cl_bw_auth=>ty_member,
+             auth   TYPE rsauth,
+             reason TYPE c LENGTH 12,
+           END OF ty_admission.
+    TYPES ty_admissions TYPE STANDARD TABLE OF ty_admission WITH EMPTY KEY.
 
     "! The check of the user on the provider at the key date: the region read without expansion, its copies made.
     CLASS-METHODS read
@@ -109,6 +116,23 @@ CLASS zzxxmla1_cl_bw_auth_sql DEFINITION
     "! for an unrestricted user and where no authorization applies (every selection is refused then).
     METHODS visibles
       RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_hierarchy_copy=>ty_t_visible.
+    "! Per member of an authorization-relevant characteristic the applying authorizations that admit it, one row
+    "! each, or one row without authorization with the reason none does (BW's reasons as check gives them, the
+    "! aggregate's combination); one statement, members of other characteristics left out. Meaningful only without
+    "! provider_refusal and for a restricted user (the profile is empty otherwise).
+    METHODS admissions
+      IMPORTING members       TYPE zzxxmla1_cl_bw_auth=>ty_tuple
+      RETURNING VALUE(result) TYPE ty_admissions.
+    "! The provider's authorization-relevant characteristics.
+    METHODS characteristics
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_auth=>ty_characteristics.
+    "! Whether one authorization allows everything (0BI_ALL): no check is needed.
+    METHODS unrestricted
+      RETURNING VALUE(result) TYPE abap_bool.
+    "! The refusal of every selection (no authorization applies to the provider, or one has a variable); initial if
+    "! neither.
+    METHODS provider_refusal
+      RETURNING VALUE(result) TYPE zzxxmla1_cl_bw_auth=>ty_check.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -180,6 +204,16 @@ CLASS zzxxmla1_cl_bw_auth_sql DEFINITION
       IMPORTING profile       TYPE ty_profile
                 request       TYPE ty_request
       RETURNING VALUE(result) TYPE ty_statement.
+    "! the common tables of the statements: q_m the request's members, q_p, q_f, q_h the profile, q_x, q_n the copies'
+    "! rows, q_c what each line shows, q_o the authorizations that admit a member, q_a the aggregates allowed
+    CLASS-METHODS common_tables
+      IMPORTING profile       TYPE ty_profile
+                request       TYPE ty_request
+      CHANGING  params        TYPE zzxxmla1_cl_sql=>ty_t_param
+      RETURNING VALUE(result) TYPE string_table.
+    "! the members no authorization admits (aggregates excepted): PHASE 1, M and BW's REASON
+    CLASS-METHODS refused_sql
+      RETURNING VALUE(result) TYPE string.
     "! a derived table of bound values, the parameters appended in their order; no rows: an empty table
     CLASS-METHODS values_sql
       IMPORTING columns       TYPE ty_columns
@@ -441,6 +475,110 @@ CLASS zzxxmla1_cl_bw_auth_sql IMPLEMENTATION.
   METHOD check_statement.
     DATA params TYPE zzxxmla1_cl_sql=>ty_t_param.
     DATA rows TYPE ty_rows.
+    DATA(int) = `INTEGER`.
+    DATA(ctes) = common_tables( EXPORTING profile = profile request = request CHANGING params = params ).
+    DATA(branches) = VALUE string_table( ( |SELECT * FROM ( { refused_sql( ) } | &&
+                                           |ORDER BY m."NAMED" DESC, m."M" LIMIT 1 ) AS r1| ) ).
+
+    " a combination of one tuple per factor that no authorization allows: each tuple's members admitted, the
+    " characteristics no tuple has aggregated
+    IF request-factors > 0.
+      DATA(sources) = VALUE string_table( ).
+      DATA(conditions) = VALUE string_table( ).
+      DATA(joins) = ``.
+      DATA(mask) = ``.
+      DO request-factors TIMES.
+        DATA(i) = sy-index.
+        CLEAR rows.
+        LOOP AT request-tuples INTO DATA(tuple) WHERE factor = i.
+          APPEND VALUE #( ( NEW i( tuple-tuple ) ) ( NEW i( tuple-member ) ) ( NEW i( tuple-mask ) ) ) TO rows.
+        ENDLOOP.
+        DATA(tuples) = values_sql( EXPORTING columns = VALUE #( ( name = `T` type = int ) ( name = `M` type = int )
+                                                                ( name = `MASK` type = int ) )
+                                             rows    = rows
+                                   CHANGING  params  = params ).
+        APPEND |q_t{ i } AS ( { tuples } )| TO ctes.
+        APPEND |q_k{ i } AS ( SELECT x."T", a."A" FROM ( SELECT DISTINCT "T" FROM q_t{ i } ) AS x CROSS JOIN q_a AS a | &&
+               |WHERE NOT EXISTS ( SELECT 1 FROM q_t{ i } AS y WHERE y."T" = x."T" AND y."M" <> 0 | &&
+               |AND NOT EXISTS ( SELECT 1 FROM q_o AS o WHERE o."M" = y."M" AND o."A" = a."A" ) ) )| TO ctes.
+        APPEND |( SELECT DISTINCT "T", "MASK" FROM q_t{ i } ) AS c{ i }| TO sources.
+        joins = |{ joins } INNER JOIN q_k{ i } AS k{ i } ON k{ i }."A" = a."A"|.
+        APPEND |k{ i }."T" = c{ i }."T"| TO conditions.
+        mask = COND #( WHEN i = 1 THEN |c1."MASK"| ELSE |BITOR( { mask }, c{ i }."MASK" )| ).
+      ENDDO.
+      DATA(every) = ipow( base = 2 exp = lines( profile-characteristics ) ) - 1.
+      APPEND |BITAND( CAST( { every } - { mask } AS BIGINT ), CAST( { every } - a."AGG" AS BIGINT ) ) = 0| TO conditions.
+      APPEND |SELECT * FROM ( SELECT 2 AS "PHASE", 0 AS "M", '{ zzxxmla1_cl_bw_auth=>c_reason-combination }' AS "REASON" | &&
+             |FROM { concat_lines_of( table = sources sep = ` CROSS JOIN ` ) } | &&
+             |WHERE NOT EXISTS ( SELECT 1 FROM q_a AS a{ joins } | &&
+             |WHERE { concat_lines_of( table = conditions sep = ` AND ` ) } ) LIMIT 1 ) AS r2| TO branches.
+    ENDIF.
+
+    result-sql = |WITH { concat_lines_of( table = ctes sep = `, ` ) } | &&
+                 |SELECT "PHASE", "M", "REASON" FROM ( { concat_lines_of( table = branches sep = ` UNION ALL ` ) } ) AS r | &&
+                 |ORDER BY "PHASE" LIMIT 1|.
+    result-params = params.
+  ENDMETHOD.
+
+  METHOD refused_sql.
+    result =
+      |SELECT 1 AS "PHASE", m."M", CASE WHEN m."KIND" = 'V' THEN CASE | &&
+      |WHEN NOT EXISTS ( SELECT 1 FROM q_p AS p WHERE p."IOBJ" = m."IOBJ" AND p."ALL" = 1 ) | &&
+      |AND NOT EXISTS ( SELECT 1 FROM q_f AS f WHERE f."IOBJ" = m."IOBJ" ) | &&
+      |AND NOT EXISTS ( SELECT 1 FROM q_c AS c WHERE c."IOBJ" = m."IOBJ" AND c."WHICH" = 'V' AND c."LEAF" = 1 ) | &&
+      |THEN '{ zzxxmla1_cl_bw_auth=>c_reason-no_values }' WHEN m."NAMED" = 1 THEN '{ zzxxmla1_cl_bw_auth=>c_reason-value }' | &&
+      |ELSE '{ zzxxmla1_cl_bw_auth=>c_reason-combination }' END | &&
+      |WHEN EXISTS ( SELECT 1 FROM q_h AS h WHERE h."IOBJ" = m."IOBJ" AND h."HIENM" = m."HIENM" | &&
+      |AND h."VERSION" = m."VERSION" ) THEN '{ zzxxmla1_cl_bw_auth=>c_reason-node }' | &&
+      |ELSE '{ zzxxmla1_cl_bw_auth=>c_reason-hierarchy }' END AS "REASON" | &&
+      |FROM q_m AS m WHERE m."KIND" <> 'A' AND NOT EXISTS ( SELECT 1 FROM q_o AS o WHERE o."M" = m."M" )|.
+  ENDMETHOD.
+
+  METHOD admissions.
+    DATA params TYPE zzxxmla1_cl_sql=>ty_t_param.
+    IF region->provider_refusal( ) IS NOT INITIAL OR region->unrestricted( ) = abap_true.
+      RETURN.
+    ENDIF.
+    DATA(request) = request( characteristics = profile-characteristics members = members ).
+    IF request-members IS INITIAL.
+      RETURN.
+    ENDIF.
+    DATA(ctes) = common_tables( EXPORTING profile = profile request = request CHANGING params = params ).
+    DATA(sql) = |WITH { concat_lines_of( table = ctes sep = `, ` ) } | &&
+                |SELECT o."M", o."A", CAST( '' AS NVARCHAR( 12 ) ) AS "REASON" FROM q_o AS o | &&
+                |UNION ALL SELECT r."M", CAST( '' AS NVARCHAR( 30 ) ) AS "A", r."REASON" FROM ( { refused_sql( ) } ) AS r ORDER BY 1, 2|.
+    DATA(rows) = zzxxmla1_cl_sql=>query( sql = sql columns = 3 params = params ).
+    DATA(seen) = VALUE int4_table( ).
+    LOOP AT rows INTO DATA(row).
+      DATA(number) = CONV i( row[ 1 ] ).
+      APPEND number TO seen.
+      APPEND VALUE #( member = request-members[ number ]-member
+                      auth   = condense( CONV string( row[ 2 ] ) )
+                      reason = condense( CONV string( row[ 3 ] ) ) ) TO result.
+    ENDLOOP.
+    " an aggregate no authorization allows has no row: refused as BW refuses a total without :
+    LOOP AT request-members INTO DATA(entry).
+      DATA(index) = sy-tabix.
+      IF NOT line_exists( seen[ table_line = index ] ).
+        APPEND VALUE #( member = entry-member reason = zzxxmla1_cl_bw_auth=>c_reason-combination ) TO result.
+      ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD characteristics.
+    result = region->profile( )-characteristics.
+  ENDMETHOD.
+
+  METHOD unrestricted.
+    result = region->unrestricted( ).
+  ENDMETHOD.
+
+  METHOD provider_refusal.
+    result = region->provider_refusal( ).
+  ENDMETHOD.
+
+  METHOD common_tables.
+    DATA rows TYPE ty_rows.
     DATA(name) = `NVARCHAR( 30 )`.
     DATA(text) = `NVARCHAR( 250 )`.
     DATA(int) = `INTEGER`.
@@ -558,66 +696,12 @@ CLASS zzxxmla1_cl_bw_auth_sql IMPLEMENTATION.
       |AND c."WHICH" = 'K' AND c."HIENM" = m."HIENM" AND c."VERSION" = m."VERSION" | &&
       |AND c."NODE_IOBJ" = m."NODE_IOBJ" AND c."NODE" = m."KEY" ) )|.
 
-    " the first member no authorization admits, the named ones first, with BW's reason
-    DATA(refused_member) =
-      |SELECT 1 AS "PHASE", m."M", CASE WHEN m."KIND" = 'V' THEN CASE | &&
-      |WHEN NOT EXISTS ( SELECT 1 FROM q_p AS p WHERE p."IOBJ" = m."IOBJ" AND p."ALL" = 1 ) | &&
-      |AND NOT EXISTS ( SELECT 1 FROM q_f AS f WHERE f."IOBJ" = m."IOBJ" ) | &&
-      |AND NOT EXISTS ( SELECT 1 FROM q_c AS c WHERE c."IOBJ" = m."IOBJ" AND c."WHICH" = 'V' AND c."LEAF" = 1 ) | &&
-      |THEN '{ zzxxmla1_cl_bw_auth=>c_reason-no_values }' WHEN m."NAMED" = 1 THEN '{ zzxxmla1_cl_bw_auth=>c_reason-value }' | &&
-      |ELSE '{ zzxxmla1_cl_bw_auth=>c_reason-combination }' END | &&
-      |WHEN EXISTS ( SELECT 1 FROM q_h AS h WHERE h."IOBJ" = m."IOBJ" AND h."HIENM" = m."HIENM" | &&
-      |AND h."VERSION" = m."VERSION" ) THEN '{ zzxxmla1_cl_bw_auth=>c_reason-node }' | &&
-      |ELSE '{ zzxxmla1_cl_bw_auth=>c_reason-hierarchy }' END AS "REASON" | &&
-      |FROM q_m AS m WHERE m."KIND" <> 'A' AND NOT EXISTS ( SELECT 1 FROM q_o AS o WHERE o."M" = m."M" ) | &&
-      |ORDER BY m."NAMED" DESC, m."M" LIMIT 1|.
-
-    DATA(ctes) = VALUE string_table(
+    result = VALUE #(
       ( |q_m AS ( { members } )| ) ( |q_p AS ( { parts } )| ) ( |q_f AS ( { ranges } )| )
       ( |q_h AS ( { hierarchy_lines } )| ) ( |q_x AS ( { paths_sql( profile-lines ) } )| )
       ( |q_n AS ( { rests_sql( profile-lines ) } )| )
       ( |q_c AS ( { cover } )| ) ( |q_o AS ( { admitted } )| )
       ( |q_a AS ( SELECT "A", SUM( CASE WHEN "AGG" = 1 THEN "BIT" ELSE 0 END ) AS "AGG" FROM q_p GROUP BY "A" )| ) ).
-    DATA(branches) = VALUE string_table( ( |SELECT * FROM ( { refused_member } ) AS r1| ) ).
-
-    " a combination of one tuple per factor that no authorization allows: each tuple's members admitted, the
-    " characteristics no tuple has aggregated
-    IF request-factors > 0.
-      DATA(sources) = VALUE string_table( ).
-      DATA(conditions) = VALUE string_table( ).
-      DATA(joins) = ``.
-      DATA(mask) = ``.
-      DO request-factors TIMES.
-        DATA(i) = sy-index.
-        CLEAR rows.
-        LOOP AT request-tuples INTO DATA(tuple) WHERE factor = i.
-          APPEND VALUE #( ( NEW i( tuple-tuple ) ) ( NEW i( tuple-member ) ) ( NEW i( tuple-mask ) ) ) TO rows.
-        ENDLOOP.
-        DATA(tuples) = values_sql( EXPORTING columns = VALUE #( ( name = `T` type = int ) ( name = `M` type = int )
-                                                                ( name = `MASK` type = int ) )
-                                             rows    = rows
-                                   CHANGING  params  = params ).
-        APPEND |q_t{ i } AS ( { tuples } )| TO ctes.
-        APPEND |q_k{ i } AS ( SELECT x."T", a."A" FROM ( SELECT DISTINCT "T" FROM q_t{ i } ) AS x CROSS JOIN q_a AS a | &&
-               |WHERE NOT EXISTS ( SELECT 1 FROM q_t{ i } AS y WHERE y."T" = x."T" AND y."M" <> 0 | &&
-               |AND NOT EXISTS ( SELECT 1 FROM q_o AS o WHERE o."M" = y."M" AND o."A" = a."A" ) ) )| TO ctes.
-        APPEND |( SELECT DISTINCT "T", "MASK" FROM q_t{ i } ) AS c{ i }| TO sources.
-        joins = |{ joins } INNER JOIN q_k{ i } AS k{ i } ON k{ i }."A" = a."A"|.
-        APPEND |k{ i }."T" = c{ i }."T"| TO conditions.
-        mask = COND #( WHEN i = 1 THEN |c1."MASK"| ELSE |BITOR( { mask }, c{ i }."MASK" )| ).
-      ENDDO.
-      DATA(every) = ipow( base = 2 exp = lines( profile-characteristics ) ) - 1.
-      APPEND |BITAND( CAST( { every } - { mask } AS BIGINT ), CAST( { every } - a."AGG" AS BIGINT ) ) = 0| TO conditions.
-      APPEND |SELECT * FROM ( SELECT 2 AS "PHASE", 0 AS "M", '{ zzxxmla1_cl_bw_auth=>c_reason-combination }' AS "REASON" | &&
-             |FROM { concat_lines_of( table = sources sep = ` CROSS JOIN ` ) } | &&
-             |WHERE NOT EXISTS ( SELECT 1 FROM q_a AS a{ joins } | &&
-             |WHERE { concat_lines_of( table = conditions sep = ` AND ` ) } ) LIMIT 1 ) AS r2| TO branches.
-    ENDIF.
-
-    result-sql = |WITH { concat_lines_of( table = ctes sep = `, ` ) } | &&
-                 |SELECT "PHASE", "M", "REASON" FROM ( { concat_lines_of( table = branches sep = ` UNION ALL ` ) } ) AS r | &&
-                 |ORDER BY "PHASE" LIMIT 1|.
-    result-params = params.
   ENDMETHOD.
 
   METHOD values_sql.

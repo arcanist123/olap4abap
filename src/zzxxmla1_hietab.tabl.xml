@@ -8,7 +8,6 @@
     <TABCLASS>TRANSP</TABCLASS>
     <DDTEXT>olap4abap generated hierarchy tables per InfoObject</DDTEXT>
     <MASTERLANG>E</MASTERLANG>
-    <MAINFLAG>X</MAINFLAG>
     <CONTFLAG>A</CONTFLAG>
     <EXCLASS>1</EXCLASS>
    </DD02V>

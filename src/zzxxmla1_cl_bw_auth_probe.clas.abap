@@ -139,6 +139,13 @@ CLASS zzxxmla1_cl_bw_auth_probe DEFINITION
                 pairs         TYPE ty_pairs OPTIONAL
       RETURNING VALUE(result) TYPE ty_results.
 
+    "! Runs the given statements at the key date, as the user, as run does (test MDX, the statement as mdx): for
+    "! questions the kinds of query do not ask.
+    METHODS run_statements
+      IMPORTING key_date      TYPE d
+                statements    TYPE string_table
+      RETURNING VALUE(result) TYPE ty_results.
+
     "! The analysis authorizations that restrict one of the characteristics (value and hierarchy authorizations,
     "! RSECVAL_STRING and RSECHIE_STRING) with all their lines, and 0BI_ALL, each with whether the current user has it
     "! (S_RS_AUTH or RSECADMIN's direct assignment), for the user of the probe.
@@ -355,6 +362,42 @@ CLASS zzxxmla1_cl_bw_auth_probe IMPLEMENTATION.
       APPEND VALUE #( test = 'USER' status = c_status-error
                       message = |BW checks the authorizations of { analysis_user }, not of { user }| ) TO result.
     ENDIF.
+    CALL FUNCTION 'RRT_SET_KEY_DATE'
+      EXPORTING
+        i_key_date = space
+        i_explicit = abap_true
+      EXCEPTIONS
+        x_message  = 1
+        OTHERS     = 2.
+    IF sy-subrc <> 0.
+      " the key date stays set for this session only
+      CLEAR sy-subrc.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD run_statements.
+    CALL FUNCTION 'RRT_SET_KEY_DATE'
+      EXPORTING
+        i_key_date = key_date
+        i_explicit = abap_true
+      EXCEPTIONS
+        x_message  = 1
+        OTHERS     = 2.
+    IF sy-subrc <> 0.
+      APPEND VALUE #( key_date = key_date test = 'KEY DATE' status = c_status-error
+                      message = |RRT_SET_KEY_DATE failed ({ sy-subrc })| ) TO result.
+      RETURN.
+    ENDIF.
+    DATA(analysis_user) = analysis_user( user ).
+    IF analysis_user = user.
+      LOOP AT statements INTO DATA(statement) WHERE table_line IS NOT INITIAL.
+        APPEND answered( VALUE #( key_date = key_date test = 'MDX' mdx = statement ) ) TO result.
+      ENDLOOP.
+    ELSE.
+      APPEND VALUE #( test = 'USER' status = c_status-error
+                      message = |BW checks the authorizations of { analysis_user }, not of { user }| ) TO result.
+    ENDIF.
+    analysis_user( sy-uname ).
     CALL FUNCTION 'RRT_SET_KEY_DATE'
       EXPORTING
         i_key_date = space

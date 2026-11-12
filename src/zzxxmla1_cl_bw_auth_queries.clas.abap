@@ -22,6 +22,10 @@
 "! refused as a hierarchy without a line).
 "! With sql the answers are the check in HANA's (ZZXXMLA1_CL_BW_AUTH_SQL), the queries still built from the region
 "! (what a query shows of a restricted hierarchy); a crossjoin is checked as its two sets, not multiplied out.
+"! With api they are the ABAP API's (ZZXXMLA1_IF_BW_AUTH_CHECK) for the queries whose selection is a product of
+"! members, the characteristics a query does not name asked as the aggregate; the others are SKIPPED. The API takes
+"! every member as named; a refused member the query does not name (of a set) is answered as BW answers it: a value
+"! outside every authorization no authorization (combination), not unknown.
 CLASS zzxxmla1_cl_bw_auth_queries DEFINITION
   PUBLIC
   FINAL
@@ -71,18 +75,21 @@ CLASS zzxxmla1_cl_bw_auth_queries DEFINITION
     TYPES ty_results TYPE STANDARD TABLE OF ty_result WITH EMPTY KEY.
 
     CONSTANTS c_empty TYPE c LENGTH 8 VALUE 'EMPTY'.
+    CONSTANTS c_skipped TYPE c LENGTH 8 VALUE 'SKIPPED'.
 
     "! The queries on the provider at the key date for the user, the characteristics read from BW.
     "! @parameter characteristics | the probe's: ZCLDOC and ZCLDIAG if none
     "! @parameter sql | answered by the check in HANA
+    "! @parameter api | answered by the ABAP API, where the selection is a product
     CLASS-METHODS read
       IMPORTING !user           TYPE xubname
                 provider        TYPE csequence DEFAULT `ZCLVISITA`
                 characteristics TYPE ty_iobjnms OPTIONAL
                 key_date        TYPE d
                 sql             TYPE abap_bool DEFAULT abap_false
+                api             TYPE abap_bool DEFAULT abap_false
       RETURNING VALUE(result)   TYPE REF TO zzxxmla1_cl_bw_auth_queries
-      RAISING   zzxxmla1_cx_bw_provider.
+      RAISING   zzxxmla1_cx_bw_provider zzxxmla1_cx_bw_auth_check.
     "! The queries on given characteristics for a region, for the unit tests.
     CLASS-METHODS create
       IMPORTING region          TYPE REF TO zzxxmla1_cl_bw_auth
@@ -144,6 +151,7 @@ CLASS zzxxmla1_cl_bw_auth_queries DEFINITION
     DATA region TYPE REF TO zzxxmla1_cl_bw_auth.
     "! the check in HANA, if it answers
     DATA sql_check TYPE REF TO zzxxmla1_cl_bw_auth_sql.
+    DATA api_check TYPE REF TO zzxxmla1_if_bw_auth_check.
     DATA characteristics TYPE ty_characteristics.
     DATA views TYPE ty_views.
 
@@ -213,6 +221,18 @@ CLASS zzxxmla1_cl_bw_auth_queries DEFINITION
                 named         TYPE zzxxmla1_cl_bw_auth=>ty_tuple OPTIONAL
                 factors       TYPE zzxxmla1_cl_bw_auth_sql=>ty_factors OPTIONAL
       RETURNING VALUE(result) TYPE ty_result.
+    "! the row with the API's answer, SKIPPED where the selection is not a product
+    METHODS api_answered
+      IMPORTING !row          TYPE ty_result
+                selection     TYPE zzxxmla1_cl_bw_auth=>ty_selection
+      RETURNING VALUE(result) TYPE ty_result.
+    "! the selection as a product of members per authorization-relevant characteristic (the aggregate where a tuple
+    "! has none), and the members the query names; is_product false if it is none
+    METHODS product_of
+      IMPORTING selection  TYPE zzxxmla1_cl_bw_auth=>ty_selection
+      EXPORTING !members   TYPE zzxxmla1_if_bw_auth_check=>ty_members
+                !named     TYPE zzxxmla1_if_bw_auth_check=>ty_members
+                is_product TYPE abap_bool.
     METHODS flat_queries
       IMPORTING characteristic TYPE ty_characteristic
       RETURNING VALUE(result)  TYPE ty_results.
@@ -265,6 +285,9 @@ CLASS zzxxmla1_cl_bw_auth_queries IMPLEMENTATION.
                      characteristics = list ).
     IF sql = abap_true.
       result->sql_check = zzxxmla1_cl_bw_auth_sql=>read( user = user provider = provider key_date = key_date ).
+    ENDIF.
+    IF api = abap_true.
+      result->api_check = zzxxmla1_cl_bw_auth_check=>for( user = user provider = provider key_date = key_date ).
     ENDIF.
   ENDMETHOD.
 
@@ -450,6 +473,10 @@ CLASS zzxxmla1_cl_bw_auth_queries IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD answered.
+    IF api_check IS BOUND.
+      result = api_answered( row = row selection = selection ).
+      RETURN.
+    ENDIF.
     result = row.
     DATA check TYPE zzxxmla1_cl_bw_auth=>ty_check.
     IF sql_check IS NOT BOUND.
@@ -521,6 +548,129 @@ CLASS zzxxmla1_cl_bw_auth_queries IMPLEMENTATION.
         APPEND LINES OF crossjoin_queries( rows_of = left cross_with = right ) TO result.
       ENDLOOP.
     ENDLOOP.
+  ENDMETHOD.
+
+  METHOD api_answered.
+    result = row.
+    product_of( EXPORTING selection = selection
+                IMPORTING members = DATA(members) named = DATA(named) is_product = DATA(is_product) ).
+    IF selection IS INITIAL OR is_product = abap_false.
+      result-status = c_skipped.
+      CLEAR: result-restricted, result-members.
+      RETURN.
+    ENDIF.
+    TRY.
+        DATA(answer) = api_check->check( members ).
+      CATCH zzxxmla1_cx_bw_auth_check INTO DATA(error).
+        answer = VALUE #( status = zzxxmla1_if_bw_auth_check=>c_status-error message = error->get_text( ) ).
+    ENDTRY.
+    result-status = answer-status.
+    result-reason = answer-reason.
+    result-message = answer-message.
+    " BW meets the members the query names first; a value of a set outside every authorization is no authorization
+    DATA(refused) = VALUE zzxxmla1_if_bw_auth_check=>ty_refused( ).
+    LOOP AT answer-refused INTO DATA(candidate).
+      IF line_exists( named[ table_line = candidate-member ] ).
+        refused = candidate.
+        EXIT.
+      ENDIF.
+    ENDLOOP.
+    IF refused IS INITIAL AND answer-refused IS NOT INITIAL.
+      " the members before the aggregates, as the API names its status
+      refused = answer-refused[ 1 ].
+      LOOP AT answer-refused INTO candidate WHERE member-kind <> zzxxmla1_if_bw_auth_check=>c_kind-aggregate.
+        refused = candidate.
+        EXIT.
+      ENDLOOP.
+      IF refused-reason = zzxxmla1_cl_bw_auth=>c_reason-value.
+        DATA(combination) = zzxxmla1_cl_bw_auth=>refusal( reason = zzxxmla1_cl_bw_auth=>c_reason-combination
+                                                          member = VALUE #( ) ).
+        refused-status = combination-status.
+        refused-reason = combination-reason.
+        refused-message = combination-message.
+      ENDIF.
+    ENDIF.
+    IF refused IS NOT INITIAL.
+      result-status = refused-status.
+      result-reason = refused-reason.
+      result-message = refused-message.
+    ENDIF.
+    IF result-status <> zzxxmla1_cl_bw_auth=>c_status-allowed.
+      CLEAR: result-restricted, result-members.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD product_of.
+    TYPES: BEGIN OF ty_column,
+             iobjnm  TYPE rsiobjnm,
+             members TYPE zzxxmla1_if_bw_auth_check=>ty_members,
+           END OF ty_column.
+    DATA columns TYPE STANDARD TABLE OF ty_column WITH EMPTY KEY.
+    DATA keys TYPE SORTED TABLE OF string WITH UNIQUE KEY table_line.
+    CLEAR: members, named.
+    is_product = abap_false.
+    " the characteristics in the order the query's tuples show them (BW meets a crossjoin's left side first), then the
+    " others: the API answers the first refused member of the request
+    DATA(relevant) = api_check->characteristics( ).
+    LOOP AT selection INTO DATA(first_tuple).
+      LOOP AT first_tuple INTO DATA(shown).
+        IF line_exists( relevant[ table_line = shown-iobjnm ] ) AND NOT line_exists( columns[ iobjnm = shown-iobjnm ] ).
+          APPEND VALUE #( iobjnm = shown-iobjnm ) TO columns.
+        ENDIF.
+      ENDLOOP.
+      EXIT.
+    ENDLOOP.
+    LOOP AT relevant INTO DATA(characteristic).
+      IF NOT line_exists( columns[ iobjnm = characteristic ] ).
+        APPEND VALUE #( iobjnm = characteristic ) TO columns.
+      ENDIF.
+    ENDLOOP.
+    LOOP AT selection INTO DATA(tuple).
+      DATA(key) = ``.
+      LOOP AT columns ASSIGNING FIELD-SYMBOL(<column>).
+        DATA(found) = 0.
+        DATA(member) = VALUE zzxxmla1_if_bw_auth_check=>ty_member( characteristic = <column>-iobjnm
+                                                                   kind = zzxxmla1_if_bw_auth_check=>c_kind-aggregate
+                                                                   value = zzxxmla1_if_bw_auth_check=>c_aggregate ).
+        LOOP AT tuple INTO DATA(internal) WHERE iobjnm = <column>-iobjnm.
+          found = found + 1.
+          member = VALUE #( characteristic = internal-iobjnm kind = internal-kind value = internal-value
+                            hierarchy = internal-hienm version = internal-version
+                            node_iobjnm = internal-node_iobjnm ).
+          CASE internal-kind.
+            WHEN zzxxmla1_cl_bw_auth=>c_kind-aggregate.
+              member = VALUE #( characteristic = internal-iobjnm kind = zzxxmla1_if_bw_auth_check=>c_kind-aggregate
+                                value = zzxxmla1_if_bw_auth_check=>c_aggregate ).
+            WHEN zzxxmla1_cl_bw_auth=>c_kind-value.
+              IF member-value IS INITIAL.
+                member-value = `#`.
+              ENDIF.
+            WHEN zzxxmla1_cl_bw_auth=>c_kind-node.
+              IF internal-node_iobjnm = internal-iobjnm.
+                " a leaf: a value with its hierarchy
+                member-kind = zzxxmla1_if_bw_auth_check=>c_kind-value.
+              ENDIF.
+          ENDCASE.
+          IF internal-named = abap_true AND NOT line_exists( named[ table_line = member ] ).
+            APPEND member TO named.
+          ENDIF.
+        ENDLOOP.
+        IF found > 1.
+          RETURN.
+        ENDIF.
+        IF NOT line_exists( <column>-members[ table_line = member ] ).
+          APPEND member TO <column>-members.
+        ENDIF.
+        key = |{ key }{ member-kind }/{ member-value }/{ member-hierarchy }/{ member-version }/{ member-node_iobjnm };|.
+      ENDLOOP.
+      INSERT key INTO TABLE keys.
+    ENDLOOP.
+    DATA(size) = CONV decfloat34( 1 ).
+    LOOP AT columns INTO DATA(column).
+      size = size * lines( column-members ).
+      APPEND LINES OF column-members TO members.
+    ENDLOOP.
+    is_product = xsdbool( size = lines( keys ) ).
   ENDMETHOD.
 
   METHOD flat_queries.

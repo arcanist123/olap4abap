@@ -38,3 +38,6 @@ __pycache__/
 
 # SAP HANA AFL SDK, downloaded by hand
 /hana_afl/
+
+# Investigation of BW's MDX answers on analysis authorisations (H2LEAF): BW's answers, not published
+/auth_issue_investigation/

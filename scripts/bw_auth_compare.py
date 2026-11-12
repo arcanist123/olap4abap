@@ -19,7 +19,7 @@ import json
 import os
 import sys
 
-from auth_check_test import SWITCH_REASONS, bw_outcome, describe
+from auth_check_test import SWITCH_REASONS, bw_outcome, describe, read_documents, widened, without_logon
 from auth_probe import ROOT, Session, read_env, statement_key
 
 
@@ -57,10 +57,12 @@ def check_batch(api, user, key_date, statements):
 def compare(bw, answer):
     """None if they agree, "switch" if they agree as an EMPTY of the switch, else what differs."""
     outcome, status, test = bw_outcome(bw), answer["status"], bw["test"]
+    if status == "OK" and outcome == "NO AUTH" and widened(bw):
+        return "widened"
     if status == "OK":
         agrees = outcome == "OK" or (outcome == "EMPTY" and test.endswith(" NE"))
-    elif status in ("NO AUTH", "UNKNOWN") and outcome == "EMPTY" and "loggedOn" not in bw \
-            and bw["keyDate"] != "9999-12-31" and answer.get("reason") in SWITCH_REASONS:
+    elif status in ("NO AUTH", "UNKNOWN") and outcome == "EMPTY" and without_logon(bw) \
+            and answer.get("reason") in SWITCH_REASONS:
         return "switch"
     else:
         agrees = outcome == status
@@ -93,14 +95,14 @@ def main():
             return 0
         statements = json.load(open(os.path.join(args.dir, "statements.json"), encoding="utf-8"))
         files = sorted(f for f in glob.glob(os.path.join(args.dir, "*.json")) if not f.endswith("statements.json"))
-        documents = [json.load(open(f, encoding="utf-8")) for f in files]
+        documents = read_documents(files)
         documents = [d for d in documents if not args.scenario or d["scenario"] in args.scenario]
         if args.scenario and len(documents) != len(set(args.scenario)):
             sys.exit(f"unknown scenario among {args.scenario}")
         failed = 0
         for document in documents:
             for key_date in [k for k in document["keyDates"] if not args.key_date or k in args.key_date]:
-                counts, differences, asked = {"agree": 0, "switch": 0}, [], []
+                counts, differences, asked = {"agree": 0, "switch": 0, "widened": 0}, [], []
                 for bw in document["results"]:
                     if bw["keyDate"] != key_date or bw["test"] == "HIERARCHIES" \
                             or (args.test and bw["test"] not in args.test):
@@ -118,12 +120,12 @@ def main():
                     difference = compare(bw, answer)
                     if difference is None:
                         counts["agree"] += 1
-                    elif difference == "switch":
-                        counts["switch"] += 1
+                    elif difference in ("switch", "widened"):
+                        counts[difference] += 1
                     else:
                         differences.append((bw, difference, answer))
                 print(f"{document['scenario']} {key_date}: {counts['agree']} agree, {counts['switch']} empty through "
-                      f"the switch, {len(differences)} differ", flush=True)
+                      f"the switch, {counts['widened']} widened by BW, {len(differences)} differ", flush=True)
                 kinds = {}
                 for bw, difference, _ in differences:
                     kind = f"{bw['test']}: {difference}"
