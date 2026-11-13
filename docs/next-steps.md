@@ -638,6 +638,91 @@ the endpoint with the logged-on user, BW's names in the answers and rowsets, BW'
 catalog shows (BW's provider against the schema's selections and user hierarchies), the key date of BW's XMLA
 service (today) and formatted values.
 
+## Next: members of a BW hierarchy named by their node
+
+Proposed by the user and agreed 2026-11-13: a query in olap4abap's names may name a member of a BW hierarchy by its
+node alone, without the path, as BW's MDX and the authorisations do; easier for people who write MDX by hand. Comes
+after the authorisations' step 5b, because which occurrence is taken depends on what the user may see.
+
+### Decided
+
+- **Forms, as BW's MDX names them.** A bare name is always a value of the hierarchy's own characteristic, as a leaf
+  (`[ZCLDOC.ZCLDOC_ORG].[009]`; NUMC with its zeros, a compounded value as its compound key). Anything else is named
+  with its InfoObject, as one key pair (`&[0HIER_NODE]&[GP]`, `&[ZCLSITE]&[NORTH]`, `&[1HIER_REST]&[REST_H]`) or in
+  BW's padded form (`[GP` padded to 32 characters, then `0HIER_NODE]`). So a bare name never finds a text node or a
+  node of an external characteristic (`[NORTH]` in `ZCLSERV_LOC` finds nothing).
+- **Postable nodes as BW names them:** the pair with the hierarchy's own characteristic (`&[ZCLPAT]&[<value>]`) is
+  the postable node with its subtree, the bare name (`[<value>]`) its own-value leaf. A postable node is in the
+  hierarchy once, so neither has several occurrences. Today's BW-names lookup (`lookup_bw_member`) does not tell
+  them apart (both search the characteristic's InfoObject and the first level wins, so `[<value>]` finds the node):
+  fixed by this step in both namings.
+- **Only as a fallback, BW hierarchies only:** after the level and root lookups of `lookup_child_of_hierarchy`
+  found nothing, so every query that resolves today resolves as before; never inside a path
+  (`[H].[PRIMARY].[CARD]` with `CARD` not below `PRIMARY` stays not found); not on level hierarchies, where names
+  repeat by design and the reference is the oracle.
+- **A node with several occurrences is supported; the functions whose result depends on the occurrence are
+  not.** Link nodes and duplicate leaves (`ZCLPAT_PRG`) have one shape under each parent (2026-10-15), so every
+  occurrence reads the same distinct SIDs. The reference resolves to a member flagged as a node of N occurrences,
+  internally one representative occurrence, the first the user may see in BW's order: its value is read through the
+  representative's path, so the fact SQL is unchanged. The flag is on the member, so a refusal is raised wherever
+  the member arrives (`CurrentMember`, `Generate`, named sets, calculated members), at evaluation, in the schema
+  reader's methods the functions go through:
+  - allowed: values (tuples, slicer, subselect, `Aggregate`, calculated measures, `Filter`, `TopCount`, `Order` with
+    `BASC`/`BDESC`), `.Name`, `.Caption`, `.UniqueName`, `.Properties`, `.Hierarchy`, `.Dimension`, `IS`;
+  - on an axis with its own unique name, the node form (`[ZCLPAT.ZCLPAT_PRG].&[ZCLPAT]&[000015]`), where all
+    occurrences are at one depth (an axis member carries its level); refused where the depths differ;
+  - refused: ascendants (`Parent`, `Ancestor`, `Ancestors`, `IsAncestor`, `PARENT_UNIQUE_NAME`), neighbours
+    (`Siblings`, `FirstSibling`, `LastSibling`, `PrevMember`, `NextMember`, `Lag`, `Lead`, `Cousin`, `IsSibling`,
+    `:`), position (`Hierarchize`, `Order` without `B`, `Rank`, `.Ordinal`, `OrderKey`), absolute depth (`.Level`,
+    `Descendants` to a level, where the depths differ), and for now the navigation down (`Children`, `Descendants`,
+    `DrilldownMember`, `DrilldownLevel`, `VisualTotals`): the same values below, but other members under each
+    occurrence; later possibly as nodes themselves.
+  A node with one occurrence is that member, with every function.
+- **Answers keep the unique names they have** (the key of the path) for every member but a node of several
+  occurrences: the node form is a way to write a query, not a new identity.
+- **The engine's shortcuts:** those that only read values (`fast_cells`, `cross_values`, the native `TopCount`,
+  `Filter` and `Order` by a measure) see the representative and stay as they are; those that build members from SQL
+  rows (the native crossjoin, `cells_first`, `outline_first`) are not used for a set that holds a node of several
+  occurrences (or map the representative back; decided when built).
+
+### Steps
+
+1. **BW's answers for a shared node (the auth probe).** `ZCLPAT`, the hierarchy with shared nodes, is not
+   authorisation relevant, and making it so would change every scenario (an authorisation without a line on it
+   allows nothing of it). So the clinic generator gets a further hierarchy of the authorisation-relevant `ZCLDIAG`,
+   e.g. `ZCLDIAG_SHR`, plain as `ZCLDIAG_ICD` and leaving it, `ZCLDOC_ORG` and the 71 reference cases unchanged: a
+   diagnosis as duplicate leaf under two parents at different depths, a linked text node with its subtree under two
+   parents, and a postable node (a diagnosis with children). New scenarios in `ZZXXMLA1_CL_BW_AUTH_GEN` (test users
+   after `A38`), each with `ZCLDOC` `*`:
+   - a type 1 line on a node that holds one occurrence of the duplicate leaf and of the linked node, not the other;
+   - a type 2 line whose level limit shows the shallow occurrence and not the deep one;
+   - a type 0 line on the linked text node itself, and one on the postable node;
+   - a flat line on the postable node's value (`EQ`), against a line on the postable node.
+   The questions, in BW's names through `scripts/auth_ask.py` (as `auth_issue_investigation`'s rounds) and added to
+   the probe's statements where they are shapes of `statements.json`: the shared node bare and padded, alone on rows,
+   as slicer, in a set with a visible node, its `Children`, `Parent`, `Siblings`, a crossjoin with `ZCLDIAG_ICD`'s
+   member of the other characteristic, NON EMPTY; the postable node padded and its value bare, alone and as slicer;
+   values (cells) where allowed. With the FULL user also the lookup question without authorisation: does the padded
+   form with the characteristic (`[<value>` padded, `ZCLDIAG]`) find a plain leaf? The new hierarchy changes the
+   hierarchies BW lists to users with `*` on `ZCLDIAG`: re-record `reference/auth/` (`auth_probe.py`) and keep the
+   comparisons (`auth_check_test.py`, `bw_auth_compare.py`) passing; `clinic-demo.md` describes the hierarchy and
+   the scenarios.
+2. **Decide the open points from step 1's answers** and record them in `mvp-scope.md` (Authorisation decision, BW's
+   rules): a node of several occurrences allowed where one occurrence is visible (proposed), or per occurrence as BW
+   answers; which occurrence BW's MDX takes and whether its `Parent` follows it; the pair form with the hierarchy's
+   own characteristic on a plain leaf (proposed: not found, unless BW finds it).
+3. **The lookup in BW's names** (`lookup_bw_member`, `ZZXXMLA1_CL_BW_HIERARCHY_COPY=>occurrences`): bare finds
+   leaves only, padded nodes only, the path table telling a leaf from a node (whether the occurrence has children;
+   check that the copy marks a postable node's own-value leaf); the occurrences counted in the whole hierarchy, the
+   representative the first visible one; `bw/check` and `bw_auth_compare.py` agree with the new scenarios.
+4. **The lookup in olap4abap's names:** the fallback in `lookup_child_of_hierarchy` for the bare name and the single
+   key pair, the flagged member, its unique name and level on an axis, and the refusals in the schema reader;
+   faults with olap4abap's texts. Unit tests on the schema reader (`ZCLPAT_PRG`: a duplicate leaf, a link, a
+   postable node in both forms, a unique node; `ZCLSERV_LOC`: `[NORTH]` not found, both pairs found).
+5. **End to end:** cases in olap4abap's names on `ZCLVISIT` (values of a node of several occurrences equal to the
+   full path's, the refusals, the postable node and its leaf; `xmla_test.py`), and the new scenarios as test users
+   through the endpoint once the authorisations' step 6 runs. Docs: `mvp-scope.md` (the naming), `CLAUDE.md`.
+
 ## Now: texts and captions
 
 Decided with the user 2026-10-16: the texts are the active work again, ahead of the rest of the BW hierarchies,
