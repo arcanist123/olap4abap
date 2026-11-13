@@ -630,6 +630,10 @@ compared, not only 9999-12-31.
    a hierarchy without a slice at the date left out (`ZZXXMLA1_CL_BW_HIERARCHY_COPY=>has_slice`) (2026-11-10).
    State of 2026-11-10: every test user's status agrees at every key date (2024-06-15, 2025-06-15, 9999-12-31; before
    the key date's slice, 393 statements at 2024-06-15 differed).
+   State of 2026-11-13: all 38 scenarios (`ZZXXMLA1_A01` to `A38`) agree at every key date, 114 runs; counted apart
+   are H2LEAF's queries BW widens (`known-issues.md`, BW's unexpected answers) and HVAL2 and HVAL3, refused as out of
+   scope (validity 2 and 3). `auth_check_test.py` agrees too with every engine (ABAP, SQL, API), ACTVT's hierarchy
+   list counted apart.
 
 Done when every test user's status agrees at every key date. Later, when BW's MDX is to return data: the engine
 enforces (the authorisations' step 5a with this selection, 5b the restriction of a hierarchy's members), Execute on
