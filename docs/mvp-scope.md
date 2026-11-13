@@ -212,11 +212,18 @@ Decisions taken by the project owner on 2026-10-02, with reasons.
     (`TCTHIENM`, `TCTHIEVERS`) and by node name and node type (`TCTNODE`, `TCTNIOBJNM`: `0HIER_NODE` for a text node,
     else the characteristic or an external one), not by `HIEID`. A line applies to the hierarchy olap4abap serves
     under that name and version (`<name>_<version>` of a version-dependent one).
-  - **Key date:** the line's date (`TCTHIEDATE`) is not matched: a line applies to the hierarchy of its name and
-    version whatever its date, and the values a node covers are those of the hierarchy's slice valid at the key
-    date. The check takes the key date as a parameter: queries use 9999-12-31, the key date olap4abap works with
-    (hierarchies, attributes and texts, see Key-date logic below), and the tests run it at several key dates, so
-    that it agrees with BW for every slice of a time-dependent hierarchy, not only the one queries see now.
+  - **Key date:** a line of validity 1 (`TCTACOMPM`, "Name and Version Identical") applies to the hierarchy of its
+    name and version whatever its date (`TCTHIEDATE`), and the nodes it shows are those of the hierarchy's slice
+    valid at the key date. The check takes the key date as a parameter: queries use 9999-12-31, the key date
+    olap4abap works with (hierarchies, attributes and texts, see Key-date logic below), and the tests run it at
+    several key dates, so that it agrees with BW for every slice of a time-dependent hierarchy, not only the one
+    queries see now.
+  - **Validity 0 and 1 are supported, 2 and 3 are not** (decided with the user 2026-11-13). Validity 0 ("Name,
+    Version Identical and Key Date Less Than or Equal to") is validity 1 up to the line's date; after it the line
+    still authorizes its flat values but shows no node of its hierarchy, which BW then does not list (HVAL0). A user
+    with an authorisation with a line of validity 2 ("Name Identical", any version) or 3 ("All Hierarchies") that
+    applies to the query's provider is not authorised, as with a variable: the query is a fault (reason `VALIDITY`),
+    whatever else the user has. The comparisons count HVAL2 and HVAL3 apart as out of scope.
   - **Variables are not supported** (decided with the user 2026-10-23): olap4abap does not fill them (`$` values,
     filled by a customer exit at query time). A user with an authorisation with a variable that applies to the
     query's provider is not authorised: the query is a fault (no authorisation), whatever else the user has.
@@ -224,7 +231,8 @@ Decisions taken by the project owner on 2026-10-02, with reasons.
     cartesian product numbers the user's authorisations and keeps per requested member a bit mask of those that
     admit it in one `BIGINT` (`next-steps.md`, The check for other callers). Only the authorisations relevant to the
     query's provider count: those that apply to it (`0TCAIPROV`, `0TCAACTVT`, `0TCAVALID` admit the provider,
-    display and today, and it has a line for every authorisation-relevant characteristic of the provider);
+    display and today; one without a line for an authorisation-relevant characteristic of the provider applies and
+    allows nothing of it, BW's Rules below);
     authorisations for other providers are left out before the numbering. A user with more than 63 relevant
     authorisations is not supported: every query on that provider is a fault (an `ERROR` of the ABAP API), raised
     when the profile is read.
@@ -270,7 +278,7 @@ selection BW does not allow is refused or unknown, never filtered silently; wher
   date, at its own depth, whether or not it is a flat value of the line (HDATE at 9999-12-31: `008` is below `GP`
   there, but no value of the line's slice to 2024-12-31; BW allows it alone and in every set). Under a type 0 or 2
   line BW refuses some sets of such leaves and expansions that end on leaves; olap4abap does not
-  (`known-issues.md`, BW's wrong answers).
+  (`known-issues.md`, BW's unexpected answers).
 - **A hierarchy is restricted, not refused, where the user has a line on it**: its members are the authorised
   subtree only, re-rooted (H1: `[ZCLDOC_ORG 001].Members` is GP and its six physicians, `LEVEL00` is GP, `LEVEL01` the
   physicians; GP has no parent: `.Parent` is empty), its ancestors refused as slicer or on rows, a visible node's
@@ -278,9 +286,13 @@ selection BW does not allow is refused or unknown, never filtered silently; wher
   (type 0, or at the level limit of type 2) has no children (`.Children` empty) and makes `.Members` of the hierarchy
   refused (H0, H2), while `Level.Members` answers the visible nodes of the level. Node type 1 has every member of
   the subtree; type 3 shows the complete hierarchy as it is, its node of the values not assigned (`REST_H`) with
-  them (`000`) too (H3). BW's metadata lists the hierarchies a user has a line on (and every hierarchy of a
-  characteristic with `*`); a hierarchy without a line is refused as a whole (members, nodes, crossjoins), only
-  `Level.Members` of it answers, empty.
+  them (`000`) too (H3). BW's metadata lists the hierarchies a user has a line on whose node is in the key date's
+  slice (HNEW: a node of the 2025 slice only lists nothing in 2024; and every hierarchy of a characteristic with
+  `*`); a hierarchy without such a line is refused as a whole (members, nodes, crossjoins), only `Level.Members` of
+  it answers, empty.
+- **An authorisation without a line for an authorisation-relevant characteristic applies and allows nothing of
+  it** (MISS: `ZCLDOC` `EQ 001` and no line on `ZCLDIAG`): BW knows `001` (a slicer on it is refused at the cells,
+  EYE 007), the other physicians are unknown, every diagnosis and node is refused and no hierarchy is listed.
 - **Within one authorisation the characteristics combine as AND, several authorisations as OR** (a union of
   sub-cubes, not per characteristic): CROSS (`009` with `I10`, `012` with `J45`) answers `(009, I10)` and
   `(012, J45)` and refuses `(009, J45)` and `(012, I10)` (EYE 007), each value alone (it aggregates the other) too;

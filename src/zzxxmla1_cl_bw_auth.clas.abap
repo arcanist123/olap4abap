@@ -16,12 +16,15 @@
 "! authorization-relevant characteristics: per authorization a sub-cube that allows per characteristic all values
 "! (CP *), the aggregate (:), flat values (EQ, BT, CP; # the not-assigned value) and per hierarchy line the nodes it
 "! shows and the leaves below them. An authorization applies when its special characteristics admit the provider
-"! (0TCAIPROV), display (0TCAACTVT 03) and today (0TCAVALID), each as far as it is authorization relevant, and it has
-"! a line for every authorization-relevant characteristic of the provider. A hierarchy line applies to the hierarchy of
-"! its name and version, in the slice valid at the key date whatever the line's date, by node type: 0 the node only, 1
-"! its subtree, 2 its subtree down to an absolute level, 3 the complete hierarchy (4, a relative level, BW corrects to
-"! 3 without a node variable). An applying authorization with a variable ($) makes the user not authorized: olap4abap
-"! fills no variables.
+"! (0TCAIPROV), display (0TCAACTVT 03) and today (0TCAVALID), each as far as it is authorization relevant; it allows
+"! nothing of an authorization-relevant characteristic of the provider it has no line for (BW knows its other values
+"! still: scenario MISS). A hierarchy line applies to the hierarchy of its name and version, in the slice valid at the
+"! key date, by node type: 0 the node only, 1 its subtree, 2 its subtree down to an absolute level, 3 the complete
+"! hierarchy (4, a relative level, BW corrects to 3 without a node variable); a line whose node the key date's slice
+"! does not have shows no node (BW does not list the hierarchy). By validity (TCTACOMPM): 1 whatever the line's date,
+"! 0 up to the line's date, after it the line authorizes its values but shows no node (expired). An applying
+"! authorization with a variable ($) or a line of another validity (2 name only, 3 all hierarchies) makes the user not
+"! authorized: olap4abap fills no variables and matches hierarchies by name and version.
 "! read( ) reads it from BW (RSECVAL_STRING, RSECHIE_STRING, the user's S_RS_AUTH and RSECUSERAUTH, RSHIEDIR and the
 "! hierarchy tables); create( ) builds it from given lines, for the unit tests. Read without expanding the hierarchy
 "! lines (expand false), it reads no slice and gives the check in HANA (ZZXXMLA1_CL_BW_AUTH_SQL) its profile: the
@@ -45,8 +48,9 @@ CLASS zzxxmla1_cl_bw_auth DEFINITION
            END OF ty_value_line.
     TYPES ty_value_lines TYPE STANDARD TABLE OF ty_value_line WITH EMPTY KEY.
     "! a hierarchy line (RSECHIE_STRING): a node by name and InfoObject (0HIER_NODE for a text node) of the hierarchy
-    "! of the name and version, its node type (0 to 4), level (type 2) and date (TCTHIEDATE, the slice its values come
-    "! from)
+    "! of the name and version, its node type (0 to 4), level (type 2), date (TCTHIEDATE, the slice its values come
+    "! from) and validity (TCTACOMPM, initial as 1); expired: validity 0 and the key date after the line's date, so the
+    "! line authorizes its values but shows no node
     TYPES: BEGIN OF ty_hierarchy_line,
              auth        TYPE rsauth,
              iobjnm      TYPE rsiobjnm,
@@ -57,6 +61,8 @@ CLASS zzxxmla1_cl_bw_auth DEFINITION
              type        TYPE c LENGTH 1,
              level       TYPE i,
              date        TYPE d,
+             validity    TYPE c LENGTH 1,
+             expired     TYPE abap_bool,
            END OF ty_hierarchy_line.
     TYPES ty_hierarchy_lines TYPE STANDARD TABLE OF ty_hierarchy_line WITH EMPTY KEY.
     "! a node of a hierarchy slice (/BIC/H of the characteristic): a leaf has the characteristic as InfoObject, an
@@ -180,6 +186,7 @@ CLASS zzxxmla1_cl_bw_auth DEFINITION
     CONSTANTS: BEGIN OF c_reason,
                  provider    TYPE c LENGTH 12 VALUE 'PROVIDER',     " no authorization applies to the provider
                  variable    TYPE c LENGTH 12 VALUE 'VARIABLE',     " an applying authorization has a variable
+                 validity    TYPE c LENGTH 12 VALUE 'VALIDITY',     " ... a line of validity 2 or 3
                  no_values   TYPE c LENGTH 12 VALUE 'NO VALUES',    " the characteristic has no value for the user
                  value       TYPE c LENGTH 12 VALUE 'VALUE',        " a value named outside every authorization
                  hierarchy   TYPE c LENGTH 12 VALUE 'HIERARCHY',    " a hierarchy without a line of the user
@@ -231,7 +238,7 @@ CLASS zzxxmla1_cl_bw_auth DEFINITION
     "! Whether one sub-cube allows everything (0BI_ALL, CP * on every characteristic): no check is needed.
     METHODS unrestricted
       RETURNING VALUE(result) TYPE abap_bool.
-    "! What the user may see of a hierarchy of a characteristic, over all sub-cubes.
+    "! What the user may see of a hierarchy of a characteristic, over all sub-cubes; nothing with a provider_refusal.
     METHODS hierarchy_access
       IMPORTING iobjnm        TYPE rsiobjnm
                 hienm         TYPE rshienm
@@ -249,8 +256,8 @@ CLASS zzxxmla1_cl_bw_auth DEFINITION
       IMPORTING reason        TYPE csequence
                 member        TYPE ty_member
       RETURNING VALUE(result) TYPE ty_check.
-    "! The refusal of every selection: no authorization applies to the provider, or an applying one has a variable;
-    "! initial if neither.
+    "! The refusal of every selection: no authorization applies to the provider, or an applying one has a variable or
+    "! a line of an unsupported validity; initial if none.
     METHODS provider_refusal
       RETURNING VALUE(result) TYPE ty_check.
 
@@ -297,17 +304,18 @@ CLASS zzxxmla1_cl_bw_auth DEFINITION
     DATA characteristics TYPE ty_characteristics.
     DATA subcubes TYPE ty_subcubes.
     DATA variable TYPE abap_bool.
+    "! an applying authorization has a hierarchy line of validity 2 or 3
+    DATA unsupported_validity TYPE abap_bool.
     "! the hierarchy lines of the applying authorizations on the authorization-relevant characteristics
     DATA hierarchy_lines TYPE ty_hierarchy_lines.
 
-    "! the part of one characteristic in an authorization; not present: the authorization has no line for it
+    "! the part of one characteristic in an authorization; without a line for it the part allows nothing
     CLASS-METHODS part
       IMPORTING iobjnm        TYPE rsiobjnm
                 !values       TYPE ty_value_lines
                 hierarchies   TYPE ty_hierarchy_lines
                 slices        TYPE ty_slices
                 value_slices  TYPE ty_slices
-      EXPORTING present       TYPE abap_bool
       RETURNING VALUE(result) TYPE ty_part.
     "! the nodes a hierarchy line shows in the slice and the values below them
     CLASS-METHODS cover
@@ -424,7 +432,7 @@ CLASS zzxxmla1_cl_bw_auth IMPLEMENTATION.
                       high   = value-tcthigh ) TO lines-values.
     ENDLOOP.
 
-    SELECT tctauth, tctiobjnm, tcthienm, tcthievers, tcthiedate, tctniobjnm, tctnode, tctatype, tcttlevel
+    SELECT tctauth, tctiobjnm, tcthienm, tcthievers, tcthiedate, tctniobjnm, tctnode, tctatype, tcttlevel, tctacompm
       FROM rsechie_string
       WHERE objvers = 'A'
         AND tctauth IN @auths
@@ -433,6 +441,7 @@ CLASS zzxxmla1_cl_bw_auth IMPLEMENTATION.
     LOOP AT hierarchies INTO DATA(hierarchy).
       " the values of a line come from the slice valid at its date (today without one)
       DATA(date) = COND d( WHEN hierarchy-tcthiedate IS INITIAL THEN today ELSE hierarchy-tcthiedate ).
+      DATA(validity) = CONV string( hierarchy-tctacompm ).
       APPEND VALUE #( auth        = hierarchy-tctauth
                       iobjnm      = hierarchy-tctiobjnm
                       hienm       = hierarchy-tcthienm
@@ -441,7 +450,9 @@ CLASS zzxxmla1_cl_bw_auth IMPLEMENTATION.
                       node        = hierarchy-tctnode
                       type        = hierarchy-tctatype
                       level       = hierarchy-tcttlevel
-                      date        = date ) TO lines-hierarchies.
+                      date        = date
+                      validity    = validity
+                      expired     = xsdbool( validity = `0` AND key_date > date ) ) TO lines-hierarchies.
       IF expand = abap_false OR NOT line_exists( lines-characteristics[ table_line = hierarchy-tctiobjnm ] ).
         CONTINUE.
       ENDIF.
@@ -586,41 +597,34 @@ CLASS zzxxmla1_cl_bw_auth IMPLEMENTATION.
       LOOP AT hierarchies TRANSPORTING NO FIELDS WHERE node CP '$*'.
         result->variable = abap_true.
       ENDLOOP.
-
-      " every authorization-relevant characteristic needs a line
-      DATA(subcube) = VALUE ty_subcube( auth = name ).
-      DATA present TYPE abap_bool.
-      LOOP AT lines-characteristics INTO DATA(characteristic).
-        DATA(part) = part( EXPORTING iobjnm      = characteristic
-                                     values      = values
-                                     hierarchies  = hierarchies
-                                     slices       = lines-slices
-                                     value_slices = lines-value_slices
-                           IMPORTING present      = present ).
-        IF present = abap_false.
-          applies = abap_false.
-          EXIT.
-        ENDIF.
-        INSERT part INTO TABLE subcube-parts.
+      " a line of validity 2 (name only) or 3 (all hierarchies): not authorized at all
+      LOOP AT hierarchies TRANSPORTING NO FIELDS WHERE validity <> space AND validity <> '0' AND validity <> '1'.
+        result->unsupported_validity = abap_true.
       ENDLOOP.
-      IF applies = abap_true.
-        APPEND subcube TO result->subcubes.
-        LOOP AT hierarchies INTO DATA(hierarchy) WHERE node NP '$*'.
-          IF line_exists( lines-characteristics[ table_line = hierarchy-iobjnm ] ).
-            APPEND hierarchy TO result->hierarchy_lines.
-          ENDIF.
-        ENDLOOP.
-      ENDIF.
+
+      " a characteristic without a line is a part that allows nothing
+      DATA(subcube) = VALUE ty_subcube( auth = name ).
+      LOOP AT lines-characteristics INTO DATA(characteristic).
+        INSERT part( iobjnm       = characteristic
+                     values       = values
+                     hierarchies  = hierarchies
+                     slices       = lines-slices
+                     value_slices = lines-value_slices ) INTO TABLE subcube-parts.
+      ENDLOOP.
+      APPEND subcube TO result->subcubes.
+      LOOP AT hierarchies INTO DATA(hierarchy) WHERE node NP '$*'.
+        IF line_exists( lines-characteristics[ table_line = hierarchy-iobjnm ] ).
+          APPEND hierarchy TO result->hierarchy_lines.
+        ENDIF.
+      ENDLOOP.
     ENDLOOP.
   ENDMETHOD.
 
   METHOD part.
     DATA(characteristic) = iobjnm.
     result-iobjnm = characteristic.
-    present = abap_false.
     DATA(excluding) = abap_false.
     LOOP AT values INTO DATA(value) WHERE iobjnm = characteristic.
-      present = abap_true.
       IF value-sign = 'E'.
         excluding = abap_true.
       ENDIF.
@@ -644,7 +648,6 @@ CLASS zzxxmla1_cl_bw_auth IMPLEMENTATION.
     result-flat = result-ranges.
 
     LOOP AT hierarchies INTO DATA(line) WHERE iobjnm = characteristic.
-      present = abap_true.
       IF is_variable( line-node ) = abap_true.
         CONTINUE.
       ENDIF.
@@ -658,6 +661,10 @@ CLASS zzxxmla1_cl_bw_auth IMPLEMENTATION.
         APPEND LINES OF cover( line = line slice = value_slice )-ranges TO result-ranges.
       ELSE.
         APPEND LINES OF cover-ranges TO result-ranges.
+      ENDIF.
+      " no node shown: an expired line, or one whose node the key date's slice does not have
+      IF line-expired = abap_true OR ( cover-nodes IS INITIAL AND slice-nodes IS NOT INITIAL ).
+        CONTINUE.
       ENDIF.
       READ TABLE result-hierarchies ASSIGNING FIELD-SYMBOL(<hierarchy>)
            WITH TABLE KEY hienm = line-hienm version = line-version.
@@ -845,6 +852,12 @@ CLASS zzxxmla1_cl_bw_auth IMPLEMENTATION.
       result = refused( reason  = c_reason-variable
                         message = |You do not have sufficient authorization: an analysis authorization with a | &&
                                   |variable applies to the InfoProvider { provider }, and variables are not supported| ).
+    ELSEIF unsupported_validity = abap_true.
+      result = refused( reason  = c_reason-validity
+                        message = |You do not have sufficient authorization: an analysis authorization with a | &&
+                                  |hierarchy line of validity "Name Identical" or "All Hierarchies" applies to the | &&
+                                  |InfoProvider { provider }, and only "Name and Version Identical" and its key date | &&
+                                  |form are supported| ).
     ELSEIF subcubes IS INITIAL.
       result = refused( reason  = c_reason-provider
                         message = |You do not have sufficient authorization for the InfoProvider { provider }| ).
@@ -1005,6 +1018,10 @@ CLASS zzxxmla1_cl_bw_auth IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD hierarchy_access.
+    " a user refused every selection sees no hierarchy
+    IF provider_refusal( ) IS NOT INITIAL.
+      RETURN.
+    ENDIF.
     LOOP AT subcubes INTO DATA(subcube).
       READ TABLE subcube-parts INTO DATA(part) WITH TABLE KEY iobjnm = iobjnm.
       IF sy-subrc <> 0.

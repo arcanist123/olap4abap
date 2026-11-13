@@ -26,6 +26,8 @@ CLASS ltc_bw_auth DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHOR
     METHODS none FOR TESTING.
     METHODS other_provider FOR TESTING.
     METHODS missing_characteristic FOR TESTING.
+    METHODS unsupported_validity FOR TESTING.
+    METHODS expired_line FOR TESTING.
     METHODS flat_values FOR TESTING.
     METHODS flat_aggregated FOR TESTING.
     METHODS interval_and_pattern FOR TESTING.
@@ -269,10 +271,55 @@ CLASS ltc_bw_auth IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD missing_characteristic.
-    " no line for the diagnosis: the authorization does not apply
-    DATA(region) = region( values = VALUE #( ( value_line( option = 'CP' low = `*` ) ) ) ).
+    " no line for the diagnosis: the authorization applies and allows no diagnosis (BW, scenario MISS)
+    DATA(region) = region( values = VALUE #( ( value_line( low = `001` ) ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = lines( region->applying( ) ) exp = 1 ).
     assert_check( region = region selection = total( ) status = zzxxmla1_cl_bw_auth=>c_status-no_auth
-                  reason = zzxxmla1_cl_bw_auth=>c_reason-provider msg = `no ZCLDIAG line` ).
+                  reason = zzxxmla1_cl_bw_auth=>c_reason-combination msg = `total` ).
+    " 001 is known, refused with the diagnosis aggregated; 002 is unknown; no diagnosis has a value
+    assert_check( region = region selection = VALUE #( ( VALUE #( ( doc( `001` ) ) ) ) )
+                  status = zzxxmla1_cl_bw_auth=>c_status-no_auth reason = zzxxmla1_cl_bw_auth=>c_reason-combination
+                  msg = `001` ).
+    assert_check( region = region selection = VALUE #( ( VALUE #( ( doc( `002` ) ) ) ) )
+                  status = zzxxmla1_cl_bw_auth=>c_status-unknown reason = zzxxmla1_cl_bw_auth=>c_reason-value
+                  msg = `002` ).
+    assert_check( region = region selection = VALUE #( ( VALUE #( ( diag( `I10` ) ) ) ) )
+                  status = zzxxmla1_cl_bw_auth=>c_status-no_auth reason = zzxxmla1_cl_bw_auth=>c_reason-no_values
+                  msg = `I10` ).
+    cl_abap_unit_assert=>assert_false(
+      region->hierarchy_access( iobjnm = c_diag hienm = c_icd version = '' )-lines ).
+  ENDMETHOD.
+
+  METHOD unsupported_validity.
+    " a line of validity 2 or 3 in an applying authorization: not authorized at all
+    DATA(region) = region( values      = VALUE #( ( all_diagnoses( ) ) )
+                           hierarchies = VALUE #( ( VALUE #( BASE hierarchy_line( node = `GP` ) validity = '2' ) ) ) ).
+    assert_check( region = region selection = VALUE #( ( VALUE #( ( org( `GP` ) ) ( diag( `I10` ) ) ) ) )
+                  status = zzxxmla1_cl_bw_auth=>c_status-no_auth reason = zzxxmla1_cl_bw_auth=>c_reason-validity
+                  msg = `validity 2` ).
+    region = region( values      = VALUE #( ( all_diagnoses( ) ) )
+                     hierarchies = VALUE #( ( VALUE #( BASE hierarchy_line( node = `GP` ) validity = '3' ) ) ) ).
+    assert_check( region = region selection = total( ) status = zzxxmla1_cl_bw_auth=>c_status-no_auth
+                  reason = zzxxmla1_cl_bw_auth=>c_reason-validity msg = `validity 3` ).
+    " 0 and 1 are supported
+    region = region( values      = VALUE #( ( all_diagnoses( ) ) )
+                     hierarchies = VALUE #( ( VALUE #( BASE hierarchy_line( node = `GP` ) validity = '0' ) ) ) ).
+    assert_check( region = region selection = VALUE #( ( VALUE #( ( org( `GP` ) ) ( diag( `I10` ) ) ) ) )
+                  status = zzxxmla1_cl_bw_auth=>c_status-allowed msg = `validity 0` ).
+  ENDMETHOD.
+
+  METHOD expired_line.
+    " validity 0 after the line's date: its values are authorized, its hierarchy shows nothing (BW, scenario HVAL0)
+    DATA(region) = region( values      = VALUE #( ( all_diagnoses( ) ) )
+                           hierarchies = VALUE #( ( VALUE #( BASE hierarchy_line( node = `GP` )
+                                                             validity = '0' date = '20241231' expired = abap_true ) ) ) ).
+    assert_check( region = region selection = VALUE #( ( VALUE #( ( doc( `001` ) ) ( diag( `I10` ) ) ) ) )
+                  status = zzxxmla1_cl_bw_auth=>c_status-allowed msg = `001 as a value` ).
+    assert_check( region = region selection = VALUE #( ( VALUE #( ( org( `GP` ) ) ( diag( `I10` ) ) ) ) )
+                  status = zzxxmla1_cl_bw_auth=>c_status-no_auth reason = zzxxmla1_cl_bw_auth=>c_reason-hierarchy
+                  msg = `GP` ).
+    cl_abap_unit_assert=>assert_false(
+      region->hierarchy_access( iobjnm = c_doc hienm = c_org version = '001' )-lines ).
   ENDMETHOD.
 
   METHOD flat_values.
@@ -432,11 +479,13 @@ CLASS ltc_bw_auth IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD node_not_in_slice.
-    " a leaf the slice at the key date does not have: the line shows nothing
+    " a leaf the slice at the key date does not have: the line shows nothing, the hierarchy is not listed (BW,
+    " scenario HNEW)
     DATA(region) = region( values      = VALUE #( ( all_diagnoses( ) ) )
                            hierarchies = VALUE #( ( hierarchy_line( node_iobjnm = c_doc node = `099` type = '0' ) ) ) ).
-    cl_abap_unit_assert=>assert_initial(
-      region->hierarchy_access( iobjnm = c_doc hienm = c_org version = '001' )-nodes ).
+    DATA(access) = region->hierarchy_access( iobjnm = c_doc hienm = c_org version = '001' ).
+    cl_abap_unit_assert=>assert_initial( access-nodes ).
+    cl_abap_unit_assert=>assert_false( access-lines ).
     assert_check( region = region selection = VALUE #( ( VALUE #( ( doc( `099` ) ) ) ) )
                   status = zzxxmla1_cl_bw_auth=>c_status-no_auth reason = zzxxmla1_cl_bw_auth=>c_reason-no_values
                   msg = `099` ).

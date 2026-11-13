@@ -6,7 +6,8 @@ members without cells, their selection checked in HANA; the user's profile read 
 compares the check's (the logged-on answer where the file has one, an EMPTY of the switch at the other key dates):
 - OK: BW answers OK (EMPTY too for a NON EMPTY query, whose members may have no facts);
 - EMPTY, NO AUTH, UNKNOWN: BW gives the same;
-- ERROR: never agrees (the endpoint failed: the message says why).
+- ERROR: never agrees (the endpoint failed: the message says why);
+- a refusal for a hierarchy line of validity 2 or 3 (reason VALIDITY) is out of scope, counted apart.
 
     python scripts/bw_auth_compare.py                                  # every scenario at its key dates
     python scripts/bw_auth_compare.py --scenario H1 --key-date 9999-12-31 --show 50
@@ -19,7 +20,7 @@ import json
 import os
 import sys
 
-from auth_check_test import SWITCH_REASONS, bw_outcome, describe, read_documents, widened, without_logon
+from auth_check_test import OUT_OF_SCOPE, SWITCH_REASONS, bw_outcome, describe, read_documents, widened, without_logon
 from auth_probe import ROOT, Session, read_env, statement_key
 
 
@@ -57,6 +58,8 @@ def check_batch(api, user, key_date, statements):
 def compare(bw, answer):
     """None if they agree, "switch" if they agree as an EMPTY of the switch, else what differs."""
     outcome, status, test = bw_outcome(bw), answer["status"], bw["test"]
+    if answer.get("reason") == OUT_OF_SCOPE:
+        return "scope"
     if status == "OK" and outcome == "NO AUTH" and widened(bw):
         return "widened"
     if status == "OK":
@@ -102,7 +105,7 @@ def main():
         failed = 0
         for document in documents:
             for key_date in [k for k in document["keyDates"] if not args.key_date or k in args.key_date]:
-                counts, differences, asked = {"agree": 0, "switch": 0, "widened": 0}, [], []
+                counts, differences, asked = {"agree": 0, "switch": 0, "widened": 0, "scope": 0}, [], []
                 for bw in document["results"]:
                     if bw["keyDate"] != key_date or bw["test"] == "HIERARCHIES" \
                             or (args.test and bw["test"] not in args.test):
@@ -120,12 +123,12 @@ def main():
                     difference = compare(bw, answer)
                     if difference is None:
                         counts["agree"] += 1
-                    elif difference in ("switch", "widened"):
+                    elif difference in ("switch", "widened", "scope"):
                         counts[difference] += 1
                     else:
                         differences.append((bw, difference, answer))
                 print(f"{document['scenario']} {key_date}: {counts['agree']} agree, {counts['switch']} empty through "
-                      f"the switch, {counts['widened']} widened by BW, {len(differences)} differ", flush=True)
+                      f"the switch, {counts['widened']} widened by BW, {counts['scope']} out of scope, {len(differences)} differ", flush=True)
                 kinds = {}
                 for bw, difference, _ in differences:
                     kind = f"{bw['test']}: {difference}"

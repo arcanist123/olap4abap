@@ -81,8 +81,8 @@ INTERFACE zzxxmla1_if_bw_auth_check
                unknown TYPE c LENGTH 8 VALUE 'UNKNOWN',
                error   TYPE c LENGTH 8 VALUE 'ERROR',
              END OF c_status.
-  "! the reasons of an error; the reasons of a refusal are BW's (PROVIDER, VARIABLE, NO VALUES, VALUE, HIERARCHY,
-  "! NODE, COMBINATION)
+  "! the reasons of an error; the reasons of a refusal are BW's (PROVIDER, VARIABLE, VALIDITY, NO VALUES, VALUE,
+  "! HIERARCHY, NODE, COMBINATION)
   CONSTANTS: BEGIN OF c_error,
                missing   TYPE c LENGTH 12 VALUE 'MISSING',    " an authorization-relevant characteristic not asked
                request   TYPE c LENGTH 12 VALUE 'REQUEST',    " a member that is not well formed

@@ -91,7 +91,7 @@ Known faults of the reference server (eMondrian); its answer is not the oracle t
   - a label filter on an upper level (contains `RESP` on `ZCLDIAG_ICD`'s `Level 02`, in a subselect) leaves every
     cell empty, the All member's too (olap4abap's answer: deliberate deviations above).
 
-## BW's wrong answers
+## BW's unexpected answers
 
 BW is the oracle of the analysis authorisations (`reference/auth/`, `mvp-scope.md`, BW's rules); where it answers
 against its own rules, olap4abap does not follow it.
@@ -114,3 +114,10 @@ against its own rules, olap4abap does not follow it.
   rule BW applies to a single member and to every member under an unlimited line, so it allows these queries.
   `auth_check_test.py` and `bw_auth_compare.py` count such rows apart ("widened by BW": BW refuses at the cells or
   the axis, olap4abap allows, the user has a type 0 or 2 line on the row's hierarchy).
+- **Hierarchies listed to a user who may display nothing** (scenario ACTVT: everything, but `0TCAACTVT` `EQ 02`,
+  change and no display; observed 2026-11-12, decided with the user 2026-11-13). BW refuses every query of the user
+  (TOTAL and every member: EYE 007 or a system error), as for a user without authorisation on the provider, but its
+  metadata lists every hierarchy of `ZCLDOC` and `ZCLDIAG`, as the authorisation's `*` would without the activity.
+  PROV and VALID, restricted by the provider and the validity, list nothing. olap4abap lists no hierarchy to a user
+  refused every selection. `auth_check_test.py` counts such a list apart ("listed by BW to a refused user": the
+  check refuses the user, reason PROVIDER, and lists nothing).

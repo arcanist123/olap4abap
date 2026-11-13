@@ -15,8 +15,13 @@ every ERROR of 9999-12-31 is refused logged on). The check agrees when
   the first 21 scenarios; counted apart as "empty through the switch");
 - ALLOWED where BW refuses at reading the cells or the axis (EYE 007) on a hierarchy the user has a level-limited
   line on (type 0 or 2): BW checks a set of leaves, or an expansion that ends on leaves, as the node with its whole
-  subtree, which such a line does not cover (docs/known-issues.md, the reference's wrong answers); counted apart as
-  "widened by BW".
+  subtree, which such a line does not cover (docs/known-issues.md, BW's unexpected answers); counted apart as
+  "widened by BW";
+- out of scope: the check refuses the user for a hierarchy line of validity 2 or 3 (reason VALIDITY, docs/mvp-scope.md,
+  Authorisation decision), whatever BW answers, and lists no hierarchy then; counted apart as "out of scope";
+- HIERARCHIES where the check refuses the user every selection (reason PROVIDER) and lists nothing, while BW lists
+  hierarchies to the user it refuses every query (ACTVT, docs/known-issues.md, BW's unexpected answers); counted apart as
+  "listed by BW to a refused user".
 For a restricted hierarchy the members the check says the query shows are compared with BW's rows: equal, or for a
 NON EMPTY query BW's among them. The hierarchies BW lists (HIERARCHIES) are compared as sets.
 
@@ -39,6 +44,10 @@ from auth_probe import PAIRS, ROOT, Session, read_env, statement_key
 
 REFUSED = ("NO AUTH", "UNKNOWN")
 SWITCH_REASONS = ("HIERARCHY", "NO VALUES")
+# the check's refusal of a user outside olap4abap's scope: a hierarchy line of validity 2 or 3
+OUT_OF_SCOPE = "VALIDITY"
+# the check's refusal of a user without an authorisation for the provider
+NO_PROVIDER = "PROVIDER"
 # BW's refusal at reading the cells or the axis (the probe's prefix), as opposed to the node check's refusal
 WIDENED_MESSAGE = re.compile(r"^(cells|axis): EYE 007")
 LIMITED_LINE = re.compile(r"^(\S+) (\S+) version (\S*) .* type ([0-4]) ")
@@ -79,14 +88,19 @@ def bw_outcome(row):
     return "NO AUTH" if row["status"] == "ERROR" else row["status"]
 
 
-def compare(bw, check):
+def compare(bw, check, out_of_scope=False, refused_user=False):
     """None if they agree, "switch" if they agree as an EMPTY of the switch, "widened" if BW refuses by widening a set
-    of leaves, else what differs."""
+    of leaves, "scope" if the check refuses the user as out of scope (out_of_scope: it does so for the scenario),
+    "listed" if BW lists hierarchies to a user the check refuses every selection (refused_user), else what differs."""
     outcome, status, test = bw_outcome(bw), check["status"], bw["test"]
+    if check.get("reason") == OUT_OF_SCOPE or (out_of_scope and test == "HIERARCHIES"):
+        return "scope"
     if test == "HIERARCHIES":
         listed = {h for h in bw.get("answer", "").split("; ") if h}
         mine = {h for h in check["answer"].split("; ") if h}
-        return None if listed == mine else f"listed {sorted(listed)}, check {sorted(mine)}"
+        if listed == mine:
+            return None
+        return "listed" if refused_user and not mine else f"listed {sorted(listed)}, check {sorted(mine)}"
     if status == "ALLOWED" and outcome == "NO AUTH" and widened(bw):
         return "widened"
     if status == "ALLOWED":
@@ -146,7 +160,11 @@ def main():
                 checked = {}
                 for row in body["results"]:
                     checked.setdefault(statement_key({**row, "keyDate": key_date}), []).append(row)
-                counts, differences, unasked = {"agree": 0, "switch": 0, "widened": 0, "skipped": 0}, [], 0
+                counts, differences, unasked = {"agree": 0, "switch": 0, "widened": 0, "skipped": 0, "scope": 0,
+                                                "listed": 0}, [], 0
+                out_of_scope = any(row.get("reason") == OUT_OF_SCOPE for row in body["results"])
+                refused_user = any(row.get("test") == "TOTAL" and row.get("reason") == NO_PROVIDER
+                                   for row in body["results"])
                 for bw in (r for r in document["results"] if r["keyDate"] == key_date):
                     candidates = checked.get(statement_key(bw))
                     if not candidates:
@@ -157,17 +175,19 @@ def main():
                     if mine["status"] == "SKIPPED":
                         counts["skipped"] += 1
                         continue
-                    difference = compare(bw, mine)
+                    difference = compare(bw, mine, out_of_scope, refused_user)
                     if difference is None:
                         counts["agree"] += 1
-                    elif difference in ("switch", "widened"):
+                    elif difference in ("switch", "widened", "scope", "listed"):
                         counts[difference] += 1
                     else:
                         differences.append((bw, difference, mine))
                 extra = sum(len(rows) for rows in checked.values())
                 print(f"{document['scenario']} {key_date}: {counts['agree']} agree, {counts['switch']} empty through "
                       f"the switch, {len(differences) - unasked} differ, {unasked} not asked by the check, {extra} "
-                      f"asked only by the check, {counts['widened']} widened by BW, {counts['skipped']} skipped (not a product) "
+                      f"asked only by the check, {counts['widened']} widened by BW, {counts['scope']} out of scope, "
+                      f"{counts['listed']} listed by BW to a refused user, "
+                      f"{counts['skipped']} skipped (not a product) "
                       f"(authorizations {body['authorizations']})", flush=True)
                 kinds = {}
                 for bw, difference, _ in differences:

@@ -276,9 +276,11 @@ CLASS zzxxmla1_cl_bw_auth_sql IMPLEMENTATION.
         ENDIF.
       ENDLOOP.
       LOOP AT base-hierarchies INTO line.
+        " an expired line (validity 0 after its date) shows no node: no copy of the key date
         APPEND VALUE #( line       = line
-                        key_copy   = copy_of( copies = copies line = line date = key_date
-                                              rest = xsdbool( line-type = '3' OR line-type = '4' ) )
+                        key_copy   = COND #( WHEN line-expired = abap_false
+                                             THEN copy_of( copies = copies line = line date = key_date
+                                                           rest = xsdbool( line-type = '3' OR line-type = '4' ) ) )
                         value_copy = copy_of( copies = copies line = line date = line-date ) ) TO profile-lines.
       ENDLOOP.
     ENDIF.
@@ -336,7 +338,7 @@ CLASS zzxxmla1_cl_bw_auth_sql IMPLEMENTATION.
         characteristic = characteristic
         all            = xsdbool( line_exists( profile-flats[ iobjnm = characteristic all = abap_true ] ) ) ).
       IF visible-all = abap_false.
-        LOOP AT profile-lines INTO DATA(line) WHERE line-iobjnm = characteristic.
+        LOOP AT profile-lines INTO DATA(line) WHERE line-iobjnm = characteristic AND line-expired = abap_false.
           DATA(visible_line) = VALUE zzxxmla1_cl_bw_hierarchy_copy=>ty_visible_line(
             name = line-line-hienm version = line-line-version node_iobj = line-line-node_iobjnm
             node = line-line-node type = line-line-type level = line-line-level ).
@@ -528,8 +530,11 @@ CLASS zzxxmla1_cl_bw_auth_sql IMPLEMENTATION.
       |AND NOT EXISTS ( SELECT 1 FROM q_c AS c WHERE c."IOBJ" = m."IOBJ" AND c."WHICH" = 'V' AND c."LEAF" = 1 ) | &&
       |THEN '{ zzxxmla1_cl_bw_auth=>c_reason-no_values }' WHEN m."NAMED" = 1 THEN '{ zzxxmla1_cl_bw_auth=>c_reason-value }' | &&
       |ELSE '{ zzxxmla1_cl_bw_auth=>c_reason-combination }' END | &&
-      |WHEN EXISTS ( SELECT 1 FROM q_h AS h WHERE h."IOBJ" = m."IOBJ" AND h."HIENM" = m."HIENM" | &&
-      |AND h."VERSION" = m."VERSION" ) THEN '{ zzxxmla1_cl_bw_auth=>c_reason-node }' | &&
+      |WHEN EXISTS ( SELECT 1 FROM q_c AS c WHERE c."IOBJ" = m."IOBJ" AND c."HIENM" = m."HIENM" | &&
+      |AND c."VERSION" = m."VERSION" AND c."WHICH" = '{ c_key_copy }' ) | &&
+      |OR EXISTS ( SELECT 1 FROM q_h AS h WHERE h."IOBJ" = m."IOBJ" AND h."HIENM" = m."HIENM" | &&
+      |AND h."VERSION" = m."VERSION" AND h."WHICH" = '{ c_key_copy }' AND h."HIESID" = 0 ) | &&
+      |THEN '{ zzxxmla1_cl_bw_auth=>c_reason-node }' | &&
       |ELSE '{ zzxxmla1_cl_bw_auth=>c_reason-hierarchy }' END AS "REASON" | &&
       |FROM q_m AS m WHERE m."KIND" <> 'A' AND NOT EXISTS ( SELECT 1 FROM q_o AS o WHERE o."M" = m."M" )|.
   ENDMETHOD.
@@ -634,11 +639,12 @@ CLASS zzxxmla1_cl_bw_auth_sql IMPLEMENTATION.
                                CHANGING  params  = params ).
     CLEAR rows.
     LOOP AT profile-lines INTO DATA(line).
-      " the key date's copy always (also without one: the line still names its hierarchy), the line date's if any
+      " the key date's copy always (also without one: the line still names its hierarchy) but of an expired line, the
+      " line date's if any
       DO 2 TIMES.
         DATA(which) = COND string( WHEN sy-index = 1 THEN c_key_copy ELSE c_value_copy ).
         DATA(copy) = COND ty_copy( WHEN sy-index = 1 THEN line-key_copy ELSE line-value_copy ).
-        IF sy-index = 2 AND copy-hiesid = 0.
+        IF ( sy-index = 1 AND line-line-expired = abap_true ) OR ( sy-index = 2 AND copy-hiesid = 0 ).
           CONTINUE.
         ENDIF.
         APPEND VALUE #( ( NEW string( line-line-auth ) ) ( NEW string( line-line-iobjnm ) )

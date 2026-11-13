@@ -232,10 +232,16 @@ key dates, without `--verify`: no logon is needed, the switch's answer is enough
 row without logged-on answer as the switch's at every key date (`without_logon`: its EMPTY of a hierarchy without
 a line counts as refused). `scripts/auth_ask.py` asks BW's MDX any statement as a test user
 (`GET auth/probe?mdx=...`, `ZZXXMLA1_CL_BW_AUTH_PROBE=>run_statements`). H2LEAF showed BW refusing sets of leaves and
-expansions to leaves under a level-limited line, which olap4abap allows (`known-issues.md`, BW's wrong answers;
-`mvp-scope.md`, a leaf is a node of the key date's slice). Open from the comparison of the further scenarios: HNEW
-at 2024-06-15 (BW lists no hierarchy when the line's node is not in the key date's slice; the checks list it,
-`hierarchy_access`) and HVAL0, HVAL2, HVAL3 (the validity of a line), which differ in all three checks.
+expansions to leaves under a level-limited line, which olap4abap allows (`known-issues.md`, BW's unexpected answers;
+`mvp-scope.md`, a leaf is a node of the key date's slice).
+
+State on 2026-11-13: the differences of the further scenarios are closed (`mvp-scope.md`, Authorisation decision and
+BW's rules). The check reads a line's validity (`TCTACOMPM`): 0 shows no node after the line's date but keeps its
+values (HVAL0); 2 and 3 are out of scope and refuse the user (reason `VALIDITY`; the comparisons count HVAL2 and HVAL3
+as "out of scope"). A line whose node is not in the key date's slice lists no hierarchy (HNEW). An authorisation
+without a line for an authorisation-relevant characteristic applies and allows nothing of it (MISS, before: did not
+apply). A user refused every selection sees no hierarchy; BW lists them to ACTVT (activity `02` only), whom it
+refuses every query: an unexpected answer of BW (`known-issues.md`, BW's unexpected answers), counted apart by `auth_check_test.py`.
 
 ### Decisions answered by step 2
 
