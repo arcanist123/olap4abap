@@ -691,26 +691,102 @@ after the authorisations' step 5b, because which occurrence is taken depends on 
 
 ### Steps
 
-1. **BW's answers for a shared node (the auth probe).** `ZCLPAT`, the hierarchy with shared nodes, is not
-   authorisation relevant, and making it so would change every scenario (an authorisation without a line on it
-   allows nothing of it). So the clinic generator gets a further hierarchy of the authorisation-relevant `ZCLDIAG`,
-   e.g. `ZCLDIAG_SHR`, plain as `ZCLDIAG_ICD` and leaving it, `ZCLDOC_ORG` and the 71 reference cases unchanged: a
-   diagnosis as duplicate leaf under two parents at different depths, a linked text node with its subtree under two
-   parents, and a postable node (a diagnosis with children). New scenarios in `ZZXXMLA1_CL_BW_AUTH_GEN` (test users
-   after `A38`), each with `ZCLDOC` `*`:
-   - a type 1 line on a node that holds one occurrence of the duplicate leaf and of the linked node, not the other;
-   - a type 2 line whose level limit shows the shallow occurrence and not the deep one;
-   - a type 0 line on the linked text node itself, and one on the postable node;
-   - a flat line on the postable node's value (`EQ`), against a line on the postable node.
-   The questions, in BW's names through `scripts/auth_ask.py` (as `auth_issue_investigation`'s rounds) and added to
-   the probe's statements where they are shapes of `statements.json`: the shared node bare and padded, alone on rows,
-   as slicer, in a set with a visible node, its `Children`, `Parent`, `Siblings`, a crossjoin with `ZCLDIAG_ICD`'s
-   member of the other characteristic, NON EMPTY; the postable node padded and its value bare, alone and as slicer;
-   values (cells) where allowed. With the FULL user also the lookup question without authorisation: does the padded
-   form with the characteristic (`[<value>` padded, `ZCLDIAG]`) find a plain leaf? The new hierarchy changes the
-   hierarchies BW lists to users with `*` on `ZCLDIAG`: re-record `reference/auth/` (`auth_probe.py`) and keep the
-   comparisons (`auth_check_test.py`, `bw_auth_compare.py`) passing; `clinic-demo.md` describes the hierarchy and
-   the scenarios.
+1. **BW's answers for a shared node (the auth probe).** Planned in detail 2026-11-13.
+
+   *Why a new hierarchy.* The authorisation questions (which occurrence BW takes where one is visible, whether a
+   level limit shows the shallow occurrence and hides the deep one, whether `Parent` follows the visible occurrence)
+   need a shared node on an authorisation-relevant characteristic. Those are `ZCLDOC` and `ZCLDIAG`, and none of
+   their hierarchies has one (`ZCLDOC_ORG`, `ZCLDOC_SITE`: every physician once; `ZCLDIAG_ICD`: a plain tree).
+   `ZCLPAT_PRG` has the shapes, but `ZCLPAT` is not authorisation relevant. The alternatives were rejected:
+   `ZCLDIAG_ICD` must keep unique node names (the reference serves it as a level hierarchy: the 71 cases, the SSAS
+   build); `ZCLDOC_ORG` carries all 38 recorded scenarios; making `ZCLPAT` relevant needs a `ZCLPAT *` line in every
+   authorisation and makes the probe ask every patient. The lookup questions without restriction (bare and padded
+   forms, a postable node and its own-value leaf, a link by name) need no new hierarchy: they can be asked on
+   `ZCLPAT_PRG` with the FULL user.
+
+   *The hierarchy is for the authorisation questions only (decided by the user 2026-11-13):* it exists in BW, the
+   probe asks BW about it and the authorisation check reads its copy as it reads any hierarchy a line names
+   (independent of the schemas), but the clinic setup does not tick it: `tick_hierarchies` skips it, so `ZCLVISIT`,
+   `ZCLVISITA` and `ZCLHIER` stay as they are and no olap4abap query reads it; the 71 reference cases and
+   `bw_hierarchy_test.py --names` are unaffected. (The schema builder still offers it, as any hierarchy BW has.)
+
+   *a) The clinic generator* (`ZZXXMLA1_CL_BW_CLINIC_GEN`): a constant `c_hierarchy_shr` `ZCLDIAG_SHR`
+   ("Diagnoses by Care Area"), a method `shared_diagnosis_nodes` and one `APPEND` in `hierarchies`, plain (no
+   version, valid to 9999-12-31), the not-assigned node suppressed as in `ZCLDIAG_ICD` (`norest`), only a few
+   diagnoses, so that the probe's queries grow little. The existing node type and `add_node` already make link nodes,
+   duplicate leaves and postable nodes (`ZCLPAT_PRG`); `delete_hierarchies` deletes every hierarchy of `ZCLDIAG`.
+   Proposed shape (depth 1 the root):
+   ```
+   CARE  All Care Areas
+   ├ CHRONIC  Chronic Conditions          (2)
+   │ ├ J45                                 (3)  duplicate leaf, the shallow occurrence
+   │ ├ CARDIO  Cardiovascular              (3)  the linked text node, its original
+   │ │ └ I10, I20, I25                     (4)
+   │ └ E11                                 (3)  postable node
+   │   └ E78                               (4)
+   ├ FOLLOWUP  Follow-up Care              (2)
+   │ ├ REVIEW  Annual Review               (3)
+   │ │ ├ CARDIO  (link)                    (4)  its leaves at depth 5
+   │ │ └ J45                               (4)  the deep occurrence
+   │ └ Z09                                 (3)
+   └ ACUTE  Acute Conditions               (2)
+     └ J06, J18, A09                       (3)
+   ```
+   `FOLLOWUP` holds the deep `J45` and the link, not the shallow ones; a level limit of 3 shows the shallow `J45` and
+   `CARDIO`'s original without its leaves, and neither the deep `J45` nor the link. The header comment of the class
+   and `docs/clinic-demo.md` (a section "The shared hierarchy of the diagnoses") describe it.
+
+   *b) The scenarios* (`ZZXXMLA1_CL_BW_AUTH_GEN`): test users `A39` to `A44`, each authorisation with `ZCLDOC` `*`
+   (`every_physician`) and lines on `ZCLDIAG_SHR` through `node( iobjnm = c_diagnosis hierarchy = c_shr version = ''
+   ... )` (as `ZCLA_COMB`'s line on `ZCLDIAG_ICD`):
+   - `SHSUB` (`ZCLA_SHSUB`): type 1 on `FOLLOWUP`: one occurrence of the duplicate leaf and of the linked node;
+   - `SHLVL` (`ZCLA_SHLVL`): type 2 on `CARE` to level `03`: the shallow occurrence, not the deep one;
+   - `SHLINK` (`ZCLA_SHLINK`): type 0 on `CARDIO`, the linked text node itself;
+   - `SHPOST0` (`ZCLA_SHPOST0`): type 0 on the postable node `E11` (`node_iobjnm = c_diagnosis`);
+   - `SHPOST1` (`ZCLA_SHPOST1`): type 1 on the postable node `E11` (it and `E78`);
+   - `SHFLAT` (`ZCLA_SHFLAT`): the flat line `EQ E11`, against `SHPOST0` and `SHPOST1`.
+   Texts at most 20 characters (`rstxt20`).
+
+   *c) The probe* (`ZZXXMLA1_CL_BW_AUTH_PROBE`) asks every node of every hierarchy BW lists, so it asks the new one
+   without change, but three things are wrong for it:
+   - a postable node (InfoObject the characteristic, with children: `CHILDID` of `/BIC/H<char>`) is taken for a leaf:
+     no `CHILDREN` test and named bare (`[E11]`), which is the form in question. It gets two entries: the leaf as
+     now (node `E11`, bare), and the postable node in the padded form (`[E11` padded to 32, `ZCLDIAG]`, `node_name`
+     with a flag), node type `POSTABLE`, with the `CHILDREN` tests, as filter of `COMBINED` too;
+   - the key of a row (`auth_probe.statement_key`) has no node type, so the two entries would have one key and two
+     statements (`write_statements` stops): the postable entry is named `E11 ZCLDIAG` (the probe's form of a node,
+     as its member keys `GP 0HIER_NODE`), so no other row's key changes;
+   - a link node and a duplicate leaf are further rows of `/BIC/H` with the same name and the same statement: `nodes`
+     keeps the first row of each InfoObject and name and leaves out the links (`LINK`).
+
+   *d) The check's queries* (`ZZXXMLA1_CL_BW_AUTH_QUERIES`) build the probe's queries from the slice themselves, so
+   `hierarchy_queries` and `combined_queries` make the same rows: the postable node's second row `E11 ZCLDIAG` (its
+   member the node with its subtree, its children), each node name once. Where the check and BW differ on the new
+   scenarios, that is the finding of this step for step 2 and 3, not a failure to fix here; the existing scenarios
+   must keep agreeing.
+
+   *e) The scripts:* `auth_probe.py` gets `("ZCLDIAG_SHR", "")` in `SPLIT` (its docstring names the users to `A44`);
+   `auth_ask.py` gets `--characteristic` (its short forms name `ZCLDOC` now) and a short form of a value node in the
+   padded form, `{P:E11}` (`[E11` padded, then the characteristic).
+
+   *f) The questions*, in BW's names through `auth_ask.py` (as the earlier investigation rounds) for the new users and
+   FULL, at 9999-12-31, written to `.local/` and summed up in this step: the shared node bare and padded, alone on
+   rows, as slicer, in a set with a visible node, its `Children`, `Parent`, `Siblings`, a crossjoin with `ZCLDOC`'s
+   members, NON EMPTY; the link `CARDIO` and its children under each parent; the postable node padded and its value
+   bare, alone and as slicer, its `Children`; values (cells) where allowed. With FULL also the lookups without
+   authorisation: does the padded form with the characteristic (`[J06` padded, `ZCLDIAG]`) find a plain leaf, does
+   the bare `[E11]` find the postable node or its leaf, which occurrence of `J45` does its `Parent` give? The same
+   lookups on `ZCLPAT_PRG` confirm them on a hierarchy with links in linked subtrees. Shapes the probe does not ask
+   yet and that are worth keeping go into the probe's tests.
+
+   *g) Order:* the generator, the scenarios, the probe and the check's queries (unit tests of the probe's node list:
+   a postable node, a link, a duplicate leaf), abaplint, `sap-write.py` each class; the clinic setup with
+   authorisations (the password of `.env.sap`); `bw_hierarchy_test.py --catalog ZCLVISIT --names` and the `*_hier*`
+   cases of `xmla_test.py` unchanged; the questions (f); `auth_probe.py --verify 10` for every scenario (the new
+   hierarchy changes what BW lists to every user with `*` on `ZCLDIAG`, `HIERARCHIES`, and adds its nodes to every
+   scenario's rows: the growth of `reference/auth/`, 49 MB with 3,833 statements before, is noted in the commit);
+   `auth_check_test.py` with each engine and `bw_auth_compare.py`, the existing scenarios agreeing as before;
+   `clinic-demo.md` (the hierarchy, the scenarios), `pull`, commit.
 2. **Decide the open points from step 1's answers** and record them in `mvp-scope.md` (Authorisation decision, BW's
    rules): a node of several occurrences allowed where one occurrence is visible (proposed), or per occurrence as BW
    answers; which occurrence BW's MDX takes and whether its `Parent` follows it; the pair form with the hierarchy's
