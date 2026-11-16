@@ -4,16 +4,20 @@ probe's run_statements: BW's "Execute as Other User" at a key date), for questio
 (docs/clinic-demo.md, Probing BW's authorizations on them). Prints per user, key date and statement BW's status (OK,
 EMPTY, NO AUTH, UNKNOWN, ERROR), its message and the members of its rows; --json writes the answers to a file.
 
-A statement may use short forms on $ZCLVISITA's ZCLDOC hierarchies:
-    {H}            [ZCLDOC<pad 30>ZCLDOC_ORG<pad 30>001], the hierarchy (--hierarchy, --version change it)
+A statement may use short forms on $ZCLVISITA's hierarchies of a characteristic (--characteristic, ZCLDOC by default):
+    {H}            [ZCLDOC<pad 30>ZCLDOC_ORG<pad 30>001], the hierarchy (--hierarchy, --version change it; without
+                   version, --version "", [ZCLDIAG<pad 30>ZCLDIAG_SHR])
     {N:GP}         a text node: [GP<pad 32>0HIER_NODE<pad 30>] under {H}
     {L:001}        a leaf: [001] under {H}
+    {P:E11}        a value node in the padded form, a postable node: [E11<pad 32>ZCLDIAG<pad 30>] under {H}
     {F:001}        the flat value [ZCLDOC].[001]
     {M}            [Measures].[ZCLVISNO]
 A line of the statements file that starts with # is a comment.
 
     python scripts/auth_ask.py --scenario H2LEAF --scenario FULL --key-date 9999-12-31 --file questions.mdx
     python scripts/auth_ask.py --scenario H2LEAF "SELECT {{M}} ON 0, {{N:GP}.Children} ON 1 FROM [$ZCLVISITA]"
+    python scripts/auth_ask.py --scenario SHPOST1 --characteristic ZCLDIAG --hierarchy ZCLDIAG_SHR --version "" \
+        "SELECT {{M}} ON 0, {{P:E11}.Children} ON 1 FROM [$ZCLVISITA]"
 """
 import argparse
 import json
@@ -24,9 +28,11 @@ from auth_probe import ROOT, Session, read_env  # noqa: F401  (ROOT for callers)
 
 
 def expand(statement, hierarchy, version, characteristic="ZCLDOC"):
-    unique = f"[{characteristic:<30}{hierarchy:<30}{version}]"
+    # BW names a hierarchy without version without padding its name
+    unique = f"[{characteristic:<30}{hierarchy:<30}{version}]" if version else f"[{characteristic:<30}{hierarchy}]"
     statement = statement.replace("{H}", unique).replace("{M}", "[Measures].[ZCLVISNO]")
     statement = re.sub(r"\{N:([^}]+)\}", lambda m: f"{unique}.[{m.group(1):<32}{'0HIER_NODE':<30}]", statement)
+    statement = re.sub(r"\{P:([^}]+)\}", lambda m: f"{unique}.[{m.group(1):<32}{characteristic:<30}]", statement)
     statement = re.sub(r"\{L:([^}]+)\}", lambda m: f"{unique}.[{m.group(1)}]", statement)
     statement = re.sub(r"\{F:([^}]+)\}", lambda m: f"[{characteristic}].[{m.group(1)}]", statement)
     return statement
@@ -44,6 +50,7 @@ def main():
     parser.add_argument("--file", help="statements, one per line")
     parser.add_argument("--scenario", action="append", required=True, help="a scenario (its test user); repeatable")
     parser.add_argument("--key-date", action="append", help="YYYY-MM-DD; repeatable (default 9999-12-31)")
+    parser.add_argument("--characteristic", default="ZCLDOC")
     parser.add_argument("--hierarchy", default="ZCLDOC_ORG")
     parser.add_argument("--version", default="001")
     parser.add_argument("--json", help="write the answers to this file")
@@ -54,7 +61,7 @@ def main():
     raw = [s for s in raw if s.strip() and not s.lstrip().startswith("#")]
     if not raw:
         sys.exit("no statements")
-    statements = [expand(s, args.hierarchy, args.version) for s in raw]
+    statements = [expand(s, args.hierarchy, args.version, args.characteristic) for s in raw]
 
     env = read_env()
     scheme = "https" if env.get("SAP_USE_SSL", "").lower() in ("true", "1", "yes") else "http"

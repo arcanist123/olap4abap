@@ -137,6 +137,13 @@ CLASS zzxxmla1_cl_bw_auth_queries DEFINITION
            END OF ty_view.
     TYPES ty_views TYPE STANDARD TABLE OF ty_view WITH EMPTY KEY.
     TYPES ty_members TYPE STANDARD TABLE OF zzxxmla1_cl_bw_auth=>ty_member WITH EMPTY KEY.
+    " a node of a slice as the probe asks it (ZZXXMLA1_CL_BW_AUTH_PROBE=>node_list): postable marks the second entry
+    " of a postable node, the node with its subtree
+    TYPES BEGIN OF ty_asked_node.
+    INCLUDE TYPE zzxxmla1_cl_bw_auth=>ty_node.
+    TYPES   postable TYPE abap_bool.
+    TYPES END OF ty_asked_node.
+    TYPES ty_asked_nodes TYPE STANDARD TABLE OF ty_asked_node WITH EMPTY KEY.
     "! a row set: the members of a characteristic's flat hierarchy or of a hierarchy, with the members it shows of a
     "! restricted one
     TYPES: BEGIN OF ty_row_set,
@@ -163,6 +170,19 @@ CLASS zzxxmla1_cl_bw_auth_queries DEFINITION
       IMPORTING hienm         TYPE rshienm
                 version       TYPE rsversion
       RETURNING VALUE(result) TYPE string.
+    "! The nodes of a slice the probe asks, as it lists them: no link node and every InfoObject and name once (the
+    "! first row), and a postable node (the characteristic's value with children) a second time right after its leaf,
+    "! flagged postable.
+    CLASS-METHODS asked_nodes
+      IMPORTING characteristic TYPE rsiobjnm
+                slice_nodes    TYPE zzxxmla1_cl_bw_auth=>ty_nodes
+      RETURNING VALUE(result)  TYPE ty_asked_nodes.
+    "! the probe's name of a node in a result row: the node name, of a postable node with the characteristic
+    "! (E11 ZCLDIAG)
+    CLASS-METHODS row_node
+      IMPORTING characteristic TYPE rsiobjnm
+                node           TYPE ty_asked_node
+      RETURNING VALUE(result)  TYPE string.
     "! the probe's key of a member: a leaf's key, a node's name padded to 32 and its InfoObject, blanks collapsed
     CLASS-METHODS member_key
       IMPORTING characteristic TYPE rsiobjnm
@@ -323,6 +343,24 @@ CLASS zzxxmla1_cl_bw_auth_queries IMPLEMENTATION.
 
   METHOD label.
     result = condense( |{ hienm } { version }| ).
+  ENDMETHOD.
+
+  METHOD asked_nodes.
+    LOOP AT slice_nodes INTO DATA(node) WHERE link = abap_false.
+      IF line_exists( result[ iobjnm = node-iobjnm name = node-name postable = abap_false ] ).
+        CONTINUE.
+      ENDIF.
+      DATA(asked) = CORRESPONDING ty_asked_node( node ).
+      APPEND asked TO result.
+      IF node-iobjnm = characteristic AND line_exists( slice_nodes[ parentid = node-nodeid ] ).
+        asked-postable = abap_true.
+        APPEND asked TO result.
+      ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD row_node.
+    result = COND #( WHEN node-postable = abap_true THEN |{ node-name } { characteristic }| ELSE node-name ).
   ENDMETHOD.
 
   METHOD member_key.
@@ -723,11 +761,13 @@ CLASS zzxxmla1_cl_bw_auth_queries IMPLEMENTATION.
         TO result.
     ENDDO.
 
-    " per node of the slice: as slicer, on the rows, its children and its parent
-    LOOP AT view-slice-nodes INTO DATA(node).
+    " per node of the slice the probe asks: as slicer, on the rows, its children and its parent; a postable node's
+    " second entry is the same member to the check (it does not tell the node from its own-value leaf)
+    LOOP AT asked_nodes( characteristic = view-iobjnm slice_nodes = view-slice-nodes ) INTO DATA(node).
       DATA(member) = node_member( view = view iobjnm = node-iobjnm name = node-name named = abap_true ).
       DATA(named) = VALUE zzxxmla1_cl_bw_auth=>ty_tuple( ( member ) ).
-      row = VALUE #( characteristic = view-iobjnm hierarchy = view-label node = node-name ).
+      row = VALUE #( characteristic = view-iobjnm hierarchy = view-label
+                     node = row_node( characteristic = view-iobjnm node = node ) ).
       row-test = `SLICER`.
       APPEND answered( row = row selection = VALUE #( ( named ) ) ) TO result.
       row-test = `ROWS`.
@@ -736,7 +776,7 @@ CLASS zzxxmla1_cl_bw_auth_queries IMPLEMENTATION.
       CLEAR seen.
       READ TABLE view-nodes INTO seen WITH KEY iobjnm = node-iobjnm name = node-name.
       DATA(visible) = xsdbool( sy-subrc = 0 ).
-      IF node-iobjnm <> view-iobjnm.
+      IF node-iobjnm <> view-iobjnm OR node-postable = abap_true.
         DATA(children) = COND ty_view_nodes( WHEN visible = abap_true AND seen-expandable = abap_true
                                              THEN VALUE #( FOR n IN view-nodes WHERE ( top = abap_false
                                                                                  AND parent_iobjnm = node-iobjnm
@@ -766,7 +806,7 @@ CLASS zzxxmla1_cl_bw_auth_queries IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD combined_queries.
-    " the restrictions on the other characteristic: its values, the text nodes of its hierarchies
+    " the restrictions on the other characteristic: its values, the text nodes and postable nodes of its hierarchies
     TYPES: BEGIN OF ty_filter,
              hierarchy TYPE string,
              node      TYPE string,
@@ -780,9 +820,10 @@ CLASS zzxxmla1_cl_bw_auth_queries IMPLEMENTATION.
                                            value = value named = abap_true ) ) TO filters.
     ENDLOOP.
     LOOP AT views INTO DATA(view) WHERE iobjnm = filter_of-iobjnm.
-      LOOP AT view-slice-nodes INTO DATA(node) WHERE iobjnm <> filter_of-iobjnm.
+      LOOP AT asked_nodes( characteristic = filter_of-iobjnm slice_nodes = view-slice-nodes ) INTO DATA(node)
+           WHERE iobjnm <> filter_of-iobjnm OR postable = abap_true.
         APPEND VALUE #( hierarchy = view-label
-                        node      = node-name
+                        node      = row_node( characteristic = filter_of-iobjnm node = node )
                         member    = node_member( view = view iobjnm = node-iobjnm name = node-name
                                                  named = abap_true ) ) TO filters.
       ENDLOOP.

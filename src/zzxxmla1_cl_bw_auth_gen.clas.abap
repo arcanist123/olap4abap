@@ -86,6 +86,8 @@ CLASS zzxxmla1_cl_bw_auth_gen DEFINITION
     CONSTANTS c_org TYPE rshienm VALUE 'ZCLDOC_ORG'.
     CONSTANTS c_site TYPE rshienm VALUE 'ZCLDOC_SITE'.
     CONSTANTS c_icd TYPE rshienm VALUE 'ZCLDIAG_ICD'.
+    "! the clinic's hierarchy of the diagnoses with shared nodes (ZZXXMLA1_CL_BW_CLINIC_GEN=>c_hierarchy_shr)
+    CONSTANTS c_shr TYPE rshienm VALUE 'ZCLDIAG_SHR'.
     CONSTANTS c_text_node TYPE rsiobjnm VALUE '0HIER_NODE'.
     CONSTANTS: BEGIN OF c_node_type,
                  node     TYPE rssauthhiertype VALUE '0',
@@ -239,7 +241,21 @@ CLASS zzxxmla1_cl_bw_auth_gen IMPLEMENTATION.
       ( name = `ROLE` user = user( 37 ) s_rs_auth = `ZCLA_BT*`
         description = `ZCLA_BT and ZCLA_BT_AGG through S_RS_AUTH ZCLA_BT* (no direct assignment)` )
       ( name = `BIALL` user = user( 38 ) auths = VALUE #( ( '0BI_ALL' ) )
-        description = `0BI_ALL assigned directly` ) ).
+        description = `0BI_ALL assigned directly` )
+      " shared nodes of ZCLDIAG_SHR: a duplicate leaf J45 at depths 3 and 4, the text node CARDIO linked under REVIEW,
+      " the postable node E11 with E78 below it (docs/next-steps.md, members of a BW hierarchy named by their node)
+      ( name = `SHSUB` user = user( 39 ) auths = VALUE #( ( 'ZCLA_SHSUB' ) )
+        description = `every physician; ZCLDIAG_SHR: the subtree of FOLLOWUP (one occurrence of J45 and of CARDIO)` )
+      ( name = `SHLVL` user = user( 40 ) auths = VALUE #( ( 'ZCLA_SHLVL' ) )
+        description = `every physician; ZCLDIAG_SHR: CARE to level 3 (the shallow J45, not the deep one)` )
+      ( name = `SHLINK` user = user( 41 ) auths = VALUE #( ( 'ZCLA_SHLINK' ) )
+        description = `every physician; ZCLDIAG_SHR: the node CARDIO, a linked text node` )
+      ( name = `SHPOST0` user = user( 42 ) auths = VALUE #( ( 'ZCLA_SHPOST0' ) )
+        description = `every physician; ZCLDIAG_SHR: the postable node E11 alone` )
+      ( name = `SHPOST1` user = user( 43 ) auths = VALUE #( ( 'ZCLA_SHPOST1' ) )
+        description = `every physician; ZCLDIAG_SHR: the subtree of the postable node E11 (E11 and E78)` )
+      ( name = `SHFLAT` user = user( 44 ) auths = VALUE #( ( 'ZCLA_SHFLAT' ) )
+        description = `every physician; the diagnosis E11 as a flat value` ) ).
   ENDMETHOD.
 
   METHOD authorizations.
@@ -256,6 +272,8 @@ CLASS zzxxmla1_cl_bw_auth_gen IMPLEMENTATION.
     DATA(not_assigned) = VALUE rsec_t_range_api( ( range_line( iobjnm = c_physician low = `#` ) ) ( all_diagnoses ) ).
     DATA(gp) = node( node = `GP` ).
     DATA(every_physician) = range_line( iobjnm = c_physician option = 'CP' low = `*` ).
+    DATA(shr_e11) = node( iobjnm = c_diagnosis hierarchy = c_shr version = '' node_iobjnm = c_diagnosis node = `E11`
+                          type = c_node_type-node ).
 
     result = VALUE #(
       ( name = 'ZCLA_FULL' text = 'All physicians'
@@ -346,7 +364,25 @@ CLASS zzxxmla1_cl_bw_auth_gen IMPLEMENTATION.
         ranges = VALUE #( ( every_physician ) ( all_diagnoses ) )
         specials = VALUE #( ( range_line( iobjnm = '0TCAIPROV' option = 'CP' low = c_infoproviders ) )
                             ( range_line( iobjnm = '0TCAACTVT' low = `03` ) )
-                            ( range_line( iobjnm = '0TCAVALID' option = 'BT' low = `20200101` high = `20231231` ) ) ) ) ).
+                            ( range_line( iobjnm = '0TCAVALID' option = 'BT' low = `20200101` high = `20231231` ) ) ) )
+      ( name = 'ZCLA_SHSUB' text = 'All, SHR FOLLOWUP'
+        ranges = VALUE #( ( every_physician ) )
+        hierarchies = VALUE #( ( node( iobjnm = c_diagnosis hierarchy = c_shr version = '' node = `FOLLOWUP` ) ) ) )
+      ( name = 'ZCLA_SHLVL' text = 'All, SHR CARE to 3'
+        ranges = VALUE #( ( every_physician ) )
+        hierarchies = VALUE #( ( node( iobjnm = c_diagnosis hierarchy = c_shr version = '' node = `CARE`
+                                       type = c_node_type-to_level level = '03' ) ) ) )
+      ( name = 'ZCLA_SHLINK' text = 'All, SHR CARDIO node'
+        ranges = VALUE #( ( every_physician ) )
+        hierarchies = VALUE #( ( node( iobjnm = c_diagnosis hierarchy = c_shr version = '' node = `CARDIO`
+                                       type = c_node_type-node ) ) ) )
+      ( name = 'ZCLA_SHPOST0' text = 'All, SHR E11 node'
+        ranges = VALUE #( ( every_physician ) ) hierarchies = VALUE #( ( shr_e11 ) ) )
+      ( name = 'ZCLA_SHPOST1' text = 'All, SHR E11 subtree'
+        ranges = VALUE #( ( every_physician ) )
+        hierarchies = VALUE #( ( VALUE #( BASE shr_e11 authtype = c_node_type-subtree ) ) ) )
+      ( name = 'ZCLA_SHFLAT' text = 'All, E11'
+        ranges = VALUE #( ( every_physician ) ( range_line( iobjnm = c_diagnosis low = `E11` ) ) ) ) ).
   ENDMETHOD.
 
   METHOD range_line.

@@ -13,9 +13,12 @@
   the `sap` backend that carries none.
 - Analysis authorisations of another user without a logon: BW's "Execute as Other User" (`RSUDO`, the released
   `RSEC_GET_USERNAME` reads the user it checks; `RSEC_SET_USERNAME` sets it, `sy-uname` stays the caller), which the
-  probe uses (`clinic-demo.md`, Probing BW's authorizations). To compare with a real logon, BW's own XMLA service
-  `/sap/bw/xml/soap/xmla` takes basic authentication (data source `default`, catalog `$INFOCUBE`); the test users'
-  password is `SAP_TEST_PASSWORD` in `.env.sap` (`scripts/auth_probe.py --verify`).
+  probe uses (`clinic-demo.md`, Probing BW's authorizations); the oracle relies on it as BW documents it, no logon
+  is needed (decided 2026-11-16, `mvp-scope.md`, Authorisation decision). To compare with a real logon anyway, BW's
+  own XMLA service `/sap/bw/xml/soap/xmla` takes basic authentication (data source `default`, catalog `$INFOCUBE`);
+  the test users' password is then `SAP_TEST_PASSWORD` in `.env.sap` (`scripts/auth_probe.py --verify`, optional),
+  which the end-to-end test through the endpoint as each user needs too (`next-steps.md`, analysis authorisations,
+  step 6).
 - Package `$ZZXXMLA1` is created by hand (ADT or SE80); the ABAP FS tool cannot create packages
   ("Parameter recordChanges could not be found. Your client is out of date.").
 - Connect Claude Code via `.mcp.json` (git-ignored, it holds credentials): the MCP servers, among them vsp

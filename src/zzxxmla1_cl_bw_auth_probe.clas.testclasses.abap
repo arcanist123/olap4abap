@@ -9,6 +9,9 @@
 * olap4abap contains code derived from Mondrian (Eclipse Public License 1.0): Copyright (C) 1998-2005 Julian Hyde,
 * Copyright (C) 2005-2021 Hitachi Vantara and others, Copyright (C) 2021-2025 Sergei Semenkov. See the NOTICE file.
 *----------------------------------------------------------------------------------------------------------------------*
+CLASS ltc_bw_auth_probe DEFINITION DEFERRED.
+CLASS zzxxmla1_cl_bw_auth_probe DEFINITION LOCAL FRIENDS ltc_bw_auth_probe.
+
 CLASS ltc_bw_auth_probe DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
   PRIVATE SECTION.
     CONSTANTS c_hierarchy TYPE string
@@ -17,6 +20,8 @@ CLASS ltc_bw_auth_probe DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATIO
     METHODS node_names FOR TESTING.
     "! lines of 75 characters that give the statement back when joined respecting blanks
     METHODS command_lines FOR TESTING.
+    "! ZCLDIAG_SHR's shapes: a link node and a duplicate leaf asked once, a postable node as leaf and as node
+    METHODS node_list FOR TESTING.
 ENDCLASS.
 
 
@@ -35,6 +40,53 @@ CLASS ltc_bw_auth_probe IMPLEMENTATION.
                                                   iobjnm         = 'ZCLDOC'
                                                   nodename       = '008' )
       exp = |{ c_hierarchy }.[008]| ).
+  ENDMETHOD.
+
+  METHOD node_list.
+    " CARE > CHRONIC > (J45, CARDIO > I10, E11 > E78), FOLLOWUP > REVIEW > (CARDIO link, J45)
+    DATA(rows) = VALUE zzxxmla1_cl_bw_auth_probe=>ty_nodes(
+      ( nodeid = 1  iobjnm = '0HIER_NODE' nodename = 'CARE'     tlevel = 1 parentid = 0 childid = 2 )
+      ( nodeid = 2  iobjnm = '0HIER_NODE' nodename = 'CHRONIC'  tlevel = 2 parentid = 1 childid = 3 )
+      ( nodeid = 3  iobjnm = 'ZCLDIAG'    nodename = 'J45'      tlevel = 3 parentid = 2 )
+      ( nodeid = 4  iobjnm = '0HIER_NODE' nodename = 'CARDIO'   tlevel = 3 parentid = 2 childid = 5 )
+      ( nodeid = 5  iobjnm = 'ZCLDIAG'    nodename = 'I10'      tlevel = 4 parentid = 4 )
+      ( nodeid = 6  iobjnm = 'ZCLDIAG'    nodename = 'E11'      tlevel = 3 parentid = 2 childid = 7 )
+      ( nodeid = 7  iobjnm = 'ZCLDIAG'    nodename = 'E78'      tlevel = 4 parentid = 6 )
+      ( nodeid = 8  iobjnm = '0HIER_NODE' nodename = 'FOLLOWUP' tlevel = 2 parentid = 1 childid = 9 )
+      ( nodeid = 9  iobjnm = '0HIER_NODE' nodename = 'REVIEW'   tlevel = 3 parentid = 8 childid = 10 )
+      ( nodeid = 10 iobjnm = '0HIER_NODE' nodename = 'CARDIO'   tlevel = 4 parentid = 9 link = 'X' )
+      ( nodeid = 11 iobjnm = 'ZCLDIAG'    nodename = 'J45'      tlevel = 4 parentid = 9 ) ).
+    DATA(nodes) = zzxxmla1_cl_bw_auth_probe=>node_list( characteristic = 'ZCLDIAG' rows = rows ).
+    DATA(asked) = VALUE string_table( FOR n IN nodes ( zzxxmla1_cl_bw_auth_probe=>row_node( characteristic = 'ZCLDIAG'
+                                                                                           node           = n ) ) ).
+    cl_abap_unit_assert=>assert_equals(
+      act = asked
+      exp = VALUE string_table( ( `CARE` ) ( `CHRONIC` ) ( `J45` ) ( `CARDIO` ) ( `I10` ) ( `E11` ) ( `E11 ZCLDIAG` )
+                                ( `E78` ) ( `FOLLOWUP` ) ( `REVIEW` ) ) ).
+    " the duplicate leaf is its first occurrence, the shallow one
+    cl_abap_unit_assert=>assert_equals( act = nodes[ 3 ]-tlevel exp = 3 ).
+    cl_abap_unit_assert=>assert_false( nodes[ 6 ]-postable ).
+    cl_abap_unit_assert=>assert_true( nodes[ 7 ]-postable ).
+    " the leaf by its key, the postable node padded with the characteristic
+    cl_abap_unit_assert=>assert_equals(
+      act = zzxxmla1_cl_bw_auth_probe=>node_name( hierarchy      = `[H]`
+                                                  characteristic = 'ZCLDIAG'
+                                                  iobjnm         = nodes[ 6 ]-iobjnm
+                                                  nodename       = nodes[ 6 ]-nodename
+                                                  postable       = nodes[ 6 ]-postable )
+      exp = `[H].[E11]` ).
+    " the InfoObject at its full length (rsiobjnm), as in every recorded statement of a text node
+    DATA node32 TYPE c LENGTH 32 VALUE 'E11'.
+    DATA iobjnm TYPE rsiobjnm VALUE 'ZCLDIAG'.
+    DATA expected TYPE string.
+    CONCATENATE `[H].[` node32 iobjnm `]` INTO expected RESPECTING BLANKS.
+    cl_abap_unit_assert=>assert_equals(
+      act = zzxxmla1_cl_bw_auth_probe=>node_name( hierarchy      = `[H]`
+                                                  characteristic = 'ZCLDIAG'
+                                                  iobjnm         = nodes[ 7 ]-iobjnm
+                                                  nodename       = nodes[ 7 ]-nodename
+                                                  postable       = nodes[ 7 ]-postable )
+      exp = expected ).
   ENDMETHOD.
 
   METHOD command_lines.

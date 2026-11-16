@@ -244,8 +244,9 @@ Decisions taken by the project owner on 2026-10-02, with reasons.
 ### BW's rules (observed 2026-10-24, step 2)
 
 What BW's MDX does with the scenarios of `clinic-demo.md` (Authorization scenarios), recorded per test user and key
-date in `reference/auth/` (`scripts/auth_probe.py`; at 9999-12-31 each statement also checked logged on as the user,
-whose answer wins where they differ). These are the rules olap4abap follows (`next-steps.md`, steps 3 to 5). A
+date in `reference/auth/` (`scripts/auth_probe.py`, BW's "Execute as Other User", relied on as BW documents it, not
+checked against a logon since 2026-11-16, decided by the user; the first recording, 2026-10-24, checked each
+statement of 9999-12-31 logged on as the user, whose answer is kept and wins where they differ). These are the rules olap4abap follows (`next-steps.md`, steps 3 to 5). A
 selection BW does not allow is refused or unknown, never filtered silently; where BW filters, it says so below.
 
 - **Refusals are of three kinds**, kept apart by the check: a value the user has no authorisation for at all does
@@ -254,6 +255,24 @@ selection BW does not allow is refused or unknown, never filtered silently; wher
   authorization" (EYE 007); a hierarchy or node outside the user's hierarchy authorisations is "No authority for the
   node from characteristic ZCLDOC, hierarchy ZCLDOC_ORG (...)". A user with no authorisation on the provider is "You
   do not have sufficient authorization for the InfoProvider ZCLVISITA" on every query.
+- **The selection of an MDX statement is the product of its members per characteristic, not the tuples it shows**
+  (observed 2026-11-16, CROSS: `ZCLA_X1` 009 with I10, `ZCLA_X2` 012 with J45). On the InfoProvider, rows of exactly
+  the two allowed pairs, `{([ZCLDOC].[009], [ZCLDIAG].[I10]), ([ZCLDOC].[012], [ZCLDIAG].[J45])}`, are refused
+  ("cells: EYE 007"): the axes are built, the read of the cells selects `{009, 012} x {I10, J45}`, and `(009, J45)`
+  is in no authorisation. One pair as rows and slicer is allowed. SAP documents the rule for a selection: "a query
+  selection accesses the cartesian product of the filters on the individual characteristics", and "the combination
+  of two or more analysis authorizations is not necessarily rectangular" (SAP Learning, Implementing Authorizations
+  in SAP BW/4HANA, Using Variables in Authorizations); a selection that is not a subset of the authorizations shows
+  nothing, "even if part of the selection is a subset" (Explaining Analysis Authorizations). A BEx query is several
+  selections: query `TEST1` on `ZCLVISITA` with a row structure of the elements (012, J45) and (009, I10) is allowed
+  for the same user, also through MDX on the query (`[ZCLVISITA/TEST1]`), each element a rectangle within one
+  authorisation; MDX on the InfoProvider makes one selection of an axis's tuples.
+  **Scope (decided by the user 2026-11-16):** olap4abap checks as BW's MDX on InfoProviders does: the combinations
+  in the query are ignored (those in the authorisations are not), one member list per authorisation-relevant
+  characteristic (a characteristic the query does not name: its aggregate), and their cartesian product must be
+  authorised. The check up to then took an axis's tuples as they are and allowed the CROSS rows BW refuses. Out of
+  scope, later: an option that checks as a BEx query does, each tuple of an axis its own selection (Out of scope
+  below).
 - **Aggregation needs `:`.** A query that does not name an authorisation-relevant characteristic (the total, a slicer
   on the other characteristic only) aggregates it and is refused without `:` on it (EQ: total refused; EQ_AGG:
   allowed). The aggregate is over all values, not over the visible ones (the total is 33,956 for every user with
@@ -324,6 +343,11 @@ selection BW does not allow is refused or unknown, never filtered silently; wher
   characteristics; Composite/MultiProviders; non-HANA cubes (F+E table union); aggregate tables, roles, virtual
   cubes, ragged hierarchies. (Drillthrough was out of scope too, but Excel offers it on every cell, so it is done:
   `DRILLTHROUGH`, with the cube's default `DrillThroughAction` when there is no `RETURN`.)
+- **Authorisation as a BEx query checks it** (decided with the user 2026-11-16, later): an option under which the
+  tuples on an axis are respected, each tuple (with the slicer, the subselects and the aggregates of the
+  characteristics it does not name) its own selection, as each element of a BEx query's structure is; it allows
+  queries BW's MDX on InfoProviders refuses (CROSS's two pairs as tuples). In scope is the product per
+  characteristic (BW's rules above).
 
 ## Open points
 

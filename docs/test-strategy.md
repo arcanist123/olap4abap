@@ -262,7 +262,8 @@ ERROR), BW's message and the cells (members of the row, value). The probe runs a
 (no logon of the user); `--verify N` sends every N-th statement of 9999-12-31 to BW's own XMLA service logged on as
 the user and keeps the logged-on answer where it refuses or differs (`loggedOn`), which wins: the switch answers a
 hierarchy the user has no node of empty where the logon refuses, and words refusals differently. Recorded
-2026-10-24 with `--verify 1`. Step 6 compares the endpoint's answers with them at 9999-12-31 (`next-steps.md`, Now:
+2026-10-24 with `--verify 1`; since 2026-11-16 the switch alone is the oracle, as BW documents it, and recordings run
+without `--verify` (an optional tool now). Step 6 compares the endpoint's answers with them at 9999-12-31 (`next-steps.md`, Now:
 analysis authorisations).
 
 `python scripts/auth_check_test.py [--scenario S] [--key-date D] [--show N] [--engine abap|sql]` compares olap4abap's

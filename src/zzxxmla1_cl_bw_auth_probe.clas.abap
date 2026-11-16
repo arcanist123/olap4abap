@@ -24,7 +24,10 @@
 "! - per characteristic, flat: its members and each value as slicer;
 "! - per hierarchy of a characteristic (name and version): all its members;
 "! - per node of the slice (text nodes and leaves, from the hierarchy table): the node as slicer, on the rows, its
-"!   children and its parent;
+"!   children and its parent; a node in the slice more than once (a link node, a duplicate leaf) is asked once, as BW's
+"!   MDX names it once; a postable node (a value with children) twice: its own-value leaf by the bare key (node type
+"!   LEAF) and the node with its subtree in the padded form with the characteristic (POSTABLE, node E11 ZCLDIAG, with
+"!   the children tests);
 "! - combined, per pair of characteristics: each row set of the one (its members, the members of each of its
 "!   hierarchies) with each value and each text node of the other as slicer (leaves too on request);
 "! - NON EMPTY: the members of each row set, and per text node its children;
@@ -153,12 +156,14 @@ CLASS zzxxmla1_cl_bw_auth_probe DEFINITION
       RETURNING VALUE(result) TYPE ty_authorizations.
 
     "! The MDX unique name of a node of a hierarchy: a text node is its name padded to 32 characters and 0HIER_NODE,
-    "! a leaf (a value of the characteristic) its key.
+    "! a leaf (a value of the characteristic) its key, a postable node (a value with children) its key padded to 32
+    "! characters and the characteristic.
     CLASS-METHODS node_name
       IMPORTING hierarchy      TYPE string
                 characteristic TYPE csequence
                 iobjnm         TYPE csequence
                 nodename       TYPE csequence
+                postable       TYPE abap_bool DEFAULT abap_false
       RETURNING VALUE(result)  TYPE string.
 
     "! An MDX statement as lines of BAPI6111MDX: every 75 characters, as BW joins the lines of 75 characters
@@ -169,12 +174,17 @@ CLASS zzxxmla1_cl_bw_auth_probe DEFINITION
 
   PROTECTED SECTION.
   PRIVATE SECTION.
+    " a node of a hierarchy slice as the probe asks it: a row of the hierarchy table (link its link flag, childid its
+    " first child); postable marks the second entry of a postable node, the node with its subtree
     TYPES: BEGIN OF ty_node,
              nodeid   TYPE rshienodid,
              iobjnm   TYPE rsiobjnm,
              nodename TYPE rsshnodename,
              tlevel   TYPE rstlevel,
              parentid TYPE rsparent,
+             childid  TYPE rschild,
+             link     TYPE rslink,
+             postable TYPE abap_bool,
            END OF ty_node.
     TYPES ty_nodes TYPE STANDARD TABLE OF ty_node WITH EMPTY KEY.
     " a level of a hierarchy as BW's MDX names it
@@ -287,11 +297,24 @@ CLASS zzxxmla1_cl_bw_auth_probe DEFINITION
       IMPORTING characteristic TYPE rsiobjnm
                 hierarchy      TYPE string
       RETURNING VALUE(result)  TYPE ty_levels.
-    "! the nodes of a hierarchy slice, in the order of the hierarchy table
+    "! the nodes of a hierarchy slice the probe asks, in the order of the hierarchy table (node_list)
     METHODS nodes
       IMPORTING characteristic TYPE rsiobjnm
                 hieid          TYPE rshieid
       RETURNING VALUE(result)  TYPE ty_nodes.
+    "! The nodes the probe asks from the rows of the hierarchy table: no link node and every InfoObject and name once
+    "! (the first row: a duplicate leaf is one member name to BW's MDX), and a postable node (the characteristic's
+    "! value with children) a second time right after its leaf, flagged postable.
+    CLASS-METHODS node_list
+      IMPORTING characteristic TYPE rsiobjnm
+                !rows          TYPE ty_nodes
+      RETURNING VALUE(result)  TYPE ty_nodes.
+    "! the probe's name of a node in a result row: the node name, of a postable node with the characteristic
+    "! (E11 ZCLDIAG), so that the leaf and the node have different keys
+    CLASS-METHODS row_node
+      IMPORTING characteristic TYPE rsiobjnm
+                node           TYPE ty_node
+      RETURNING VALUE(result)  TYPE string.
     METHODS select
       IMPORTING rows          TYPE string
                 slicer        TYPE string OPTIONAL
@@ -617,10 +640,15 @@ CLASS zzxxmla1_cl_bw_auth_probe IMPLEMENTATION.
       DATA(member) = node_name( hierarchy      = hierarchy-unique
                                 characteristic = characteristic
                                 iobjnm         = node-iobjnm
-                                nodename       = node-nodename ).
-      row-node = node-nodename.
-      row-node_type = COND #( WHEN node-iobjnm = characteristic THEN `LEAF` ELSE `TEXT NODE` ).
+                                nodename       = node-nodename
+                                postable       = node-postable ).
+      row-node = row_node( characteristic = characteristic node = node ).
+      row-node_type = COND #( WHEN node-postable = abap_true THEN `POSTABLE`
+                              WHEN node-iobjnm = characteristic THEN `LEAF`
+                              ELSE `TEXT NODE` ).
       row-level = node-tlevel.
+      " a leaf has no children; a postable node and a text node have
+      DATA(has_children) = xsdbool( node-iobjnm <> characteristic OR node-postable = abap_true ).
       IF tests-slicer = abap_true.
         row-test = `SLICER`.
         row-mdx = select( rows = `` slicer = member ).
@@ -631,12 +659,12 @@ CLASS zzxxmla1_cl_bw_auth_probe IMPLEMENTATION.
         row-mdx = select( |\{{ member }\}| ).
         APPEND answered( row ) TO result.
       ENDIF.
-      IF tests-children = abap_true AND node-iobjnm <> characteristic.
+      IF tests-children = abap_true AND has_children = abap_true.
         row-test = `CHILDREN`.
         row-mdx = select( |\{{ member }.Children\}| ).
         APPEND answered( row ) TO result.
       ENDIF.
-      IF tests-non_empty = abap_true AND node-iobjnm <> characteristic.
+      IF tests-non_empty = abap_true AND has_children = abap_true.
         row-test = `CHILDREN NE`.
         row-mdx = select( |NON EMPTY \{{ member }.Children\}| ).
         APPEND answered( row ) TO result.
@@ -658,15 +686,16 @@ CLASS zzxxmla1_cl_bw_auth_probe IMPLEMENTATION.
     ENDLOOP.
     LOOP AT filter_of-hierarchies INTO DATA(hierarchy).
       LOOP AT hierarchy-nodes INTO DATA(node).
-        IF leaves = abap_false AND node-iobjnm = filter_of-name.
+        IF leaves = abap_false AND node-iobjnm = filter_of-name AND node-postable = abap_false.
           CONTINUE.
         ENDIF.
         APPEND VALUE #( hierarchy = hierarchy-label
-                        node      = node-nodename
+                        node      = row_node( characteristic = filter_of-name node = node )
                         member    = node_name( hierarchy      = hierarchy-unique
                                                characteristic = filter_of-name
                                                iobjnm         = node-iobjnm
-                                               nodename       = node-nodename ) ) TO filters.
+                                               nodename       = node-nodename
+                                               postable       = node-postable ) ) TO filters.
       ENDLOOP.
     ENDLOOP.
 
@@ -797,13 +826,34 @@ CLASS zzxxmla1_cl_bw_auth_probe IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD nodes.
+    DATA rows TYPE ty_nodes.
     DATA(table) = |/BIC/H{ characteristic }|.
-    SELECT nodeid, iobjnm, nodename, tlevel, parentid
+    SELECT nodeid, iobjnm, nodename, tlevel, parentid, childid, link
       FROM (table)
       WHERE hieid = @hieid
         AND objvers = 'A'
       ORDER BY nodeid ASCENDING
-      INTO CORRESPONDING FIELDS OF TABLE @result.
+      INTO CORRESPONDING FIELDS OF TABLE @rows.
+    result = node_list( characteristic = characteristic rows = rows ).
+  ENDMETHOD.
+
+  METHOD node_list.
+    LOOP AT rows INTO DATA(row) WHERE link IS INITIAL.
+      IF line_exists( result[ iobjnm = row-iobjnm nodename = row-nodename postable = abap_false ] ).
+        CONTINUE.
+      ENDIF.
+      row-postable = abap_false.
+      APPEND row TO result.
+      IF row-iobjnm = characteristic AND row-childid <> 0.
+        row-postable = abap_true.
+        APPEND row TO result.
+      ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD row_node.
+    result = COND #( WHEN node-postable = abap_true THEN |{ node-nodename } { characteristic }|
+                     ELSE node-nodename ).
   ENDMETHOD.
 
   METHOD select.
@@ -1024,7 +1074,7 @@ CLASS zzxxmla1_cl_bw_auth_probe IMPLEMENTATION.
 
   METHOD node_name.
     DATA node32 TYPE c LENGTH 32.
-    IF iobjnm = characteristic.
+    IF iobjnm = characteristic AND postable = abap_false.
       result = |{ hierarchy }.[{ nodename }]|.
     ELSE.
       node32 = nodename.

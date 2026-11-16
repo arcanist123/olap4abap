@@ -17,7 +17,9 @@
 "!   hierarchy time dependent, each with two versions of two time slices,
 "! - on the diagnosis ZCLDIAG, also authorization relevant, the plain hierarchy ZCLDIAG_ICD (all diagnoses > chapter >
 "!   group > diagnosis), for authorizations that combine both characteristics; every value is in it (the initial one
-"!   under Not recorded > No diagnosis) and the not-assigned node is suppressed,
+"!   under Not recorded > No diagnosis) and the not-assigned node is suppressed, and the plain hierarchy ZCLDIAG_SHR
+"!   (care areas) of a few diagnoses with a duplicate leaf at two depths, a linked text node and a postable node, for
+"!   BW's answers on shared nodes under analysis authorizations only: no schema ticks it,
 "! - on the patient ZCLPAT the plain hierarchy ZCLPAT_PRG (care programs > program > patient) with link nodes: a
 "!   patient in two programs is a leaf in both (a duplicate node, or a link node), the heart program is under chronic
 "!   care and under senior care, and senior care with it under prevention (link nodes), and parents with their
@@ -66,6 +68,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     CONSTANTS c_hierarchy_site TYPE rshienm VALUE 'ZCLDOC_SITE'.
     CONSTANTS c_hierarchy_diag TYPE rshienm VALUE 'ZCLDIAG_ICD'.
     CONSTANTS c_hierarchy_prg  TYPE rshienm VALUE 'ZCLPAT_PRG'.
+    "! the diagnoses by care area, with shared nodes: for the authorization questions only, ticked into no schema
+    CONSTANTS c_hierarchy_shr  TYPE rshienm VALUE 'ZCLDIAG_SHR'.
     CONSTANTS c_hierarchy_serv TYPE rshienm VALUE 'ZCLSERV_CAT'.
     CONSTANTS c_hierarchy_loc  TYPE rshienm VALUE 'ZCLSERV_LOC'.
 
@@ -344,6 +348,10 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     "! The nodes of ZCLDIAG_ICD: all diagnoses > chapter > group > diagnosis; the initial value (no diagnosis recorded)
     "! a leaf of its own chapter and group, so every value is assigned.
     METHODS diagnosis_nodes RETURNING VALUE(result) TYPE ty_t_hie_node.
+    "! The nodes of ZCLDIAG_SHR: care areas > ... > diagnosis, a few diagnoses only. J45 is a leaf at depth 3 under
+    "! CHRONIC and at depth 4 under FOLLOWUP > REVIEW (a duplicate node), the text node CARDIO is under CHRONIC and
+    "! linked under REVIEW (its leaves at depths 4 and 5), and E11 is a postable node with E78 below it.
+    METHODS shared_diagnosis_nodes RETURNING VALUE(result) TYPE ty_t_hie_node.
     "! The nodes of ZCLPAT_PRG: all care programs > area > program > patient; a program under a second parent is a link
     "! node, a patient in a second program a duplicate node or a link node; in family care a parent is a postable node
     "! with their children below them.
@@ -438,7 +446,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen DEFINITION
     "! Adds to the schema of a provider every BW hierarchy BW has for the characteristic of one of its dimensions and
     "! olap4abap serves (ZZXXMLA1_CL_BW_HIERARCHY_COPY=>offered), as the user ticks them in the schema builder
     "! (ZCLDIAG_ICD, ZCLPAT_PRG, ZCLSERV_CAT, ZCLSERV_LOC and per version ZCLDOC_ORG and ZCLDOC_SITE, their slices valid
-    "! to 9999-12-31: ZCLDOC_ORG_001, ..., on ZCLVISIT and ZCLVISITA).
+    "! to 9999-12-31: ZCLDOC_ORG_001, ..., on ZCLVISIT and ZCLVISITA); not ZCLDIAG_SHR, which is for the authorization
+    "! questions only.
     METHODS tick_hierarchies
       CHANGING !schema TYPE zzxxmla1_cl_schema_def=>ty_schema.
     "! The test catalog ZCLHIER from the InfoCube's schema: the reference's reference/schema/ClinicBW.xml, catalog and
@@ -915,6 +924,11 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     " node suppressed
     APPEND VALUE #( iobjnm = 'ZCLDIAG' name = c_hierarchy_diag dateto = '99991231' text = `Diagnoses by ICD-10 Chapter`
                     norest = abap_true nodes = diagnosis_nodes( ) ) TO result.
+    " a few diagnoses by care area, with a duplicate leaf, a linked text node and a postable node: BW's answers on
+    " shared nodes under analysis authorizations (docs/next-steps.md, members of a BW hierarchy named by their node);
+    " not ticked into any schema (tick_hierarchies)
+    APPEND VALUE #( iobjnm = 'ZCLDIAG' name = c_hierarchy_shr dateto = '99991231' text = `Diagnoses by Care Area`
+                    norest = abap_true nodes = shared_diagnosis_nodes( ) ) TO result.
     " the patients' care programs, plain too, with link nodes
     APPEND VALUE #( iobjnm = 'ZCLPAT' name = c_hierarchy_prg dateto = '99991231' text = `Care Programs`
                     nodes = care_program_nodes( ) ) TO result.
@@ -1154,6 +1168,30 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
     APPEND VALUE #( name = `NOT_RECORDED` parent = `DIAGNOSES` text = `Not recorded` ) TO result.
     APPEND VALUE #( name = `NO_DIAGNOSIS` parent = `NOT_RECORDED` text = `No diagnosis` ) TO result.
     APPEND VALUE #( name = `` parent = `NO_DIAGNOSIS` ) TO result.
+  ENDMETHOD.
+
+  METHOD shared_diagnosis_nodes.
+    " FOLLOWUP holds the deep J45 and the link, not the shallow ones: a level limit of 3 shows the shallow J45 and
+    " CARDIO's original without its leaves, and neither the deep J45 nor the link.
+    result = VALUE #(
+      ( name = `CARE` text = `All Care Areas` )
+      ( name = `CHRONIC`  parent = `CARE`     text = `Chronic Conditions` )
+      ( name = `J45`      parent = `CHRONIC` )
+      ( name = `CARDIO`   parent = `CHRONIC`  text = `Cardiovascular` )
+      ( name = `I10`      parent = `CARDIO` )
+      ( name = `I20`      parent = `CARDIO` )
+      ( name = `I25`      parent = `CARDIO` )
+      ( name = `E11`      parent = `CHRONIC` )
+      ( name = `E78`      parent = `E11` )
+      ( name = `FOLLOWUP` parent = `CARE`     text = `Follow-up Care` )
+      ( name = `REVIEW`   parent = `FOLLOWUP` text = `Annual Review` )
+      ( name = `CARDIO`   parent = `REVIEW`   text = `Cardiovascular` link = abap_true )
+      ( name = `J45`      parent = `REVIEW` )
+      ( name = `Z09`      parent = `FOLLOWUP` )
+      ( name = `ACUTE`    parent = `CARE`     text = `Acute Conditions` )
+      ( name = `J06`      parent = `ACUTE` )
+      ( name = `J18`      parent = `ACUTE` )
+      ( name = `A09`      parent = `ACUTE` ) ).
   ENDMETHOD.
 
   METHOD node_name.
@@ -2461,7 +2499,8 @@ CLASS zzxxmla1_cl_bw_clinic_gen IMPLEMENTATION.
         CONTINUE.
       ENDIF.
       DATA(bw_hierarchies) = zzxxmla1_cl_bw_hierarchy_copy=>offered( characteristic ).
-      LOOP AT bw_hierarchies INTO DATA(offered) WHERE supported = abap_true.
+      " ZCLDIAG_SHR is for the authorization questions only
+      LOOP AT bw_hierarchies INTO DATA(offered) WHERE supported = abap_true AND name <> c_hierarchy_shr.
         DATA(annotations) = NEW zzxxmla1_cl_schema_def=>ty_annotations(
           array = VALUE zzxxmla1_cl_schema_def=>ty_t_annotation( ( name = zzxxmla1_cl_schema=>c_bw_hierarchy
                                                                    cdata = offered-name ) ) ).

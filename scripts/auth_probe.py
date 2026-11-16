@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Records BW's answers for the analysis authorization scenarios (docs/clinic-demo.md, Authorization scenarios): runs
 the probe (GET auth/probe of the schema API, ZZXXMLA1_CL_BW_AUTH_PROBE: BW's own MDX on $ZCLVISITA) with the
-analysis authorizations of each test user ZZXXMLA1_A01 ... A38 at each key date, one request per key date and kind of
+analysis authorizations of each test user ZZXXMLA1_A01 ... A44 at each key date, one request per key date and kind of
 query, and writes reference/auth/<scenario>.json, the oracle of olap4abap's authorization check (docs/next-steps.md,
 Now: analysis authorisations, step 2).
 
@@ -130,7 +130,7 @@ def compact(row):
 # slow where it refuses many queries (HDATE's parent test); the probe's filter restricts the hierarchies only, so the
 # flat queries come with every part and are kept once
 SPLIT = [("ZCLDOC_ORG", "001"), ("ZCLDOC_ORG", "002"), ("ZCLDOC_SITE", "001"), ("ZCLDOC_SITE", "002"),
-         ("ZCLDIAG_ICD", "")]
+         ("ZCLDIAG_ICD", ""), ("ZCLDIAG_SHR", "")]
 
 
 def probe_request(api, user, params):

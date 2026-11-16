@@ -163,24 +163,27 @@ authorisations). It writes them with BW's API (`RSEC_CREATE_AUTHORIZATION_API`, 
 - The users are service users (type `S`: the password never has to be changed, HTTP basic logons work) with the profile
   `ZZXXMLA1_REP` (`S_RS_COMP` and `S_RS_COMP1` display and execute of every query component, `S_RFC` of every function
   group), written with `SUSR_INTERFACE_PROF`. With the setup's password field empty they get a generated password
-  nobody knows: they cannot log on, BW's checks can still run for them (the probe runs as them without a logon). The
-  password is not stored on the system; `scripts/auth_probe.py --verify` logs on as them with `SAP_TEST_PASSWORD` of
-  `.env.sap`, so give the setup that password (or set it with `BAPI_USER_CHANGE`).
+  nobody knows: they cannot log on, BW's checks can still run for them (the probe runs as them without a logon, and
+  the oracle needs nothing else). The password is not stored on the system; only a logon as them needs it (the
+  end-to-end test through the endpoint, the optional `scripts/auth_probe.py --verify`, both with `SAP_TEST_PASSWORD`
+  of `.env.sap`): give the setup that password, or set it later with `BAPI_USER_CHANGE`.
 
 ### BW's answers per scenario (the oracle)
 
 `scripts/auth_probe.py` runs the probe for each test user (`GET auth/probe?user=...` of the schema API) at the three
 key dates and writes `reference/auth/<scenario>.json` (`next-steps.md`, Now: analysis authorisations, step 2;
-`mvp-scope.md`, Authorisation decision, for the rules read from them). With `--verify 1` every statement of
-9999-12-31 also goes to BW's own XMLA service (`/sap/bw/xml/soap/xmla`) logged on as the user, and the logged-on
-answer is kept with the statement where it is a refusal or differs (`loggedOn`), since the switch is not a logon.
-Observed on every scenario: the values are the same; the switch words BW's refusals differently ("Hierarchy node not
+`mvp-scope.md`, Authorisation decision, for the rules read from them). The switch's answer is the oracle: BW's
+"Execute as Other User" runs with the user's analysis authorizations as BW documents it, and the recordings are not
+checked against a logon (decided by the user 2026-11-16). The first recording (2026-10-24) was: with `--verify 1`
+every statement of 9999-12-31 also went to BW's own XMLA service (`/sap/bw/xml/soap/xmla`) logged on as the user,
+and the logged-on answer is kept with the statement where it is a refusal or differs (`loggedOn`); `--verify` stays
+an optional tool. Observed then on every scenario: the values are the same; the switch words BW's refusals differently ("Hierarchy node not
 authorized" against "No authority for the node from characteristic ZCLDOC, hierarchy ZCLDOC_ORG (00000000,001)", a
 generic BRAINOLAPAPI 012 for a user without any authorization on the provider against "You do not have sufficient
 authorization for the InfoProvider ZCLVISITA"); and a statement on a hierarchy the user has no node of is EMPTY
-through the switch but refused logged on. Where they differ, the logged-on answer is BW's. BW's XMLA service has no
-key date of its own (it uses today, in the slices valid to 9999-12-31), so the other key dates are the switch's
-only.
+through the switch but refused logged on. Where a file has a logged-on answer the comparison scripts take it; a row
+without one is the switch's (`without_logon`: its EMPTY of a hierarchy without a line counts as refused). BW's XMLA
+service has no key date of its own (it uses today, in the slices valid to 9999-12-31).
 
 | User | Scenario | Authorizations | Restriction (`ZCLDIAG` `*` unless named) |
 |---|---|---|---|
@@ -222,6 +225,12 @@ only.
 | `ZZXXMLA1_A36` | VALID | `ZCLA_VALID` | everything, but `0TCAVALID` `BT 20200101 20231231` (expired) |
 | `ZZXXMLA1_A37` | ROLE | through `S_RS_AUTH` | `ZCLA_BT` and `ZCLA_BT_AGG` through `S_RS_AUTH` `BIAUTH` `ZCLA_BT*` of the profile `ZZXXMLA1_RSA` (no direct assignment) |
 | `ZZXXMLA1_A38` | BIALL | `0BI_ALL` | BW's `0BI_ALL`, assigned directly |
+| `ZZXXMLA1_A39` | SHSUB | `ZCLA_SHSUB` | `ZCLDOC` `*`; `ZCLDIAG_SHR`: node `FOLLOWUP`, type 1 (one occurrence of `J45` and of `CARDIO`) |
+| `ZZXXMLA1_A40` | SHLVL | `ZCLA_SHLVL` | `ZCLDOC` `*`; `ZCLDIAG_SHR`: node `CARE` to level 3 (the shallow `J45`, not the deep one) |
+| `ZZXXMLA1_A41` | SHLINK | `ZCLA_SHLINK` | `ZCLDOC` `*`; `ZCLDIAG_SHR`: node `CARDIO`, type 0 (a linked text node) |
+| `ZZXXMLA1_A42` | SHPOST0 | `ZCLA_SHPOST0` | `ZCLDOC` `*`; `ZCLDIAG_SHR`: the postable node `E11` (node InfoObject `ZCLDIAG`), type 0 |
+| `ZZXXMLA1_A43` | SHPOST1 | `ZCLA_SHPOST1` | `ZCLDOC` `*`; `ZCLDIAG_SHR`: the postable node `E11`, type 1 (it and `E78`) |
+| `ZZXXMLA1_A44` | SHFLAT | `ZCLA_SHFLAT` | `ZCLDOC` `*`; `ZCLDIAG` `EQ E11` (flat, against SHPOST0 and SHPOST1) |
 
 No scenario has a variable or a relative level: BW takes a `$` value only if a customer exit variable of that name
 exists for the characteristic (the API leaves the line out, message RSEC 189), and corrects node type 4 (relative
@@ -244,6 +253,42 @@ version. The text nodes are named by their text in upper case with `_` for blank
 `RESPIRATORY`, `UPPER_RESPIRATORY_INFECTIONS`, `CHRONIC_LOWER_RESPIRATORY_DISEAS`, `CHECK_UPS`, ... A department
 treats some chapters more than others (respiratory diagnoses mostly in pulmonology, general practice and pediatrics),
 so a node of each hierarchy restricts the visits differently from their intersection.
+
+## The shared hierarchy of the diagnoses
+
+For BW's answers on shared nodes under analysis authorizations (`next-steps.md`, members of a BW hierarchy named by
+their node, step 1), `ZCLDIAG` has a second plain hierarchy, `ZCLDIAG_SHR`, Diagnoses by Care Area (neither version
+nor time dependent, valid to 9999-12-31, the not-assigned node suppressed), of a few diagnoses only, so that the
+probe's queries grow little:
+
+```
+CARE  All Care Areas                       (1)
+├ CHRONIC  Chronic Conditions              (2)
+│ ├ J45                                    (3)  duplicate leaf, the shallow occurrence
+│ ├ CARDIO  Cardiovascular                 (3)  the linked text node, its original
+│ │ └ I10, I20, I25                        (4)
+│ └ E11                                    (3)  postable node
+│   └ E78                                  (4)
+├ FOLLOWUP  Follow-up Care                 (2)
+│ ├ REVIEW  Annual Review                  (3)
+│ │ ├ CARDIO  (link)                       (4)  its leaves at depth 5
+│ │ └ J45                                  (4)  the deep occurrence
+│ └ Z09                                    (3)
+└ ACUTE  Acute Conditions                  (2)
+  └ J06, J18, A09                          (3)
+```
+
+`FOLLOWUP` holds the deep `J45` and the link, not the shallow ones: a level limit of 3 shows the shallow `J45` and
+`CARDIO`'s original without its leaves, and neither the deep `J45` nor the link. The hierarchy is for the
+authorization questions only: the scenarios SHSUB to SHFLAT name it, the probe asks it as any hierarchy BW lists and
+the check reads its copy as it reads any hierarchy a line names, but the setup ticks it into no schema
+(`tick_hierarchies` skips it), so `ZCLVISIT`, `ZCLVISITA` and `ZCLHIER` do not show it. The schema builder still
+offers it.
+
+The probe asks a node in the slice more than once (the link `CARDIO`, the duplicate `J45`) once, its first row, as
+BW's MDX names it once, and a postable node twice: its own-value leaf by the bare key (`[E11]`, node `E11`, type
+LEAF) and the node with its subtree in the padded form with the characteristic (`[E11<pad 32>ZCLDIAG<pad 30>]`, node
+`E11 ZCLDIAG`, type POSTABLE, with the children tests and as filter of the combined queries).
 
 ## The hierarchy of the care programs
 

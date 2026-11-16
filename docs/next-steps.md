@@ -526,6 +526,52 @@ key figure authorisations (`0TCAKYFNM`), filling variables (a user with one is n
 queries, and what Discover's
 cardinalities (`level_cardinality`) tell a restricted user.
 
+### The selection as a product per characteristic, and one statement per provider (2026-11-16)
+
+Found 2026-11-16 (`mvp-scope.md`, BW's rules, the selection is the product): BW's MDX on InfoProviders checks the
+product of the members per characteristic, not the tuples a query shows; our check took an axis's tuples as they are
+and allowed a set of two allowed pairs that BW refuses (CROSS, `{(009, I10), (012, J45)}`). A BEx query with the two
+pairs as elements of a structure (`TEST1`) is allowed: each element is a selection of its own. Scope decided by the
+user the same day: the product per characteristic, as BW's MDX; the BEx query's way (each tuple its own selection)
+an option for later (`mvp-scope.md`, Out of scope; Later below). Next to it the cold cost of the check in
+HANA: the statement carried its data in its text, so HANA compiled a new statement for nearly every request, each
+with a large plan, while running it was cheap (measurements in `.local/`).
+
+The goal is one statement text per InfoProvider, compiled once and kept in the plan cache. State on 2026-11-16, what
+still changes the text of `ZZXXMLA1_CL_BW_AUTH_SQL`'s statement:
+
+- the number of factors, by the query (`check_statement`): each factor (the slicer, each axis, each subselect axis)
+  adds its tables `q_t<i>` and `q_k<i>`, a join and a `BITOR`; a query without factor has no combination branch
+  (step 2);
+- the copies, by the user's profile and the key date (`paths_sql`): a `UNION ALL` branch per characteristic with
+  hierarchy lines in the profile, literal `HIESID`/`SVER` conditions per copy (the key date's slice, an expired
+  line's own) (step 3);
+- the not-assigned members, by the profile and the key date (`rests_sql`): a subquery of its own per copy that shows
+  its not-assigned node, with literal keys (step 3);
+- `every` (2^n - 1 over the profile's characteristics), a literal; harmless once the characteristics are the
+  provider's (step 2).
+
+So the text is the same today for the same query shape, user's hierarchies and key date; after step 2 it depends on
+the provider and the profile's copies, after step 3 on the provider only.
+
+1. Done 2026-11-16: the bound rows of the check's derived tables (`q_m`, `q_p`, `q_f`, `q_h`, `q_t*`) are one JSON
+   parameter each, read by `JSON_TABLE` (`ZZXXMLA1_CL_BW_AUTH_SQL=>values_sql`, HANA 2.0 SPS04 or later): the text
+   no longer depends on the number of rows, and the plans are a fraction of their former size; every scenario of
+   every engine answers as before.
+2. Next: the selection per characteristic. `ZZXXMLA1_CL_BW_AUTH_SELECTION` makes one member list per
+   authorisation-relevant characteristic of the provider (the members of every factor of it, the aggregate where the
+   query names none) and the check combines them in HANA as one factor each, so the statement's factors are the
+   provider's characteristics, the same for every query; `every` is the provider's. This is also the product rule
+   of the scope (`mvp-scope.md`). The probe asks the explicit tuples of CROSS (a test of its own), the check and BW
+   agree on them, the other scenarios as before. Open: a characteristic in two places of a query (the flat
+   `[ZCLDOC]` on rows, `ZCLDOC_ORG` in the slicer): BW's selection is probably the intersection; ask BW one such
+   statement before building it.
+3. The copies as data: the copy keys of `paths_sql` (`HIESID`, `SVER`) as a JSON table and every path table of the
+   provider's hierarchy characteristics in the statement, whether the profile has lines on it or not; then the
+   not-assigned members of `rests_sql` in one form per characteristic, keyed by the same JSON table. Measured with
+   `M_SQL_PLAN_CACHE` (`.local/hana/sql.js`, the `hdb` client) after `ALTER SYSTEM CLEAR SQL PLAN CACHE` (ask the
+   user before clearing it).
+
 ## Next: BW's MDX on InfoProviders
 
 Planned with the user 2026-10-25 (`mvp-scope.md`, BW MDX decision), narrowed the same day to a first goal: **send a
@@ -664,6 +710,12 @@ after the authorisations' step 5b, because which occurrence is taken depends on 
   found nothing, so every query that resolves today resolves as before; never inside a path
   (`[H].[PRIMARY].[CARD]` with `CARD` not below `PRIMARY` stays not found); not on level hierarchies, where names
   repeat by design and the reference is the oracle.
+- **The node form has no level** (decided by the user 2026-11-16): it is exactly one segment directly under the
+  hierarchy, a bare name or one key pair (`[H].[J45]`, `[H].&[ZCLDIAG]&[J45]`). Anything with a level is the path
+  form: `[H].[Level 03].&[ZCLDIAG]&[J45]` is a key lookup at that level as today (`lookup_bw_member_by_key`), the
+  level must match, and the node form's fallback never applies to it, so its representative is never checked
+  against a level. A path of names (two or more segments) and the full key (one pair per level) are the path form
+  too. A root's full key is one pair and so equals its node form: one occurrence, the same member.
 - **A node with several occurrences is supported; the functions whose result depends on the occurrence are
   not.** Link nodes and duplicate leaves (`ZCLPAT_PRG`) have one shape under each parent (2026-10-15), so every
   occurrence reads the same distinct SIDs. The reference resolves to a member flagged as a node of N occurrences,
@@ -779,12 +831,45 @@ after the authorisations' step 5b, because which occurrence is taken depends on 
    lookups on `ZCLPAT_PRG` confirm them on a hierarchy with links in linked subtrees. Shapes the probe does not ask
    yet and that are worth keeping go into the probe's tests.
 
+   *BW's answers (2026-11-16,* 30 statements as FULL and the six users at 9999-12-31, `auth_ask.py`; questions and
+   answers in `.local/shared-nodes/`):
+   - **One occurrence, the first the user may see.** `.Members` lists every occurrence (22 rows: the link `CARDIO`
+     with its subtree under `REVIEW`, the deep `J45`), but a node named alone is one member: FULL and SHLVL get
+     `[J45].Parent` and `CARDIO.Parent` = `CHRONIC` (the first occurrence), SHSUB (the subtree of `FOLLOWUP`)
+     `REVIEW` (the only visible one, the deep `J45` and the link). The values are the same either way (`J45` 1,383,
+     `CARDIO` 3,904). `.Siblings` and `.Level.Members` follow the same occurrence (`J45`'s level 3: the shallow nodes;
+     SHSUB: `CARDIO`, `J45` under `REVIEW`).
+   - **The level limit** (SHLVL, `CARE` to level 3): the shallow `J45` and `CARDIO` allowed, `CARDIO.Children` and
+     `REVIEW.Children` EMPTY (not expandable), `I10` UNKNOWN; the postable node `E11 ZCLDIAG` (level 3) allowed with
+     EMPTY children, its own-value leaf `[E11]` (level 4) NO AUTH; `.Members` NO AUTH (as H2: nodes that may not be
+     expanded).
+   - **The postable node:** the pair (`[E11<pad>ZCLDIAG]`) is the node with its subtree (1,760 = `E11` 825 + `E78`
+     935), its children the own-value leaf `[E11]` and `E78`; the bare `[E11]` is the leaf (825, no children, parent
+     the node). The flat value `[ZCLDIAG].[E11]` is the leaf's 825. Type 0 on the node (SHPOST0) allows the node with
+     its whole value, not the leaf (NO AUTH) nor the children (EMPTY), and its parent is EMPTY (the node is a top);
+     type 1 (SHPOST1) allows the node, the leaf and `E78`, `.Members` the three. A flat `EQ E11` (SHFLAT) allows no
+     node of the hierarchy, not even the leaf `[E11]` (NO AUTH), only the flat value; `.Members` EMPTY.
+   - **Lookups:** the pair with the hierarchy's own characteristic finds a plain leaf too (FULL: `[J06<pad>ZCLDIAG]`
+     and `[J45<pad>ZCLDIAG]` answer as `J06`, `J45`; a user who may not see it gets "Value J45 ZCLDIAG ... unknown");
+     a bare name of a text node is a value of the characteristic (`[CARDIO]`: UNKNOWN, "Value CARDIO for
+     characteristic ZCLDIAG unknown"), as decided.
+   - **The linked text node itself** (SHLINK, type 0 on `CARDIO`): allowed, its children EMPTY, its parent EMPTY (a
+     top); `J45` and `I10` UNKNOWN, `REVIEW.Children` NO AUTH.
+   - **A set:** `{[J45], CHRONIC}` as SHSUB shows `J45` only (a member of a set the user may not see is left out,
+     as BW's rules have it).
+   - **BW fails** (BRAIN 299, "System error in program CL_RSR_HIERARCHY_DIM") on a flat value as slicer
+     (`[ZCLDIAG].[E11]`, `[J45]`) for SHLINK and SHPOST0, whose only `ZCLDIAG` line is a type 0 line on a node of
+     `ZCLDIAG_SHR`; the probe's rows of these users show it as ERROR.
+
    *g) Order:* the generator, the scenarios, the probe and the check's queries (unit tests of the probe's node list:
    a postable node, a link, a duplicate leaf), abaplint, `sap-write.py` each class; the clinic setup with
-   authorisations (the password of `.env.sap`); `bw_hierarchy_test.py --catalog ZCLVISIT --names` and the `*_hier*`
-   cases of `xmla_test.py` unchanged; the questions (f); `auth_probe.py --verify 10` for every scenario (the new
+   authorisations (no password: the switch is the oracle, decided 2026-11-16); `bw_hierarchy_test.py --catalog
+   ZCLVISIT --names` and the `*_hier*` cases of `xmla_test.py` unchanged; the questions (f); `auth_probe.py` for
+   the six new scenarios only, without `--verify` (decided 2026-11-16: the existing 38 keep their recordings, which
+   have no `ZCLDIAG_SHR` rows and so test what they tested; re-recording all of them, about 4 hours, answers nothing
+   step 1 asks. Planned before: every scenario, since the new
    hierarchy changes what BW lists to every user with `*` on `ZCLDIAG`, `HIERARCHIES`, and adds its nodes to every
-   scenario's rows: the growth of `reference/auth/`, 49 MB with 3,833 statements before, is noted in the commit);
+   scenario's rows, a re-recording a later step may still want);
    `auth_check_test.py` with each engine and `bw_auth_compare.py`, the existing scenarios agreeing as before;
    `clinic-demo.md` (the hierarchy, the scenarios), `pull`, commit.
 2. **Decide the open points from step 1's answers** and record them in `mvp-scope.md` (Authorisation decision, BW's
@@ -2241,6 +2326,10 @@ evaluation (`MemberArrayValueCalc`; before, `([Measures].[Foo], [Time].CurrentMe
 
 ## Later
 
+- Authorisation as a BEx query checks it (`mvp-scope.md`, Out of scope; decided 2026-11-16): an option that respects
+  the tuples on an axis, each tuple its own selection as an element of a BEx query's structure, instead of the
+  product per characteristic of BW's MDX on InfoProviders. The check would take a table of products (one per tuple,
+  with the slicer, subselects and aggregates), the call "a table of products" the request API left open.
 - Blank handling in HANA and CDS (decided 2026-10-16 to look into later): a compounded characteristic's name with its
   parts at full length, as BW concatenates them (`next-steps.md`, Now: texts and captions), needs blanks inside a
   string. CDS gives its string functions ABAP's blank semantics in the SQL it generates: `rpad( 'AB', 6, ' ' )` is

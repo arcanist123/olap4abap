@@ -9,6 +9,9 @@
 * olap4abap contains code derived from Mondrian (Eclipse Public License 1.0): Copyright (C) 1998-2005 Julian Hyde,
 * Copyright (C) 2005-2021 Hitachi Vantara and others, Copyright (C) 2021-2025 Sergei Semenkov. See the NOTICE file.
 *----------------------------------------------------------------------------------------------------------------------*
+CLASS ltc_bw_auth_queries DEFINITION DEFERRED.
+CLASS zzxxmla1_cl_bw_auth_queries DEFINITION LOCAL FRIENDS ltc_bw_auth_queries.
+
 "! The probe's queries on made-up lines shaped as the scenarios H1 (the subtree of GP), H0 (the node GP only) and EQ
 "! (flat values, no hierarchy line), on a small ZCLDOC_ORG 001 and ZCLDIAG_ICD; the answers as reference/auth/ has
 "! BW's.
@@ -21,6 +24,8 @@ CLASS ltc_bw_auth_queries DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURAT
     METHODS subtree FOR TESTING.
     METHODS node_only FOR TESTING.
     METHODS flat_values FOR TESTING.
+    "! ZCLDIAG_SHR's shapes as the probe asks them: a link node and a duplicate leaf once, a postable node twice
+    METHODS asked_nodes FOR TESTING.
 
     "! the queries for the lines of authorization ZA (the special lines added)
     METHODS run
@@ -51,6 +56,32 @@ ENDCLASS.
 
 
 CLASS ltc_bw_auth_queries IMPLEMENTATION.
+
+  METHOD asked_nodes.
+    " CARE > CHRONIC > (J45, CARDIO > I10, E11 > E78), FOLLOWUP > REVIEW > (CARDIO link, J45)
+    DATA(slice_nodes) = VALUE zzxxmla1_cl_bw_auth=>ty_nodes(
+      ( node( id = 1 parent = 0 name = `CARE` level = 1 ) )
+      ( node( id = 2 parent = 1 name = `CHRONIC` level = 2 ) )
+      ( node( id = 3 parent = 2 iobjnm = c_diag name = `J45` level = 3 ) )
+      ( node( id = 4 parent = 2 name = `CARDIO` level = 3 ) )
+      ( node( id = 5 parent = 4 iobjnm = c_diag name = `I10` level = 4 ) )
+      ( node( id = 6 parent = 2 iobjnm = c_diag name = `E11` level = 3 ) )
+      ( node( id = 7 parent = 6 iobjnm = c_diag name = `E78` level = 4 ) )
+      ( node( id = 8 parent = 1 name = `FOLLOWUP` level = 2 ) )
+      ( node( id = 9 parent = 8 name = `REVIEW` level = 3 ) )
+      ( VALUE #( BASE node( id = 10 parent = 9 name = `CARDIO` level = 4 ) link = abap_true ) )
+      ( node( id = 11 parent = 9 iobjnm = c_diag name = `J45` level = 4 ) ) ).
+    DATA(nodes) = zzxxmla1_cl_bw_auth_queries=>asked_nodes( characteristic = c_diag slice_nodes = slice_nodes ).
+    DATA(asked) = VALUE string_table( FOR n IN nodes ( zzxxmla1_cl_bw_auth_queries=>row_node( characteristic = c_diag
+                                                                                             node           = n ) ) ).
+    cl_abap_unit_assert=>assert_equals(
+      act = asked
+      exp = VALUE string_table( ( `CARE` ) ( `CHRONIC` ) ( `J45` ) ( `CARDIO` ) ( `I10` ) ( `E11` ) ( `E11 ZCLDIAG` )
+                                ( `E78` ) ( `FOLLOWUP` ) ( `REVIEW` ) ) ).
+    " the duplicate leaf is its first occurrence, the shallow one
+    cl_abap_unit_assert=>assert_equals( act = nodes[ 3 ]-level exp = 3 ).
+    cl_abap_unit_assert=>assert_true( nodes[ 7 ]-postable ).
+  ENDMETHOD.
 
   METHOD node.
     result = VALUE #( nodeid = id parentid = parent iobjnm = iobjnm name = name level = level ).

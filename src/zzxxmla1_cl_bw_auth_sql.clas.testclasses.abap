@@ -34,6 +34,9 @@ CLASS ltc_bw_auth_sql DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION 
     METHODS members_only FOR TESTING.
     "! the statement's first row is the refusal, with BW's message of the member's reason
     METHODS answers FOR TESTING.
+    "! bound rows as one JSON parameter: numbers as numbers, strings escaped; the statement's text the same for any
+    "! number of rows, none included
+    METHODS values_as_json FOR TESTING.
     "! a line of the complete hierarchy shows the not-assigned node and its values of its key date's copy (q_n) as
     "! nodes, once per copy; without such a copy q_n is empty
     METHODS complete_hierarchy_rest FOR TESTING.
@@ -121,7 +124,10 @@ CLASS ltc_bw_auth_sql IMPLEMENTATION.
                                  ( VALUE #( ( VALUE #( ( value( iobjnm = c_diag value = `I10` named = abap_true ) ) ) ) ) ) ) ).
     DATA(statement) = zzxxmla1_cl_bw_auth_sql=>check_statement( profile = profile( ) request = request ).
     DATA(sql) = statement-sql.
-    cl_abap_unit_assert=>assert_char_cp( act = sql exp = `WITH q_m AS ( SELECT CAST( ? AS INTEGER ) AS "M", *` ).
+    cl_abap_unit_assert=>assert_char_cp(
+      act = sql
+      exp = `WITH q_m AS ( SELECT "M", "IOBJ", *FROM JSON_TABLE( CAST( ? AS NCLOB ), '$[*]' COLUMNS ( ` &&
+            `"M" INTEGER PATH '$.c1', "IOBJ" NVARCHAR( 30 ) PATH '$.c2', *` ).
     " the copies of the line, both of the path table of ZCLDOC
     cl_abap_unit_assert=>assert_char_cp(
       act = sql
@@ -130,9 +136,13 @@ CLASS ltc_bw_auth_sql IMPLEMENTATION.
     cl_abap_unit_assert=>assert_char_cp( act = sql exp = `*q_t1 AS (*q_k1 AS (*q_t2 AS (*q_k2 AS (*` ).
     cl_abap_unit_assert=>assert_char_cp( act = sql exp = `*BITAND( CAST( 3 - BITOR( c1."MASK", c2."MASK" ) AS BIGINT ), *` ).
     cl_abap_unit_assert=>assert_char_cp( act = sql exp = `* ORDER BY "PHASE" LIMIT 1` ).
-    " members 3 x 8, flags 2 x 5, one range 9, the line on both copies 2 x 11, tuples (2 + 1) x 3
-    cl_abap_unit_assert=>assert_equals( exp = 24 + 10 + 9 + 22 + 9 act = lines( statement-params ) ).
-    cl_abap_unit_assert=>assert_equals( exp = 3 act = count( val = sql sub = `CAST( ? AS INTEGER ) AS "T"` ) ).
+    " one JSON parameter per derived table: members, flags, ranges, hierarchy lines and the tuples of each factor
+    cl_abap_unit_assert=>assert_equals( exp = 6 act = lines( statement-params ) ).
+    cl_abap_unit_assert=>assert_equals( exp = 2 act = count( val = sql sub = `"T" INTEGER PATH '$.c1'` ) ).
+    " the three members 001, 002 and I10, numbered, in the first parameter
+    DATA(members) = CAST string( statement-params[ 1 ] ).
+    cl_abap_unit_assert=>assert_char_cp( act = members->* exp = `[{"c1":1,*},{"c1":2,*},{"c1":3,*}]` ).
+    cl_abap_unit_assert=>assert_equals( exp = 3 act = count( val = members->* sub = `"c1":` ) ).
   ENDMETHOD.
 
   METHOD members_only.
@@ -144,7 +154,7 @@ CLASS ltc_bw_auth_sql IMPLEMENTATION.
     DATA(sql) = zzxxmla1_cl_bw_auth_sql=>check_statement( profile = profile request = request )-sql.
     cl_abap_unit_assert=>assert_equals( exp = 0 act = count( val = sql sub = `q_t1` ) ).
     cl_abap_unit_assert=>assert_char_cp( act = sql exp = `*q_x AS ( SELECT CAST( NULL AS NVARCHAR( 30 ) ) AS "IOBJ", *WHERE 1 = 0 )*` ).
-    cl_abap_unit_assert=>assert_char_cp( act = sql exp = `*q_h AS ( SELECT CAST( NULL AS NVARCHAR( 30 ) ) AS "A", *WHERE 1 = 0 )*` ).
+    cl_abap_unit_assert=>assert_char_cp( act = sql exp = `*q_h AS ( SELECT "A", "IOBJ", *FROM JSON_TABLE( *` ).
     cl_abap_unit_assert=>assert_char_cp( act = sql exp = `*q_n AS ( SELECT CAST( NULL AS NVARCHAR( 30 ) ) AS "IOBJ", *WHERE 1 = 0 )*` ).
   ENDMETHOD.
 
@@ -173,6 +183,32 @@ CLASS ltc_bw_auth_sql IMPLEMENTATION.
       act = sql
       exp = `*q_c AS ( SELECT DISTINCT *UNION ALL SELECT DISTINCT h."A", *INNER JOIN q_n AS n ON n."IOBJ" = h."IOBJ" ` &&
             `AND n."HIESID" = h."HIESID" AND n."SVER" = h."SVER" WHERE h."TYPE" IN ( '3', '4' ) AND h."WHICH" = 'K' )*` ).
+  ENDMETHOD.
+
+  METHOD values_as_json.
+    DATA(columns) = VALUE zzxxmla1_cl_bw_auth_sql=>ty_columns( ( name = `M` type = `INTEGER` )
+                                                               ( name = `KEY` type = `NVARCHAR( 250 )` ) ).
+    DATA params TYPE zzxxmla1_cl_sql=>ty_t_param.
+    DATA(one) = zzxxmla1_cl_bw_auth_sql=>values_sql(
+      EXPORTING columns = columns
+                rows    = VALUE #( ( VALUE #( ( NEW i( 7 ) ) ( NEW string( `a"b\c` ) ) ) ) )
+      CHANGING  params  = params ).
+    cl_abap_unit_assert=>assert_equals(
+      act = one
+      exp = `SELECT "M", "KEY" FROM JSON_TABLE( CAST( ? AS NCLOB ), '$[*]' ` &&
+            `COLUMNS ( "M" INTEGER PATH '$.c1', "KEY" NVARCHAR( 250 ) PATH '$.c2' ) ) AS j` ).
+    cl_abap_unit_assert=>assert_equals( act = CAST string( params[ 1 ] )->* exp = `[{"c1":7,"c2":"a\"b\\c"}]` ).
+    DATA(three) = zzxxmla1_cl_bw_auth_sql=>values_sql(
+      EXPORTING columns = columns
+                rows    = VALUE #( ( VALUE #( ( NEW i( 1 ) ) ( NEW string( `x` ) ) ) )
+                                   ( VALUE #( ( NEW i( 2 ) ) ( NEW string( `y` ) ) ) )
+                                   ( VALUE #( ( NEW i( 3 ) ) ( NEW string( `` ) ) ) ) )
+      CHANGING  params  = params ).
+    DATA(none) = zzxxmla1_cl_bw_auth_sql=>values_sql( EXPORTING columns = columns rows = VALUE #( )
+                                                      CHANGING  params  = params ).
+    cl_abap_unit_assert=>assert_equals( act = three exp = one ).
+    cl_abap_unit_assert=>assert_equals( act = none exp = one ).
+    cl_abap_unit_assert=>assert_equals( act = CAST string( params[ 3 ] )->* exp = `[]` ).
   ENDMETHOD.
 
   METHOD answers.

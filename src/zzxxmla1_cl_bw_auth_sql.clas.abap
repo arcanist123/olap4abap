@@ -214,11 +214,18 @@ CLASS zzxxmla1_cl_bw_auth_sql DEFINITION
     "! the members no authorization admits (aggregates excepted): PHASE 1, M and BW's REASON
     CLASS-METHODS refused_sql
       RETURNING VALUE(result) TYPE string.
-    "! a derived table of bound values, the parameters appended in their order; no rows: an empty table
+    "! A derived table of bound values: the rows as one JSON parameter (an array of objects, key c1, c2, ... per
+    "! column) read by JSON_TABLE, so the statement's text is the same whatever the number of rows and HANA compiles
+    "! it once (a UNION ALL of a SELECT per row made a new statement per number of rows, compiled in seconds and
+    "! evicting other plans from the plan cache); no rows: the array [], an empty table.
     CLASS-METHODS values_sql
       IMPORTING columns       TYPE ty_columns
                 !rows         TYPE ty_rows
       CHANGING  params        TYPE zzxxmla1_cl_sql=>ty_t_param
+      RETURNING VALUE(result) TYPE string.
+    "! the rows of values_sql as a JSON array of objects, a value a number (type i) or a string
+    CLASS-METHODS values_json
+      IMPORTING !rows         TYPE ty_rows
       RETURNING VALUE(result) TYPE string.
     "! the path rows of the copies the lines are expanded on, a UNION ALL over the characteristics' path tables
     CLASS-METHODS paths_sql
@@ -711,20 +718,40 @@ CLASS zzxxmla1_cl_bw_auth_sql IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD values_sql.
-    IF rows IS INITIAL.
-      result = |SELECT { concat_lines_of( table = VALUE string_table( FOR c IN columns
-                                                    ( |CAST( NULL AS { c-type } ) AS "{ c-name }"| ) ) sep = `, ` ) } | &&
-               |FROM DUMMY WHERE 1 = 0|.
-      RETURN.
-    ENDIF.
-    DATA(row_sql) = |SELECT { concat_lines_of( table = VALUE string_table( FOR c IN columns
-                                                 ( |CAST( ? AS { c-type } ) AS "{ c-name }"| ) ) sep = `, ` ) } FROM DUMMY|.
-    DATA(selects) = VALUE string_table( ).
-    LOOP AT rows INTO DATA(row).
-      APPEND row_sql TO selects.
-      APPEND LINES OF row TO params.
+    DATA names TYPE string_table.
+    DATA definitions TYPE string_table.
+    LOOP AT columns INTO DATA(column).
+      DATA(position) = sy-tabix.
+      APPEND |"{ column-name }"| TO names.
+      APPEND |"{ column-name }" { column-type } PATH '$.c{ position }'| TO definitions.
     ENDLOOP.
-    result = concat_lines_of( table = selects sep = ` UNION ALL ` ).
+    APPEND NEW string( values_json( rows ) ) TO params.
+    result = |SELECT { concat_lines_of( table = names sep = `, ` ) } | &&
+             |FROM JSON_TABLE( CAST( ? AS NCLOB ), '$[*]' | &&
+             |COLUMNS ( { concat_lines_of( table = definitions sep = `, ` ) } ) ) AS j|.
+  ENDMETHOD.
+
+  METHOD values_json.
+    DATA objects TYPE string_table.
+    DATA pairs TYPE string_table.
+    FIELD-SYMBOLS <value> TYPE any.
+    LOOP AT rows INTO DATA(row).
+      CLEAR pairs.
+      LOOP AT row INTO DATA(param).
+        DATA(position) = sy-tabix.
+        ASSIGN param->* TO <value>.
+        DESCRIBE FIELD <value> TYPE DATA(kind).
+        IF kind = cl_abap_typedescr=>typekind_int.
+          " a template, not CONV string, which keeps the sign position as a trailing blank
+          APPEND |"c{ position }":{ <value> }| TO pairs.
+        ELSE.
+          APPEND |"c{ position }":"{ escape( val = CONV string( <value> ) format = cl_abap_format=>e_json_string ) }"|
+            TO pairs.
+        ENDIF.
+      ENDLOOP.
+      APPEND |\{{ concat_lines_of( table = pairs sep = `,` ) }\}| TO objects.
+    ENDLOOP.
+    result = |[{ concat_lines_of( table = objects sep = `,` ) }]|.
   ENDMETHOD.
 
   METHOD paths_sql.
