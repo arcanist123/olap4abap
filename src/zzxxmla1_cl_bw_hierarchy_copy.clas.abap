@@ -382,14 +382,27 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy DEFINITION
       IMPORTING hierarchy     TYPE ty_hierarchy
                 visibles      TYPE ty_t_visible
       RETURNING VALUE(result) TYPE ty_restriction.
-    "! The members of a copy's not-assigned node as the check of a user's authorizations names them
-    "! (ZZXXMLA1_CL_BW_AUTH_SQL: a line of the complete hierarchy shows them, as levels_sql reads them for it): REST_H
-    "! by its InfoObject 1HIER_REST, its values by the characteristic and their key, as the refill names a leaf; a
-    "! query of the columns NODE_IOBJ, NODE_NAME and LEAF (1 for a value), initial where the hierarchy does not show
-    "! the node (the closure read is then the table, which has none of its rows).
+    "! The members of a copy's not-assigned node as the check of a user's authorizations names them (a line of the
+    "! complete hierarchy shows them, as levels_sql reads them for it): REST_H by its InfoObject 1HIER_REST, its
+    "! values by the characteristic and their key, as the refill names a leaf; a query of the columns NODE_IOBJ,
+    "! NODE_NAME and LEAF (1 for a value), initial where the hierarchy does not show the node (the closure read is
+    "! then the table, which has none of its rows). ZZXXMLA1_CL_BW_AUTH_SQL reads them for all copies of a
+    "! characteristic at once, over leaf_source.
     CLASS-METHODS rest_members_sql
       IMPORTING hierarchy     TYPE ty_hierarchy
       RETURNING VALUE(result) TYPE string.
+    TYPES:
+      "! what names a characteristic's values in its copies: BW's SID table and the expression of a key there (alias
+      "! s; leaf_name)
+      BEGIN OF ty_leaf_source,
+        sid_table TYPE tabname,
+        leaf_name TYPE string,
+      END OF ty_leaf_source.
+    "! The SID table and key expression that name the values of a characteristic (its basic one) as the refill names
+    "! a leaf; initial where BW has no SID table of it.
+    CLASS-METHODS leaf_source
+      IMPORTING characteristic TYPE rsiobjnm
+      RETURNING VALUE(result)  TYPE ty_leaf_source.
     "! Whether a restriction hides children of a node it shows (a node of type 0, a level limit of type 2): BW refuses
     "! the hierarchy's members then (Hierarchy.Members), a level's members are its visible ones.
     CLASS-METHODS truncated
@@ -1415,6 +1428,15 @@ CLASS zzxxmla1_cl_bw_hierarchy_copy IMPLEMENTATION.
       refuse( |BW has no SID table of { hierarchy-characteristic }| ).
     ENDIF.
     result = rest_members_of( hierarchy = hierarchy sid_table = metadata-tables-sids leaf_name = leaf ).
+  ENDMETHOD.
+
+  METHOD leaf_source.
+    DATA(metadata) = NEW zzxxmla1_cl_bw_view_gen( )->metadata( characteristic ).
+    DATA(leaf) = leaf_name( metadata ).
+    IF metadata-tables-sids IS INITIAL OR leaf IS INITIAL.
+      RETURN.
+    ENDIF.
+    result = VALUE #( sid_table = metadata-tables-sids leaf_name = leaf ).
   ENDMETHOD.
 
   METHOD rest_members_of.

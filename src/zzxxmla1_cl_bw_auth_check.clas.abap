@@ -409,20 +409,15 @@ CLASS zzxxmla1_cl_bw_auth_check IMPLEMENTATION.
         APPEND internal( entry-member ) TO members.
       ENDLOOP.
     ENDLOOP.
-    DATA(admissions) = sql->admissions( members ).
+    DATA(masks) = sql->masks( members ).
     LOOP AT groups ASSIGNING FIELD-SYMBOL(<group>).
       LOOP AT <group>-entries ASSIGNING FIELD-SYMBOL(<entry>).
         DATA(member) = internal( <entry>-member ).
         CLEAR reason.
-        LOOP AT admissions INTO DATA(admission) WHERE member = member.
-          IF admission-auth IS INITIAL.
-            reason = admission-reason.
-          ELSE.
-            DATA(bit) = line_index( auths[ table_line = admission-auth ] ).
-            IF bit > 0.
-              SET BIT bit OF <entry>-mask.
-            ENDIF.
-          ENDIF.
+        " the statement numbers the authorizations itself: a mask is compared only with masks of the same statement
+        LOOP AT masks INTO DATA(masked) WHERE member = member.
+          <entry>-mask = masked-mask.
+          reason = masked-reason.
         ENDLOOP.
         IF <entry>-mask IS INITIAL.
           DATA(check) = zzxxmla1_cl_bw_auth=>refusal(

@@ -512,7 +512,7 @@ ways in, the second first:
      as the other engines do.
    Built 2026-11-12: `ZZXXMLA1_IF_BW_AUTH_CHECK`, `ZZXXMLA1_CL_BW_AUTH_CHECK` (exception `ZZXXMLA1_CX_BW_AUTH_CHECK`),
    over `ZZXXMLA1_CL_BW_AUTH_SQL=>admissions` (the check's tables as `common_tables`, per member the applying
-   authorizations that admit it). The request is a flat table of members, the product taken over the characteristics
+   authorizations that admit it; since 2026-11-16 `masks`, step 2 of the next section). The request is a flat table of members, the product taken over the characteristics
    they name; `check` answers ERROR for a malformed request, a missing authorisation-relevant characteristic, a
    hierarchy without a slice at the key date and a node, leaf or value the provider does not have (BW's hierarchy
    table, the SID table; a leaf's `#` is its blank key). A refusal names the first refused member BW meets walking the
@@ -558,19 +558,34 @@ the provider and the profile's copies, after step 3 on the provider only.
    parameter each, read by `JSON_TABLE` (`ZZXXMLA1_CL_BW_AUTH_SQL=>values_sql`, HANA 2.0 SPS04 or later): the text
    no longer depends on the number of rows, and the plans are a fraction of their former size; every scenario of
    every engine answers as before.
-2. Next: the selection per characteristic. `ZZXXMLA1_CL_BW_AUTH_SELECTION` makes one member list per
-   authorisation-relevant characteristic of the provider (the members of every factor of it, the aggregate where the
-   query names none) and the check combines them in HANA as one factor each, so the statement's factors are the
-   provider's characteristics, the same for every query; `every` is the provider's. This is also the product rule
-   of the scope (`mvp-scope.md`). The probe asks the explicit tuples of CROSS (a test of its own), the check and BW
-   agree on them, the other scenarios as before. Open: a characteristic in two places of a query (the flat
-   `[ZCLDOC]` on rows, `ZCLDOC_ORG` in the slicer): BW's selection is probably the intersection; ask BW one such
-   statement before building it.
-3. The copies as data: the copy keys of `paths_sql` (`HIESID`, `SVER`) as a JSON table and every path table of the
-   provider's hierarchy characteristics in the statement, whether the profile has lines on it or not; then the
-   not-assigned members of `rests_sql` in one form per characteristic, keyed by the same JSON table. Measured with
-   `M_SQL_PLAN_CACHE` (`.local/hana/sql.js`, the `hdb` client) after `ALTER SYSTEM CLEAR SQL PLAN CACHE` (ask the
-   user before clearing it).
+2. Built 2026-11-16 (decided with the user the same day): the selection per characteristic, checked by classes.
+   The request is one member list per authorisation-relevant characteristic of the provider (`POS`): the members of
+   every factor of it, its aggregate where the factors have none; a member the query only names (the node of a
+   `Children`) is checked alone (`POS` 0); a factor without tuple leaves the members only, no product. One
+   statement (`ZZXXMLA1_CL_BW_AUTH_SQL=>check_statement`, sections with named CTEs: inputs, copies, what each line
+   shows, admissions, masks and classes, refusals) gives per member the mask of the authorisations that admit it
+   (`AUTH_BIT`, numbered per statement, at most 63, `c_max_auths`), groups the members of a characteristic by mask
+   into classes and names the members no authorisation admits with BW's reason; the search of a combination of
+   classes without a common bit runs in ABAP (`hole`), over the classes, never over the product. The factor tables
+   `q_t`/`q_k`, the combination branch and `every` are gone. The ABAP API (`ZZXXMLA1_CL_BW_AUTH_CHECK`) takes its
+   masks from the same statement (`masks`, a bound switch lists the members) and keeps its own cover. The
+   endpoint now refuses CROSS's two pairs as BW does (`{(009, I10), (012, J45)}`: NO AUTH, combination). Checked
+   on HANA beforehand: a table function per authorisation (`EXCEPT` of the requested product) is planned with its
+   contents when it is plain SQL, but builds the product; the classes do not. Open: the probe asks no explicit
+   tuple set and no characteristic in two places of a query (the flat `[ZCLDOC]` on rows, `ZCLDOC_ORG` in the
+   slicer); the check takes the union of a characteristic's members there, the safe side if BW intersects; add
+   both shapes to the probe and record BW's answers. `ZZXXMLA1_CL_BW_AUTH`'s own check (engine `abap`) still takes
+   the tuples as they are.
+3. Built 2026-11-16: the copies as data. The copies the lines read are a JSON table (`copies`: line
+   characteristic, basic characteristic, `HIESID`, `SVER`, whether the copy shows REST_H and its SID); the
+   statement has a branch per hierarchy characteristic of the provider (`copy_paths` over its path table,
+   `copy_unassigned` over its closure and SID table, `ZZXXMLA1_CL_BW_HIERARCHY_COPY=>leaf_source`), whether the
+   profile has lines on it or not, so reading the profile creates the copy tables of each of them
+   (`hierarchy_tables`). The text is the same for every query, user and key date of a provider (unit test
+   `same_text`); measure with `M_SQL_PLAN_CACHE` (`.local/hana/sql.js`, the `hdb` client) after
+   `ALTER SYSTEM CLEAR SQL PLAN CACHE` (ask the user before clearing it).
+   The comparisons with BW after steps 2 and 3 (`bw_auth_compare.py`, `auth_check_test.py --engine sql` and
+   `--engine api`) are recorded below once they have run.
 
 ## Next: BW's MDX on InfoProviders
 

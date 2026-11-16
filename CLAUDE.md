@@ -529,8 +529,11 @@ After changing ABAP in SAP, run `pull` before committing so `src/` is current.
   `python scripts/auth_check_test.py`, `GET auth/check?user=...&keyDate=...`, `ZZXXMLA1_CL_BW_AUTH_QUERIES` asks the
   probe's queries as selections; a line's flat values from the slice of its date, a type 3 line the complete
   hierarchy). The same check in HANA (`ZZXXMLA1_CL_BW_AUTH_SQL`, step 5's engine: the profile per node, each
-  hierarchy line expanded on the path table of the copy of its slice at the key date and at its own date, one
-  statement per query, a crossjoin as its factors) agrees with the oracle at every key date too
+  hierarchy line expanded on the path table of the copy of its slice at the key date and at its own date; since
+  2026-11-16 the selection as the product of its members per characteristic, one statement whose text is the
+  provider's (its data and copies bound as JSON) giving per member the mask of the authorisations that admit it,
+  grouped into classes, the combinations of classes searched in ABAP; `docs/next-steps.md`, The selection as a
+  product per characteristic) agrees with the oracle at every key date too
   (`auth_check_test.py --engine sql`, `GET auth/check?...&engine=sql`); nothing is enforced yet (step 5a, 5b). For it
   the copies hold any slice (`current` with a key date; a slice's copy is deleted once BW has the slice no more) and
   name a leaf by the characteristic and its key (`NODE_IOBJ`, `NODE_NAME`; copies filled before
