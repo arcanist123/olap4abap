@@ -510,6 +510,7 @@ ways in, the second first:
      restricted members of a hierarchy, 5b) of every scenario and key date, a characteristic the query aggregates
      asked as `:`, answered through the API (`GET auth/check?...&engine=api`, `auth_check_test.py --engine api`), which must agree
      as the other engines do.
+   The API as built, for its callers: `bw-auth-check-api.md` (with `POST bw/check`).
    Built 2026-11-12: `ZZXXMLA1_IF_BW_AUTH_CHECK`, `ZZXXMLA1_CL_BW_AUTH_CHECK` (exception `ZZXXMLA1_CX_BW_AUTH_CHECK`),
    over `ZZXXMLA1_CL_BW_AUTH_SQL=>admissions` (the check's tables as `common_tables`, per member the applying
    authorizations that admit it; since 2026-11-16 `masks`, step 2 of the next section). The request is a flat table of members, the product taken over the characteristics

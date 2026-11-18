@@ -24,6 +24,8 @@ Read before designing anything:
 - `docs/mondrian-hierarchies-and-time-dependency.md` - background on Mondrian's modelling
 - `docs/environment.md` - systems, ports, build procedures, tool quirks
 - `docs/next-steps.md` - what to do next, in which order, and the open decisions
+- `docs/bw-auth-check-api.md` - the check of BW's analysis authorisations for callers: the ABAP API
+  `ZZXXMLA1_IF_BW_AUTH_CHECK` and `POST bw/check`
 - `docs/known-issues.md` - debt (what is wrong within the built scope), deliberate deviations and the reference's
   known wrong answers; read before comparing answers. Not-yet-built features are scope, not issues
 
