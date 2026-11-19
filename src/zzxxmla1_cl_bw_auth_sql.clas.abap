@@ -61,8 +61,9 @@ CLASS zzxxmla1_cl_bw_auth_sql DEFINITION
              value_copy TYPE ty_copy,
            END OF ty_line.
     TYPES ty_lines TYPE STANDARD TABLE OF ty_line WITH EMPTY KEY.
-    "! the tables of a hierarchy characteristic of the provider (its basic one): the copies' path and closure tables,
-    "! the SID table and the expression of a key there (alias s) that name the values of REST_H (initial: not named)
+    "! the tables of a hierarchy characteristic of the provider (its basic one): the copies' path table, their
+    "! not-assigned view as closure (the closure table's rows and those under REST_H, which the table has not), the
+    "! SID table and the expression of a key there (alias s) that name the values of REST_H (initial: not named)
     TYPES: BEGIN OF ty_hierarchy_tables,
              basic     TYPE rsiobjnm,
              path      TYPE tabname,
@@ -349,7 +350,7 @@ CLASS zzxxmla1_cl_bw_auth_sql IMPLEMENTATION.
       DATA(leaf) = zzxxmla1_cl_bw_hierarchy_copy=>leaf_source( basic ).
       APPEND VALUE #( basic     = basic
                       path      = tables-path
-                      closure   = tables-closure
+                      closure   = tables-rest_view
                       sid_table = leaf-sid_table
                       leaf_name = leaf-leaf_name ) TO result.
     ENDLOOP.

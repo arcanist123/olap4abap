@@ -74,9 +74,9 @@ CLASS ltc_bw_auth_sql IMPLEMENTATION.
                                                          date = '20250101' )
                                    key_copy   = VALUE #( basic = c_doc hiesid = 41 sver = `1` )
                                    value_copy = VALUE #( basic = c_doc hiesid = 40 sver = `2` ) ) )
-      tables          = VALUE #( ( basic = c_diag path = 'ZZXXMLA1P0000003' closure = 'ZZXXMLA1C0000003'
+      tables          = VALUE #( ( basic = c_diag path = 'ZZXXMLA1P0000003' closure = 'ZZXXMLA1R0000003'
                                    sid_table = '/BIC/SZCLDIAG' leaf_name = `s."/BIC/ZCLDIAG"` )
-                                 ( basic = c_doc path = 'ZZXXMLA1P0000002' closure = 'ZZXXMLA1C0000002'
+                                 ( basic = c_doc path = 'ZZXXMLA1P0000002' closure = 'ZZXXMLA1R0000002'
                                    sid_table = '/BIC/SZCLDOC' leaf_name = `s."/BIC/ZCLDOC"` ) ) ).
   ENDMETHOD.
 
