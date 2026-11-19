@@ -416,6 +416,22 @@ Decided with the user 2026-10-24, after an evaluation of the user's proposal: st
      filter and `MDSCHEMA_MEMBERS`), and the levels renumbered from the user's top node. `.Members` of the hierarchy
      with a node that may not be expanded is a refusal (a.), `Level.Members` the visible nodes of the level.
    - A user with an applying authorisation with a variable: every query a fault (no authorisation).
+   - A user whose profile restricts key figures (`0TCAKYFNM` authorisation-relevant and an applying authorisation
+     without a line on it or with one other than `I EQ *`): every query on the provider a fault, reason
+     `KEY_FIGURES` (`mvp-scope.md`, Authorisation decision, 2026-11-19). Built ahead of the rest of step 5, in the
+     check itself: `ZZXXMLA1_CL_BW_AUTH_SQL=>read` (and `ZZXXMLA1_CL_BW_AUTH=>read`) raise it as they raise more
+     than 63 authorisations, so `bw/check`, `bw/checks` and `ZZXXMLA1_IF_BW_AUTH_CHECK` answer `ERROR` with that
+     reason; a scenario with a `0TCAKYFNM` line (clinic generator, `ZZXXMLA1_CL_BW_AUTH_GEN`) and its rows in
+     `auth_check_test.py` and `bw_auth_compare.py` (counted as out of scope, as HVAL2 and HVAL3), unit tests on
+     made-up lines. Before writing it: check whether `0TCAKYFNM` is authorisation-relevant on the trial system,
+     and ask the user before switching it on there (it changes every user's authorisations).
+   - The same for a navigation attribute (decided 2026-11-19): a user whose profile restricts an
+     authorisation-relevant navigation attribute the provider has switched on: every query on the provider a fault,
+     reason `NAVIGATION_ATTRIBUTE`, built with the key figure refusal in the same `read`s. Before writing it: find
+     where BW keeps the flag of a navigation attribute and the provider's navigation attributes (the provider reader
+     `ZZXXMLA1_CL_BW_PROVIDER` reads the latter), and a scenario on the clinic (an attribute of `ZCLDOC` made
+     navigational and authorisation-relevant: ask the user first, it changes the demo for every user). Modelling
+     it (the value from master data at the key date, BW's rule of checking it only when used) waits for probes.
    - The Discover cache (`ZZXXMLA1_CL_DISCOVER_CACHE`) is keyed by the user too (`discover_key`), at least for the
      rowsets that show members.
 6. **End to end** (`scripts/auth_test.py`): the probe's 9999-12-31 queries in olap4abap's names (as

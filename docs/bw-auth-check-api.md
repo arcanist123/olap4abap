@@ -30,7 +30,9 @@ check for other callers; The selection as a product per characteristic). The rul
 - **Hierarchy authorisations** are read on the slice of the hierarchy valid at the key date, matched by
   hierarchy name and version, a node by name and InfoObject (never by `HIEID`).
 - **Not supported:** variables in authorisations (a user with one is not authorised), authorisation-relevant
-  navigation attributes, key figure authorisations (`0TCAKYFNM`).
+  navigation attributes and key figure authorisations (`0TCAKYFNM`). Planned: a user whose profile restricts key
+  figures or a navigation attribute of the provider gets `ERROR`, reason `KEY_FIGURES` or `NAVIGATION_ATTRIBUTE`
+  (`mvp-scope.md`, Authorisation decision).
 - **No data is read** and nothing is written, except that the first check on a characteristic with BW hierarchies
   can create olap4abap's copy tables of them (see the LUW note below).
 

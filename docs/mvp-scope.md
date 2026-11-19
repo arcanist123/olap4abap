@@ -217,7 +217,10 @@ Decisions taken by the project owner on 2026-10-02, with reasons.
     valid at the key date. The check takes the key date as a parameter: queries use 9999-12-31, the key date
     olap4abap works with (hierarchies, attributes and texts, see Key-date logic below), and the tests run it at
     several key dates, so that it agrees with BW for every slice of a time-dependent hierarchy, not only the one
-    queries see now.
+    queries see now. That queries see the slice valid to 9999-12-31, not today's, gives no number BW would not give
+    (decided with the user 2026-11-19): a user of BW's MDX can set the key date (the probe does, `RRT_SET_KEY_DATE`),
+    so BW's answer at 9999-12-31 is one the user can get from BW. A slice starting in the future (a node's subtree
+    larger than today) needs no guard.
   - **Validity 0 and 1 are supported, 2 and 3 are not** (decided with the user 2026-11-13). Validity 0 ("Name,
     Version Identical and Key Date Less Than or Equal to") is validity 1 up to the line's date; after it the line
     still authorizes its flat values but shows no node of its hierarchy, which BW then does not list (HVAL0). A user
@@ -236,6 +239,22 @@ Decisions taken by the project owner on 2026-10-02, with reasons.
     authorisations for other providers are left out before the numbering. A user with more than 63 relevant
     authorisations is not supported: every query on that provider is a fault (an `ERROR` of the ABAP API), raised
     when the profile is read.
+  - **Key figure authorisations are not supported** (decided with the user 2026-11-19): a user whose profile
+    restricts key figures on the query's provider is not supported: every query on that provider is a fault (an
+    `ERROR` of the ABAP API, reason `KEY_FIGURES`), raised when the profile is read, whatever else the user has.
+    The profile restricts key figures when `0TCAKYFNM` is authorisation-relevant (`RSDCHA-AUTHRELFL`) and an
+    applying authorisation has no line on it or a line other than `I EQ *`; a line on it while it is not
+    authorisation-relevant is ignored, as BW ignores it. So olap4abap never shows a key figure BW would withhold,
+    whether it refuses (today's check) or withholds cells (planned).
+  - **Authorisation-relevant navigation attributes are not supported** (decided with the user 2026-11-19), as key
+    figure authorisations: a user whose profile restricts a navigation attribute the query's provider has switched on
+    is not supported: every query on that provider is a fault (an `ERROR` of the ABAP API, reason
+    `NAVIGATION_ATTRIBUTE`), raised when the profile is read, whether or not the query uses the attribute. The
+    profile restricts it when the attribute is authorisation-relevant (BW's flag of the navigation attribute, its own
+    authorisation name `<characteristic>__<attribute>`) and an applying authorisation has no line on it or a line
+    other than `I EQ *`. Why not more: the attribute's value comes from master data (time-dependent at the key date),
+    not from the facts, and BW is understood to check it only when the query uses it; neither is probed yet, and a
+    check that ignored it could show what BW withholds.
 - **Identity is not olap4abap's:** the user is managed on the SICF node; olap4abap takes `sy-uname` as given and
   checks the authorisations of that user. It reads the user with BW's released `RSEC_GET_USERNAME` (the user of
   `sy-uname`, or under BW's "Execute as Other User" the user being tested, as BW's own checks do), so that a check run
